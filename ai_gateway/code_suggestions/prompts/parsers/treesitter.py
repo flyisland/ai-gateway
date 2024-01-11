@@ -14,6 +14,7 @@ from ai_gateway.code_suggestions.prompts.parsers.base import (
     BaseCodeParser,
     BaseVisitor,
     CodeContext,
+    CodeParsingError,
     Point,
 )
 from ai_gateway.code_suggestions.prompts.parsers.blocks import (
@@ -127,14 +128,18 @@ class CodeParser(BaseCodeParser):
         cls,
         content: str,
         lang_id: Optional[LanguageId] = None,
+        parse_timeout_micros: Optional[int] = 500_000,  # 0.5 seconds
     ):
-        return await asyncio.to_thread(cls._from_language_id, content, lang_id)
+        return await asyncio.to_thread(
+            cls._from_language_id, content, lang_id, parse_timeout_micros
+        )
 
     @classmethod
     def _from_language_id(
         cls,
         content: str,
         lang_id: Optional[LanguageId] = None,
+        parse_timeout_micros: Optional[int] = 500_000,  # 0.5 seconds
     ):
         if lang_id is None:
             raise ValueError(f"Unsupported language: {lang_id}")
@@ -143,8 +148,10 @@ class CodeParser(BaseCodeParser):
 
         try:
             parser = get_parser(lang_def.grammar_name)
+            parser.set_timeout_micros(parse_timeout_micros)
+
             tree = parser.parse(bytes(content, "utf8"))
-        except (AttributeError, TypeError) as ex:
-            raise ValueError(f"Unsupported code content: {str(ex)}")
+        except Exception as ex:
+            raise CodeParsingError(f"Failed to parse code content: {str(ex)}")
 
         return cls(tree, lang_id)

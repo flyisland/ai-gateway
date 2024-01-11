@@ -5,12 +5,18 @@ from tree_sitter import Node
 
 __all__ = [
     "Point",
+    "CodeParsingError",
     "CodeContext",
     "BaseVisitor",
     "BaseCodeParser",
 ]
 
+
 Point = tuple[int, int]
+
+
+class CodeParsingError(Exception):
+    pass
 
 
 class CodeContext(NamedTuple):
