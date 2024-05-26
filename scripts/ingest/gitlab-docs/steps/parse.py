@@ -1,13 +1,24 @@
-#!/usr/bin/env ruby
+#!/usr/bin/env python
 
-# frozen_string_literal: true
+import glob
+import os
 
-puts "clone dir: #{ENV['GITLAB_DOCS_CLONE_DIR']}"
+DOC_DIR = os.getenv("GITLAB_DOCS_CLONE_DIR", "")
+ROOT_URL = os.getenv("GITLAB_DOCS_WEB_ROOT_URL", "")
 
-DOC_DIR = ENV['GITLAB_DOCS_CLONE_DIR']
-ROOT_URL = ENV.fetch('GITLAB_DOCS_WEB_ROOT_URL')
-METADATA_KEYS = %w[title md5sum source source_type source_url].freeze
+print(f"clone dir: {DOC_DIR}")
 
+METADATA_KEYS = "title md5sum source source_type source_url".split()
+
+
+def parse(filenames):
+    for filename in filenames:
+        source = filename.replace(f"{DOC_DIR}/doc/", "", 1)
+
+        print(f"parsing: {{ filename: {filename}, source: {source} }}")
+
+
+"""
 require 'json'
 require_relative "base_content_parser"
 require_relative "docs_content_parser"
@@ -26,6 +37,7 @@ def parse(filenames)
   end
 end
 
+
 def export(entries)
   log_name = ENV.fetch('GITLAB_DOCS_JSONL_EXPORT_PATH')
   File.delete(log_name) if File.exist?(log_name)
@@ -37,10 +49,14 @@ def export(entries)
     end
   end
 end
+"""
 
-def execute
-  entries = parse(Dir.glob("#{DOC_DIR}/doc/**/*.md"))
-  export(entries)
-end
 
-execute
+def export(entries):
+    return []
+
+
+if __name__ == "__main__":
+    mdfiles = glob.glob(f"{DOC_DIR}/doc/**/*.md", recursive=True)
+    entries = parse(mdfiles)
+    export(entries)
