@@ -3,6 +3,7 @@
 import glob
 import os
 
+# pylint: disable=direct-environment-variable-reference
 DOC_DIR = os.getenv("GITLAB_DOCS_CLONE_DIR", "")
 ROOT_URL = os.getenv("GITLAB_DOCS_WEB_ROOT_URL", "")
 
@@ -17,7 +18,10 @@ def parse(filenames):
 
         print(f"parsing: {{ filename: {filename}, source: {source} }}")
 
+    return []
 
+
+# pylint: disable=pointless-string-statement
 """
 require 'json'
 require_relative "base_content_parser"
@@ -56,6 +60,7 @@ def export(entries):
     return []
 
 
+# pylint: disable=invalid-name
 if __name__ == "__main__":
     mdfiles = glob.glob(f"{DOC_DIR}/doc/**/*.md", recursive=True)
     entries = parse(mdfiles)
