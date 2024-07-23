@@ -1,9 +1,10 @@
 #!/usr/bin/env python
 
+import dataclasses
 import glob
+import json
 import os
 import re
-from dataclasses import dataclass
 from hashlib import sha256
 
 # pylint: disable=direct-environment-variable-reference
@@ -16,7 +17,7 @@ FRONT_RE = re.compile(r"---\n(?P<frontmatter>.*?)---\n", re.DOTALL)
 METADATA_KEYS = "title md5sum source source_type source_url".split()
 
 
-@dataclass
+@dataclasses.dataclass
 class Metadata:
     title: str = ""
     md5sum: str = ""
@@ -25,7 +26,7 @@ class Metadata:
     source_url: str = ""
 
 
-@dataclass
+@dataclasses.dataclass
 class RAGChunk:
     content: str
     metadata: Metadata
@@ -79,7 +80,7 @@ end
 
 def export(entries):
     for entry in entries:
-        print(entry)
+        print(json.dumps(dataclasses.asdict(entry)))
 
 
 # pylint: disable=invalid-name
