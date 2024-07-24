@@ -30,13 +30,16 @@ echo "***** Python parser to $JSONL_PYTHON *****"
 GITLAB_DOCS_JSONL_EXPORT_PATH="$JSONL_PYTHON" "$STEPS_DIR"/parse.py
 
 echo "------------------------------------------------------- Comparing Results -------------------------------------------------------"
-echo "Validate checksum of generated ${GITLAB_DOCS_JSONL_EXPORT_PATH}..."
+echo "***** Validate checksum of generated ${GITLAB_DOCS_JSONL_EXPORT_PATH}..."
 cp "${SCRIPT_DIR}/testdata/${TEST_FILE}" "${TEST_CLONE}/"
 cd ${TEST_CLONE}
 sha256sum -c ${TEST_FILE}
 cd -
 
-echo "Count chunked files..."
+echo "***** Count chunked files..."
 echo "ruby: $(jq .metadata.source < "${GITLAB_DOCS_JSONL_EXPORT_PATH}" | uniq | wc -l)"
 echo "python: $(jq .metadata.source < "${JSONL_PYTHON}" | uniq | wc -l)"
 diff -u3 <(jq .metadata.source < "${GITLAB_DOCS_JSONL_EXPORT_PATH}" | uniq) <(jq .metadata.source < "${JSONL_PYTHON}" | uniq)
+
+echo "***** Check titles match..."
+diff -u3 <(jq .metadata.title < "${GITLAB_DOCS_JSONL_EXPORT_PATH}" | uniq) <(jq .metadata.title < "${JSONL_PYTHON}" | uniq)
