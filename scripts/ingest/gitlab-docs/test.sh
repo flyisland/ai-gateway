@@ -39,3 +39,4 @@ cd -
 echo "Count chunked files..."
 echo "ruby: $(jq .metadata.source < "${GITLAB_DOCS_JSONL_EXPORT_PATH}" | uniq | wc -l)"
 echo "python: $(jq .metadata.source < "${JSONL_PYTHON}" | uniq | wc -l)"
+diff -u3 <(jq .metadata.source < "${GITLAB_DOCS_JSONL_EXPORT_PATH}" | uniq) <(jq .metadata.source < "${JSONL_PYTHON}" | uniq)
