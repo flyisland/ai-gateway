@@ -10,11 +10,12 @@ from hashlib import sha256
 # pylint: disable=direct-environment-variable-reference
 DOC_DIR = os.getenv("GITLAB_DOCS_CLONE_DIR", "")
 ROOT_URL = os.getenv("GITLAB_DOCS_WEB_ROOT_URL", "")
+LOG_PATH = os.getenv("GITLAB_DOCS_JSONL_EXPORT_PATH", "docs.jsonl")
 
 print(f"clone dir: {DOC_DIR}")
 
 FRONT_RE = re.compile(r"---\n(?P<frontmatter>.*?)---\n", re.DOTALL)
-METADATA_KEYS = "title md5sum source source_type source_url".split()
+TITLE_RE = re.compile(r"#+\s+(?P<title>.+)\n")
 
 
 @dataclasses.dataclass
@@ -43,6 +44,7 @@ def split_md(markdown):
 
 
 def parse(filenames):
+    """Generate RAGChunk entries"""
     for filename in filenames:
         # filename: /tmp/gitlab-docs-v17.0.1-ee/doc/user/application_security/dast/checks/798.38.md
         print(f"parsing: {filename}")
@@ -57,33 +59,25 @@ def parse(filenames):
             text = file.read()
         # TODO: should this field be renamed to .checksum ?
         metadata.md5sum = sha256(text.encode("utf-8")).hexdigest()
-        content, front = split_md(text)
+        content, _ = split_md(text)
+
+        match = TITLE_RE.match(content.lstrip())
+        if match:
+            metadata.title = match.group("title")
 
         yield metadata
 
 
-# pylint: disable=pointless-string-statement
-"""
-def export(entries)
-  log_name = ENV.fetch('GITLAB_DOCS_JSONL_EXPORT_PATH')
-  File.delete(log_name) if File.exist?(log_name)
-  File.open(log_name, 'w') do |f|
-    entries.flatten.each do |entry|
-      entry = entry.dup
-      entry[:metadata] = entry[:metadata].slice(*METADATA_KEYS)
-      f.puts JSON.dump(entry)
-    end
-  end
-end
-"""
-
-
 def export(entries):
-    for entry in entries:
-        print(json.dumps(dataclasses.asdict(entry)))
+    """Save chunks to JSONL"""
+    if os.path.exists(LOG_PATH):
+        os.remove(LOG_PATH)
+    with open(LOG_PATH, "w", encoding="utf-8") as fw:
+        for entry in entries:
+            fw.write(json.dumps(dataclasses.asdict(entry)))
+            fw.write("\n")
 
 
-# pylint: disable=invalid-name
 if __name__ == "__main__":
     mdfiles = sorted(glob.glob(f"{DOC_DIR}/doc/**/*.md", recursive=True))
     entries = parse(mdfiles)
