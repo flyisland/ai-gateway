@@ -36,6 +36,6 @@ cd ${TEST_CLONE}
 sha256sum -c ${TEST_FILE}
 cd -
 
-echo "Count entries..."
-echo "ruby: $(wc -l < "${GITLAB_DOCS_JSONL_EXPORT_PATH}")"
-echo "python: $(wc -l < "${JSONL_PYTHON}")"
+echo "Count chunked files..."
+echo "ruby: $(jq .metadata.source < "${GITLAB_DOCS_JSONL_EXPORT_PATH}" | uniq | wc -l)"
+echo "python: $(jq .metadata.source < "${JSONL_PYTHON}" | uniq | wc -l)"
