@@ -62,6 +62,6 @@ def export(entries):
 
 # pylint: disable=invalid-name
 if __name__ == "__main__":
-    mdfiles = glob.glob(f"{DOC_DIR}/doc/**/*.md", recursive=True)
+    mdfiles = sorted(glob.glob(f"{DOC_DIR}/doc/**/*.md", recursive=True))
     entries = parse(mdfiles)
     export(entries)
