@@ -65,7 +65,7 @@ def parse(filenames):
         if match:
             metadata.title = match.group("title")
 
-        yield metadata
+        yield RAGChunk("", metadata)
 
 
 def export(entries):
