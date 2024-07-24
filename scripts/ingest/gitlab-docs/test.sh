@@ -22,10 +22,20 @@ echo "------------------------------------------------------- Validating -------
 echo "------------------------------------------------------- Exporting Variables -------------------------------------------------------"
 source "${STEPS_DIR}"/export_variables.sh
 echo "------------------------------------------------------- Parsing -------------------------------------------------------"
+echo "***** Ruby parser to $GITLAB_DOCS_JSONL_EXPORT_PATH *****"
 "${STEPS_DIR}"/parse.rb
+echo
+JSONL_PYTHON="$PWD/docs-python.jsonl"
+echo "***** Python parser to $JSONL_PYTHON *****"
+GITLAB_DOCS_JSONL_EXPORT_PATH="$JSONL_PYTHON" "$STEPS_DIR"/parse.py
 
 echo "------------------------------------------------------- Comparing Results -------------------------------------------------------"
+echo "Validate checksum of generated ${GITLAB_DOCS_JSONL_EXPORT_PATH}..."
 cp "${SCRIPT_DIR}/testdata/${TEST_FILE}" "${TEST_CLONE}/"
 cd ${TEST_CLONE}
 sha256sum -c ${TEST_FILE}
 cd -
+
+echo "Count entries..."
+echo "ruby: $(wc -l < "${GITLAB_DOCS_JSONL_EXPORT_PATH}")"
+echo "python: $(wc -l < "${JSONL_PYTHON}")"
