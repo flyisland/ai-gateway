@@ -17,6 +17,9 @@ print(f"clone dir: {DOC_DIR}")
 FRONT_RE = re.compile(r"---\n(?P<frontmatter>.*?)---\n", re.DOTALL)
 TITLE_RE = re.compile(r"#+\s+(?P<title>.+)\n")
 
+MIN_CHARS_PER_EMBEDDING = 100
+MAX_CHARS_PER_EMBEDDING = 1500
+
 
 @dataclasses.dataclass
 class Metadata:
@@ -43,6 +46,19 @@ def split_md(markdown):
     return markdown[end:], match.group("frontmatter")
 
 
+def split_to_chunks(content, filename):
+    """Get chunks of content if its larger than embedding min chars"""
+    if len(content) < MIN_CHARS_PER_EMBEDDING:
+        # warn until there is an answer
+        # https://gitlab.com/gitlab-org/modelops/applied-ml/code-suggestions/ai-assist/-/issues/562
+        print(f"--- WARNING: {filename}")
+        print(
+            f"removed from dataset, filesize {len(filename)} is less that MIN_CHARS_PER_EMBEDDING ({MIN_CHARS_PER_EMBEDDING})"
+        )
+        print(content)
+        print("----------------------------------------")
+
+
 def parse(filenames):
     """Generate RAGChunk entries"""
     for filename in filenames:
@@ -64,6 +80,8 @@ def parse(filenames):
         match = TITLE_RE.match(content.lstrip())
         if match:
             metadata.title = match.group("title")
+
+        split_to_chunks(content, metadata.source)
 
         yield RAGChunk("", metadata)
 
