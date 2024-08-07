@@ -6,6 +6,7 @@ import json
 import os
 import re
 from hashlib import sha256
+from itertools import batched
 
 # pylint: disable=direct-environment-variable-reference
 DOC_DIR = os.getenv("GITLAB_DOCS_CLONE_DIR", "")
@@ -57,6 +58,12 @@ def split_to_chunks(content, filename):
         )
         print(content)
         print("----------------------------------------")
+    else:
+        chunks = batched(content, MAX_CHARS_PER_EMBEDDING)
+        for c in chunks:
+            if len(c) < MIN_CHARS_PER_EMBEDDING:
+                return
+            yield c
 
 
 def parse(filenames):
@@ -81,9 +88,8 @@ def parse(filenames):
         if match:
             metadata.title = match.group("title")
 
-        split_to_chunks(content, metadata.source)
-
-        yield RAGChunk("", metadata)
+        for chunk in split_to_chunks(content, metadata.source):
+            yield RAGChunk(chunk, metadata)
 
 
 def export(entries):
