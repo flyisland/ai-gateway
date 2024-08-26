@@ -6,7 +6,6 @@ import json
 import os
 import re
 from hashlib import sha256
-from itertools import batched
 
 # pylint: disable=direct-environment-variable-reference
 DOC_DIR = os.getenv("GITLAB_DOCS_CLONE_DIR", "")
@@ -35,6 +34,15 @@ class Metadata:
 class RAGChunk:
     content: str
     metadata: Metadata
+
+
+def batched(s, n):
+    """Yield chunks of len n from s
+
+    batched('ABCDEFG', 3) → ABC DEF G
+    """
+    for i in range(0, len(s), n):
+        yield s[i : i + n]
 
 
 def split_md(markdown):
