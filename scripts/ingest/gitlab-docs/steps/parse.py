@@ -9,10 +9,11 @@ from hashlib import sha256
 
 # pylint: disable=direct-environment-variable-reference
 DOC_DIR = os.getenv("GITLAB_DOCS_CLONE_DIR", "")
-ROOT_URL = os.getenv("GITLAB_DOCS_WEB_ROOT_URL", "")
+ROOT_URL = os.getenv("GITLAB_DOCS_WEB_ROOT_URL", "https://gitlab.com/help")
 LOG_PATH = os.getenv("GITLAB_DOCS_JSONL_EXPORT_PATH", "docs.jsonl")
 
 print(f"clone dir: {DOC_DIR}")
+print(f"root url:  {ROOT_URL}")
 
 FRONT_RE = re.compile(r"---\n(?P<frontmatter>.*?)---\n", re.DOTALL)
 TITLE_RE = re.compile(r"#+\s+(?P<title>.+)\n")
@@ -84,7 +85,7 @@ def parse(filenames):
         # source: user/application_security/dast/checks/798.38.md
         metadata.source = filename.replace(f"{DOC_DIR}/doc/", "", 1)
         # source_url: https://docs.gitlab.com/ee/user/application_security/dast/browser/checks/798.38
-        metadata.source_url = ROOT_URL + "/" + filename.replace(".md", "")
+        metadata.source_url = ROOT_URL + "/" + metadata.source.replace(".md", "")
 
         with open(filename, "r", encoding="utf-8") as file:
             text = file.read()
