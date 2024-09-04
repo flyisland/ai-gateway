@@ -58,11 +58,12 @@ def batched_lines(s, n):
     chunk = ""
     for line in s.splitlines(keepends=True):
         if len(chunk + line) > n:
-            yield chunk
+            # XXX: Ruby parser only strips one newline
+            yield chunk.removesuffix("\n")
             chunk = line
         else:
             chunk += line
-    if len(chunk) < n:
+    if len(chunk) <= n:
         yield chunk
 
 
@@ -79,7 +80,7 @@ def split_md(markdown):
 def split_to_chunks(content, filename):
     """Get chunks of content if its larger than embedding min chars"""
     if len(content) < MIN_CHARS_PER_EMBEDDING:
-        # previous Ruby code strips tails that are less than < MIN_CHARS_PER_EMBEDDING
+        # XXX: previous Ruby code strips tails that are less than < MIN_CHARS_PER_EMBEDDING
         # but it is not clear why, so...
         #
         # warn until there is an answer to
@@ -91,8 +92,8 @@ def split_to_chunks(content, filename):
             + "----------------------------------------"
         )
     else:
-        #chunks = batched(content, MAX_CHARS_PER_EMBEDDING)
-        chunks = batched_lines(content, MAX_CHARS_PER_EMBEDDING)
+        # chunks = batched(content, MAX_CHARS_PER_EMBEDDING)
+        chunks = batched_lines(content.strip(), MAX_CHARS_PER_EMBEDDING)
         for c in chunks:
             if len(c) < MIN_CHARS_PER_EMBEDDING:
                 return
@@ -109,11 +110,11 @@ def parse(filenames):
         # source: user/application_security/dast/checks/798.38.md
         metadata.source = filename.replace(f"{DOC_DIR}/doc/", "", 1)
         # source_url: https://docs.gitlab.com/ee/user/application_security/dast/browser/checks/798.38
-        metadata.source_url = ROOT_URL + "/" + metadata.source.replace(".md", "")
+        metadata.source_url = ROOT_URL + "/" + metadata.source.removesuffix(".md")
 
         with open(filename, "r", encoding="utf-8") as file:
             text = file.read()
-        # TODO: should this field be renamed to .checksum ?
+        # XXX: should this field be renamed to .checksum ?
         metadata.md5sum = sha256(text.encode("utf-8")).hexdigest()
         content, _ = split_md(text)
 
