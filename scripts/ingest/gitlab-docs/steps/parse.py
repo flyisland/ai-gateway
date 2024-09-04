@@ -53,6 +53,19 @@ def batched(s, n):
         yield s[i : i + n]
 
 
+def batched_lines(s, n):
+    """Yield chunks of lines, with chunk len no more than n"""
+    chunk = ""
+    for line in s.splitlines(keepends=True):
+        if len(chunk + line) > n:
+            yield chunk
+            chunk = line
+        else:
+            chunk += line
+    if len(chunk) < n:
+        yield chunk
+
+
 def split_md(markdown):
     """Separates front matter from markdown content and returns pair
     of strings (content, frontmatter)"""
@@ -78,7 +91,8 @@ def split_to_chunks(content, filename):
             + "----------------------------------------"
         )
     else:
-        chunks = batched(content, MAX_CHARS_PER_EMBEDDING)
+        #chunks = batched(content, MAX_CHARS_PER_EMBEDDING)
+        chunks = batched_lines(content, MAX_CHARS_PER_EMBEDDING)
         for c in chunks:
             if len(c) < MIN_CHARS_PER_EMBEDDING:
                 return
