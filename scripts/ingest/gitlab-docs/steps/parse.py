@@ -37,6 +37,13 @@ class RAGChunk:
     metadata: Metadata
 
 
+def warn(s):
+    """Print s to stderr in red"""
+    red = "\033[31m"
+    reset = "\033[0m"
+    print(f"{red}--- WARNING: {s}{reset}")
+
+
 def batched(s, n):
     """Yield chunks of len n from s
 
@@ -59,14 +66,17 @@ def split_md(markdown):
 def split_to_chunks(content, filename):
     """Get chunks of content if its larger than embedding min chars"""
     if len(content) < MIN_CHARS_PER_EMBEDDING:
-        # warn until there is an answer
+        # previous Ruby code strips tails that are less than < MIN_CHARS_PER_EMBEDDING
+        # but it is not clear why, so...
+        #
+        # warn until there is an answer to
         # https://gitlab.com/gitlab-org/modelops/applied-ml/code-suggestions/ai-assist/-/issues/562
-        print(f"--- WARNING: {filename}")
-        print(
-            f"removed from dataset, filesize {len(filename)} is less that MIN_CHARS_PER_EMBEDDING ({MIN_CHARS_PER_EMBEDDING})"
+        warn(
+            f"{filename}\n"
+            + f"removed from dataset, filesize {len(filename)} is less that MIN_CHARS_PER_EMBEDDING ({MIN_CHARS_PER_EMBEDDING})\n\n"
+            + content
+            + "----------------------------------------"
         )
-        print(content)
-        print("----------------------------------------")
     else:
         chunks = batched(content, MAX_CHARS_PER_EMBEDDING)
         for c in chunks:
