@@ -1,11 +1,11 @@
 #!/usr/bin/env python
 
 import dataclasses
-import glob
 import json
 import os
 import re
 from hashlib import sha256
+from pathlib import Path
 
 # pylint: disable=direct-environment-variable-reference
 DOC_DIR = os.getenv("GITLAB_DOCS_CLONE_DIR", "")
@@ -108,7 +108,7 @@ def parse(filenames):
 
         metadata = Metadata()
         # source: user/application_security/dast/checks/798.38.md
-        metadata.source = filename.replace(f"{DOC_DIR}/doc/", "", 1)
+        metadata.source = str(filename).replace(f"{DOC_DIR}/doc/", "", 1)
         # source_url: https://docs.gitlab.com/ee/user/application_security/dast/browser/checks/798.38
         metadata.source_url = ROOT_URL + "/" + metadata.source.removesuffix(".md")
 
@@ -137,6 +137,6 @@ def export(entries):
 
 
 if __name__ == "__main__":
-    mdfiles = sorted(glob.glob(f"{DOC_DIR}/doc/**/*.md", recursive=True))
+    mdfiles = sorted(Path(DOC_DIR).glob("doc/**/*.md"))
     entries = parse(mdfiles)
     export(entries)
