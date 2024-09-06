@@ -42,4 +42,8 @@ echo "python: $(jq .metadata.source < "${JSONL_PYTHON}" | uniq | wc -l)"
 diff -u3 <(jq .metadata.source < "${GITLAB_DOCS_JSONL_EXPORT_PATH}" | uniq) <(jq .metadata.source < "${JSONL_PYTHON}" | uniq)
 
 echo "***** Check titles match..."
-diff -u3 <(jq .metadata.title < "${GITLAB_DOCS_JSONL_EXPORT_PATH}" | uniq) <(jq .metadata.title < "${JSONL_PYTHON}" | uniq)
+# reformat JSONL for readability and diffing
+jq . < "${GITLAB_DOCS_JSONL_EXPORT_PATH}" > /tmp/ruby.jsonl
+jq . < "${JSONL_PYTHON}" > /tmp/python.jsonl
+
+"${SCRIPT_DIR}"/test_titles.sh
