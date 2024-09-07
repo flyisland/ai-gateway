@@ -77,4 +77,5 @@ ingest:dry-run:
     # can only pack files inside $CI_PROJECT_DIR
     # https://docs.gitlab.com/ee/ci/yaml/index.html#artifactspaths
     paths:
-    - $GITLAB_DOCS_JSONL_EXPORT_PATH
+      - $GITLAB_DOCS_JSONL_EXPORT_PATH
+    when: always
