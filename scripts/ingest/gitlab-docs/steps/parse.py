@@ -100,16 +100,8 @@ def split_to_chunks(content, filename):
 
 
 def parse_title(content):
-    comment_re = re.compile(r"\s*<!--.+?-->\s*", re.DOTALL)
-    warning_re = re.compile(r"\s*WARNING:.+?\n\n", re.DOTALL)
-    title_re = re.compile(r"\s*#+\s+(?P<title>.+?)\n", re.DOTALL)
-    match = comment_re.match(content)
-    if match:
-        content = content[match.end() :]
-    match = warning_re.match(content)
-    if match:
-        content = content[match.end() :]
-    match = title_re.match(content)
+    title_re = re.compile(r"^#+\s+(?P<title>.+?)\n", re.MULTILINE)
+    match = title_re.search(content)
     if match:
         return match.group("title")
     return None
