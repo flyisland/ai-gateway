@@ -16,7 +16,7 @@ print(f"clone dir: {DOC_DIR}")
 print(f"root url:  {ROOT_URL}")
 
 FRONT_RE = re.compile(r"---\n(?P<frontmatter>.*?)---\n", re.DOTALL)
-TITLE_RE = re.compile(r"#+\s+(?P<title>.+)\n")
+TITLE_RE = re.compile(r"(\s*<!--.+?-->\s*)?#+\s+(?P<title>.+?)\n", re.DOTALL)
 
 MIN_CHARS_PER_EMBEDDING = 100
 MAX_CHARS_PER_EMBEDDING = 1500
