@@ -16,7 +16,6 @@ print(f"clone dir: {DOC_DIR}")
 print(f"root url:  {ROOT_URL}")
 
 FRONT_RE = re.compile(r"---\n(?P<frontmatter>.*?)---\n", re.DOTALL)
-TITLE_RE = re.compile(r"(\s*<!--.+?-->\s*)?#+\s+(?P<title>.+?)\n", re.DOTALL)
 
 MIN_CHARS_PER_EMBEDDING = 100
 MAX_CHARS_PER_EMBEDDING = 1500
@@ -100,6 +99,22 @@ def split_to_chunks(content, filename):
             yield c
 
 
+def parse_title(content):
+    comment_re = re.compile(r"\s*<!--.+?-->\s*", re.DOTALL)
+    warning_re = re.compile(r"\s*WARNING:.+?\n\n", re.DOTALL)
+    title_re = re.compile(r"\s*#+\s+(?P<title>.+?)\n", re.DOTALL)
+    match = comment_re.match(content)
+    if match:
+        content = content[match.end() :]
+    match = warning_re.match(content)
+    if match:
+        content = content[match.end() :]
+    match = title_re.match(content)
+    if match:
+        return match.group("title")
+    return None
+
+
 def parse(filenames):
     """Generate RAGChunk entries"""
     for filename in filenames:
@@ -118,9 +133,7 @@ def parse(filenames):
         metadata.md5sum = sha256(text.encode("utf-8")).hexdigest()
         content, _ = split_md(text)
 
-        match = TITLE_RE.match(content.lstrip())
-        if match:
-            metadata.title = match.group("title")
+        metadata.title = parse_title(content)
 
         for chunk in split_to_chunks(content, metadata.source):
             yield RAGChunk(chunk, metadata)
