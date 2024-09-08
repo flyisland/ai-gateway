@@ -124,6 +124,7 @@ def parse(filenames):
         # XXX: should this field be renamed to .checksum ?
         metadata.md5sum = sha256(text.encode("utf-8")).hexdigest()
         content, _ = split_md(text)
+        content = content.strip()
 
         metadata.title = parse_title(content)
 
