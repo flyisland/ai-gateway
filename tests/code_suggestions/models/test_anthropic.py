@@ -680,7 +680,11 @@ class TestAnthropicChatModel:
                 "model": model_name_version,
                 "system": (
                     [
-                        message.content
+                        {
+                            "text": message.content,
+                            "type": "text",
+                            "cache_control": {"type": "ephemeral"},
+                        }
                         for message in messages
                         if message.role == Role.SYSTEM
                     ]
@@ -865,7 +869,11 @@ class TestAnthropicChatModel:
             **AnthropicChatModel.OPTS_MODEL,
             **{
                 "model": model_name_version,
-                "system": "nice human",
+                "system": {
+                    "text": "nice human",
+                    "type": "text",
+                    "cache_control": {"type": "ephemeral"},
+                },
                 "messages": [{"role": Role.USER, "content": "write code"}],
                 "stream": True,
             },
