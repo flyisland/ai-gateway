@@ -1,9 +1,10 @@
 import json
-from typing import Literal, Optional, TypeVar, Union
+from typing import Literal, Optional, TypeVar
 
 from pydantic import BaseModel
 
 from ai_gateway.models.base_chat import Role
+from ai_gateway.chat.context.current_page import PageContext
 
 __all__ = [
     "AgentToolAction",
@@ -14,12 +15,9 @@ __all__ = [
     "TypeAgentEvent",
     "AgentStep",
     "TypeAgentInputs",
-    "Context",
     "CurrentFile",
     "AdditionalContext",
     "Message",
-    "IssueContext",
-    "MergeRequestContext"
 ]
 
 
@@ -65,34 +63,6 @@ class AgentStep(BaseModel):
     observation: str
 
 
-class Context(BaseModel, frozen=True):  # type: ignore[call-arg]
-    type: Literal["issue", "epic", "merge_request", "commit", "build"]
-    content: str
-
-
-class IssueContext(BaseModel):
-    type: Literal["issue"]
-    title: str
-
-
-class EpicContext(Context):
-    type: Literal["epic"] = "epic"
-
-
-class MergeRequestContext(BaseModel):
-    type: Literal["merge_request"]
-    title: str
-    enhanced_context: bool = False
-
-
-class CommitContext(Context):
-    type: Literal["commit"] = "commit"
-
-
-class BuildContext(Context):
-    type: Literal["build"] = "build"
-
-
 class CurrentFile(BaseModel):
     file_path: str
     data: str
@@ -108,8 +78,6 @@ class AdditionalContext(BaseModel):
     content: Optional[str] = None
     metadata: Optional[dict] = None
 
-
-PageContext = Union[Context, IssueContext, MergeRequestContext]
 
 class Message(BaseModel):
     role: Role
