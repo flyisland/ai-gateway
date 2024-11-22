@@ -1,12 +1,8 @@
 from typing import Literal, Union
+
 from pydantic import BaseModel
 
-__all__ = [
-    "Context",
-    "IssueContext",
-    "MergeRequestContext",
-    "PageContext"
-]
+__all__ = ["Context", "IssueContext", "MergeRequestContext", "PageContext"]
 
 
 class Context(BaseModel, frozen=True):  # type: ignore[call-arg]

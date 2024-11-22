@@ -3,8 +3,8 @@ from typing import Literal, Optional, TypeVar
 
 from pydantic import BaseModel
 
-from ai_gateway.models.base_chat import Role
 from ai_gateway.chat.context.current_page import PageContext
+from ai_gateway.models.base_chat import Role
 
 __all__ = [
     "AgentToolAction",
