@@ -17,12 +17,12 @@ from ai_gateway.chat.agents import (
     AgentBaseEvent,
     AgentStep,
     AgentToolAction,
-    Context,
     CurrentFile,
     Message,
     ReActAgentInputs,
 )
 from ai_gateway.chat.agents.typing import AgentFinalAnswer, TypeAgentEvent
+from ai_gateway.chat.context.current_page import Context, MergeRequestContext
 from ai_gateway.config import Config
 from ai_gateway.models.base_chat import Role
 from ai_gateway.prompts.typing import Model, ModelMetadata
@@ -153,6 +153,25 @@ class TestReActAgentStream:
                     ),
                     unavailable_resources=["Mystery Resource 1", "Mystery Resource 2"],
                     conciseness_prompt_change_active=False,
+                ),
+                "thought\nFinal Answer: answer\n",
+                [AgentFinalAnswer(text=c) for c in "answer"],
+            ),
+            (
+                AgentRequest(
+                    messages=[
+                        Message(
+                            role=Role.USER,
+                            content="What this MR changing?",
+                            context=MergeRequestContext(type="merge_request", title="Fixing database"),
+                        ),
+                    ],
+                    options=AgentRequestOptions(
+                        agent_scratchpad=ReActAgentScratchpad(
+                            agent_type="react",
+                            steps=[],
+                        ),
+                    ),
                 ),
                 "thought\nFinal Answer: answer\n",
                 [AgentFinalAnswer(text=c) for c in "answer"],

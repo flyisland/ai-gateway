@@ -15,22 +15,10 @@ class IssueContext(BaseModel):
     title: str
 
 
-class EpicContext(Context):
-    type: Literal["epic"] = "epic"
-
-
 class MergeRequestContext(BaseModel):
     type: Literal["merge_request"]
     title: str
     enhanced_context: bool = False
-
-
-class CommitContext(Context):
-    type: Literal["commit"] = "commit"
-
-
-class BuildContext(Context):
-    type: Literal["build"] = "build"
 
 
 PageContext = Union[Context, IssueContext, MergeRequestContext]
