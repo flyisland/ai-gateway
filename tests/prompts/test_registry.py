@@ -14,9 +14,11 @@ from langchain_core.runnables import RunnableBinding, RunnableSequence
 from pydantic import BaseModel, HttpUrl
 from pyfakefs.fake_filesystem import FakeFilesystem
 
+from ai_gateway.integrations.amazon_q.chat import ChatAmazonQ
 from ai_gateway.api.auth_utils import StarletteUser
 from ai_gateway.prompts import LocalPromptRegistry, Prompt, PromptRegistered
 from ai_gateway.prompts.config import (
+    ChatAmazonQParams,
     ChatAnthropicParams,
     ChatLiteLLMParams,
     ModelClassProvider,
@@ -131,6 +133,32 @@ params:
     - Bar
 """,
     )
+    fs.create_file(
+        prompts_definitions_dir / "chat" / "react" / "amazon_q.yml",
+        contents="""
+---
+name: Amazon Q React prompt
+model:
+  name: amazon_q
+  params:
+    model_class_provider: amazon_q
+    temperature: 0.1
+    top_p: 0.8
+    top_k: 40
+    max_tokens: 256
+    max_retries: 6
+unit_primitives:
+  - agent_quick_actions
+prompt_template:
+  system: Template1
+  user: Template2
+params:
+  timeout: 60
+  stop:
+    - Foo
+    - Bar
+""",
+    )
     yield fs
 
 
@@ -138,6 +166,7 @@ params:
 def model_factories():
     yield {
         ModelClassProvider.ANTHROPIC: lambda model, **kwargs: ChatAnthropic(model=model, **kwargs),  # type: ignore[call-arg]
+        ModelClassProvider.AMAZON_Q: lambda model, **kwargs: ChatAmazonQ(model=model, **kwargs),  # type: ignore[call-arg]
         ModelClassProvider.LITE_LLM: lambda model, **kwargs: ChatLiteLLM(
             model=model, **kwargs
         ),
@@ -235,6 +264,29 @@ def prompts_registered():
                     },
                 ),
             },
+        ),
+        "chat/react/amazon_q": PromptRegistered(
+            klass=MockPromptClass,
+            config=PromptConfig(
+                name="Amazon Q React prompt",
+                model=ModelConfig(
+                    name="amazon_q",
+                    params=ChatAmazonQParams(
+                        model_class_provider=ModelClassProvider.AMAZON_Q,
+                        temperature=0.1,
+                        top_p=0.8,
+                        top_k=40,
+                        max_tokens=256,
+                        max_retries=6,
+                    ),
+                ),
+                unit_primitives=["agent_quick_actions"],
+                prompt_template={"system": "Template1", "user": "Template2"},
+                params={
+                    "timeout": 60,
+                    "stop": ["Foo", "Bar"],
+                },
+            ),
         ),
     }
 
@@ -480,6 +532,7 @@ class TestLocalPromptRegistry:
     @pytest.mark.parametrize(
         (
             "prompt_id",
+            "model_metadata",
             "expected_name",
             "expected_class",
             "expected_model",
@@ -491,21 +544,23 @@ class TestLocalPromptRegistry:
         [
             (
                 "code_suggestions/generations",
+                None,
                 "Claude 3 Code Generations Agent",
                 Prompt,
                 "claude-3-5-sonnet@20240620",
                 "2.0.0",
                 ChatLiteLLM,
                 {"stop": ["</new_code>"], "vertex_location": "us-east5"},
-                {"code_suggestions/generations": "base"},
+                {"code_suggestions/generations": "vertex"},
             ),
             (
                 "code_suggestions/generations",
-                "Claude 3 Code Generations Agent",
+                None,
+                "Amazon Q Code Generations Agent",
                 Prompt,
-                "claude-3-5-sonnet-20241022",
-                "^1.0.0",
-                ChatAnthropic,
+                "amazon_q",
+                "1.0.0",
+                ChatAmazonQ,
                 {"stop": ["</new_code>"]},
                 {},
             ),
@@ -516,6 +571,7 @@ class TestLocalPromptRegistry:
         model_factories: dict[ModelClassProvider, TypeModelFactory],
         internal_event_client: Mock,
         prompt_id: str,
+        model_metadata: ModelMetadata | None,
         expected_name: str,
         expected_prompt_version: str,
         expected_class: Type[Prompt],

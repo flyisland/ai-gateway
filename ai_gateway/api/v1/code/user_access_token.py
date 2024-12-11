@@ -46,7 +46,7 @@ async def user_access_token(
     internal_event_client: InternalEventsClient = Depends(get_internal_event_client),
 ):
     if not current_user.can(
-        GitLabUnitPrimitive.COMPLETE_CODE,
+        GitLabUnitPrimitive.AGENT_QUICK_ACTIONS,
         disallowed_issuers=[CloudConnectorConfig().service_name],
     ):
         raise HTTPException(
@@ -83,7 +83,7 @@ async def user_access_token(
             x_gitlab_realm,
             current_user,
             x_gitlab_instance_id,
-            scopes=[GitLabUnitPrimitive.COMPLETE_CODE],
+            scopes=[GitLabUnitPrimitive.AGENT_QUICK_ACTIONS],
         )
     except Exception:
         raise HTTPException(status_code=500, detail="Failed to generate JWT")

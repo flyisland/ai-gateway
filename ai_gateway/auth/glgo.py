@@ -1,6 +1,7 @@
 import base64
 import hashlib
 import json
+import os
 import uuid
 from datetime import datetime, timedelta, timezone
 from typing import Optional
@@ -22,11 +23,22 @@ class GlgoAuthority:
         glgo_base_url: str,
     ):
         self.signing_key = signing_key
-        self.kid = self._build_kid(signing_key)
-        self.token_endpoint = f"{glgo_base_url}/cc/token"
+        # self.kid = self._build_kid(signing_key)
+        # self.token_endpoint = f"{glgo_base_url}/cc/token"
+        if self._is_cc_endpoint_enabled():
+            self.kid = self._build_kid(signing_key)
+            self.token_endpoint = f"{glgo_base_url}/cc/token"
+        else:
+            self.kid = None
+            self.token_endpoint = f"{glgo_base_url}/aws/token"
+
 
     def token(self, user_id: str, cloud_connector_token: Optional[str]):
-        token = self._build_token(user_id, cloud_connector_token)
+        # token = self._build_token(user_id, cloud_connector_token)
+        if self._is_cc_endpoint_enabled():
+            token = self._build_token(user_id, cloud_connector_token)
+        else:
+            token = cloud_connector_token
 
         headers = {
             "Authorization": f"Bearer {token}",
@@ -45,6 +57,11 @@ class GlgoAuthority:
 
         return response.json().get("token")
 
+    # pylint: disable=direct-environment-variable-reference
+    def _is_cc_endpoint_enabled(self):
+        return os.environ.get("CC_ENDPOINT_ENABLED", "False") == "True"
+
+    # pylint: enable=direct-environment-variable-reference
     def _build_token(self, user_id: str, cloud_connector_token: Optional[str]):
         now = datetime.now(timezone.utc)
         payload = {

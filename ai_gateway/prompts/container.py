@@ -25,6 +25,7 @@ class ContainerPrompts(containers.DeclarativeContainer):
                 models.anthropic_claude_chat_fn
             ),
             ModelClassProvider.LITE_LLM: providers.Factory(models.lite_llm_chat_fn),
+            ModelClassProvider.AMAZON_Q: providers.Factory(models.amazon_q_chat_fn),
         },
         default_prompts=config.default_prompts,
         internal_event_client=internal_event.client,
