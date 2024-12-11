@@ -14,7 +14,7 @@ Model: TypeAlias = RunnableBinding | BaseChatModel
 class ModelMetadata(BaseModel):
     name: Annotated[str, StringConstraints(max_length=255)]
     provider: Annotated[str, StringConstraints(max_length=255)]
-    endpoint: Annotated[AnyUrl, UrlConstraints(max_length=255)]
+    endpoint: Optional[Annotated[AnyUrl, UrlConstraints(max_length=255)]] = None
     api_key: Optional[Annotated[str, StringConstraints(max_length=255)]] = None
     identifier: Optional[Annotated[str, StringConstraints(max_length=255)]] = None
 

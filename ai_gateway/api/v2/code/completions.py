@@ -377,7 +377,22 @@ def _build_code_generations(
         category=__name__,
     )
 
-    if payload.model_provider == KindModelProvider.ANTHROPIC:
+    if True:  # pylint: disable=using-constant-test
+        model_metadata = ModelMetadata(
+            name="amazon_q",
+            provider="amazon_q",
+        )
+
+        code_completions = _resolve_agent_code_completions(
+            model_metadata=model_metadata,
+            current_user=current_user,
+            prompt_registry=prompt_registry,
+            completions_agent_factory=completions_agent_factory,
+        )
+
+        if payload.context:
+            kwargs.update({"code_context": [ctx.content for ctx in payload.context]})
+    elif payload.model_provider == KindModelProvider.ANTHROPIC:
         if payload.prompt_version == 3:
             return _resolve_code_generations_anthropic_chat(
                 payload,
@@ -496,7 +511,7 @@ def _build_code_completions(
 
     # Providers that are handled via the prompt registry perform their own UP check and event tracking. If we reach
     # this point is because we're using some other legacy provider, and we need to perform these steps now
-    if not current_user.can(GitLabUnitPrimitive.COMPLETE_CODE):
+    if not current_user.can(GitLabUnitPrimitive.AGENT_QUICK_ACTIONS):
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Unauthorized to access code completions",

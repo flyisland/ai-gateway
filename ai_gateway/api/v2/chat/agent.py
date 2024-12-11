@@ -62,7 +62,7 @@ def authorize_agent_request(
     agent_request: AgentRequest,
     internal_event_client: InternalEventsClient,
 ):
-    if current_user.can(GitLabUnitPrimitive.DUO_CHAT):
+    if current_user.can(GitLabUnitPrimitive.AGENT_QUICK_ACTIONS):
         internal_event_client.track_event(
             f"request_{GitLabUnitPrimitive.DUO_CHAT}",
             category=__name__,

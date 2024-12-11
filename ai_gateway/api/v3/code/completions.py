@@ -99,6 +99,15 @@ async def code_suggestions(
     config: Config,
     stream_handler: StreamHandler = handle_stream,
 ):
+    if not current_user.can(
+        GitLabUnitPrimitive.AGENT_QUICK_ACTIONS,
+        disallowed_issuers=[CloudConnectorConfig().service_name],
+    ):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Unauthorized to access code suggestions",
+        )
+
     language_server_version = LanguageServerVersion.from_string(
         request.headers.get(X_GITLAB_LANGUAGE_SERVER_VERSION, None)
     )

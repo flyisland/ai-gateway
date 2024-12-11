@@ -37,7 +37,7 @@ def fast_api_router():
 def auth_user():
     return CloudConnectorUser(
         authenticated=True,
-        claims=UserClaims(scopes=["duo_chat"]),
+        claims=UserClaims(scopes=["duo_chat", "agent_quick_actions"]),
     )
 
 
@@ -322,7 +322,8 @@ class TestReActAgentStream:
         [
             (
                 CloudConnectorUser(
-                    authenticated=True, claims=UserClaims(scopes=["duo_chat"])
+                    authenticated=True,
+                    claims=UserClaims(scopes=["duo_chat", "agent_quick_actions"]),
                 ),
                 AgentRequest(messages=[Message(role=Role.USER, content="Hi")]),
                 200,
@@ -341,7 +342,13 @@ class TestReActAgentStream:
             (
                 CloudConnectorUser(
                     authenticated=True,
-                    claims=UserClaims(scopes=["duo_chat", "include_file_context"]),
+                    claims=UserClaims(
+                        scopes=[
+                            "duo_chat",
+                            "include_file_context",
+                            "agent_quick_actions",
+                        ]
+                    ),
                 ),
                 AgentRequest(
                     messages=[
@@ -363,7 +370,8 @@ class TestReActAgentStream:
             ),
             (
                 CloudConnectorUser(
-                    authenticated=True, claims=UserClaims(scopes=["duo_chat"])
+                    authenticated=True,
+                    claims=UserClaims(scopes=["duo_chat", "agent_quick_actions"]),
                 ),
                 AgentRequest(
                     messages=[
@@ -380,7 +388,8 @@ class TestReActAgentStream:
             ),
             (
                 CloudConnectorUser(
-                    authenticated=True, claims=UserClaims(scopes=["duo_chat"])
+                    authenticated=True,
+                    claims=UserClaims(scopes=["duo_chat", "agent_quick_actions"]),
                 ),
                 AgentRequest(
                     messages=[
@@ -397,7 +406,8 @@ class TestReActAgentStream:
             ),
             (
                 CloudConnectorUser(
-                    authenticated=True, claims=UserClaims(scopes=["duo_chat"])
+                    authenticated=True,
+                    claims=UserClaims(scopes=["duo_chat", "agent_quick_actions"]),
                 ),
                 AgentRequest(
                     messages=[
