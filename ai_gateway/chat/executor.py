@@ -73,15 +73,6 @@ class GLAgentRemoteExecutor(Generic[TypeAgentInputs, TypeAgentEvent]):
 
         tools_by_name = self.tools_by_name
 
-        for message in inputs.messages:
-            if (
-                (context := message.context)
-                and (type := context.type)
-                and (type == "merge_request")
-                and ("merge_request_reader" in tools_by_name)
-            ):
-                message.context.enhanced_context = True
-
         starlette_context.context[_REACT_AGENT_AVAILABLE_TOOL_NAMES_CONTEXT_KEY] = list(
             tools_by_name.keys()
         )
