@@ -10,15 +10,25 @@ class Context(BaseModel, frozen=True):  # type: ignore[call-arg]
     content: str
 
 
+class CiBuildContext(BaseModel):
+    type: Literal["build"]
+
+
+class CommitContext(BaseModel):
+    type: Literal["commit"]
+    title: str
+
+class EpicContext(BaseModel):
+    type: Literal["epic"]
+    title: str
+
 class IssueContext(BaseModel):
     type: Literal["issue"]
     title: str
 
-
 class MergeRequestContext(BaseModel):
     type: Literal["merge_request"]
     title: str
-    enhanced_context: bool = False
 
 
-PageContext = Union[Context, IssueContext, MergeRequestContext]
+PageContext = Union[Context, CiBuildContext, CommitContext, EpicContext, IssueContext, MergeRequestContext]

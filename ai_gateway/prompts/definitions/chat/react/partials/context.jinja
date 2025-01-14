@@ -6,5 +6,6 @@
 </context>
     {%- else  %}
         {%- set context_path = "chat/react/partials/context/" + context.type + ".jinja" %}
+        {%- include context_path %}
     {%- endif  %}
 {%- endif %}
