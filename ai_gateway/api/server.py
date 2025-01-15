@@ -14,6 +14,7 @@ from gitlab_cloud_connector import (
     LocalAuthProvider,
 )
 from prometheus_fastapi_instrumentator import Instrumentator, metrics
+from starlette import status
 from starlette.exceptions import HTTPException as StarletteHTTPException
 from starlette.middleware import Middleware
 from starlette.requests import Request
@@ -156,9 +157,15 @@ async def model_api_exception_handler(request: Request, exc: ModelAPIError):
 async def validation_exception_handler(request: Request, exc: RequestValidationError):
     if is_feature_enabled(FeatureFlag.EXPANDED_AI_LOGGING):
         context["exception_message"] = str(exc)
-        return JSONResponse(status_code=422, content={"detail": exc.errors()})
+        return JSONResponse(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            content={"detail": exc.errors()},
+        )
 
-    return JSONResponse(status_code=422, content={"detail": "Validation error"})
+    return JSONResponse(
+        status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+        content={"detail": "Validation error"},
+    )
 
 
 def setup_custom_exception_handlers(app: FastAPI):
