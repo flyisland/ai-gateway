@@ -163,7 +163,9 @@ class TestReActAgentStream:
                         Message(
                             role=Role.USER,
                             content="What this MR changing?",
-                            context=MergeRequestContext(type="merge_request", title="Fixing database"),
+                            context=MergeRequestContext(
+                                type="merge_request", title="Fixing database"
+                            ),
                         ),
                     ],
                     options=AgentRequestOptions(

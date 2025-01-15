@@ -34,4 +34,11 @@ class MergeRequestContext(BaseModel):
     title: str
 
 
-PageContext = Union[Context, CiBuildContext, CommitContext, EpicContext, IssueContext, MergeRequestContext]
+PageContext = Union[
+    Context,
+    CiBuildContext,
+    CommitContext,
+    EpicContext,
+    IssueContext,
+    MergeRequestContext,
+]
