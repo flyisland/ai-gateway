@@ -102,11 +102,12 @@ class TestPostProcessorCompletions:
 
         mock_remove_comment_only_completion.assert_called_once()
         mock_trim_by_min_allowed_context.assert_called_once()
+
         mock_fix_end_block_errors.assert_called_once()
+        mock_fix_end_block_errors_legacy.assert_not_called()
+
         mock_clean_model_reflection.assert_called_once()
         mock_strip_whitespaces.assert_called_once()
-
-        mock_fix_end_block_errors_legacy.assert_not_called()
 
     @pytest.mark.asyncio
     async def test_process_with_custom_operations(
@@ -169,8 +170,9 @@ class TestPostProcessorCompletions:
 
         mock_remove_comment_only_completion.assert_called_once()
         mock_trim_by_min_allowed_context.assert_called_once()
-        mock_fix_end_block_errors.assert_called_once()
-        mock_clean_model_reflection.assert_called_once()
 
-        mock_strip_whitespaces.assert_not_called()
+        mock_fix_end_block_errors.assert_called_once()
         mock_fix_end_block_errors_legacy.assert_not_called()
+
+        mock_clean_model_reflection.assert_called_once()
+        mock_strip_whitespaces.assert_not_called()
