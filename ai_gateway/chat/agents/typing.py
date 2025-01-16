@@ -3,7 +3,7 @@ from typing import Literal, Optional, TypeVar
 
 from pydantic import BaseModel
 
-from ai_gateway.chat.context.current_page import PageContext
+from ai_gateway.chat.context.current_page import CurrentPageContext
 from ai_gateway.models.base_chat import Role
 
 __all__ = [
@@ -82,7 +82,7 @@ class AdditionalContext(BaseModel):
 class Message(BaseModel):
     role: Role
     content: str
-    context: Optional[PageContext] = None
+    context: Optional[CurrentPageContext] = None
     current_file: Optional[CurrentFile] = None
     additional_context: Optional[list[AdditionalContext]] = None
     resource_content: Optional[str] = None
