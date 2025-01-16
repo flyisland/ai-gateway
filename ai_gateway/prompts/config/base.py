@@ -3,7 +3,7 @@ from pydantic import BaseModel, ConfigDict
 
 from ai_gateway.prompts.config.models import TypeModelParams
 
-__all__ = ["PromptConfig", "ModelConfig"]
+__all__ = ["PromptConfig", "ModelConfig", "ModelDefinition"]
 
 
 class ModelConfig(BaseModel):
@@ -23,6 +23,10 @@ class PromptParams(BaseModel):
     timeout: float | None = None
     vertex_location: str | None = None
 
+class ModelDefinition(BaseModel):
+    name: str
+    description: str
+    providers: dict[str, ModelConfig]
 
 class PromptConfig(BaseModel):
     model_config = ConfigDict(extra="forbid")

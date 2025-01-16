@@ -31,6 +31,7 @@ class LocalPromptRegistry(BasePromptRegistry):
         internal_event_client: InternalEventsClient,
         custom_models_enabled: bool,
         disable_streaming: bool = False,
+        model_definitions: dict = None,
     ):
         self.prompts_registered = prompts_registered
         self.model_factories = model_factories
@@ -38,6 +39,7 @@ class LocalPromptRegistry(BasePromptRegistry):
         self.internal_event_client = internal_event_client
         self.custom_models_enabled = custom_models_enabled
         self.disable_streaming = disable_streaming
+        self.model_definitions = model_definitions
 
     def _resolve_id(
         self,
@@ -78,6 +80,19 @@ class LocalPromptRegistry(BasePromptRegistry):
         prompt_id = self._resolve_id(prompt_id, model_metadata)
         prompt_registered = self.prompts_registered[prompt_id]
         config = self._get_prompt_config(prompt_registered.versions, prompt_version)
+
+        model_definition = self.model_definitions[config.model]
+        if not model_definition:
+            raise ValueError(
+                f"Model definition '{config.model}' not found"
+            )
+
+        model_config = model_definition.providers.get(model_metadata.provider if model_metadata else 'base')
+        if not model_config:
+            raise ValueError(
+                f"No provider '{model_metadata.provider if model_metadata else 'base'}' found for model definition '{config.model}'"
+            )
+
         model_class_provider = config.model.params.model_class_provider
         model_factory = self.model_factories.get(model_class_provider, None)
 

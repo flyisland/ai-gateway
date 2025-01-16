@@ -1,0 +1,12 @@
+name: conversation-performant
+description: A performant model for conversational use cases/
+providers:
+  anthropic:
+    name: claude-3-5-sonnet-20241022
+    params:
+      model_class_provider: anthropic
+  vertex:
+    name: claude-3-5-sonnet-v2@20241022
+    params:
+      model_class_provider: litellm
+      custom_llm_provider: vertex_ai

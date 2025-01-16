@@ -4,6 +4,9 @@ from typing import Annotated, Optional, Set
 from dotenv import find_dotenv
 from pydantic import BaseModel, Field, RootModel
 from pydantic_settings import BaseSettings, SettingsConfigDict
+from pathlib import Path
+
+from ai_gateway.prompts.config.base import ModelDefinition
 
 __all__ = [
     "Config",
@@ -255,9 +258,11 @@ class Config(BaseSettings):
     feature_flags: Annotated[
         ConfigFeatureFlags, Field(default_factory=ConfigFeatureFlags)
     ] = ConfigFeatureFlags()
+    model_definitions: dict[str, ModelDefinition] = {}
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
+        self.load_model_definitions()
 
         self._apply_global_configs(
             parent=self.google_cloud_platform,
@@ -267,6 +272,17 @@ class Config(BaseSettings):
         self.model_endpoints.update_fireworks_current_region_endpoint(
             self.google_cloud_platform.location
         )
+
+    def load_model_definitions(self):
+        definitions_dir = Path(__file__).parent / ".." / "prompts" / "model_definitions"
+
+        for path in definitions_dir.glob("*.yml"):
+            with open(path,"r") as fp:
+                try:
+                    model_def = ModelDefinition(**yaml.safe_load(fp))
+                    self.model_definitions[model_def.name] = model_def
+                except Exception as e:
+                    raise ValueError(f"Failed to load model definition from {path}: {e}")
 
     def _apply_global_configs(self, parent: BaseModel, children: list[BaseModel]):
         """Set a parent config to child configs if the field value is not specified"""
