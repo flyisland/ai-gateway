@@ -377,22 +377,7 @@ def _build_code_generations(
         category=__name__,
     )
 
-    if True:  # pylint: disable=using-constant-test
-        model_metadata = ModelMetadata(
-            name="amazon_q",
-            provider="amazon_q",
-        )
-
-        code_completions = _resolve_agent_code_completions(
-            model_metadata=model_metadata,
-            current_user=current_user,
-            prompt_registry=prompt_registry,
-            completions_agent_factory=completions_agent_factory,
-        )
-
-        if payload.context:
-            kwargs.update({"code_context": [ctx.content for ctx in payload.context]})
-    elif payload.model_provider == KindModelProvider.ANTHROPIC:
+    if payload.model_provider == KindModelProvider.ANTHROPIC:
         if payload.prompt_version == 3:
             return _resolve_code_generations_anthropic_chat(
                 payload,
@@ -459,7 +444,23 @@ def _build_code_completions(
 ) -> tuple[CodeCompletions | CodeCompletionsLegacy, dict]:
     kwargs = {}
 
-    if payload.model_provider == KindModelProvider.ANTHROPIC:
+
+    if True:  # pylint: disable=using-constant-test
+        model_metadata = ModelMetadata(
+            name="amazon_q",
+            provider="amazon_q",
+        )
+
+        code_completions = _resolve_agent_code_completions(
+            model_metadata=model_metadata,
+            current_user=current_user,
+            prompt_registry=prompt_registry,
+            completions_agent_factory=completions_agent_factory,
+        )
+
+        if payload.context:
+            kwargs.update({"code_context": [ctx.content for ctx in payload.context]})
+    elif payload.model_provider == KindModelProvider.ANTHROPIC:
         code_completions = completions_anthropic_factory(
             model__name=payload.model_name,
         )
