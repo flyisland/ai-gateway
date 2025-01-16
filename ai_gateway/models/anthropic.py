@@ -337,12 +337,7 @@ def _build_model_messages(messages: list[Message]) -> dict:
 
     for message in messages:
         if message.role == Role.SYSTEM:
-            system_message = {
-                "text": message.content,
-                "type": "text",
-                "cache_control": {"type": "ephemeral"},
-            }
-            request["system"] = system_message
+            request["system"] = message.content
         else:
             request["messages"].append(message.dict())
 
