@@ -119,6 +119,7 @@ class TestGLAgentRemoteExecutor:
                 assert set(context.get("duo_chat.agent_available_tools")) == {
                     "build_reader",
                     "gitlab_documentation",
+                    "commit_reader",
                     "epic_reader",
                     "issue_reader",
                     "merge_request_reader",

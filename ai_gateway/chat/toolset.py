@@ -10,7 +10,6 @@ from ai_gateway.chat.tools.gitlab import (
     MergeRequestReader,
     SelfHostedGitlabDocumentation,
 )
-from ai_gateway.feature_flags import FeatureFlag, is_feature_enabled
 
 __all__ = ["DuoChatToolsRegistry"]
 
@@ -26,6 +25,7 @@ class DuoChatToolsRegistry(BaseToolsRegistry):
         # similar to what we implemented for the Prompt Registry
         tools = [
             BuildReader(),
+            CommitReader(),
             EpicReader(),
             IssueReader(),
             MergeRequestReader(),
@@ -35,9 +35,6 @@ class DuoChatToolsRegistry(BaseToolsRegistry):
             tools.append(SelfHostedGitlabDocumentation())
         else:
             tools.append(GitlabDocumentation())
-
-        if is_feature_enabled(FeatureFlag.AI_COMMIT_READER_FOR_CHAT):
-            tools.append(CommitReader())
 
         return tools
 

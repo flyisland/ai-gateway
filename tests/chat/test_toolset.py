@@ -15,7 +15,6 @@ from ai_gateway.chat.tools.gitlab import (
     SelfHostedGitlabDocumentation,
 )
 from ai_gateway.chat.toolset import DuoChatToolsRegistry
-from ai_gateway.feature_flags.context import current_feature_flag_context
 
 
 class TestDuoChatToolRegistry:
@@ -25,6 +24,7 @@ class TestDuoChatToolRegistry:
             (
                 {
                     BuildReader,
+                    CommitReader,
                     EpicReader,
                     IssueReader,
                     MergeRequestReader,
@@ -47,6 +47,7 @@ class TestDuoChatToolRegistry:
 
         assert actual_tools == {
             BuildReader,
+            CommitReader,
             SelfHostedGitlabDocumentation,
             EpicReader,
             IssueReader,
@@ -124,39 +125,3 @@ class TestDuoChatToolRegistry:
         tools = DuoChatToolsRegistry().get_on_behalf(user, "")
 
         assert len(tools) == 0
-
-    @pytest.mark.parametrize(
-        "feature_flag, unit_primitive, reader_tool_type",
-        [("ai_commit_reader_for_chat", GitLabUnitPrimitive.ASK_COMMIT, CommitReader)],
-    )
-    def test_feature_flag(
-        self,
-        feature_flag: str,
-        unit_primitive: GitLabUnitPrimitive,
-        reader_tool_type: Type[BaseTool],
-    ):
-        current_feature_flag_context.set({feature_flag})
-
-        user = StarletteUser(
-            CloudConnectorUser(
-                authenticated=True,
-                claims=UserClaims(
-                    scopes=[
-                        unit_primitive.value,
-                        GitLabUnitPrimitive.DOCUMENTATION_SEARCH.value,
-                    ]
-                ),
-            )
-        )
-
-        tools = DuoChatToolsRegistry().get_on_behalf(user, "17.5.0-pre")
-        actual_tools = {type(tool) for tool in tools}
-
-        assert actual_tools == {GitlabDocumentation, reader_tool_type}
-
-        current_feature_flag_context.set(set())
-
-        tools = DuoChatToolsRegistry().get_on_behalf(user, "17.5.0-pre")
-        actual_tools = {type(tool) for tool in tools}
-
-        assert actual_tools == {GitlabDocumentation}
