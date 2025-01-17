@@ -1,3 +1,5 @@
+import os
+
 from typing import Any, Dict, Iterator, List, Optional
 
 from langchain_core.callbacks.manager import CallbackManagerForLLMRun
@@ -11,6 +13,8 @@ __all__ = [
 
 
 class ChatAmazonQ(BaseChatModel):
+    amazon_q_client_factory: Any
+
     def _generate(
         self,
         messages: List[BaseMessage],
@@ -40,6 +44,19 @@ class ChatAmazonQ(BaseChatModel):
         yield cg_chunk
 
     def _build_response(self, messages: List[BaseMessage]):
+        current_user = self.metadata["user"]
+        # pylint: disable=direct-environment-variable-reference
+        role_arn = os.environ.get("AWS_ROLE_ARN")
+        # pylint: enable=direct-environment-variable-reference
+
+        q_client = self.amazon_q_client_factory.get_client(
+            current_user=current_user,
+            auth_header=current_user.auth_header,
+            role_arn=role_arn,
+        )
+
+        print(q_client.client) # returns the boto3 client
+
         return f"Amazon Q Response: {messages[0].content[0:100]}"
 
     @property

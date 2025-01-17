@@ -67,9 +67,11 @@ class GLAgentRemoteExecutor(Generic[TypeAgentInputs, TypeAgentEvent]):
         if not user.is_debug:
             self._tools = self.tools_registry.get_on_behalf(user, gl_version)
 
+        self._user = user
+
     async def stream(self, *, inputs: TypeAgentInputs) -> AsyncIterator[TypeAgentEvent]:
         inputs.tools = self.tools
-        agent: ReActAgent = self.agent_factory(model_metadata=inputs.model_metadata)
+        agent: ReActAgent = self.agent_factory(user=self._user, model_metadata=inputs.model_metadata)
 
         tools_by_name = self.tools_by_name
 

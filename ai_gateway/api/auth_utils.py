@@ -9,8 +9,10 @@ class StarletteUser(BaseUser):
     def __init__(
         self,
         cloud_connector_user: CloudConnectorUser,
+        auth_header: str = None,
     ):
         self.cloud_connector_user = cloud_connector_user
+        self.auth_header = auth_header
 
     # overriding starlette BaseUser methods
     @property

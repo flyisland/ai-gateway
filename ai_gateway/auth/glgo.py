@@ -19,18 +19,17 @@ class GlgoAuthority:
     def __init__(
         self,
         signing_key: str,
-        # glgo_base_url: str,
-        oidc_base_url: str,
+        glgo_base_url: str,
     ):
         self.signing_key = signing_key
         # self.kid = self._build_kid(signing_key)
         # self.token_endpoint = f"{glgo_base_url}/cc/token"
         if self._is_cc_endpoint_enabled():
             self.kid = self._build_kid(signing_key)
-            self.token_endpoint = f"{oidc_base_url}/cc/token"
+            self.token_endpoint = f"{glgo_base_url}/cc/token"
         else:
             self.kid = None
-            self.token_endpoint = f"{oidc_base_url}/aws/token"
+            self.token_endpoint = f"{glgo_base_url}/aws/token"
 
 
     def token(self, user_id: str, cloud_connector_token: str):

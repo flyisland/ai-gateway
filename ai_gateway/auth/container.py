@@ -17,6 +17,5 @@ class ContainerSelfSignedJwt(containers.DeclarativeContainer):
     glgo_authority = providers.Singleton(
         GlgoAuthority,
         signing_key=config.self_signed_jwt.signing_key,
-        # glgo_base_url=config.glgo_base_url,
-        oidc_base_url=config.glgo_base_url,
+        glgo_base_url=config.glgo_base_url,
     )
