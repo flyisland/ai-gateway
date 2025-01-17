@@ -34,3 +34,4 @@ class AgentRequest(BaseModel):
     unavailable_resources: Optional[list[str]] = [
         "Merge Requests, Pipelines, Vulnerabilities"
     ]
+
