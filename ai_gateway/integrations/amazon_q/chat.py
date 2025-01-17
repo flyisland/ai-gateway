@@ -7,6 +7,8 @@ from langchain_core.language_models.chat_models import BaseChatModel
 from langchain_core.messages import AIMessage, BaseMessage, ChatMessageChunk
 from langchain_core.outputs import ChatGeneration, ChatGenerationChunk, ChatResult
 
+from ai_gateway.integrations.amazon_q.errors import AWSException
+
 __all__ = [
     "ChatAmazonQ",
 ]
@@ -56,8 +58,15 @@ class ChatAmazonQ(BaseChatModel):
         )
 
         print(q_client.client) # returns the boto3 client
+        
+        try:
+            response = q_client.send_chat_message({"message": messages, "converstaion_id": "1"})
+            print("RESPONSE FROM Q")
+            print(response)
+        except AWSException as e:
+            raise e.to_http_exception()
 
-        return f"Amazon Q Response: {messages[0].content[0:100]}"
+        return f"Amazon Q Response2: {messages[0].content[0:100]}"
 
     @property
     def _identifying_params(self) -> Dict[str, Any]:
