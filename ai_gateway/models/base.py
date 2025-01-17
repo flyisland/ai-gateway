@@ -81,8 +81,11 @@ class TokensConsumptionMetadata(BaseModel):
     # number of tokens sent to AI Gateway
     context_tokens_sent: Optional[int] = None
     # number of tokens from context used in the prompt
-    context_tokens_used: Optional[int] = None
-
+    cached_tokens: Optional[int] = None
+    # number of tokens retrieved from the cache for this request
+    # This field represents the number of tokens served from cache, indicating cache usage efficiency
+    cache_creation_input_tokens: Optional[int] = None
+    # Only for Anthropic case because we show cache writes. Anthropic charges for cache writes
 
 class ModelMetadata(NamedTuple):
     name: str
