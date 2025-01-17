@@ -10,11 +10,9 @@ model:
 unit_primitives:
   - documentation_search
 prompt_template:
-  system: |
-    {% include 'chat/gitlab_documentation/system.jinja' %}
   user: |
-    {% include 'chat/gitlab_documentation/user.jinja' %}
+    {% include 'chat/documentation_search/user.jinja' %}
   assistant: |
-    {% include 'chat/gitlab_documentation/assistant.jinja' %}
+    {% include 'chat/documentation_search/assistant.jinja' %}
 params:
   timeout: 60

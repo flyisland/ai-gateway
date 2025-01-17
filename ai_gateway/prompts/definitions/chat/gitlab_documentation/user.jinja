@@ -1,9 +1,0 @@
-{{question}}
-{% set content %}
-    {% for document in documents %}
-    <doc>
-    CONTENT: {{ document.content }}
-    ATTRS: CNT-IDX-{{ document.id }}
-    </doc>
-    {% endfor %}
-{% endset %}
