@@ -84,8 +84,8 @@ POST /v3/code/completions
 | Attribute                                        | Type    | Required | Description                                                                                        | Example                  |
 | ------------------------------------------------ | ------- | -------- | -------------------------------------------------------------------------------------------------- | ------------------------ |
 | `prompt_components.type`                         | string  | yes      | Identifies the prompt_payload type (for completions use `code_editor_completion`)                  | `code_editor_completion` |
-| `prompt_components.payload.choices_count`        | int     | no       | The number of code completion choices to return (max_len: **4**). Only applies for `vertex-ai`. Does not support streaming. | `2`
-| `prompt_components.payload.prompt`               | string ||  [hash, array]    | no    | The content of a prebuilt prompt. [hash, array] type has role with the options: system, user and assistant. | `Human: Complete the function...` || `[{"role": "system", "content": "You are a helpful AI assistant."}]`                                  |
+| `prompt_components.payload.choices_count`        | int     | no       | The number of code completion choices to return (max_len: **4**). Only applies for `vertex-ai`. Does not support streaming. | `2` |
+| `prompt_components.payload.prompt`               | string or  [hash, array]    | no    | The content of a prebuilt prompt. [hash, array] type has role with the options: system, user and assistant. | `Human: Complete the function...` or `[{"role": "system", "content": "You are a helpful AI assistant."}]`  |
 | `prompt_components.payload.file_name`            | string  | yes      | The name of the current file (max_len: **255**)                                                    | `README.md`              |
 | `prompt_components.payload.content_above_cursor` | string  | yes      | The content above cursor (max_len: **100,000**)                                                    | `import numpy as np`     |
 | `prompt_components.payload.content_below_cursor` | string  | yes      | The content below cursor (max_len: **100,000**)                                                    | `def __main__:\n`        |
@@ -96,7 +96,8 @@ POST /v3/code/completions
 | `prompt_components.metadata.source`              | string  | no       | Source of the completionrequest (max_len: **255**)                                                 | `GitLab EE`              |
 | `prompt_components.metadata.version`             | string  | no       | Version of the source (max_len: **255**)                                                           | `16.3`                   |
 
-##### GitLab SaaS
+**GitLab SaaS**
+
 ```shell
 curl --request POST \
   --url "http://localhost:5052/v3/code/completions" \
@@ -124,7 +125,8 @@ curl --request POST \
     }'
 ```
 
-##### GitLab self-managed
+**GitLab self-managed**
+
 ```shell
 curl --request POST \
   --url "http://localhost:5052/v3/code/completions" \
@@ -196,7 +198,8 @@ Example response:
 | `prompt_components.metadata.source`              | string  | no       | Source of the completionrequest (max_len: **255**)                                                 | `GitLab EE`                          |
 | `prompt_components.metadata.version`             | string  | no       | Version of the source (max_len: **255**)                                                           | `16.3`                               |
 
-##### GitLab SaaS
+**GitLab SaaS**
+
 ```shell
 curl --request POST \
   --url "http://localhost:5052/v3/code/completions" \
@@ -246,7 +249,8 @@ curl --request POST \
     }'
 ```
 
-##### GitLab self-managed
+**GitLab self-managed**
+
 ```shell
 curl --request POST \
   --url "http://localhost:5052/v3/code/completions" \
@@ -309,7 +313,7 @@ package main
 import "fmt"
 
 func main() {
-  fmt.Println("Hello World") 
+  fmt.Println("Hello World")
 }
 
 [...]
@@ -348,12 +352,12 @@ third-party model provider.
 | `prompt_version`                    | int    | yes      | The version of the prompt (option: 1).                                                                                       | `1`                       |
 | `project_path`                      | string | no       | The name of the project (max_len: **255**).                                                                      | `gitlab-orb/gitlab-shell` |
 | `project_id`                        | int    | no       | The ID of the project.                                                                                           | `33191677`                |
-| `stream`                      | boolean | no       | Enables streaming response, if applicable (default: false)      | `true`
+| `stream`                      | boolean | no       | Enables streaming response, if applicable (default: false)      | `true` |
 | `model_provider`                    | string | no       | The name of the model provider. Valid values are: `anthropic` and `vertex-ai`.                                   | `vertex-ai`               |
-| `model_name`                      | string | no       | The name of the model (max_length: **50**). | `claude-2.1`
-| `model_endpoint`                     | string | no       | The endpoint for the model. | `https://api.example.com/v3`
-| `model_api_key`                     | string | no       | The API key for the model. | `x3iJ-this-Is-key34EXam!pl3`
-| `model_identifier`                     | string | no       | The identifier for the model. | `36381667`
+| `model_name`                      | string | no       | The name of the model (max_length: **50**). | `claude-2.1` |
+| `model_endpoint`                     | string | no       | The endpoint for the model. | `https://api.example.com/v3` |
+| `model_api_key`                     | string | no       | The API key for the model. | `x3iJ-this-Is-key34EXam!pl3` |
+| `model_identifier`                     | string | no       | The identifier for the model. | `36381667` |
 | `current_file`                      | hash   | yes      | The data of the current file.                                                                                    |                           |
 | `current_file.file_name`            | string | yes      | The name of the current file (max_len: **255**).                                                                 | `README.md`               |
 | `current_file.language_identifier`  | string | no       | The language identifier defined from editor (max_len: **255**). This overrides language detected from file name. | `python`                  |
@@ -448,12 +452,12 @@ This accepts prebuilt `prompt` and forwards it directly to third-party provider.
 | `prompt_version`                    | int    | yes      | The version of the prompt (options: 1 or 2).                                                    | `2`                                  |
 | `project_path`                      | string | no       | The name of the project (max_len: **255**)                                     | `gitlab-orb/gitlab-shell`            |
 | `project_id`                        | int    | no       | The ID of the project                                                          | `33191677`                           |
-| `stream`                      | boolean | no       | Enables streaming response, if applicable (default: false) | `true`
+| `stream`                      | boolean | no       | Enables streaming response, if applicable (default: false) | `true` |
 | `model_provider`                    | string | no       | The name of the model provider. Valid values are: `anthropic` and `vertex-ai`. | `anthropic`                          |
-| `model_name`                      | string | no       | The name of the model (max_length: **50**). | `claude-2.1`
-| `model_endpoint`                     | string | no       | The endpoint for the model. | `https://api.example.com/v3`
-| `model_api_key`                     | string | no       | The API key for the model. | `x3iJ-this-Is-key34EXam!pl3`
-| `model_identifier`                     | string | no       | The identifier for the model. | `36381667`
+| `model_name`                      | string | no       | The name of the model (max_length: **50**). | `claude-2.1` |
+| `model_endpoint`                     | string | no       | The endpoint for the model. | `https://api.example.com/v3` |
+| `model_api_key`                     | string | no       | The API key for the model. | `x3iJ-this-Is-key34EXam!pl3` |
+| `model_identifier`                     | string | no       | The identifier for the model. | `36381667` |
 | `current_file`                      | hash   | yes      | The data of the current file                                                   |                                      |
 | `current_file.file_name`            | string | yes      | The name of the current file (max_len: **255**)                                | `README.md`                          |
 | `current_file.content_above_cursor` | string | yes      | The content above cursor (max_len: **100,000**)                                | `import numpy as np`                 |
@@ -471,7 +475,8 @@ This accepts prebuilt `prompt` and forwards it directly to third-party provider.
 | `telemetry.accepts`                 | int    | yes      | The number of previously accepted completions                                  | `1`                                  |
 | `telemetry.errors`                  | int    | yes      | The number of previously failed completions                                    | `0`                                  |
 
-##### GitLab SaaS
+**GitLab SaaS**
+
 ```shell
 curl --request POST \
   --url "http://localhost:5052/v2/code/completions" \
@@ -509,7 +514,7 @@ curl --request POST \
   }'
 ```
 
-##### GitLab self-managed
+**GitLab self-managed**
 
 ```shell
 curl --request POST \
@@ -569,12 +574,12 @@ This accepts prebuilt `prompt` and forwards it directly to third-party provider.
 | `prompt_version`                    | int    | yes      | The version of the prompt (options: 1, 2 or 3).                                                    | `3`                                  |
 | `project_path`                      | string | no       | The name of the project (max_len: **255**)                                     | `gitlab-orb/gitlab-shell`            |
 | `project_id`                        | int    | no       | The ID of the project                                                          | `33191677`                           |
-| `stream`                      | boolean | no       | Enables streaming response, if applicable (default: false) | `true`
+| `stream`                      | boolean | no       | Enables streaming response, if applicable (default: false) | `true` |
 | `model_provider`                    | string | no       | The name of the model provider. Valid values are: `anthropic` and `vertex-ai`. | `anthropic`                          |
-| `model_name`                      | string | no       | The name of the model (max_length: **50**). | `claude-2.1`
-| `model_endpoint`                     | string | no       | The endpoint for the model. | `https://api.example.com/v3`
-| `model_api_key`                     | string | no       | The API key for the model. | `x3iJ-this-Is-key34EXam!pl3`
-| `model_identifier`                     | string | no       | The identifier for the model. | `36381667`
+| `model_name`                      | string | no       | The name of the model (max_length: **50**). | `claude-2.1` |
+| `model_endpoint`                     | string | no       | The endpoint for the model. | `https://api.example.com/v3` |
+| `model_api_key`                     | string | no       | The API key for the model. | `x3iJ-this-Is-key34EXam!pl3` |
+| `model_identifier`                     | string | no       | The identifier for the model. | `36381667` |
 | `current_file`                      | hash   | yes      | The data of the current file                                                   |                                      |
 | `current_file.file_name`            | string | yes      | The name of the current file (max_len: **255**)                                | `README.md`                          |
 | `current_file.content_above_cursor` | string | yes      | The content above cursor (max_len: **100,000**)                                | `import numpy as np`                 |
@@ -592,7 +597,8 @@ This accepts prebuilt `prompt` and forwards it directly to third-party provider.
 | `telemetry.accepts`                 | int    | yes      | The number of previously accepted completions                                  | `1`                                  |
 | `telemetry.errors`                  | int    | yes      | The number of previously failed completions                                    | `0`                                  |
 
-##### GitLab SaaS
+**GitLab SaaS**
+
 ```shell
 curl --request POST \
   --url "http://localhost:5052/v2/code/completions" \
@@ -612,7 +618,8 @@ curl --request POST \
   }'
 ```
 
-##### GitLab self-managed
+**GitLab self-managed**
+
 ```shell
 curl --request POST \
   --url "http://localhost:5052/v2/code/completions" \
@@ -781,9 +788,9 @@ This accepts prebuilt `prompt` and forwards it directly to third-party provider.
 | `project_id`                        | int    | no       | The ID of the project                                                                                                                                                                  | `33191677`                           |
 | `model_provider`                    | string | no       | The name of the model provider. Valid values are: `anthropic` and `vertex-ai`. Default to `vertex-ai`.                                                                                 | `anthropic`                          |
 | `model_name`                        | string | no       | The name of the model name. Valid values are: `claude-2`, `claude-2.0`, `claude-2.1` if model_provider is `anthropic`.`code-bison`, `code-bison@002` if model_provider is `vertex-ai`. | `claude-2.1`                         |
-| `model_endpoint`                     | string | no       | The endpoint for the model. | `https://api.example.com/v3`
-| `model_api_key`                     | string | no       | The API key for the model. | `x3iJ-this-Is-key34EXam!pl3`
-| `model_identifier`                   | string | no       | The identifier for the model. | `36381667`
+| `model_endpoint`                     | string | no       | The endpoint for the model. | `https://api.example.com/v3` |
+| `model_api_key`                     | string | no       | The API key for the model. | `x3iJ-this-Is-key34EXam!pl3` |
+| `model_identifier`                   | string | no       | The identifier for the model. | `36381667` |
 | `current_file`                      | hash   | yes      | The data of the current file                                                                                                                                                           |                                      |
 | `current_file.file_name`            | string | yes      | The name of the current file (max_len: **255**)                                                                                                                                        | `README.md`                          |
 | `current_file.content_above_cursor` | string | yes      | The content above cursor (max_len: **100,000**)                                                                                                                                        | `import numpy as np`                 |
@@ -800,7 +807,8 @@ This accepts prebuilt `prompt` and forwards it directly to third-party provider.
 | `telemetry.accepts`                 | int    | yes      | The number of previously accepted completions                                                                                                                                          | `1`                                  |
 | `telemetry.errors`                  | int    | yes      | The number of previously failed completions                                                                                                                                            | `0`                                  |
 
-##### GitLab SaaS
+**GitLab SaaS**
+
 ```shell
 curl --request POST \
   --url "http://localhost:5052/v2/code/generations" \
@@ -837,7 +845,8 @@ curl --request POST \
   }'
 ```
 
-##### GitLab self-managed
+**GitLab self-managed**
+
 ```shell
 curl --request POST \
   --url "http://localhost:5052/v2/code/generations" \
@@ -874,7 +883,7 @@ Example response:
       "name": "exp_truncate_suffix",
       "variant": 0
     }
-  ]
+  ],
   "object": "text_completion",
   "created": 1682031100,
   "choices": [
