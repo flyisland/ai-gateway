@@ -1,0 +1,4 @@
+model_name: claude-3-5-sonnet-20241022
+additional_params:
+  temperature: 0.9
+  max_tokens: 200

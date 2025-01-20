@@ -1,5 +1,8 @@
+from pathlib import Path
 from abc import ABC, abstractmethod
 from typing import Any, AsyncIterator, Mapping, Optional, Tuple, TypeVar, cast
+
+import yaml
 
 from gitlab_cloud_connector import GitLabUnitPrimitive, WrongUnitPrimitives
 from jinja2 import PackageLoader
@@ -81,13 +84,38 @@ class Prompt(RunnableBinding[Input, Output]):
         config: ModelConfig,
         disable_streaming: bool,
     ) -> Model:
+        general_model_name = config.name
+        model_config = self._load_model_config(general_model_name)
+
+        # Get the specific model name from the config, or use the general name if not found
+        specific_model_name = model_config.get('model_name', general_model_name)
+
+        # Merge additional parameters from the YAML files
+        additional_params = model_config.get('additional_params', {})
+        merged_params = {**additional_params,
+                         **config.params.model_dump(
+          exclude={"model_class_provider"}, exclude_none=True, by_alias=True
+        )}
+
         return model_factory(
-            model=config.name,
-            disable_streaming=disable_streaming,
-            **config.params.model_dump(
-                exclude={"model_class_provider"}, exclude_none=True, by_alias=True
-            ),
+          model=specific_model_name,
+          disable_streaming=disable_streaming,
+          **merged_params
         )
+
+    # def _build_model(
+    #     self,
+    #     model_factory: TypeModelFactory,
+    #     config: ModelConfig,
+    #     disable_streaming: bool,
+    # ) -> Model:
+    #     return model_factory(
+    #         model=config.name,
+    #         disable_streaming=disable_streaming,
+    #         **config.params.model_dump(
+    #             exclude={"model_class_provider"}, exclude_none=True, by_alias=True
+    #         ),
+    #     )
 
     @property
     def model_name(self) -> str:
@@ -132,6 +160,17 @@ class Prompt(RunnableBinding[Input, Output]):
     @staticmethod
     def _prompt_template_to_messages(tpl: dict[str, str]) -> list[Tuple[str, str]]:
         return list(tpl.items())
+
+    @staticmethod
+    def _load_model_config(general_model_name: str) -> dict:
+      # Assuming the YAML files are in a 'model_configs' directory next to this script
+      config_dir = Path(__file__).parent / "model_configs"
+      yaml_path = config_dir / f"{general_model_name}.yaml"
+
+      if yaml_path.exists():
+        with open(yaml_path, "r") as file:
+          return yaml.safe_load(file)
+      return {}
 
     @classmethod
     def _build_prompt_template(
