@@ -4,7 +4,11 @@ from pydantic import BaseModel
 
 __all__ = [
     "Context",
-    "PageContext",
+    "CiBuildContext",
+    "CommitContext",
+    "EpicContext",
+    "IssueContext",
+    "MergeRequestContext",
     "CurrentPageContext",
 ]
 
@@ -21,37 +25,37 @@ class Context(BaseModel, frozen=True):  # type: ignore[call-arg]
     content: str
 
 
-class PageContext(BaseModel):
-    """
-    Represents current page context. Is a parent class for individual GitLab AI resources.
-    Field type should be overridden in the subclass as a Literal.
-    """
-
-    type: str
-
-
-CurrentPageContext = Union[Context, PageContext]
-
-
-class CiBuildContext(PageContext):
+class CiBuildContext(BaseModel):
     type: Literal["build"]
 
 
-class CommitContext(PageContext):
+class CommitContext(BaseModel):
     type: Literal["commit"]
     title: str
 
 
-class EpicContext(PageContext):
+class EpicContext(BaseModel):
     type: Literal["epic"]
     title: str
 
 
-class IssueContext(PageContext):
+class IssueContext(BaseModel):
     type: Literal["issue"]
     title: str
 
 
-class MergeRequestContext(PageContext):
+class MergeRequestContext(BaseModel):
     type: Literal["merge_request"]
     title: str
+
+
+# This Union allows to pass page context params and automatically
+# define a correct instance of specific context
+CurrentPageContext = Union[
+    Context,
+    CiBuildContext,
+    CommitContext,
+    EpicContext,
+    IssueContext,
+    MergeRequestContext,
+]
