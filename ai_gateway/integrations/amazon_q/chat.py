@@ -38,13 +38,16 @@ class ChatAmazonQ(BaseChatModel):
         run_manager: Optional[CallbackManagerForLLMRun] = None,
         **kwargs: Any,
     ) -> Iterator[ChatGenerationChunk]:
-        message = self._build_response(messages=messages)
-        cg_chunk = ChatGenerationChunk(
-            message=ChatMessageChunk(content=message, role="system")
-        )
-        if run_manager:
-            run_manager.on_llm_new_token(message, chunk=cg_chunk)
-        yield cg_chunk
+        message_stream = self._build_response(messages=messages)
+        stream_output = message_stream["responseStream"]
+        for event in stream_output:
+          # Assuming each event in the EventStream has a 'content' field
+          # You may need to adjust this based on the actual structure of your EventStream
+          print("message_stream event: ", event)
+          assistantResponseEvent = event['assistantResponseEvent']
+          content = assistantResponseEvent.get('content', '')
+          yield ChatGenerationChunk(message=AIMessageChunk(content=content))
+
 
     def _build_response(self, messages: List[BaseMessage]):
         current_user = self.metadata["user"]
@@ -61,20 +64,12 @@ class ChatAmazonQ(BaseChatModel):
         print(q_client.client) # returns the boto3 client
 
         try:
-            message_stream = q_client.send_message(
-              message=messages[0].content,
-              conversationId="test_vivek"
-            )
-            stream_output = message_stream["responseStream"]
-            for event in stream_output:
-              # Assuming each event in the EventStream has a 'content' field
-              # You may need to adjust this based on the actual structure of your EventStream
-              print("message_stream event: ", event)
-              assistantResponseEvent = event['assistantResponseEvent']
-              content = assistantResponseEvent.get('content', '')
-              yield ChatGenerationChunk(message=AIMessageChunk(content=content))
+          return  q_client.send_chat_message({
+              "message": messages[0].content,
+              "converstaion_id": "test_vivek"
+            })
         except AWSException as e:
-            raise e.to_http_exception()
+          raise e.to_http_exception()
 
     @property
     def _identifying_params(self) -> Dict[str, Any]:
