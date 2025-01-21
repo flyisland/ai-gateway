@@ -17,9 +17,12 @@ curl --header "Authorization: Bearer <access_token>" --header "X-Gitlab-Authenti
 
 ## Working with self hosted models
 
-It is important to note that some parameters that are optional in GitLab SaaS API endpoints may be required when calling the same endpoints in self-managed GitLab instances.
+Some parameters that are optional in the auto-generated API doc are required for self-hosted models.
 
-Learn [how to configure self-hosted models](https://docs.gitlab.com/ee/administration/self_hosted_models/configure_duo_features.html#configure-the-self-hosted-model ) and visit the [GitLab docs](https://docs.gitlab.com/ee/administration/self_hosted_models/supported_models_and_hardware_requirements.html#approved-llms ) for a list of supported self hosted models.
+For more information, see:
+
+- [How to configure self-hosted models](https://docs.gitlab.com/ee/administration/self_hosted_models/configure_duo_features.html#configure-the-self-hosted-model )
+- [Approved LLMs for self-hosted models](https://docs.gitlab.com/ee/administration/self_hosted_models/supported_models_and_hardware_requirements.html#approved-llms )
 
 ## Code Suggestions
 
@@ -85,13 +88,13 @@ POST /v3/code/completions
 | ------------------------------------------------ | ------- | -------- | -------------------------------------------------------------------------------------------------- | ------------------------ |
 | `prompt_components.type`                         | string  | yes      | Identifies the prompt_payload type (for completions use `code_editor_completion`)                  | `code_editor_completion` |
 | `prompt_components.payload.choices_count`        | int     | no       | The number of code completion choices to return (max_len: **4**). Only applies for `vertex-ai`. Does not support streaming. | `2` |
-| `prompt_components.payload.prompt`               | string or  [hash, array]    | no    | The content of a prebuilt prompt. [hash, array] type has role with the options: system, user and assistant. | `Human: Complete the function...` or `[{"role": "system", "content": "You are a helpful AI assistant."}]`  |
+| `prompt_components.payload.prompt`               | string or  [hash, array]    | no    | The content of a pre-built prompt. [hash, array] type has role with the options: system, user and assistant. | `Human: Complete the function...` or `[{"role": "system", "content": "You are a helpful AI assistant."}]`  |
 | `prompt_components.payload.file_name`            | string  | yes      | The name of the current file (max_len: **255**)                                                    | `README.md`              |
 | `prompt_components.payload.content_above_cursor` | string  | yes      | The content above cursor (max_len: **100,000**)                                                    | `import numpy as np`     |
 | `prompt_components.payload.content_below_cursor` | string  | yes      | The content below cursor (max_len: **100,000**)                                                    | `def __main__:\n`        |
 | `prompt_components.payload.language_identifier`  | string  | no       | [Language identifier](https://code.visualstudio.com/docs/languages/identifiers) (max_len: **255**) | `python`                 |
 | `prompt_components.payload.model_provider`       | string  | no       | The model engine that should be used for the completion                                            | `vertex-ai`              |
-| `prompt_components.payload.model_name`           | string  | no       | The name of the model name                                            | `code-gecko@002`              |
+| `prompt_components.payload.model_name`           | string  | no       | The name of the model                                            | `code-gecko@002`              |
 | `prompt_components.payload.stream`               | boolean | no       | Enables streaming response, if applicable (default: false)                                         | `true`                   |
 | `prompt_components.metadata.source`              | string  | no       | Source of the completionrequest (max_len: **255**)                                                 | `GitLab EE`              |
 | `prompt_components.metadata.version`             | string  | no       | Version of the source (max_len: **255**)                                                           | `16.3`                   |
@@ -125,7 +128,7 @@ curl --request POST \
     }'
 ```
 
-**GitLab self-managed**
+**GitLab self-managed with a self-hosted model**
 
 ```shell
 curl --request POST \
@@ -189,7 +192,7 @@ Example response:
 | `prompt_components.payload.content_below_cursor` | string  | yes      | The content below cursor (max_len: **100,000**)                                                    | `def __main__:\n`                    |
 | `prompt_components.payload.language_identifier`  | string  | no       | [Language identifier](https://code.visualstudio.com/docs/languages/identifiers) (max_len: **255**) | `python`                             |
 | `prompt_components.payload.model_provider`       | string  | no       | The model engine that should be used for the completion                                            | `anthropic`                          |
-| `prompt_components.payload.model_name`           | string  | no       | The name of the model name   | `claude-2.1`              |
+| `prompt_components.payload.model_name`           | string  | no       | The name of the model   | `claude-2.1`              |
 | `prompt_components.payload.stream`               | boolean | no       | Enables streaming response, if applicable (default: false)                                         | `true`                               |
 | `prompt_components.payload.prompt`               | string  | no       | An optional pre-built prompt to be passed directly to the model (max_len: **400,000**)             | `Human: You are a code assistant...` |
 | `prompt_components.payload.prompt_id`            | string  | no       | The ID of the prompt             | `123456` |
@@ -249,7 +252,7 @@ curl --request POST \
     }'
 ```
 
-**GitLab self-managed**
+**GitLab self-managed with a self-hosted model**
 
 ```shell
 curl --request POST \
@@ -445,7 +448,7 @@ Example response:
 
 ##### V2 Prompt
 
-This accepts prebuilt `prompt` and forwards it directly to third-party provider. Prebuilt `prompt`s only supports `anthropic` model provider.
+This accepts a pre-built `prompt` and forwards it directly to third-party provider. Prebuilt `prompt`s only supports the `anthropic` model provider.
 
 | Attribute                           | Type   | Required | Description                                                                    | Example                              |
 | ----------------------------------- | ------ | -------- | ------------------------------------------------------------------------------ | ------------------------------------ |
@@ -462,7 +465,7 @@ This accepts prebuilt `prompt` and forwards it directly to third-party provider.
 | `current_file.file_name`            | string | yes      | The name of the current file (max_len: **255**)                                | `README.md`                          |
 | `current_file.content_above_cursor` | string | yes      | The content above cursor (max_len: **100,000**)                                | `import numpy as np`                 |
 | `current_file.content_below_cursor` | string | yes      | The content below cursor (max_len: **100,000**)                                | `def __main__:\n`                    |
-| `prompt`                            | string | no      | The content of a prebuilt prompt                                               | `Human: You are a code assistant...` |
+| `prompt`                            | string | no      | The content of a pre-built prompt                                               | `Human: You are a code assistant...` |
 | `choices_count`                     | int    | no       | The number of code completion choices to return (max_len: **4**). Only applies for `vertex-ai`. Does not support streaming. **Note:** The response may return a number of choices less than the `choices_count` as we drop suggestions with low scores.      | `2`                                   |
 | `telemetry`                         | array  | no       | The list of telemetry data from previous request (max_len: **10**)             |                                      |
 | `telemetry.model_engine`            | string | no       | The model engine used for completions (max_len: **50**)                        | `vertex-ai`                          |
@@ -514,7 +517,7 @@ curl --request POST \
   }'
 ```
 
-**GitLab self-managed**
+**GitLab self-managed with a self-hosted model**
 
 ```shell
 curl --request POST \
@@ -567,7 +570,7 @@ Example response:
 
 ##### V3 Prompt
 
-This accepts prebuilt `prompt` and forwards it directly to third-party provider. Prebuilt `prompt`s only supports `anthropic` model provider.
+This accepts a pre-built `prompt` and forwards it directly to a third-party provider. Prebuilt `prompt`s only supports the `anthropic` model provider.
 
 | Attribute                           | Type   | Required | Description                                                                    | Example                              |
 | ----------------------------------- | ------ | -------- | ------------------------------------------------------------------------------ | ------------------------------------ |
@@ -584,7 +587,7 @@ This accepts prebuilt `prompt` and forwards it directly to third-party provider.
 | `current_file.file_name`            | string | yes      | The name of the current file (max_len: **255**)                                | `README.md`                          |
 | `current_file.content_above_cursor` | string | yes      | The content above cursor (max_len: **100,000**)                                | `import numpy as np`                 |
 | `current_file.content_below_cursor` | string | yes      | The content below cursor (max_len: **100,000**)                                | `def __main__:\n`                    |
-| `prompt`                            | [hash, array] | no      | The content of a prebuilt prompt built with a role (options: system, user and assistant) and string content                                             |  |
+| `prompt`                            | [hash, array] | no      | The content of a pre-built prompt built with a role (options: system, user and assistant) and string content                                             |  |
 | `choices_count`                     | int    | no       | The number of code completion choices to return (max_len: **4**). Only applies for `vertex-ai`. Does not support streaming. **Note:** The response may return a number of choices less than the `choices_count` as we drop suggestions with low scores.      | `2`                                   |
 | `telemetry`                         | array  | no       | The list of telemetry data from previous request (max_len: **10**)             |                                      |
 | `telemetry.model_engine`            | string | no       | The model engine used for completions (max_len: **50**)                        | `vertex-ai`                          |
@@ -618,7 +621,7 @@ curl --request POST \
   }'
 ```
 
-**GitLab self-managed**
+**GitLab self-managed with a self-hosted model**
 
 ```shell
 curl --request POST \
@@ -778,7 +781,7 @@ Example response:
 
 ##### V2 Prompt
 
-This accepts prebuilt `prompt` and forwards it directly to third-party provider.
+This accepts a pre-built `prompt` and forwards it directly to the third-party provider.
 
 | Attribute                           | Type   | Required | Description                                                                                                                                                                            | Example                              |
 | ----------------------------------- | ------ | -------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------ |
@@ -795,7 +798,7 @@ This accepts prebuilt `prompt` and forwards it directly to third-party provider.
 | `current_file.file_name`            | string | yes      | The name of the current file (max_len: **255**)                                                                                                                                        | `README.md`                          |
 | `current_file.content_above_cursor` | string | yes      | The content above cursor (max_len: **100,000**)                                                                                                                                        | `import numpy as np`                 |
 | `current_file.content_below_cursor` | string | yes      | The content below cursor (max_len: **100,000**)                                                                                                                                        | `def __main__:\n`                    |
-| `prompt`                            | string | yes      | The content of a prebuilt prompt                                                                                                                                                       | `Human: You are a code assistant...` |
+| `prompt`                            | string | yes      | The content of a pre-built prompt                                                                                                                                                       | `Human: You are a code assistant...` |
 | `telemetry`                         | array  | no       | The list of telemetry data from previous request (max_len: **10**)                                                                                                                     |                                      |
 | `telemetry.model_engine`            | string | no       | The model engine used for completions (max_len: **50**)                                                                                                                                | `vertex-ai`                          |
 | `telemetry.model_name`              | string | no       | The model name used for completions (max_len: **50**)                                                                                                                                  | `code-gecko`                         |
@@ -845,7 +848,7 @@ curl --request POST \
   }'
 ```
 
-**GitLab self-managed**
+**GitLab self-managed with a self-hosted model**
 
 ```shell
 curl --request POST \
