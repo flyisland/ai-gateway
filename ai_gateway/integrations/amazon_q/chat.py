@@ -39,6 +39,7 @@ class ChatAmazonQ(BaseChatModel):
         **kwargs: Any,
     ) -> Iterator[ChatGenerationChunk]:
         message_stream = self._build_response(messages=messages)
+        print("DEBUG-ChatAmazonQ: message_stream", message_stream)
         stream_output = message_stream["responseStream"]
         for event in stream_output:
           # Assuming each event in the EventStream has a 'content' field
@@ -60,8 +61,8 @@ class ChatAmazonQ(BaseChatModel):
             auth_header=current_user.auth_header,
             role_arn=role_arn,
         )
-
-        print(q_client.client) # returns the boto3 client
+        
+        print("DEBUG-ChatAmazonQ: q_client.client", q_client.client)
 
         try:
           return  q_client.send_chat_message({

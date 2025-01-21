@@ -49,6 +49,8 @@ class AmazonQClientFactory:
         auth_header: str,
     ):
         user_id = current_user.global_user_id
+        print("DEBUG-AmazonQClientFactory: user_id", user_id)
+        print("DEBUG-AmazonQClientFactory: auth_header", auth_header)
         if not user_id:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST, detail="User Id is missing"
@@ -56,6 +58,7 @@ class AmazonQClientFactory:
 
         try:
             _, _, cloud_connector_token = auth_header.partition(" ")
+            print("DEBUG-AmazonQClientFactory: cloud_connector_token", cloud_connector_token)
             token = self.glgo_authority.token(
                 user_id=user_id,
                 cloud_connector_token=cloud_connector_token,
@@ -142,10 +145,10 @@ class AmazonQClient:
     def send_chat_message(self, payload):
 
         try:
-            self._send_message(payload)
+            return self._send_message(payload)
         except ClientError as ex:
             if ex.__class__.__name__ == "AccessDeniedException":
-                return self._retry_send_event(ex, event_request.code, payload)
+                return self._retry_send_message(ex, event_request.code, payload)
 
             raise
 
@@ -163,12 +166,24 @@ class AmazonQClient:
         )
 
     def _send_message(self, payload):
+        print("DEBUG-AmazonQClient: payload", payload)
         return self.client.send_message(
             message=payload["message"],
             conversationId=payload["conversation_id"],
         )
 
     def _retry_send_event(self, error, code, payload):
+        self._is_retry(error, code)
+
+        return self._send_event(payload)
+        
+    def _retry_send_message(self, error, code, payload):
+        self._is_retry(error, code)
+
+        return self._send_message(payload)
+
+
+    def _is_retry(self, error, code):
         match str(error.response.get("reason")):
             case AccessDeniedExceptionReason.GITLAB_EXPIRED_IDENTITY:
                 self.client.create_auth_grant(code=code)
@@ -179,5 +194,3 @@ class AmazonQClient:
                     status_code=status.HTTP_403_FORBIDDEN,
                     detail=str(error),
                 )
-
-        return self._send_event(payload)
