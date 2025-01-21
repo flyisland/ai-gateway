@@ -140,7 +140,7 @@ class AmazonQClient:
                 return self._retry_send_event(ex, event_request.code, payload)
 
             raise
-        
+
     @raise_aws_errors
     def send_chat_message(self, payload):
 
@@ -165,12 +165,15 @@ class AmazonQClient:
             event=payload,
         )
 
+
     def _send_message(self, payload):
         print("DEBUG-AmazonQClient: payload", payload)
         return self.client.send_message(
             message=payload["message"],
             conversationId=payload["conversation_id"],
+            history=payload["history"]
         )
+
 
     def _retry_send_event(self, error, code, payload):
         self._is_retry(error, code)

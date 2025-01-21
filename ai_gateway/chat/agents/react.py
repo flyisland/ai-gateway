@@ -166,14 +166,16 @@ class ReActPromptTemplate(Runnable[ReActAgentInputs, PromptValue]):
         if not isinstance(messages[-1], HumanMessage):
             raise ValueError("Last message must be a human message")
 
-        messages.append(
-            AIMessage(
-                jinja2_formatter(
-                    self.prompt_template["assistant"],
-                    agent_scratchpad=input.agent_scratchpad,
-                )
-            )
-        )
+        if "assistant" in self.prompt_template:
+          messages.append(
+              AIMessage(
+                  jinja2_formatter(
+                      self.prompt_template["assistant"],
+                      agent_scratchpad=input.agent_scratchpad,
+                  )
+              )
+          )
+
         return ChatPromptValue(messages=messages)
 
 
