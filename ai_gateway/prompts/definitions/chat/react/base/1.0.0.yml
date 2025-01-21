@@ -11,8 +11,6 @@ prompt_template:
     {% include 'chat/react/system.jinja' %}
   user: |
     {% include 'chat/react/user.jinja' %}
-  assistant: |
-    {% include 'chat/react/assistant.jinja' %}
 params:
   timeout: 30
   stop:

@@ -8,7 +8,7 @@ from langchain_core.messages import AIMessage, BaseMessage, ChatMessageChunk
 from langchain_core.outputs import ChatGeneration, ChatGenerationChunk, ChatResult
 
 from ai_gateway.integrations.amazon_q.errors import AWSException
-from langchain_core.messages import AIMessageChunk
+from langchain_core.messages import AIMessageChunk, SystemMessage
 
 __all__ = [
     "ChatAmazonQ",
@@ -61,15 +61,31 @@ class ChatAmazonQ(BaseChatModel):
             role_arn=role_arn,
         )
 
-        print(q_client.client) # returns the boto3 client
+        send_message_params = self._calculate_send_message_params(messages)
 
-        try:
-          return  q_client.send_chat_message({
-              "message": messages[0].content,
-              "conversation_id": "test_vivek"
-            })
-        except AWSException as e:
-          raise e.to_http_exception()
+        return q_client.send_chat_message(send_message_params)
+
+    def _calculate_send_message_params(self, messages: List[BaseMessage]):
+        if messages and isinstance(messages[0], SystemMessage):
+            system_message = messages.pop(0)
+            if messages:
+                messages[0].content = system_message.content + messages[0].content
+
+        message_content = messages.pop().content if messages else ""
+
+        history = [
+            {
+                "userInputMessage": messages[i].content,
+                "assistantResponseMessage": messages[i + 1].content,
+            }
+            for i in range(0, len(messages) - 1, 2)
+        ]
+
+        return {
+            "message": message_content,
+            "conversation_id": "test_vivek",
+            "history": history,
+        }
 
     @property
     def _identifying_params(self) -> Dict[str, Any]:
