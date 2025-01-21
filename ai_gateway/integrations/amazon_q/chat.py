@@ -66,7 +66,7 @@ class ChatAmazonQ(BaseChatModel):
         try:
           return  q_client.send_chat_message({
               "message": messages[0].content,
-              "converstaion_id": "test_vivek"
+              "conversation_id": "test_vivek"
             })
         except AWSException as e:
           raise e.to_http_exception()
