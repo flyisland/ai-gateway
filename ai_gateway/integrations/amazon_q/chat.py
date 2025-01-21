@@ -64,10 +64,10 @@ class ChatAmazonQ(BaseChatModel):
         print(q_client.client) # returns the boto3 client
 
         try:
-          return  q_client.send_chat_message({
-              "message": messages[0].content,
-              "conversation_id": "test_vivek"
-            })
+          return q_client.client.send_message(
+            message=messages[0].content,
+            conversationId="test_vivek"
+          )
         except AWSException as e:
           raise e.to_http_exception()
 
