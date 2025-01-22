@@ -152,7 +152,7 @@ class TestReActAgentStream:
                         api_key="token",
                     ),
                     unavailable_resources=["Mystery Resource 1", "Mystery Resource 2"],
-                    conciseness_prompt_change_active=False
+                    conciseness_prompt_change_active=False,
                 ),
                 "thought\nFinal Answer: answer\n",
                 [AgentFinalAnswer(text=c) for c in "answer"],
@@ -193,7 +193,7 @@ class TestReActAgentStream:
             "model_metadata",
             "expected_actions",
             "unavailable_resources",
-            "conciseness_prompt_change_active"
+            "conciseness_prompt_change_active",
         ),
         [
             (
@@ -250,7 +250,7 @@ class TestReActAgentStream:
                     )
                 ],
                 ["Mystery Resource 1", "Mystery Resource 2"],
-                False
+                False,
             )
         ],
     )

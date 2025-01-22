@@ -120,7 +120,9 @@ async def chat(
         agent_scratchpad=scratchpad,
         model_metadata=agent_request.model_metadata,
         unavailable_resources=agent_request.unavailable_resources,
-        conciseness_prompt_change_active=is_feature_enabled(FeatureFlag.CONCISENESS_PROMPT_CHANGE)
+        conciseness_prompt_change_active=is_feature_enabled(
+            FeatureFlag.CONCISENESS_PROMPT_CHANGE
+        ),
     )
 
     gl_version = request.headers.get(X_GITLAB_VERSION_HEADER, "")

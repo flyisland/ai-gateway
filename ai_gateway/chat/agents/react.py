@@ -46,6 +46,7 @@ class ReActAgentInputs(BaseModel):
     tools: Optional[list[BaseTool]] = None
     conciseness_prompt_change_active: Optional[bool] = None
 
+
 class ReActPlainTextParser(BaseCumulativeTransformOutputParser):
     re_thought: re.Pattern = re.compile(
         r"<message>Thought:\s*([\s\S]*?)\s*(?:Action|Final Answer):"
