@@ -8,7 +8,7 @@ from langchain_core.messages import AIMessage, BaseMessage, ChatMessageChunk
 from langchain_core.outputs import ChatGeneration, ChatGenerationChunk, ChatResult
 
 from ai_gateway.integrations.amazon_q.errors import AWSException
-from langchain_core.messages import AIMessageChunk, SystemMessage
+from langchain_core.messages import AIMessageChunk, SystemMessage, HumanMessage
 
 __all__ = [
     "ChatAmazonQ",
@@ -44,7 +44,7 @@ class ChatAmazonQ(BaseChatModel):
           # Assuming each event in the EventStream has a 'content' field
           # You may need to adjust this based on the actual structure of your EventStream
           print("message_stream event: ", event)
-          assistantResponseEvent = event['assistantResponseEvent']
+          assistantResponseEvent = event.get('assistantResponseEvent', {})
           content = assistantResponseEvent.get('content', '')
           yield ChatGenerationChunk(message=AIMessageChunk(content=content))
 
@@ -73,13 +73,13 @@ class ChatAmazonQ(BaseChatModel):
 
         message_content = messages.pop().content if messages else ""
 
-        history = [
-            {
-                "userInputMessage": messages[i].content,
-                "assistantResponseMessage": messages[i + 1].content,
-            }
-            for i in range(0, len(messages) - 1, 2)
-        ]
+        history = []
+        for message in messages:
+            if isinstance(message, HumanMessage):
+                history.append({ "userInputMessage": message.content })
+
+            if isinstance(message, AIMessage):
+                history.append({ "assistantResponseMessage": message.content })
 
         return {
             "message": message_content,
