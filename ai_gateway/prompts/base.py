@@ -1,5 +1,4 @@
 from abc import ABC, abstractmethod
-from pathlib import Path
 from typing import Any, AsyncIterator, Mapping, Optional, Tuple, TypeVar, cast
 
 from gitlab_cloud_connector import GitLabUnitPrimitive, WrongUnitPrimitives

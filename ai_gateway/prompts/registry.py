@@ -36,7 +36,6 @@ class LocalPromptRegistry(BasePromptRegistry):
         default_prompts: dict[str, str],
         internal_event_client: InternalEventsClient,
         custom_models_enabled: bool,
-        model_configs: dict[str, GeneralModelConfig],
         disable_streaming: bool = False,
     ):
         self.prompts_registered = prompts_registered
@@ -45,7 +44,6 @@ class LocalPromptRegistry(BasePromptRegistry):
         self.internal_event_client = internal_event_client
         self.custom_models_enabled = custom_models_enabled
         self.disable_streaming = disable_streaming
-        self.model_configs = model_configs
 
     def _resolve_id(
         self,
@@ -172,7 +170,6 @@ class LocalPromptRegistry(BasePromptRegistry):
             default_prompts,
             internal_event_client,
             custom_models_enabled,
-            model_configs,
             disable_streaming,
         )
 
