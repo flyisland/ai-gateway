@@ -20,6 +20,12 @@ class PromptRegistered(NamedTuple):
     versions: dict[str, PromptConfig]
 
 
+class GeneralModelConfig(NamedTuple):
+    name: str
+    model_name: str
+    additional_params: dict | None = None
+
+
 class LocalPromptRegistry(BasePromptRegistry):
     key_prompt_type_base: str = "base"
 
@@ -30,6 +36,7 @@ class LocalPromptRegistry(BasePromptRegistry):
         default_prompts: dict[str, str],
         internal_event_client: InternalEventsClient,
         custom_models_enabled: bool,
+        model_configs: dict[str, GeneralModelConfig],
         disable_streaming: bool = False,
     ):
         self.prompts_registered = prompts_registered
@@ -38,6 +45,7 @@ class LocalPromptRegistry(BasePromptRegistry):
         self.internal_event_client = internal_event_client
         self.custom_models_enabled = custom_models_enabled
         self.disable_streaming = disable_streaming
+        self.model_configs = model_configs
 
     def _resolve_id(
         self,
@@ -116,16 +124,29 @@ class LocalPromptRegistry(BasePromptRegistry):
         """
 
         prompts_definitions_dir = Path(__file__).parent / "definitions"
+        model_configs_dir = (
+            Path(__file__).parent / "model_configs"
+        )  # New directory for model configs
+        model_configs = {}  # New dictionary to store model configs
         prompts_registered = {}
 
+        # Parse model config YAML files
+        for config_file in model_configs_dir.glob("*.yml"):
+            with open(config_file, "r") as fp:
+                model_configs[config_file.stem] = GeneralModelConfig(
+                    **yaml.safe_load(fp)
+                )
+
+        # raise Exception(model_configs)
         # Iterate over each folder
         for path in prompts_definitions_dir.glob("**"):
             versions = {}
 
             # Iterate over each version file
             for version in path.glob("*.yml"):
-                with open(version, "r") as fp:
-                    versions[version.stem] = PromptConfig(**yaml.safe_load(fp))
+                versions[version.stem] = cls._process_version_file(
+                    version, model_configs
+                )
 
             # If there were no yml files in this folder, skip it
             if not versions:
@@ -151,5 +172,37 @@ class LocalPromptRegistry(BasePromptRegistry):
             default_prompts,
             internal_event_client,
             custom_models_enabled,
+            model_configs,
             disable_streaming,
         )
+
+    @classmethod
+    def _process_version_file(
+        cls, version_file: Path, model_configs: dict[str, GeneralModelConfig]
+    ) -> PromptConfig:
+        """Processes a single version YAML file and returns a PromptConfig.
+
+        Args:
+            version_file: Path to the version YAML file
+            model_configs: Dictionary of model configurations
+
+        Returns:
+            PromptConfig: Processed prompt configuration
+        """
+
+        with open(version_file, "r") as fp:
+            prompt_config_params = yaml.safe_load(fp)
+            general_model_name = prompt_config_params["model"]["name"]
+            config_for_general_model = model_configs.get(general_model_name, None)
+            if config_for_general_model:
+                prompt_config_params["model"].update(
+                    {
+                        "name": config_for_general_model.model_name,
+                        "params": {
+                            **(config_for_general_model.additional_params or {}),
+                            **prompt_config_params["model"]["params"],
+                        },
+                    }
+                )
+
+        return PromptConfig(**prompt_config_params)
