@@ -59,7 +59,7 @@ prompt_template:
 ---
 name: Test prompt 1.0.1
 model:
-  name: claude-2.1
+  name: conversation_quick
   params:
     model_class_provider: litellm
     top_p: 0.1
@@ -129,6 +129,20 @@ params:
     - Bar
 """,
     )
+    model_configs_dir = (
+        Path(__file__).parent.parent.parent / "ai_gateway" / "prompts" / "model_configs"
+    )
+    fs.create_file(
+        model_configs_dir / "conversation_quick.yml",
+        contents="""
+---
+name: conversation_quick
+model_name: claude-2.1
+additional_params:
+  temperature: 0.9
+  max_tokens: 200
+""",
+    )
     yield fs
 
 
@@ -175,6 +189,7 @@ def prompts_registered():
                             max_tokens=256,
                             max_retries=10,
                             custom_llm_provider="vllm",
+                            temperature=0.9,
                         ),
                     ),
                     unit_primitives=["explain_code"],
