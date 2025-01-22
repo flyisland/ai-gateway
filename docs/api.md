@@ -15,9 +15,9 @@ curl --header "Authorization: Bearer <access_token>" --header "X-Gitlab-Authenti
   "http://localhost:5052/v2/code/completions"
 ```
 
-## Working with self hosted models
+## Working with self-hosted models
 
-Some parameters that are optional in the auto-generated API doc are required for self-hosted models.
+Some parameters that are optional in the [auto-generated interactive API documentation site](#api) are required for self-hosted models.
 
 For more information, see:
 
@@ -99,8 +99,6 @@ POST /v3/code/completions
 | `prompt_components.metadata.source`              | string  | no       | Source of the completionrequest (max_len: **255**)                                                 | `GitLab EE`              |
 | `prompt_components.metadata.version`             | string  | no       | Version of the source (max_len: **255**)                                                           | `16.3`                   |
 
-**GitLab SaaS**
-
 ```shell
 curl --request POST \
   --url "http://localhost:5052/v3/code/completions" \
@@ -128,7 +126,7 @@ curl --request POST \
     }'
 ```
 
-**GitLab self-managed with a self-hosted model**
+**For self-hosted model**
 
 ```shell
 curl --request POST \
@@ -201,8 +199,6 @@ Example response:
 | `prompt_components.metadata.source`              | string  | no       | Source of the completionrequest (max_len: **255**)                                                 | `GitLab EE`                          |
 | `prompt_components.metadata.version`             | string  | no       | Version of the source (max_len: **255**)                                                           | `16.3`                               |
 
-**GitLab SaaS**
-
 ```shell
 curl --request POST \
   --url "http://localhost:5052/v3/code/completions" \
@@ -252,7 +248,7 @@ curl --request POST \
     }'
 ```
 
-**GitLab self-managed with a self-hosted model**
+**For self-hosted model**
 
 ```shell
 curl --request POST \
@@ -478,8 +474,6 @@ This accepts a pre-built `prompt` and forwards it directly to third-party provid
 | `telemetry.accepts`                 | int    | yes      | The number of previously accepted completions                                  | `1`                                  |
 | `telemetry.errors`                  | int    | yes      | The number of previously failed completions                                    | `0`                                  |
 
-**GitLab SaaS**
-
 ```shell
 curl --request POST \
   --url "http://localhost:5052/v2/code/completions" \
@@ -517,7 +511,7 @@ curl --request POST \
   }'
 ```
 
-**GitLab self-managed with a self-hosted model**
+**For self-hosted model**
 
 ```shell
 curl --request POST \
@@ -600,8 +594,6 @@ This accepts a pre-built `prompt` and forwards it directly to a third-party prov
 | `telemetry.accepts`                 | int    | yes      | The number of previously accepted completions                                  | `1`                                  |
 | `telemetry.errors`                  | int    | yes      | The number of previously failed completions                                    | `0`                                  |
 
-**GitLab SaaS**
-
 ```shell
 curl --request POST \
   --url "http://localhost:5052/v2/code/completions" \
@@ -621,7 +613,7 @@ curl --request POST \
   }'
 ```
 
-**GitLab self-managed with a self-hosted model**
+**For self-hosted model**
 
 ```shell
 curl --request POST \
@@ -810,8 +802,6 @@ This accepts a pre-built `prompt` and forwards it directly to the third-party pr
 | `telemetry.accepts`                 | int    | yes      | The number of previously accepted completions                                                                                                                                          | `1`                                  |
 | `telemetry.errors`                  | int    | yes      | The number of previously failed completions                                                                                                                                            | `0`                                  |
 
-**GitLab SaaS**
-
 ```shell
 curl --request POST \
   --url "http://localhost:5052/v2/code/generations" \
@@ -848,7 +838,7 @@ curl --request POST \
   }'
 ```
 
-**GitLab self-managed with a self-hosted model**
+**For self-hosted model**
 
 ```shell
 curl --request POST \
