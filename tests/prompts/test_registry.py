@@ -1,4 +1,3 @@
-import os
 from pathlib import Path
 from textwrap import dedent
 from typing import Sequence, Type, cast
@@ -700,8 +699,6 @@ class TestLocalPromptRegistry:
                 ),  # type:ignore
             }
         )
-
-        print(os.listdir("/tmp"))
 
         prompt = registry.get("test", "1.0.0")
         assert prompt.unit_primitives == []
