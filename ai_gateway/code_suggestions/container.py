@@ -161,6 +161,7 @@ class ContainerCodeCompletions(containers.DeclarativeContainer):
         post_processor=providers.Factory(
             PostProcessorCompletions,
             exclude=config.excl_post_proc,
+            score_threshold=config.score_threshold,
         ).provider,
     )
 

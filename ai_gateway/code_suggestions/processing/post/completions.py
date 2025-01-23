@@ -7,6 +7,7 @@ from ai_gateway.code_suggestions.processing.ops import strip_whitespaces
 from ai_gateway.code_suggestions.processing.post.base import PostProcessorBase
 from ai_gateway.code_suggestions.processing.post.ops import (
     clean_model_reflection,
+    filter_score,
     fix_end_block_errors,
     fix_end_block_errors_legacy,
     remove_comment_only_completion,
@@ -32,11 +33,13 @@ class PostProcessorOperation(StrEnum):
     CLEAN_MODEL_REFLECTION = "clean_model_reflection"
     STRIP_WHITESPACES = "strip_whitespaces"
     STRIP_ASTERISKS = "strip_asterisks"
+    FILTER_SCORE = "filter_score"
 
 
 # This is the ordered list of prost-processing functions
 # Please do not change the order unless you have determined that it is acceptable
 ORDERED_POST_PROCESSORS = [
+    PostProcessorOperation.FILTER_SCORE,
     PostProcessorOperation.REMOVE_COMMENTS,
     PostProcessorOperation.TRIM_BY_MINIMUM_CONTEXT,
     PostProcessorOperation.FIX_END_BLOCK_ERRORS,
@@ -56,6 +59,8 @@ class PostProcessor(PostProcessorBase):
         ] = None,
         exclude: Optional[list] = None,
         extras: Optional[list] = None,
+        score: Optional[float] = None,
+        score_threshold: Optional[float] = None,
     ):
         self.code_context = code_context
         self.lang_id = lang_id
@@ -63,10 +68,15 @@ class PostProcessor(PostProcessorBase):
         self.overrides = overrides if overrides else {}
         self.exclude = set(exclude) if exclude else []
         self.extras = extras if extras else []
+        self.score = score
+        self.score_threshold = score_threshold
 
     @property
     def ops(self) -> list[AliasOpsRecord]:
         return {
+            PostProcessorOperation.FILTER_SCORE: partial(
+                filter_score, score=self.score, threshold=self.score_threshold
+            ),
             PostProcessorOperation.REMOVE_COMMENTS: partial(
                 remove_comment_only_completion, lang_id=self.lang_id
             ),

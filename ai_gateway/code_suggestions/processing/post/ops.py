@@ -327,3 +327,8 @@ def strip_asterisks(completion: str) -> str:
     # else, return the original completion
     # if there is no match for a string of asterisks, no need to clean the completion
     return completion
+
+
+# Very simple filtering based on score
+def filter_score(completion: str, score: float, threshold: float) -> str:
+    return "" if isinstance(score, (int, float)) and score < threshold else completion
