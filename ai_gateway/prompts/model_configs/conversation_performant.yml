@@ -1,5 +1,4 @@
-name: conversation_performant
-model_name: claude-3-5-sonnet-20241022
-additional_params:
+name: claude-3-5-sonnet-20241022
+params:
   temperature: 0.9
   max_tokens: 200

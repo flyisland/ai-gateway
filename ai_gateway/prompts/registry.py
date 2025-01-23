@@ -7,7 +7,7 @@ from poetry.core.constraints.version import Version, parse_constraint
 
 from ai_gateway.internal_events.client import InternalEventsClient
 from ai_gateway.prompts.base import BasePromptRegistry, Prompt
-from ai_gateway.prompts.config import ModelClassProvider, PromptConfig
+from ai_gateway.prompts.config import BaseModelConfig, ModelClassProvider, PromptConfig
 from ai_gateway.prompts.typing import ModelMetadata, TypeModelFactory
 
 __all__ = ["LocalPromptRegistry", "PromptRegistered"]
@@ -18,12 +18,6 @@ log = structlog.stdlib.get_logger("prompts")
 class PromptRegistered(NamedTuple):
     klass: Type[Prompt]
     versions: dict[str, PromptConfig]
-
-
-class GeneralModelConfig(NamedTuple):
-    name: str
-    model_name: str
-    additional_params: dict | None = None
 
 
 class LocalPromptRegistry(BasePromptRegistry):
@@ -131,9 +125,7 @@ class LocalPromptRegistry(BasePromptRegistry):
         # Parse model config YAML files
         for config_file in model_configs_dir.glob("*.yml"):
             with open(config_file, "r") as fp:
-                model_configs[config_file.stem] = GeneralModelConfig(
-                    **yaml.safe_load(fp)
-                )
+                model_configs[config_file.stem] = BaseModelConfig(**yaml.safe_load(fp))
 
         # raise Exception(model_configs)
         # Iterate over each folder
@@ -175,7 +167,7 @@ class LocalPromptRegistry(BasePromptRegistry):
 
     @classmethod
     def _process_version_file(
-        cls, version_file: Path, model_configs: dict[str, GeneralModelConfig]
+        cls, version_file: Path, model_configs: dict[str, BaseModelConfig]
     ) -> PromptConfig:
         """Processes a single version YAML file and returns a PromptConfig.
 
@@ -194,9 +186,9 @@ class LocalPromptRegistry(BasePromptRegistry):
             if config_for_general_model:
                 prompt_config_params["model"].update(
                     {
-                        "name": config_for_general_model.model_name,
+                        "name": config_for_general_model.name,
                         "params": {
-                            **(config_for_general_model.additional_params or {}),
+                            **(config_for_general_model.params.model_dump() or {}),
                             **prompt_config_params["model"]["params"],
                         },
                     }

@@ -136,9 +136,8 @@ params:
         model_configs_dir / "conversation_quick.yml",
         contents="""
 ---
-name: conversation_quick
-model_name: claude-2.1
-additional_params:
+name: claude-2.1
+params:
   temperature: 0.9
   max_tokens: 200
 """,
