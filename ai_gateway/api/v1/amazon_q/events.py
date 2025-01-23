@@ -39,8 +39,9 @@ async def events(
             detail="Unauthorized to perform action",
         )
 
+    payload = event_request.payload
     internal_event_client.track_event(
-        f"request_{GitLabUnitPrimitive.AMAZON_Q_INTEGRATION}",
+        f"request_{GitLabUnitPrimitive.AMAZON_Q_INTEGRATION}_{payload.source}_{payload.command}",
         category=__name__,
     )
 

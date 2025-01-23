@@ -55,7 +55,7 @@ def fast_api_router():
 
 def merge_request_event_payload():
     return {
-        "command": "foo",
+        "command": "review",
         "source": "merge_request",
         "project_path": "PROJ-123",
         "project_id": "PROJ-123",
@@ -71,7 +71,7 @@ def merge_request_event_payload():
 
 def issue_event_payload():
     return {
-        "command": "foo",
+        "command": "fix",
         "source": "issue",
         "project_path": "PROJ-123",
         "project_id": "PROJ-123",
@@ -318,7 +318,20 @@ class TestEvents:
         assert response.status_code == status.HTTP_400_BAD_REQUEST
 
     @pytest.mark.parametrize(
-        "payload", [merge_request_event_payload(), issue_event_payload()]
+        (
+            "payload",
+            "track_event",
+        ),
+        [
+            (
+                merge_request_event_payload(),
+                "request_amazon_q_integration_merge_request_review",
+            ),
+            (
+                issue_event_payload(),
+                "request_amazon_q_integration_issue_fix",
+            ),
+        ],
     )
     def test_successful_events_call(
         self,
@@ -327,8 +340,10 @@ class TestEvents:
         mock_q_boto3,
         mock_sts_client,
         mock_glgo,
+        mock_track_internal_event: MagicMock,
         credentials,
         payload,
+        track_event,
     ):
         mock_send_event = MagicMock(return_value=None)
         mock_q_client_response = MagicMock()
@@ -346,4 +361,9 @@ class TestEvents:
             eventId="Quick Action",
             eventVersion="1.0",
             event=json.dumps(payload, separators=(",", ":")),
+        )
+
+        mock_track_internal_event.assert_called_once_with(
+            track_event,
+            category="ai_gateway.api.v1.amazon_q.events",
         )
