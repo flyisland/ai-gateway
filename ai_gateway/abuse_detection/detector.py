@@ -95,7 +95,7 @@ class AbuseDetector:
         if not self.enabled:
             return False
 
-        return random.random() < self.sampling_rate
+        return secrets.SystemRandom().random() < self.sampling_rate
 
     async def detect(
         self,
@@ -161,3 +161,4 @@ class AbuseDetector:
 
         log.info("abuse request score", score=score, **detail_labels)
         ABUSE_SCORE.labels(**detail_labels).observe(score)
+
