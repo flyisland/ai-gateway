@@ -151,6 +151,17 @@ class AmazonQClient:
                 return self._retry_send_message(ex, event_request.code, payload)
 
             raise
+        
+    @raise_aws_errors
+    def send_inline_code_message(self, payload):
+
+        try:
+            return self._generate_code_recommendations(payload)
+        except ClientError as ex:
+            if ex.__class__.__name__ == "AccessDeniedException":
+                return self._retry_generate_code_recommendations(ex, event_request.code, payload)
+
+            raise
 
 
     @raise_aws_errors
@@ -171,7 +182,14 @@ class AmazonQClient:
         return self.client.send_message(
             message=payload["message"],
             conversationId=payload["conversation_id"],
-            history=payload["history"]
+            # history=payload["history"]
+        )
+        
+    def _generate_code_recommendations(self, payload):
+        print("DEBUG-AmazonQClient: payload", payload)
+        return self.client.generate_code_recommendations(
+            fileContext=payload["file_context"],
+            maxResults=payload["max_results"],
         )
 
 
@@ -184,6 +202,11 @@ class AmazonQClient:
         self._is_retry(error, code)
 
         return self._send_message(payload)
+        
+    def _retry_generate_code_recommendations(self, error, code, payload):
+        self._is_retry(error, code)
+
+        return self._generate_code_recommendations(payload)
 
 
     def _is_retry(self, error, code):

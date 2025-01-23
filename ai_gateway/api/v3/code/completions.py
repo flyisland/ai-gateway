@@ -80,6 +80,9 @@ async def completions(
     prompt_registry: Annotated[BasePromptRegistry, Depends(get_prompt_registry)],
     config: Annotated[Config, Depends(get_config)],
 ):
+    print("DEBUG [/completions]: payload", payload)
+    print("DEBUG [/completions]: prompt_registry", prompt_registry)
+    print("DEBUG [/completions]: config", config)
     return await code_suggestions(
         request=request,
         payload=payload,

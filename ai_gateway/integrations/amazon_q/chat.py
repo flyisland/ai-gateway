@@ -44,9 +44,11 @@ class ChatAmazonQ(BaseChatModel):
           # Assuming each event in the EventStream has a 'content' field
           # You may need to adjust this based on the actual structure of your EventStream
           print("message_stream event: ", event)
-          assistantResponseEvent = event['assistantResponseEvent']
-          content = assistantResponseEvent.get('content', '')
-          yield ChatGenerationChunk(message=AIMessageChunk(content=content))
+          # Check if "assistantResponseEvent" is in event since some event does not have it
+          if 'assistantResponseEvent' in event:
+              assistantResponseEvent = event['assistantResponseEvent']
+              content = assistantResponseEvent.get('content', '')
+              yield ChatGenerationChunk(message=AIMessageChunk(content=content))
 
 
     def _build_response(self, messages: List[BaseMessage]):
@@ -60,6 +62,8 @@ class ChatAmazonQ(BaseChatModel):
             auth_header=current_user.auth_header,
             role_arn=role_arn,
         )
+        
+        print("DEBUG: messages", messages)
 
         send_message_params = self._calculate_send_message_params(messages)
 
@@ -80,7 +84,8 @@ class ChatAmazonQ(BaseChatModel):
             }
             for i in range(0, len(messages) - 1, 2)
         ]
-
+        print("DEBUG: history", history)
+        print("DEBUG: message_content", message_content)
         return {
             "message": message_content,
             "conversation_id": "test_vivek",

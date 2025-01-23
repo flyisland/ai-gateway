@@ -3076,7 +3076,7 @@ description = "boto3 fork which includes q developer clients"
 optional = false
 python-versions = ">=3.9"
 files = [
-    {file = "q_developer_boto3-1.3.0-py3-none-any.whl", hash = "sha256:b224e4c26980674782ad9a6a77d077e4313d56d3261066065ff156c15d94de1e"},
+    {file = "q_developer_boto3-1.4.0-py3-none-any.whl", hash = "sha256:c15ad4093eaef3b41ecea20821e5107462a32103ef4dcead41a06615d17c806d"},
 ]
 
 [package.dependencies]
@@ -3084,7 +3084,7 @@ boto3 = ">=1.14.11"
 
 [package.source]
 type = "file"
-url = "vendor/q_developer_boto3-1.3.0-py3-none-any.whl"
+url = "vendor/q_developer_boto3-1.4.0-py3-none-any.whl"
 
 [[package]]
 name = "referencing"

@@ -1,3 +1,5 @@
+import os
+
 from time import time
 from typing import Annotated, AsyncIterator, Optional, Tuple, Union
 
@@ -64,6 +66,13 @@ from ai_gateway.structured_logging import get_request_logger
 from ai_gateway.tracking import SnowplowEvent, SnowplowEventContext
 from ai_gateway.tracking.errors import log_exception
 from ai_gateway.tracking.instrumentator import SnowplowInstrumentator
+from ai_gateway.async_dependency_resolver import (
+    get_amazon_q_client_factory,
+    get_internal_event_client,
+)
+from ai_gateway.integrations.amazon_q.client import AmazonQClientFactory
+from ai_gateway.integrations.amazon_q.errors import AWSException
+from ai_gateway.internal_events import InternalEventsClient
 
 __all__ = [
     "router",
@@ -441,25 +450,52 @@ def _build_code_completions(
     completions_fireworks_qwen_factory: Factory[CodeCompletions],
     completions_agent_factory: Factory[CodeCompletions],
     internal_event_client: InternalEventsClient,
+    amazon_q_client_factory: AmazonQClientFactory,
 ) -> tuple[CodeCompletions | CodeCompletionsLegacy, dict]:
     kwargs = {}
 
 
     if True:  # pylint: disable=using-constant-test
-        model_metadata = ModelMetadata(
-            name="amazon_q",
-            provider="amazon_q",
-        )
+        # model_metadata = ModelMetadata(
+        #     name="amazon_q",
+        #     provider="amazon_q",
+        # )
 
-        code_completions = _resolve_agent_code_completions(
-            model_metadata=model_metadata,
-            current_user=current_user,
-            prompt_registry=prompt_registry,
-            completions_agent_factory=completions_agent_factory,
-        )
+        # code_completions = _resolve_agent_code_completions(
+        #     model_metadata=model_metadata,
+        #     current_user=current_user,
+        #     prompt_registry=prompt_registry,
+        #     completions_agent_factory=completions_agent_factory,
+        # )
 
-        if payload.context:
-            kwargs.update({"code_context": [ctx.content for ctx in payload.context]})
+        # if payload.context:
+        #     kwargs.update({"code_context": [ctx.content for ctx in payload.context]})
+        print("DEBUG: [/events]", "Checking user permission")
+        if not current_user.can(GitLabUnitPrimitive.AMAZON_Q_INTEGRATION):
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Unauthorized to perform action",
+            )
+    
+        internal_event_client.track_event(
+            f"request_{GitLabUnitPrimitive.AMAZON_Q_INTEGRATION}",
+            category=__name__,
+        )
+        # pylint: disable=direct-environment-variable-reference
+        role_arn = os.environ.get("AWS_ROLE_ARN")
+        # pylint: enable=direct-environment-variable-reference
+    
+        try:
+            q_client = amazon_q_client_factory.get_client(
+                current_user=current_user,
+                auth_header=current_user.auth_header,
+                role_arn=role_arn,
+            )
+            print("DEBUG: [/events]", "Sending event to AmazonQ API", payload)
+            q_client.send_inline_code_message(payload)
+            print("DEBUG: [/events]", "Send event completed!")
+        except AWSException as e:
+            raise e.to_http_exception()
     elif payload.model_provider == KindModelProvider.ANTHROPIC:
         code_completions = completions_anthropic_factory(
             model__name=payload.model_name,
