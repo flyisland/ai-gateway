@@ -450,7 +450,7 @@ class LiteLlmTextGenModel(TextGenModelBase):
         if self._use_suffix_as_stop_token():
             suffix_stop_token = self._get_suffix_stop_token(suffix)
             if suffix_stop_token:
-                return self.stop_tokens + [self._get_suffix_stop_token(suffix)]
+                return self.stop_tokens + [suffix_stop_token]
 
         return self.stop_tokens
 
