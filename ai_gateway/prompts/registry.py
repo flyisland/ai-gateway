@@ -57,7 +57,7 @@ class LocalPromptRegistry(BasePromptRegistry):
         all_versions = [Version.parse(version) for version in versions.keys()]
         compatible_versions = list(filter(constraint.allows, all_versions))
         if not compatible_versions:
-            log.debug(
+            log.info(
                 "No compatible versions found",
                 versions=versions,
                 prompt_version=prompt_version,
