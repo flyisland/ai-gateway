@@ -331,4 +331,6 @@ def strip_asterisks(completion: str) -> str:
 
 # Very simple filtering based on score
 def filter_score(completion: str, score: float, threshold: float) -> str:
-    return "" if isinstance(score, (int, float)) and score < threshold else completion
+    if threshold != -9999.0 and isinstance(score, (int, float)) and score < threshold:
+        return ""
+    return completion

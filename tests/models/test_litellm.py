@@ -735,10 +735,12 @@ class TestLiteLlmTextGenModel:
                     "custom_llm_provider": "text-completion-openai",
                     "extra_headers": {"x-session-affinity": "test"},
                     "prompt_cache_max_len": 0,
+                    "logprobs": 1,
                 },
                 "def hello_world():",
                 "def goodbye_world():\n//another line",
                 True,
+                999.0,
             ),
         ],
     )
