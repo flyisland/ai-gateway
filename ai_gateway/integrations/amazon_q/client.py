@@ -58,7 +58,10 @@ class AmazonQClientFactory:
 
         try:
             _, _, cloud_connector_token = auth_header.partition(" ")
-            print("DEBUG-AmazonQClientFactory: cloud_connector_token", cloud_connector_token)
+            print(
+                "DEBUG-AmazonQClientFactory: cloud_connector_token",
+                cloud_connector_token,
+            )
             token = self.glgo_authority.token(
                 user_id=user_id,
                 cloud_connector_token=cloud_connector_token,
@@ -147,22 +150,20 @@ class AmazonQClient:
         try:
             return self._send_message(payload)
         except ClientError as ex:
-            if ex.__class__.__name__ == "AccessDeniedException":
-                return self._retry_send_message(ex, event_request.code, payload)
+            # if ex.__class__.__name__ == "AccessDeniedException":
+            #     return self._retry_send_message(ex, event_request.code, payload)
 
-            raise
-        
+            raise ex
+
     @raise_aws_errors
     def send_inline_code_message(self, payload):
 
         try:
             return self._generate_code_recommendations(payload)
         except ClientError as ex:
-            if ex.__class__.__name__ == "AccessDeniedException":
-                return self._retry_generate_code_recommendations(ex, event_request.code, payload)
-
-            raise
-
+            # if ex.__class__.__name__ == "AccessDeniedException":
+            #     return self._retry_generate_code_recommendations(ex, event_request.code, payload)
+            raise ex
 
     @raise_aws_errors
     def _create_o_auth_app_connection(self, **params):
@@ -176,38 +177,35 @@ class AmazonQClient:
             event=payload,
         )
 
-
     def _send_message(self, payload):
-        print("DEBUG-AmazonQClient: payload", payload)
+        print("DEBUG [AmazonQClient]: _send_message payload", payload)
         return self.client.send_message(
             message=payload["message"],
             conversationId=payload["conversation_id"],
             # history=payload["history"]
         )
-        
+
     def _generate_code_recommendations(self, payload):
-        print("DEBUG-AmazonQClient: payload", payload)
+        print("DEBUG [AmazonQClient]: _generate_code_recommendations payload", payload)
         return self.client.generate_code_recommendations(
             fileContext=payload["file_context"],
             maxResults=payload["max_results"],
         )
 
-
     def _retry_send_event(self, error, code, payload):
         self._is_retry(error, code)
 
         return self._send_event(payload)
-        
+
     def _retry_send_message(self, error, code, payload):
         self._is_retry(error, code)
 
         return self._send_message(payload)
-        
+
     def _retry_generate_code_recommendations(self, error, code, payload):
         self._is_retry(error, code)
 
         return self._generate_code_recommendations(payload)
-
 
     def _is_retry(self, error, code):
         match str(error.response.get("reason")):
