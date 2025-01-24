@@ -443,10 +443,10 @@ class LiteLlmTextGenModel(TextGenModelBase):
             ),
         )
 
-    def _use_suffix_as_stop_token(self):
+    def _use_suffix_as_stop_token(self) -> bool:
         return self.provider == KindModelProvider.FIREWORKS
 
-    def _get_stop_tokens(self, suffix):
+    def _get_stop_tokens(self, suffix) -> list[str]:
         if self._use_suffix_as_stop_token():
             suffix_stop_token = self._get_suffix_stop_token(suffix)
             if suffix_stop_token:
@@ -454,7 +454,7 @@ class LiteLlmTextGenModel(TextGenModelBase):
 
         return self.stop_tokens
 
-    def _get_suffix_stop_token(self, suffix):
+    def _get_suffix_stop_token(self, suffix) -> str:
         if not suffix or not suffix.strip():
             return ""
 
