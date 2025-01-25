@@ -188,8 +188,8 @@ class AmazonQClient:
     def _generate_code_recommendations(self, payload):
         print("DEBUG [AmazonQClient]: _generate_code_recommendations payload", payload)
         return self.client.generate_code_recommendations(
-            fileContext=payload["file_context"],
-            maxResults=payload["max_results"],
+            fileContext=payload["fileContext"],
+            maxResults=payload["maxResults"],
         )
 
     def _retry_send_event(self, error, code, payload):

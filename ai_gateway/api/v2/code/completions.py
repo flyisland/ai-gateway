@@ -57,6 +57,7 @@ from ai_gateway.code_suggestions import (
 from ai_gateway.code_suggestions.base import CodeSuggestionsOutput
 from ai_gateway.code_suggestions.processing.base import ModelEngineOutput
 from ai_gateway.code_suggestions.processing.ops import lang_from_filename
+from ai_gateway.code_suggestions.processing.typing import MetadataPromptBuilder
 from ai_gateway.config import Config
 from ai_gateway.feature_flags.context import current_feature_flag_context
 from ai_gateway.instrumentators.base import TelemetryInstrumentator
@@ -189,9 +190,14 @@ async def completions(
             **kwargs,
         )
 
-    if isinstance(suggestions[0], AsyncIterator):
-        return await _handle_stream(suggestions[0])
+        if isinstance(suggestions[0], AsyncIterator):
+            return await _handle_stream(suggestions[0])
     choices, tokens_consumption_metadata = _completion_suggestion_choices(suggestions)
+    request_log.debug(
+        "code completion:",
+        choices=choices,
+        suggestions=suggestions,
+    )
     return SuggestionsResponse(
         id="id",
         created=int(time()),
@@ -627,7 +633,7 @@ async def _execute_code_completion_api(
     current_user: Annotated[StarletteUser, Depends(get_current_user)],
     internal_event_client: InternalEventsClient,
     amazon_q_client_factory: AmazonQClientFactory,
-) -> AsyncIterator[CodeSuggestionsChunk]:
+) -> list[ModelEngineOutput]:
     print("DEBUG: [_execute_code_completion_api]", "Checking user permission")
     if not current_user.can(GitLabUnitPrimitive.AMAZON_Q_INTEGRATION):
         raise HTTPException(
@@ -650,34 +656,53 @@ async def _execute_code_completion_api(
             role_arn=role_arn,
         )
         language = lang_from_filename(payload.current_file.file_name)
-        language_name = language.name if language else ""
+        language_name = language.name.lower() if language else ""
+        prefix = (
+            payload.current_file.content_above_cursor[-100:]
+            if payload.current_file.content_above_cursor
+            else ""
+        )
+        suffix = (
+            payload.current_file.content_below_cursor[:100]
+            if payload.current_file.content_below_cursor
+            else ""
+        )
         cc_payload = {
-            "file_context": {
-                "leftFileContent": payload.current_file.content_above_cursor,
-                "rightFileContent": payload.current_file.content_below_cursor,
+            "fileContext": {
+                "leftFileContent": prefix,
+                "rightFileContent": suffix,
                 "filename": payload.current_file.file_name,
                 "programmingLanguage": {
                     "languageName": language_name,
                 },
             },
-            "max_results": 1,
+            "maxResults": 1,
         }
         print(
             "DEBUG: [_execute_code_completion_api]",
             "Sending event to AmazonQ API",
             cc_payload,
         )
-        message_stream = q_client.send_inline_code_message(cc_payload)
-        print("DEBUG: [_execute_code_completion_api]", "Send event completed!")
-        stream_output = message_stream["responseStream"]
-        for event in stream_output:
-            # Assuming each event in the EventStream has a 'content' field
-            # You may need to adjust this based on the actual structure of your EventStream
-            print("DEBUG: [_execute_code_completion_api]message_stream event: ", event)
-            # Check if "CodeRecommendations" is in event since some event does not have it
-            if "assistantResponseEvent" in event:
-                code_recommendations = event["CodeRecommendations"]
-                content = code_recommendations.get("content", "")
-                yield CodeSuggestionsChunk(text=content)
+        suggestion_resp = q_client.send_inline_code_message(cc_payload)
+        print(
+            "DEBUG: [_execute_code_completion_api]",
+            "Send event completed!",
+            suggestion_resp,
+        )
+        output: list[ModelEngineOutput] = []
+        for suggestion in suggestion_resp["CodeRecommendations"]:
+            output.append(
+                ModelEngineOutput(
+                    text=suggestion["content"],
+                    score=0,
+                    model=ModelMetadata(name="amazon_q", engine="amazon_q"),
+                    metadata=MetadataPromptBuilder(components={}, experiments=[]),
+                    tokens_consumption_metadata=TokensConsumptionMetadata(
+                        input_tokens=0, output_tokens=0
+                    ),
+                    lang_id=language_name,
+                )
+            )
+        return output
     except AWSException as e:
         raise e.to_http_exception()
