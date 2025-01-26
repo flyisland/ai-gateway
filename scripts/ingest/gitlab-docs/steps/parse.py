@@ -4,6 +4,7 @@ import dataclasses
 import json
 import os
 import re
+import sys
 from hashlib import sha256
 from pathlib import Path
 
@@ -40,7 +41,7 @@ def warn(s):
     """Print s to stderr in red"""
     red = "\033[31m"
     reset = "\033[0m"
-    print(f"{red}--- WARNING: {s}{reset}")
+    print(f"{red}--- WARNING: {s}{reset}", file=sys.stderr)
 
 
 def batched(s, n):
