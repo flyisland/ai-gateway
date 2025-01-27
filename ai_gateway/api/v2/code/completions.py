@@ -65,6 +65,7 @@ from ai_gateway.integrations.amazon_q.client import AmazonQClientFactory
 from ai_gateway.integrations.amazon_q.errors import AWSException
 from ai_gateway.internal_events import InternalEventsClient
 from ai_gateway.models import KindAnthropicModel, KindModelProvider
+from ai_gateway.models import ModelMetadata as EngineOutputModelMetadata
 from ai_gateway.models.base import TokensConsumptionMetadata
 from ai_gateway.prompts import BasePromptRegistry
 from ai_gateway.prompts.typing import ModelMetadata
@@ -197,6 +198,10 @@ async def completions(
         "code completion:",
         choices=choices,
         suggestions=suggestions,
+    )
+    print("DEBUG [completions]: choices", choices)
+    print(
+        "DEBUG [completions]: tokens_consumption_metadata", tokens_consumption_metadata
     )
     return SuggestionsResponse(
         id="id",
@@ -691,18 +696,21 @@ async def _execute_code_completion_api(
         )
         output: list[ModelEngineOutput] = []
         for suggestion in suggestion_resp["CodeRecommendations"]:
+            print("DEBUG: [_execute_code_completion_api]", "Suggestion:", suggestion)
             output.append(
                 ModelEngineOutput(
                     text=suggestion["content"],
                     score=0,
-                    model=ModelMetadata(name="amazon_q", engine="amazon_q"),
+                    model=EngineOutputModelMetadata(name="amazon_q", engine="amazon_q"),
                     metadata=MetadataPromptBuilder(components={}, experiments=[]),
                     tokens_consumption_metadata=TokensConsumptionMetadata(
                         input_tokens=0, output_tokens=0
                     ),
-                    lang_id=language_name,
+                    lang_id=language,
                 )
             )
+        print("DEBUG: [_execute_code_completion_api]", "Output:", output)
         return output
     except AWSException as e:
+        print("DEBUG: [_execute_code_completion_api]", "Error:", e)
         raise e.to_http_exception()
