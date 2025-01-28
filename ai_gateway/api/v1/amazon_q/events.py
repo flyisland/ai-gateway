@@ -33,6 +33,7 @@ async def events(
         get_amazon_q_client_factory
     ),
 ):
+    print("DEBUG: [/events]", "Checking user permission")
     if not current_user.can(GitLabUnitPrimitive.AMAZON_Q_INTEGRATION):
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
@@ -50,8 +51,9 @@ async def events(
             auth_header=request.headers.get(AUTH_HEADER),
             role_arn=event_request.role_arn,
         )
-
+        print("DEBUG: [/events]", "Sending event to AmazonQ API", event_request)
         q_client.send_event(event_request)
+        print("DEBUG: [/events]", "Send event completed!")
     except AWSException as e:
         raise e.to_http_exception()
 

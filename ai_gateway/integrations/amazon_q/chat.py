@@ -1,14 +1,15 @@
 import os
-
 from typing import Any, Dict, Iterator, List, Optional
 
 from langchain_core.callbacks.manager import CallbackManagerForLLMRun
 from langchain_core.language_models.chat_models import BaseChatModel
-from langchain_core.messages import AIMessage, BaseMessage, ChatMessageChunk
+from langchain_core.messages import (
+    AIMessage,
+    AIMessageChunk,
+    BaseMessage,
+    SystemMessage,
+)
 from langchain_core.outputs import ChatGeneration, ChatGenerationChunk, ChatResult
-
-from ai_gateway.integrations.amazon_q.errors import AWSException
-from langchain_core.messages import AIMessageChunk, SystemMessage
 
 __all__ = [
     "ChatAmazonQ",
@@ -41,13 +42,14 @@ class ChatAmazonQ(BaseChatModel):
         message_stream = self._build_response(messages=messages)
         stream_output = message_stream["responseStream"]
         for event in stream_output:
-          # Assuming each event in the EventStream has a 'content' field
-          # You may need to adjust this based on the actual structure of your EventStream
-          print("message_stream event: ", event)
-          assistantResponseEvent = event['assistantResponseEvent']
-          content = assistantResponseEvent.get('content', '')
-          yield ChatGenerationChunk(message=AIMessageChunk(content=content))
-
+            # Assuming each event in the EventStream has a 'content' field
+            # You may need to adjust this based on the actual structure of your EventStream
+            print("message_stream event: ", event)
+            # Check if "assistantResponseEvent" is in event since some event does not have it
+            if "assistantResponseEvent" in event:
+                assistantResponseEvent = event["assistantResponseEvent"]
+                content = assistantResponseEvent.get("content", "")
+                yield ChatGenerationChunk(message=AIMessageChunk(content=content))
 
     def _build_response(self, messages: List[BaseMessage]):
         current_user = self.metadata["user"]
@@ -61,6 +63,8 @@ class ChatAmazonQ(BaseChatModel):
             role_arn=role_arn,
         )
 
+        print("DEBUG: messages", messages)
+
         send_message_params = self._calculate_send_message_params(messages)
 
         return q_client.send_chat_message(send_message_params)
@@ -69,7 +73,7 @@ class ChatAmazonQ(BaseChatModel):
         if messages and isinstance(messages[0], SystemMessage):
             system_message = messages.pop(0)
             if messages:
-                messages[0].content = system_message.content + messages[0].content
+                messages[0].content = f"{system_message.content}{messages[0].content}"
 
         message_content = messages.pop().content if messages else ""
 
@@ -80,7 +84,8 @@ class ChatAmazonQ(BaseChatModel):
             }
             for i in range(0, len(messages) - 1, 2)
         ]
-
+        print("DEBUG: history", history)
+        print("DEBUG: message_content", message_content)
         return {
             "message": message_content,
             "conversation_id": "test_vivek",

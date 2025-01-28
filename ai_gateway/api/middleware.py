@@ -13,8 +13,8 @@ from gitlab_cloud_connector import (
     CloudConnectorAuthError,
     CloudConnectorUser,
 )
-from gitlab_cloud_connector.auth import AUTH_HEADER
 from gitlab_cloud_connector import authenticate as cloud_connector_authenticate
+from gitlab_cloud_connector.auth import AUTH_HEADER
 from langsmith.run_helpers import tracing_context
 from starlette.authentication import (
     AuthCredentials,

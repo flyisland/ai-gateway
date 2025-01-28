@@ -94,6 +94,9 @@ async def suggestions(
     prompt_registry: Annotated[BasePromptRegistry, Depends(get_prompt_registry)],
     config: Annotated[Config, Depends(get_config)],
 ):
+    print("DEBUG [/suggestions]: payload", payload)
+    print("DEBUG [/suggestions]: prompt_registry", prompt_registry)
+    print("DEBUG [/suggestions]: config", config)
     return await v3_code_suggestions(
         request=request,
         payload=payload,
