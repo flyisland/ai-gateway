@@ -36,6 +36,7 @@ class TypeAgentFactory(Protocol[TypeAgentEvent]):
     ) -> Runnable[TypeAgentInputs, TypeAgentEvent]: ...
 
 
+# pylint: disable=attribute-defined-outside-init
 class GLAgentRemoteExecutor(Generic[TypeAgentInputs, TypeAgentEvent]):
     def __init__(
         self,
@@ -71,7 +72,9 @@ class GLAgentRemoteExecutor(Generic[TypeAgentInputs, TypeAgentEvent]):
 
     async def stream(self, *, inputs: TypeAgentInputs) -> AsyncIterator[TypeAgentEvent]:
         inputs.tools = self.tools
-        agent: ReActAgent = self.agent_factory(user=self._user, model_metadata=inputs.model_metadata)
+        agent: ReActAgent = self.agent_factory(
+            user=self._user, model_metadata=inputs.model_metadata
+        )
 
         tools_by_name = self.tools_by_name
 

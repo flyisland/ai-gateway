@@ -20,6 +20,7 @@ from ai_gateway.chat.agents.typing import (
     TypeAgentEvent,
 )
 from ai_gateway.chat.tools.base import BaseTool
+from ai_gateway.feature_flags import FeatureFlag, is_feature_enabled
 from ai_gateway.models.base_chat import Role
 from ai_gateway.prompts import Prompt, jinja2_formatter
 from ai_gateway.prompts.typing import ModelMetadata
@@ -43,6 +44,7 @@ class ReActAgentInputs(BaseModel):
     model_metadata: Optional[ModelMetadata] = None
     unavailable_resources: Optional[list[str]] = None
     tools: Optional[list[BaseTool]] = None
+    conciseness_prompt_change_active: Optional[bool] = None
 
 
 class ReActPlainTextParser(BaseCumulativeTransformOutputParser):
@@ -141,15 +143,22 @@ class ReActPromptTemplate(Runnable[ReActAgentInputs, PromptValue]):
         messages = []
 
         if "system" in self.prompt_template:
-            messages.append(
-                SystemMessage(
-                    jinja2_formatter(
-                        self.prompt_template["system"],
-                        tools=input.tools,
-                        unavailable_resources=input.unavailable_resources,
-                    )
-                )
+            content = jinja2_formatter(
+                self.prompt_template["system"],
+                tools=input.tools,
+                unavailable_resources=input.unavailable_resources,
+                conciseness_prompt_change_active=input.conciseness_prompt_change_active,
             )
+            if is_feature_enabled(FeatureFlag.ENABLE_ANTHROPIC_PROMPT_CACHING):
+                content = [
+                    {
+                        "text": content,
+                        "type": "text",
+                        "cache_control": {"type": "ephemeral"},
+                    }
+                ]
+
+            messages.append(SystemMessage(content=content))
 
         for m in input.messages:
             if m.role is Role.USER:
@@ -167,14 +176,14 @@ class ReActPromptTemplate(Runnable[ReActAgentInputs, PromptValue]):
             raise ValueError("Last message must be a human message")
 
         if "assistant" in self.prompt_template:
-          messages.append(
-              AIMessage(
-                  jinja2_formatter(
-                      self.prompt_template["assistant"],
-                      agent_scratchpad=input.agent_scratchpad,
-                  )
-              )
-          )
+            messages.append(
+                AIMessage(
+                    jinja2_formatter(
+                        self.prompt_template["assistant"],
+                        agent_scratchpad=input.agent_scratchpad,
+                    )
+                )
+            )
 
         return ChatPromptValue(messages=messages)
 

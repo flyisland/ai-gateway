@@ -1,3 +1,4 @@
+import os
 from time import time
 from typing import Annotated, AsyncIterator, Optional, Tuple, Union
 
@@ -13,8 +14,12 @@ from gitlab_cloud_connector import (
 from ai_gateway.api.auth_utils import StarletteUser, get_current_user
 from ai_gateway.api.error_utils import capture_validation_errors
 from ai_gateway.api.feature_category import feature_category
-from ai_gateway.api.middleware import X_GITLAB_LANGUAGE_SERVER_VERSION
 from ai_gateway.api.snowplow_context import get_snowplow_code_suggestion_context
+from ai_gateway.api.v2.code.model_provider_handlers import (  # AnthropicHandler,
+    FireworksHandler,
+    LegacyHandler,
+    LiteLlmHandler,
+)
 from ai_gateway.api.v2.code.typing import (
     CompletionsRequestV1,
     CompletionsRequestV2,
@@ -27,6 +32,7 @@ from ai_gateway.api.v2.code.typing import (
     SuggestionsResponse,
 )
 from ai_gateway.async_dependency_resolver import (
+    get_amazon_q_client_factory,
     get_code_suggestions_completions_agent_factory_provider,
     get_code_suggestions_completions_anthropic_provider,
     get_code_suggestions_completions_fireworks_qwen_factory_provider,
@@ -49,14 +55,17 @@ from ai_gateway.code_suggestions import (
     CodeSuggestionsChunk,
 )
 from ai_gateway.code_suggestions.base import CodeSuggestionsOutput
-from ai_gateway.code_suggestions.language_server import LanguageServerVersion
 from ai_gateway.code_suggestions.processing.base import ModelEngineOutput
 from ai_gateway.code_suggestions.processing.ops import lang_from_filename
+from ai_gateway.code_suggestions.processing.typing import MetadataPromptBuilder
 from ai_gateway.config import Config
 from ai_gateway.feature_flags.context import current_feature_flag_context
 from ai_gateway.instrumentators.base import TelemetryInstrumentator
+from ai_gateway.integrations.amazon_q.client import AmazonQClientFactory
+from ai_gateway.integrations.amazon_q.errors import AWSException
 from ai_gateway.internal_events import InternalEventsClient
 from ai_gateway.models import KindAnthropicModel, KindModelProvider
+from ai_gateway.models import ModelMetadata as EngineOutputModelMetadata
 from ai_gateway.models.base import TokensConsumptionMetadata
 from ai_gateway.prompts import BasePromptRegistry
 from ai_gateway.prompts.typing import ModelMetadata
@@ -121,57 +130,79 @@ async def completions(
         get_snowplow_instrumentator
     ),
     internal_event_client: InternalEventsClient = Depends(get_internal_event_client),
+    amazon_q_client_factory: AmazonQClientFactory = Depends(
+        get_amazon_q_client_factory
+    ),
 ):
-    code_completions, kwargs = _build_code_completions(
-        request,
-        payload,
-        current_user,
-        prompt_registry,
-        completions_legacy_factory,
-        completions_anthropic_factory,
-        completions_litellm_factory,
-        completions_fireworks_qwen_factory,
-        completions_agent_factory,
-        internal_event_client,
-    )
+    if True:  # pylint: disable=using-constant-test
+        # pylint: disable=no-value-for-parameter
+        suggestions = await _execute_code_completion_api(
+            payload,
+            current_user,
+            internal_event_client,
+            amazon_q_client_factory,
+        )
+    else:
+        code_completions, kwargs = _build_code_completions(
+            request,
+            payload,
+            current_user,
+            prompt_registry,
+            completions_legacy_factory,
+            completions_anthropic_factory,
+            completions_litellm_factory,
+            completions_fireworks_qwen_factory,
+            completions_agent_factory,
+            internal_event_client,
+            amazon_q_client_factory,
+        )
 
-    snowplow_event_context = None
-    try:
-        language = lang_from_filename(payload.current_file.file_name)
-        language_name = language.name if language else ""
-        snowplow_event_context = get_snowplow_code_suggestion_context(
-            req=request,
+        snowplow_event_context = None
+        try:
+            language = lang_from_filename(payload.current_file.file_name)
+            language_name = language.name if language else ""
+            snowplow_event_context = get_snowplow_code_suggestion_context(
+                req=request,
+                prefix=payload.current_file.content_above_cursor,
+                suffix=payload.current_file.content_below_cursor,
+                language=language_name,
+                global_user_id=current_user.global_user_id,
+                region=config.google_cloud_platform.location(),
+            )
+            snowplow_instrumentator.watch(SnowplowEvent(context=snowplow_event_context))
+        except Exception as e:
+            log_exception(e)
+
+        request_log.info(
+            "code completion input:",
+            model_name=payload.model_name,
+            model_provider=payload.model_provider,
+            prompt=payload.prompt if hasattr(payload, "prompt") else None,
             prefix=payload.current_file.content_above_cursor,
             suffix=payload.current_file.content_below_cursor,
-            language=language_name,
-            global_user_id=current_user.global_user_id,
-            region=config.google_cloud_platform.location(),
+            current_file_name=payload.current_file.file_name,
+            stream=payload.stream,
         )
-        snowplow_instrumentator.watch(SnowplowEvent(context=snowplow_event_context))
-    except Exception as e:
-        log_exception(e)
 
-    request_log.info(
-        "code completion input:",
-        model_name=payload.model_name,
-        model_provider=payload.model_provider,
-        prompt=payload.prompt if hasattr(payload, "prompt") else None,
-        prefix=payload.current_file.content_above_cursor,
-        suffix=payload.current_file.content_below_cursor,
-        current_file_name=payload.current_file.file_name,
-        stream=payload.stream,
-    )
+        suggestions = await _execute_code_completion(
+            payload=payload,
+            code_completions=code_completions,
+            snowplow_event_context=snowplow_event_context,
+            **kwargs,
+        )
 
-    suggestions = await _execute_code_completion(
-        payload=payload,
-        code_completions=code_completions,
-        snowplow_event_context=snowplow_event_context,
-        **kwargs,
-    )
-
-    if isinstance(suggestions[0], AsyncIterator):
-        return await _handle_stream(suggestions[0])
+        if isinstance(suggestions[0], AsyncIterator):
+            return await _handle_stream(suggestions[0])
     choices, tokens_consumption_metadata = _completion_suggestion_choices(suggestions)
+    request_log.debug(
+        "code completion:",
+        choices=choices,
+        suggestions=suggestions,
+    )
+    print("DEBUG [completions]: choices", choices)
+    print(
+        "DEBUG [completions]: tokens_consumption_metadata", tokens_consumption_metadata
+    )
     return SuggestionsResponse(
         id="id",
         created=int(time()),
@@ -180,6 +211,7 @@ async def completions(
             name=suggestions[0].model.name,
             lang=suggestions[0].lang,
             tokens_consumption_metadata=tokens_consumption_metadata,
+            region=config.google_cloud_platform.location(),
         ),
         experiments=suggestions[0].metadata.experiments,
         metadata=SuggestionsResponse.MetadataBase(
@@ -296,6 +328,7 @@ async def generations(
             engine=suggestion.model.engine,
             name=suggestion.model.name,
             lang=suggestion.lang,
+            region=config.google_cloud_platform.location(),
         ),
         metadata=SuggestionsResponse.MetadataBase(
             enabled_feature_flags=current_feature_flag_context.get(),
@@ -444,7 +477,6 @@ def _build_code_completions(
 ) -> tuple[CodeCompletions | CodeCompletionsLegacy, dict]:
     kwargs = {}
 
-
     if True:  # pylint: disable=using-constant-test
         model_metadata = ModelMetadata(
             name="amazon_q",
@@ -464,14 +496,11 @@ def _build_code_completions(
         code_completions = completions_anthropic_factory(
             model__name=payload.model_name,
         )
-
-        # We support the prompt version 3 only with the Anthropic models
-        if payload.prompt_version == 3:
-            kwargs.update({"raw_prompt": payload.prompt})
     elif payload.model_provider in (
         KindModelProvider.LITELLM,
         KindModelProvider.MISTRALAI,
     ):
+        LiteLlmHandler(payload, request, kwargs).update_completion_params()
         code_completions = _resolve_code_completions_litellm(
             payload=payload,
             current_user=current_user,
@@ -480,16 +509,9 @@ def _build_code_completions(
             completions_litellm_factory=completions_litellm_factory,
         )
 
-        if payload.context:
-            kwargs.update({"code_context": [ctx.content for ctx in payload.context]})
-
         return code_completions, kwargs
     elif payload.model_provider == KindModelProvider.FIREWORKS:
-        kwargs.update({"max_output_tokens": 48, "context_max_percent": 0.3})
-
-        if payload.context:
-            kwargs.update({"code_context": [ctx.content for ctx in payload.context]})
-
+        FireworksHandler(payload, request, kwargs).update_completion_params()
         code_completions = _resolve_code_completions_litellm(
             payload=payload,
             current_user=current_user,
@@ -501,14 +523,7 @@ def _build_code_completions(
         return code_completions, kwargs
     else:
         code_completions = completions_legacy_factory()
-        if payload.choices_count > 0:
-            kwargs.update({"candidate_count": payload.choices_count})
-
-        language_server_version = LanguageServerVersion.from_string(
-            request.headers.get(X_GITLAB_LANGUAGE_SERVER_VERSION, None)
-        )
-        if language_server_version.supports_advanced_context() and payload.context:
-            kwargs.update({"code_context": [ctx.content for ctx in payload.context]})
+        LegacyHandler(payload, request, kwargs).update_completion_params()
 
     # Providers that are handled via the prompt registry perform their own UP check and event tracking. If we reach
     # this point is because we're using some other legacy provider, and we need to perform these steps now
@@ -616,3 +631,86 @@ async def _execute_code_completion(
     if isinstance(code_completions, CodeCompletions):
         return [output]
     return output
+
+
+async def _execute_code_completion_api(
+    payload: CompletionsRequestWithVersion,
+    current_user: Annotated[StarletteUser, Depends(get_current_user)],
+    internal_event_client: InternalEventsClient,
+    amazon_q_client_factory: AmazonQClientFactory,
+) -> list[ModelEngineOutput]:
+    print("DEBUG: [_execute_code_completion_api]", "Checking user permission")
+    if not current_user.can(GitLabUnitPrimitive.AMAZON_Q_INTEGRATION):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Unauthorized to perform action",
+        )
+
+    internal_event_client.track_event(
+        f"request_{GitLabUnitPrimitive.AMAZON_Q_INTEGRATION}",
+        category=__name__,
+    )
+    # pylint: disable=direct-environment-variable-reference
+    role_arn = os.environ.get("AWS_ROLE_ARN")
+    # pylint: enable=direct-environment-variable-reference
+
+    try:
+        q_client = amazon_q_client_factory.get_client(
+            current_user=current_user,
+            auth_header=current_user.auth_header,
+            role_arn=role_arn,
+        )
+        language = lang_from_filename(payload.current_file.file_name)
+        language_name = language.name.lower() if language else ""
+        prefix = (
+            payload.current_file.content_above_cursor[-100:]
+            if payload.current_file.content_above_cursor
+            else ""
+        )
+        suffix = (
+            payload.current_file.content_below_cursor[:100]
+            if payload.current_file.content_below_cursor
+            else ""
+        )
+        cc_payload = {
+            "fileContext": {
+                "leftFileContent": prefix,
+                "rightFileContent": suffix,
+                "filename": payload.current_file.file_name,
+                "programmingLanguage": {
+                    "languageName": language_name,
+                },
+            },
+            "maxResults": 1,
+        }
+        print(
+            "DEBUG: [_execute_code_completion_api]",
+            "Sending event to AmazonQ API",
+            cc_payload,
+        )
+        suggestion_resp = q_client.send_inline_code_message(cc_payload)
+        print(
+            "DEBUG: [_execute_code_completion_api]",
+            "Send event completed!",
+            suggestion_resp,
+        )
+        output: list[ModelEngineOutput] = []
+        for suggestion in suggestion_resp["CodeRecommendations"]:
+            print("DEBUG: [_execute_code_completion_api]", "Suggestion:", suggestion)
+            output.append(
+                ModelEngineOutput(
+                    text=suggestion["content"],
+                    score=0,
+                    model=EngineOutputModelMetadata(name="amazon_q", engine="amazon_q"),
+                    metadata=MetadataPromptBuilder(components={}, experiments=[]),
+                    tokens_consumption_metadata=TokensConsumptionMetadata(
+                        input_tokens=0, output_tokens=0
+                    ),
+                    lang_id=language,
+                )
+            )
+        print("DEBUG: [_execute_code_completion_api]", "Output:", output)
+        return output
+    except AWSException as e:
+        print("DEBUG: [_execute_code_completion_api]", "Error:", e)
+        raise e.to_http_exception()
