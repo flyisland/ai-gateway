@@ -119,7 +119,7 @@ class TestPostProcessorCompletions:
 
         mock_clean_model_reflection.assert_called_once()
         mock_strip_whitespaces.assert_called_once()
-        mock_filter_score.assert_called_once()
+        mock_filter_score.assert_not_called()
 
     @pytest.mark.asyncio
     async def test_process_with_custom_operations(
@@ -147,6 +147,7 @@ class TestPostProcessorCompletions:
             },
             extras=[
                 PostProcessorOperation.STRIP_ASTERISKS,
+                PostProcessorOperation.FILTER_SCORE,
             ],
         )
         await post_processor.process(completion)
@@ -191,4 +192,4 @@ class TestPostProcessorCompletions:
 
         mock_clean_model_reflection.assert_called_once()
         mock_strip_whitespaces.assert_not_called()
-        mock_filter_score.assert_called_once()
+        mock_filter_score.assert_not_called()

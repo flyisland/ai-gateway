@@ -6,6 +6,7 @@ from typing import Any, Callable, NewType, Optional
 from ai_gateway.code_suggestions.processing.ops import strip_whitespaces
 from ai_gateway.code_suggestions.processing.post.base import PostProcessorBase
 from ai_gateway.code_suggestions.processing.post.ops import (
+    SCORE_THRESHOLD_DISABLED,
     clean_model_reflection,
     filter_score,
     fix_end_block_errors,
@@ -39,7 +40,6 @@ class PostProcessorOperation(StrEnum):
 # This is the ordered list of prost-processing functions
 # Please do not change the order unless you have determined that it is acceptable
 ORDERED_POST_PROCESSORS = [
-    PostProcessorOperation.FILTER_SCORE,
     PostProcessorOperation.REMOVE_COMMENTS,
     PostProcessorOperation.TRIM_BY_MINIMUM_CONTEXT,
     PostProcessorOperation.FIX_END_BLOCK_ERRORS,
@@ -69,7 +69,9 @@ class PostProcessor(PostProcessorBase):
         self.exclude = set(exclude) if exclude else []
         self.extras = extras if extras else []
         self.score = score
-        self.score_threshold = score_threshold
+        self.score_threshold = (
+            score_threshold if score_threshold else SCORE_THRESHOLD_DISABLED
+        )
 
     @property
     def ops(self) -> list[AliasOpsRecord]:

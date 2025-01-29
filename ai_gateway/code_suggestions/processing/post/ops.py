@@ -25,6 +25,7 @@ __all__ = [
 
 log = structlog.stdlib.get_logger("codesuggestions")
 
+SCORE_THRESHOLD_DISABLED = -9999.0
 
 _COMMENT_IDENTIFIERS = ["/*", "//", "#"]
 _SPECIAL_CHARS = "()[];.,$%&^*@#!{}/"
@@ -331,6 +332,10 @@ def strip_asterisks(completion: str) -> str:
 
 # Very simple filtering based on score
 def filter_score(completion: str, score: float, threshold: float) -> str:
-    if threshold != -9999.0 and isinstance(score, (int, float)) and score < threshold:
+    if (
+        threshold != SCORE_THRESHOLD_DISABLED
+        and isinstance(score, (int, float))
+        and score < threshold
+    ):
         return ""
     return completion
