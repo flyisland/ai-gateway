@@ -15,10 +15,10 @@ from ai_gateway.chat.agents.react import (
 from ai_gateway.chat.agents.typing import (
     AdditionalContext,
     AgentStep,
-    Context,
     CurrentFile,
     Message,
 )
+from ai_gateway.chat.context.current_page import Context, IssueContext
 from ai_gateway.chat.tools.gitlab import IssueReader, MergeRequestReader
 from ai_gateway.feature_flags.context import current_feature_flag_context
 from ai_gateway.models.base_chat import Role
@@ -214,6 +214,26 @@ class TestReActAgent:
                             resource_content="Please use this information about identified issue",
                             context=Context(
                                 type="issue", content="this issue is about Duo Chat"
+                            ),
+                        ),
+                    ],
+                ),
+                "Thought: I'm thinking...\nFinal Answer: A",
+                [
+                    AgentFinalAnswer(
+                        text="A",
+                    ),
+                ],
+            ),
+            (
+                ReActAgentInputs(
+                    messages=[
+                        Message(
+                            role=Role.USER,
+                            content="Explain this issue",
+                            resource_content="Please use this information about identified issue",
+                            context=IssueContext(
+                                type="issue", title="Duo Chat issue"
                             ),
                         ),
                     ],
