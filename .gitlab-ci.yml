@@ -209,11 +209,12 @@ semgrep-sast:
 
 tag-self-hosted:
   stage: release
+  image: registry.gitlab.com/gitlab-org/release-cli:latest
   needs:
     - build-docker-model-gateway
-  script:
-    - |
-      git tag "self-hosted-${GITLAB_VERSION}" ${CI_COMMIT_SHA}
-      git push origin "self-hosted-${GITLAB_VERSION}"
+  release:
+    tag_name: 'self-hosted-${GITLAB_VERSION}'
+    ref: '${CI_COMMIT_SHA}'
+    description: 'Self-hosted release compatible with Gitlab ${GITLAB_VERSION}'
   rules:
-    - if: $GITLAB_VERSION
+    - if: $CI_PIPELINE_TRIGGERED && $GITLAB_VERSION
