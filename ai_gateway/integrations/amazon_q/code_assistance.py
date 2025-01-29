@@ -1,11 +1,13 @@
 import asyncio
 import os
+from dataclasses import dataclass
 from logging import getLogger
 from typing import Any, Optional
 
 from fastapi import HTTPException, status
 from gitlab_cloud_connector import GitLabUnitPrimitive
 
+from ai_gateway.api.auth_utils import StarletteUser
 from ai_gateway.api.v1.amazon_q.typing import (
     CodeRecommendation,
     CodeSuggestionRequest,
@@ -13,17 +15,28 @@ from ai_gateway.api.v1.amazon_q.typing import (
     FileContext,
     ProgrammingLanguage,
 )
-from ai_gateway.api.v2.code.typing import CodeSuggestionContext
+from ai_gateway.api.v3.code.typing import EditorContentCodeSuggestionPayload
 from ai_gateway.code_suggestions.base import ModelProvider
 from ai_gateway.code_suggestions.processing.base import ModelEngineOutput
 from ai_gateway.code_suggestions.processing.ops import lang_from_filename
 from ai_gateway.code_suggestions.processing.typing import MetadataPromptBuilder
-from ai_gateway.integrations.amazon_q.client import AmazonQClient
+from ai_gateway.integrations.amazon_q.client import AmazonQClient, AmazonQClientFactory
 from ai_gateway.integrations.amazon_q.errors import AWSException
+from ai_gateway.internal_events.client import InternalEventsClient
 from ai_gateway.models import ModelMetadata as EngineOutputModelMetadata
 from ai_gateway.models.base import TokensConsumptionMetadata
 
 logger = getLogger(__name__)
+
+
+@dataclass
+class CodeSuggestionContext:
+    """Data class to hold completion context information."""
+
+    current_user: StarletteUser
+    internal_event_client: InternalEventsClient
+    amazon_q_client_factory: AmazonQClientFactory
+    payload: EditorContentCodeSuggestionPayload
 
 
 class CodeSuggestionService:

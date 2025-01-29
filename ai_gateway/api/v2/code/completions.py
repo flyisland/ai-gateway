@@ -20,7 +20,6 @@ from ai_gateway.api.v2.code.model_provider_handlers import (  # AnthropicHandler
     LiteLlmHandler,
 )
 from ai_gateway.api.v2.code.typing import (
-    CodeSuggestionContext,
     CompletionsRequestV1,
     CompletionsRequestV2,
     CompletionsRequestV3,
@@ -65,7 +64,10 @@ from ai_gateway.config import Config
 from ai_gateway.feature_flags.context import current_feature_flag_context
 from ai_gateway.instrumentators.base import TelemetryInstrumentator
 from ai_gateway.integrations.amazon_q.client import AmazonQClientFactory
-from ai_gateway.integrations.amazon_q.code_assistance import CodeSuggestionService
+from ai_gateway.integrations.amazon_q.code_assistance import (
+    CodeSuggestionContext,
+    CodeSuggestionService,
+)
 from ai_gateway.integrations.amazon_q.errors import AWSException
 from ai_gateway.internal_events import InternalEventsClient
 from ai_gateway.models import KindAnthropicModel, KindModelProvider

@@ -14,7 +14,6 @@ from ai_gateway.api.auth_utils import StarletteUser, get_current_user
 from ai_gateway.api.feature_category import feature_category
 from ai_gateway.api.middleware import X_GITLAB_LANGUAGE_SERVER_VERSION
 from ai_gateway.api.snowplow_context import get_snowplow_code_suggestion_context
-from ai_gateway.api.v2.code.typing import CodeSuggestionContext
 from ai_gateway.api.v3.code.typing import (
     CodeContextPayload,
     CodeEditorComponents,
@@ -49,7 +48,10 @@ from ai_gateway.config import Config
 from ai_gateway.container import ContainerApplication
 from ai_gateway.feature_flags.context import current_feature_flag_context
 from ai_gateway.integrations.amazon_q.client import AmazonQClientFactory
-from ai_gateway.integrations.amazon_q.code_assistance import CodeSuggestionService
+from ai_gateway.integrations.amazon_q.code_assistance import (
+    CodeSuggestionContext,
+    CodeSuggestionService,
+)
 from ai_gateway.integrations.amazon_q.errors import AWSException
 from ai_gateway.internal_events.client import InternalEventsClient
 from ai_gateway.models import KindModelProvider
