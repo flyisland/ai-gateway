@@ -53,9 +53,7 @@ class ChatAmazonQ(BaseChatModel):
             for event in stream_output:
                 try:
                     if "messageMetadataEvent" in event:
-                        content = event["messageMetadataEvent"].get(
-                            "conversationId", ""
-                        )
+                        content = ""
                     elif "assistantResponseEvent" in event:
                         content = event["assistantResponseEvent"].get("content", "")
                     else:
