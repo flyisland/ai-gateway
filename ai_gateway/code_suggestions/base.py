@@ -33,6 +33,7 @@ class ModelProvider(StrEnum):
     VERTEX_AI = "vertex-ai"
     ANTHROPIC = "anthropic"
     LITELLM = "litellm"
+    AMAZONQ = "amazon-q"
 
 
 class KindUseCase(StrEnum):

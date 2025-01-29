@@ -14,11 +14,13 @@ from ai_gateway.api.auth_utils import StarletteUser, get_current_user
 from ai_gateway.api.feature_category import feature_category
 from ai_gateway.api.middleware import X_GITLAB_LANGUAGE_SERVER_VERSION
 from ai_gateway.api.snowplow_context import get_snowplow_code_suggestion_context
+from ai_gateway.api.v2.code.typing import CodeSuggestionContext
 from ai_gateway.api.v3.code.typing import (
     CodeContextPayload,
     CodeEditorComponents,
     CompletionRequest,
     CompletionResponse,
+    EditorContentCodeSuggestionPayload,
     EditorContentCompletionPayload,
     EditorContentGenerationPayload,
     ModelMetadata,
@@ -27,7 +29,12 @@ from ai_gateway.api.v3.code.typing import (
     StreamModelEngine,
     StreamSuggestionsResponse,
 )
-from ai_gateway.async_dependency_resolver import get_config, get_container_application
+from ai_gateway.async_dependency_resolver import (
+    get_amazon_q_client_factory,
+    get_config,
+    get_container_application,
+    get_internal_event_client,
+)
 from ai_gateway.code_suggestions import (
     CodeCompletions,
     CodeCompletionsLegacy,
@@ -37,9 +44,14 @@ from ai_gateway.code_suggestions import (
     ModelProvider,
 )
 from ai_gateway.code_suggestions.base import SAAS_PROMPT_MODEL_MAP
+from ai_gateway.code_suggestions.processing.base import ModelEngineOutput
 from ai_gateway.config import Config
 from ai_gateway.container import ContainerApplication
 from ai_gateway.feature_flags.context import current_feature_flag_context
+from ai_gateway.integrations.amazon_q.client import AmazonQClientFactory
+from ai_gateway.integrations.amazon_q.code_assistance import CodeSuggestionService
+from ai_gateway.integrations.amazon_q.errors import AWSException
+from ai_gateway.internal_events.client import InternalEventsClient
 from ai_gateway.models import KindModelProvider
 from ai_gateway.prompts import BasePromptRegistry
 from ai_gateway.structured_logging import get_request_logger
@@ -80,6 +92,10 @@ async def completions(
     current_user: Annotated[StarletteUser, Depends(get_current_user)],
     prompt_registry: Annotated[BasePromptRegistry, Depends(get_prompt_registry)],
     config: Annotated[Config, Depends(get_config)],
+    internal_event_client: InternalEventsClient = Depends(get_internal_event_client),
+    amazon_q_client_factory: AmazonQClientFactory = Depends(
+        get_amazon_q_client_factory
+    ),
 ):
     print("DEBUG [/completions]: payload", payload)
     print("DEBUG [/completions]: prompt_registry", prompt_registry)
@@ -90,6 +106,8 @@ async def completions(
         current_user=current_user,
         prompt_registry=prompt_registry,
         config=config,
+        internal_event_client=internal_event_client,
+        amazon_q_client_factory=amazon_q_client_factory,
     )
 
 
@@ -102,6 +120,8 @@ async def code_suggestions(
     prompt_registry: BasePromptRegistry,
     config: Config,
     stream_handler: StreamHandler = handle_stream,
+    internal_event_client: InternalEventsClient = None,
+    amazon_q_client_factory: AmazonQClientFactory = None,
 ):
     if not current_user.can(
         GitLabUnitPrimitive.AGENT_QUICK_ACTIONS,
@@ -146,6 +166,8 @@ async def code_suggestions(
             code_context=code_context,
             stream_handler=stream_handler,
             snowplow_event_context=snowplow_code_suggestion_context,
+            internal_event_client=internal_event_client,
+            amazon_q_client_factory=amazon_q_client_factory,
         )
     if component.type == CodeEditorComponents.GENERATION:
         return await code_generation(
@@ -155,6 +177,8 @@ async def code_suggestions(
             prompt_registry=prompt_registry,
             stream_handler=stream_handler,
             snowplow_event_context=snowplow_code_suggestion_context,
+            internal_event_client=internal_event_client,
+            amazon_q_client_factory=amazon_q_client_factory,
         )
 
 
@@ -170,29 +194,44 @@ async def code_completion(
     ],
     code_context: list[CodeContextPayload] = None,
     snowplow_event_context: Optional[SnowplowEventContext] = None,
+    current_user: StarletteUser = None,
+    internal_event_client: InternalEventsClient = None,
+    amazon_q_client_factory: AmazonQClientFactory = None,
 ):
     kwargs = {}
 
-    if payload.model_provider == ModelProvider.ANTHROPIC:
-        # TODO: As we migrate to v3 we can rewrite this to use prompt registry
-        engine = completions_anthropic_factory(model__name=payload.model_name)
-        kwargs.update({"raw_prompt": payload.prompt})
+    if payload.model_provider is None:
+        print("DEBUG [code_completion]: payload.model_provider is None")
+        payload.model_provider = ModelProvider.AMAZONQ
+        converted_payload = EditorContentCodeSuggestionPayload(payload=payload)
+        suggestions = await _execute_code_completion_for_amazonq(
+            converted_payload,
+            current_user,
+            internal_event_client,
+            amazon_q_client_factory,
+        )
     else:
-        engine = completions_legacy_factory()
+        print("DEBUG [code_completion]: payload.model_provider is not None")
+        if payload.model_provider == ModelProvider.ANTHROPIC:
+            # TODO: As we migrate to v3 we can rewrite this to use prompt registry
+            engine = completions_anthropic_factory(model__name=payload.model_name)
+            kwargs.update({"raw_prompt": payload.prompt})
+        else:
+            engine = completions_legacy_factory()
 
-    if payload.choices_count > 0:
-        kwargs.update({"candidate_count": payload.choices_count})
+        if payload.choices_count > 0:
+            kwargs.update({"candidate_count": payload.choices_count})
 
-    suggestions = await engine.execute(
-        prefix=payload.content_above_cursor,
-        suffix=payload.content_below_cursor,
-        file_name=payload.file_name,
-        editor_lang=payload.language_identifier,
-        stream=payload.stream,
-        code_context=code_context,
-        snowplow_event_context=snowplow_event_context,
-        **kwargs,
-    )
+        suggestions = await engine.execute(
+            prefix=payload.content_above_cursor,
+            suffix=payload.content_below_cursor,
+            file_name=payload.file_name,
+            editor_lang=payload.language_identifier,
+            stream=payload.stream,
+            code_context=code_context,
+            snowplow_event_context=snowplow_event_context,
+            **kwargs,
+        )
 
     if not isinstance(suggestions, list):
         suggestions = [suggestions]
@@ -252,48 +291,64 @@ async def code_generation(
     ],
     code_context: list[CodeContextPayload] = None,
     snowplow_event_context: Optional[SnowplowEventContext] = None,
+    internal_event_client: InternalEventsClient = None,
+    amazon_q_client_factory: AmazonQClientFactory = None,
 ):
     model_provider = payload.model_provider
-    if payload.prompt_id:
-        # for backward compatibility, eventually prmpt_version should be a mandatory field
-        prompt_version = payload.prompt_version or "^1.0.0"
-        # For SaaS: prompt_version and prompt_id are mandatory fields
-        # in case prompt_id is present, model_provider is not directly passed in from request
-        model_provider = SAAS_PROMPT_MODEL_MAP[prompt_version]["model_provider"]
-
-        prompt = prompt_registry.get_on_behalf(
-            user=current_user,
-            prompt_id=payload.prompt_id,
-            prompt_version=payload.prompt_version,
-            internal_event_category=__name__,
+    model_provider = ModelProvider.AMAZONQ
+    # TODO: How to check for AmazonQ??
+    if payload.prompt_id and model_provider is ModelProvider.AMAZONQ:
+        print("DEBUG [code_completion]: payload.model_provider is None")
+        payload.model_provider = ModelProvider.AMAZONQ
+        converted_payload = EditorContentCodeSuggestionPayload(payload=payload)
+        suggestions = await _execute_code_completion_for_amazonq(
+            converted_payload,
+            current_user,
+            internal_event_client,
+            amazon_q_client_factory,
         )
-        engine = agent_factory(model__prompt=prompt)
-
-        request_log.info(
-            "Executing code generation with prompt registry",
-            prompt_name=prompt.name,
-            prompt_model_class=prompt.model.__class__.__name__,
-            prompt_model_name=prompt.model_name,
-        )
+        suggestion = suggestions[0]
     else:
-        # TODO: Since we are migrating to prompt registry, we should sunset this branch
-        if model_provider == KindModelProvider.ANTHROPIC:
-            engine = generations_anthropic_factory()
+        if payload.prompt_id:
+            # for backward compatibility, eventually prmpt_version should be a mandatory field
+            prompt_version = payload.prompt_version or "^1.0.0"
+            # For SaaS: prompt_version and prompt_id are mandatory fields
+            # in case prompt_id is present, model_provider is not directly passed in from request
+            model_provider = SAAS_PROMPT_MODEL_MAP[prompt_version]["model_provider"]
+
+            prompt = prompt_registry.get_on_behalf(
+                user=current_user,
+                prompt_id=payload.prompt_id,
+                prompt_version=payload.prompt_version,
+                internal_event_category=__name__,
+            )
+            engine = agent_factory(model__prompt=prompt)
+
+            request_log.info(
+                "Executing code generation with prompt registry",
+                prompt_name=prompt.name,
+                prompt_model_class=prompt.model.__class__.__name__,
+                prompt_model_name=prompt.model_name,
+            )
         else:
-            engine = generations_vertex_factory()
+            # TODO: Since we are migrating to prompt registry, we should sunset this branch
+            if model_provider == KindModelProvider.ANTHROPIC:
+                engine = generations_anthropic_factory()
+            else:
+                engine = generations_vertex_factory()
 
-        if payload.prompt:
-            engine.with_prompt_prepared(payload.prompt)
+            if payload.prompt:
+                engine.with_prompt_prepared(payload.prompt)
 
-    suggestion = await engine.execute(
-        prefix=payload.content_above_cursor,
-        file_name=payload.file_name,
-        editor_lang=payload.language_identifier,
-        model_provider=model_provider,
-        stream=payload.stream,
-        snowplow_event_context=snowplow_event_context,
-        prompt_enhancer=payload.prompt_enhancer,
-    )
+        suggestion = await engine.execute(
+            prefix=payload.content_above_cursor,
+            file_name=payload.file_name,
+            editor_lang=payload.language_identifier,
+            model_provider=model_provider,
+            stream=payload.stream,
+            snowplow_event_context=snowplow_event_context,
+            prompt_enhancer=payload.prompt_enhancer,
+        )
 
     if isinstance(suggestion, AsyncIterator):
         return await stream_handler(suggestion, engine)
@@ -314,3 +369,33 @@ async def code_generation(
             enabled_feature_flags=current_feature_flag_context.get(),
         ),
     )
+
+
+async def _execute_code_completion_for_amazonq(
+    payload: EditorContentCodeSuggestionPayload,
+    current_user: StarletteUser,
+    internal_event_client: InternalEventsClient,
+    amazon_q_client_factory: AmazonQClientFactory,
+) -> list[ModelEngineOutput]:
+    try:
+        context = CodeSuggestionContext(
+            current_user=current_user,
+            internal_event_client=internal_event_client,
+            amazon_q_client_factory=amazon_q_client_factory,
+            payload=payload,
+        )
+
+        completion_service = CodeSuggestionService(context)
+        return await completion_service.execute()
+    except ValueError as e:
+        print("Validation error: %s", str(e))
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
+    except AWSException as e:
+        print("AWS service error: %s", str(e))
+        raise e.to_http_exception()
+    except Exception as e:
+        print("Unexpected error in code completion: %s", str(e))
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Internal server error during code completion",
+        )

@@ -61,7 +61,7 @@ class EditorContentPayload(BaseModel):
         Field(None, examples=["python"])
     )
     model_provider: Optional[
-        Literal[ModelProvider.VERTEX_AI, ModelProvider.ANTHROPIC]
+        Literal[ModelProvider.VERTEX_AI, ModelProvider.ANTHROPIC, ModelProvider.AMAZONQ]
     ] = None
     model_name: Optional[str] = Field(
         None, examples=[KindVertexTextModel.CODE_GECKO_002]
@@ -74,6 +74,7 @@ class EditorContentCompletionPayload(EditorContentPayload):
     prompt: Optional[str | list[Message]] = Field(
         None, examples=["Complete the function"]
     )
+    type: Literal[CodeEditorComponents.GENERATION] = CodeEditorComponents.GENERATION
 
 
 class EditorContentGenerationPayload(EditorContentPayload):
@@ -81,6 +82,14 @@ class EditorContentGenerationPayload(EditorContentPayload):
     prompt_id: Optional[str] = None
     prompt_enhancer: Optional[dict[str, Any]] = None
     prompt_version: Optional[str] = None
+    type: Literal[CodeEditorComponents.COMPLETION] = CodeEditorComponents.COMPLETION
+
+
+class EditorContentCodeSuggestionPayload(BaseModel):
+    payload: Annotated[
+        Union[EditorContentCompletionPayload, EditorContentGenerationPayload],
+        Body(discriminator="type"),
+    ]
 
 
 class CodeEditorCompletion(BaseModel):

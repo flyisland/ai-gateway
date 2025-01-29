@@ -1,4 +1,3 @@
-import os
 from time import time
 from typing import Annotated, AsyncIterator, Optional, Tuple, Union
 
@@ -21,6 +20,7 @@ from ai_gateway.api.v2.code.model_provider_handlers import (  # AnthropicHandler
     LiteLlmHandler,
 )
 from ai_gateway.api.v2.code.typing import (
+    CodeSuggestionContext,
     CompletionsRequestV1,
     CompletionsRequestV2,
     CompletionsRequestV3,
@@ -30,6 +30,10 @@ from ai_gateway.api.v2.code.typing import (
     StreamSuggestionsResponse,
     SuggestionsRequest,
     SuggestionsResponse,
+)
+from ai_gateway.api.v3.code.typing import (
+    EditorContentCodeSuggestionPayload,
+    EditorContentCompletionPayload,
 )
 from ai_gateway.async_dependency_resolver import (
     get_amazon_q_client_factory,
@@ -54,18 +58,17 @@ from ai_gateway.code_suggestions import (
     CodeGenerations,
     CodeSuggestionsChunk,
 )
-from ai_gateway.code_suggestions.base import CodeSuggestionsOutput
+from ai_gateway.code_suggestions.base import CodeSuggestionsOutput, ModelProvider
 from ai_gateway.code_suggestions.processing.base import ModelEngineOutput
 from ai_gateway.code_suggestions.processing.ops import lang_from_filename
-from ai_gateway.code_suggestions.processing.typing import MetadataPromptBuilder
 from ai_gateway.config import Config
 from ai_gateway.feature_flags.context import current_feature_flag_context
 from ai_gateway.instrumentators.base import TelemetryInstrumentator
 from ai_gateway.integrations.amazon_q.client import AmazonQClientFactory
+from ai_gateway.integrations.amazon_q.code_assistance import CodeSuggestionService
 from ai_gateway.integrations.amazon_q.errors import AWSException
 from ai_gateway.internal_events import InternalEventsClient
 from ai_gateway.models import KindAnthropicModel, KindModelProvider
-from ai_gateway.models import ModelMetadata as EngineOutputModelMetadata
 from ai_gateway.models.base import TokensConsumptionMetadata
 from ai_gateway.prompts import BasePromptRegistry
 from ai_gateway.prompts.typing import ModelMetadata
@@ -134,9 +137,10 @@ async def completions(
         get_amazon_q_client_factory
     ),
 ):
-    if True:  # pylint: disable=using-constant-test
-        # pylint: disable=no-value-for-parameter
-        suggestions = await _execute_code_completion_api(
+    if payload.model_provider is None:
+        # TODO: Is this a good check???
+        payload.model_provider = KindModelProvider.AMAZONQ
+        suggestions = await _execute_code_completion_for_amazonq(
             payload,
             current_user,
             internal_event_client,
@@ -191,17 +195,16 @@ async def completions(
             **kwargs,
         )
 
-        if isinstance(suggestions[0], AsyncIterator):
-            return await _handle_stream(suggestions[0])
+    if not isinstance(suggestions, list):
+        suggestions = [suggestions]
+
+    if isinstance(suggestions[0], AsyncIterator):
+        return await _handle_stream(suggestions[0])
     choices, tokens_consumption_metadata = _completion_suggestion_choices(suggestions)
     request_log.debug(
         "code completion:",
         choices=choices,
         suggestions=suggestions,
-    )
-    print("DEBUG [completions]: choices", choices)
-    print(
-        "DEBUG [completions]: tokens_consumption_metadata", tokens_consumption_metadata
     )
     return SuggestionsResponse(
         id="id",
@@ -477,22 +480,7 @@ def _build_code_completions(
 ) -> tuple[CodeCompletions | CodeCompletionsLegacy, dict]:
     kwargs = {}
 
-    if True:  # pylint: disable=using-constant-test
-        model_metadata = ModelMetadata(
-            name="amazon_q",
-            provider="amazon_q",
-        )
-
-        code_completions = _resolve_agent_code_completions(
-            model_metadata=model_metadata,
-            current_user=current_user,
-            prompt_registry=prompt_registry,
-            completions_agent_factory=completions_agent_factory,
-        )
-
-        if payload.context:
-            kwargs.update({"code_context": [ctx.content for ctx in payload.context]})
-    elif payload.model_provider == KindModelProvider.ANTHROPIC:
+    if payload.model_provider == KindModelProvider.ANTHROPIC:
         code_completions = completions_anthropic_factory(
             model__name=payload.model_name,
         )
@@ -633,84 +621,56 @@ async def _execute_code_completion(
     return output
 
 
-async def _execute_code_completion_api(
+async def _execute_code_completion_for_amazonq(
     payload: CompletionsRequestWithVersion,
-    current_user: Annotated[StarletteUser, Depends(get_current_user)],
+    current_user: StarletteUser,
     internal_event_client: InternalEventsClient,
     amazon_q_client_factory: AmazonQClientFactory,
 ) -> list[ModelEngineOutput]:
-    print("DEBUG: [_execute_code_completion_api]", "Checking user permission")
-    if not current_user.can(GitLabUnitPrimitive.AMAZON_Q_INTEGRATION):
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="Unauthorized to perform action",
-        )
-
-    internal_event_client.track_event(
-        f"request_{GitLabUnitPrimitive.AMAZON_Q_INTEGRATION}",
-        category=__name__,
-    )
-    # pylint: disable=direct-environment-variable-reference
-    role_arn = os.environ.get("AWS_ROLE_ARN")
-    # pylint: enable=direct-environment-variable-reference
-
+    """Entry point for code completion with AmazonQ."""
     try:
-        q_client = amazon_q_client_factory.get_client(
-            current_user=current_user,
-            auth_header=current_user.auth_header,
-            role_arn=role_arn,
-        )
-        language = lang_from_filename(payload.current_file.file_name)
-        language_name = language.name.lower() if language else ""
-        prefix = (
-            payload.current_file.content_above_cursor[-100:]
-            if payload.current_file.content_above_cursor
-            else ""
-        )
-        suffix = (
-            payload.current_file.content_below_cursor[:100]
-            if payload.current_file.content_below_cursor
-            else ""
-        )
-        cc_payload = {
-            "fileContext": {
-                "leftFileContent": prefix,
-                "rightFileContent": suffix,
-                "filename": payload.current_file.file_name,
-                "programmingLanguage": {
-                    "languageName": language_name,
-                },
-            },
-            "maxResults": 1,
-        }
-        print(
-            "DEBUG: [_execute_code_completion_api]",
-            "Sending event to AmazonQ API",
-            cc_payload,
-        )
-        suggestion_resp = q_client.send_inline_code_message(cc_payload)
-        print(
-            "DEBUG: [_execute_code_completion_api]",
-            "Send event completed!",
-            suggestion_resp,
-        )
-        output: list[ModelEngineOutput] = []
-        for suggestion in suggestion_resp["CodeRecommendations"]:
-            print("DEBUG: [_execute_code_completion_api]", "Suggestion:", suggestion)
-            output.append(
-                ModelEngineOutput(
-                    text=suggestion["content"],
-                    score=0,
-                    model=EngineOutputModelMetadata(name="amazon_q", engine="amazon_q"),
-                    metadata=MetadataPromptBuilder(components={}, experiments=[]),
-                    tokens_consumption_metadata=TokensConsumptionMetadata(
-                        input_tokens=0, output_tokens=0
-                    ),
-                    lang_id=language,
-                )
+        # Validate payload
+        if not payload or not payload.current_file:
+            print("Invalid payload: Missing required fields")
+            raise ValueError("Invalid payload: Missing required fields")
+
+        # Validate file content
+        if (
+            payload.current_file.content_above_cursor is None
+            and payload.current_file.content_below_cursor is None
+        ):
+            print("Invalid payload: No content provided for completion")
+            raise ValueError("Invalid payload: No content provided for completion")
+
+        cc_payload = EditorContentCodeSuggestionPayload(
+            payload=EditorContentCompletionPayload(
+                file_name=payload.current_file.file_name,
+                language_identifier=payload.current_file.language_identifier,
+                content_above_cursor=payload.current_file.content_above_cursor,
+                content_below_cursor=payload.current_file.content_below_cursor,
+                model_provider=ModelProvider.AMAZONQ,
+                model_name=payload.model_name,
+                prompt=None,
             )
-        print("DEBUG: [_execute_code_completion_api]", "Output:", output)
-        return output
+        )
+        context = CodeSuggestionContext(
+            current_user=current_user,
+            internal_event_client=internal_event_client,
+            amazon_q_client_factory=amazon_q_client_factory,
+            payload=cc_payload,
+        )
+
+        completion_service = CodeSuggestionService(context)
+        return await completion_service.execute()
+    except ValueError as e:
+        print("Validation error: %s", str(e))
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
     except AWSException as e:
-        print("DEBUG: [_execute_code_completion_api]", "Error:", e)
+        print("AWS service error: %s", str(e))
         raise e.to_http_exception()
+    except Exception as e:
+        print("Unexpected error in code completion: %s", str(e))
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Internal server error during code completion",
+        )

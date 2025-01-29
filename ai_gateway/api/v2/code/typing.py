@@ -10,6 +10,8 @@ from pydantic import (
 )
 from starlette.responses import StreamingResponse
 
+from ai_gateway.api.auth_utils import StarletteUser
+from ai_gateway.api.v3.code.typing import EditorContentCodeSuggestionPayload
 from ai_gateway.code_suggestions import (
     PROVIDERS_MODELS_MAP,
     USE_CASES_MODELS_MAP,
@@ -17,6 +19,8 @@ from ai_gateway.code_suggestions import (
 )
 from ai_gateway.experimentation import ExperimentTelemetry
 from ai_gateway.instrumentators.base import Telemetry
+from ai_gateway.integrations.amazon_q.client import AmazonQClientFactory
+from ai_gateway.internal_events.client import InternalEventsClient
 from ai_gateway.models import KindModelProvider, Message
 from ai_gateway.models.base import TokensConsumptionMetadata
 
@@ -147,6 +151,13 @@ class SuggestionsResponse(BaseModel):
 
 class StreamSuggestionsResponse(StreamingResponse):
     pass
+
+
+class CodeSuggestionContext(BaseModel):
+    current_user: StarletteUser
+    internal_event_client: InternalEventsClient
+    amazon_q_client_factory: AmazonQClientFactory
+    payload: EditorContentCodeSuggestionPayload
 
 
 def _validate_model_name(
