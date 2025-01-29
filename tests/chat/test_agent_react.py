@@ -232,9 +232,7 @@ class TestReActAgent:
                             role=Role.USER,
                             content="Explain this issue",
                             resource_content="Please use this information about identified issue",
-                            context=IssueContext(
-                                type="issue", title="Duo Chat issue"
-                            ),
+                            context=IssueContext(type="issue", title="Duo Chat issue"),
                         ),
                     ],
                 ),
