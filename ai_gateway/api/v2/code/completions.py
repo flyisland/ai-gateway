@@ -197,17 +197,18 @@ async def completions(
             **kwargs,
         )
 
+    request_log.debug(
+        "code completion:",
+        suggestions=suggestions,
+    )
+
     if not isinstance(suggestions, list):
         suggestions = [suggestions]
 
     if isinstance(suggestions[0], AsyncIterator):
         return await _handle_stream(suggestions[0])
     choices, tokens_consumption_metadata = _completion_suggestion_choices(suggestions)
-    request_log.debug(
-        "code completion:",
-        choices=choices,
-        suggestions=suggestions,
-    )
+    request_log.debug("code completion:", choices=choices)
     return SuggestionsResponse(
         id="id",
         created=int(time()),

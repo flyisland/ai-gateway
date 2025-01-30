@@ -303,13 +303,12 @@ async def code_generation(
         print("DEBUG [code_completion]: payload.model_provider is None")
         payload.model_provider = ModelProvider.AMAZONQ
         converted_payload = EditorContentCodeSuggestionPayload(payload=payload)
-        suggestions = await _execute_code_completion_for_amazonq(
+        suggestion = await _execute_code_completion_for_amazonq(
             converted_payload,
             current_user,
             internal_event_client,
             amazon_q_client_factory,
         )
-        suggestion = suggestions[0]
     else:
         if payload.prompt_id:
             # for backward compatibility, eventually prmpt_version should be a mandatory field
@@ -352,25 +351,54 @@ async def code_generation(
             prompt_enhancer=payload.prompt_enhancer,
         )
 
+    if not isinstance(suggestion, list):
+        suggestion = [suggestion]
+
     if isinstance(suggestion, AsyncIterator):
         return await stream_handler(suggestion, engine)
 
-    choices = (
-        [CompletionResponse.Choice(text=suggestion.text)] if suggestion.text else []
-    )
-
-    return CompletionResponse(
+    choices = _generation_suggestion_choices(suggestion)
+    print("DEBUG [code_completion]: choices size", len(choices))
+    resp = CompletionResponse(
         choices=choices,
         metadata=ResponseMetadataBase(
             timestamp=int(time()),
             model=ModelMetadata(
-                engine=suggestion.model.engine,
-                name=suggestion.model.name,
-                lang=suggestion.lang,
+                engine=suggestion[0].model.engine,
+                name=suggestion[0].model.name,
+                lang=suggestion[0].lang,
             ),
             enabled_feature_flags=current_feature_flag_context.get(),
         ),
     )
+    print("DEBUG [code_completion]: resp", resp)
+    return resp
+
+
+def _generation_suggestion_choices(
+    suggestions: list,
+) -> list[CompletionResponse.Choice]:
+    if len(suggestions) == 0:
+        return []
+    choices: list[CompletionResponse.Choice] = []
+
+    choices = []
+    for suggestion in suggestions:
+        request_log.debug(
+            "code completion suggestion:",
+            suggestion=suggestion.text,
+            score=suggestion.score,
+            language=suggestion.lang,
+        )
+        if not suggestion.text:
+            continue
+
+        choices.append(
+            CompletionResponse.Choice(
+                text=suggestion.text,
+            )
+        )
+    return choices
 
 
 async def _execute_code_completion_for_amazonq(

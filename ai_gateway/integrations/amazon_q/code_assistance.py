@@ -70,6 +70,7 @@ class CodeSuggestionService:
 
             completion_payload: CodeSuggestionRequest = self._build_completion_payload()
             suggestions = await self._get_completion_suggestions(completion_payload)
+            print("DEBUG: Return suggestions", suggestions)
 
             return self._process_suggestions(suggestions)
 
