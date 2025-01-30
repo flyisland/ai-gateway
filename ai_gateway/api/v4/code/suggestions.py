@@ -20,8 +20,13 @@ from ai_gateway.api.v4.code.typing import (
     StreamSSEMessage,
     StreamSuggestionChunk,
 )
-from ai_gateway.async_dependency_resolver import get_config, get_container_application
+from ai_gateway.async_dependency_resolver import (
+    get_code_suggestions_generations_amazon_q_factory_provider,
+    get_config,
+    get_container_application,
+)
 from ai_gateway.code_suggestions import CodeSuggestionsChunk
+from ai_gateway.code_suggestions.generations import CodeGenerations
 from ai_gateway.config import Config
 from ai_gateway.feature_flags.context import current_feature_flag_context
 from ai_gateway.prompts import BasePromptRegistry
@@ -93,6 +98,10 @@ async def suggestions(
     current_user: Annotated[StarletteUser, Depends(get_current_user)],
     prompt_registry: Annotated[BasePromptRegistry, Depends(get_prompt_registry)],
     config: Annotated[Config, Depends(get_config)],
+    generations_amazon_q_factory: Annotated[
+        CodeGenerations,
+        Depends(get_code_suggestions_generations_amazon_q_factory_provider),
+    ],
 ):
     return await v3_code_suggestions(
         request=request,
@@ -100,5 +109,6 @@ async def suggestions(
         current_user=current_user,
         prompt_registry=prompt_registry,
         config=config,
+        generations_amazon_q_factory=generations_amazon_q_factory,
         stream_handler=handle_stream_sse,
     )

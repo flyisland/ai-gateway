@@ -9,6 +9,7 @@ from gitlab_cloud_connector import (
     GitLabFeatureCategory,
     GitLabUnitPrimitive,
 )
+from gitlab_cloud_connector.auth import AUTH_HEADER
 
 from ai_gateway.api.auth_utils import StarletteUser, get_current_user
 from ai_gateway.api.feature_category import feature_category
@@ -27,7 +28,12 @@ from ai_gateway.api.v3.code.typing import (
     StreamModelEngine,
     StreamSuggestionsResponse,
 )
-from ai_gateway.async_dependency_resolver import get_config, get_container_application
+from ai_gateway.async_dependency_resolver import (
+    get_code_suggestions_completions_amazon_q_factory_provider,
+    get_code_suggestions_generations_amazon_q_factory_provider,
+    get_config,
+    get_container_application,
+)
 from ai_gateway.code_suggestions import (
     CodeCompletions,
     CodeCompletionsLegacy,
@@ -80,6 +86,14 @@ async def completions(
     current_user: Annotated[StarletteUser, Depends(get_current_user)],
     prompt_registry: Annotated[BasePromptRegistry, Depends(get_prompt_registry)],
     config: Annotated[Config, Depends(get_config)],
+    completions_amazon_q_factory: Annotated[
+        CodeCompletions,
+        Depends(get_code_suggestions_completions_amazon_q_factory_provider),
+    ],
+    generations_amazon_q_factory: Annotated[
+        CodeGenerations,
+        Depends(get_code_suggestions_generations_amazon_q_factory_provider),
+    ],
 ):
     return await code_suggestions(
         request=request,
@@ -87,6 +101,8 @@ async def completions(
         current_user=current_user,
         prompt_registry=prompt_registry,
         config=config,
+        completions_amazon_q_factory=completions_amazon_q_factory,
+        generations_amazon_q_factory=generations_amazon_q_factory,
     )
 
 
@@ -99,6 +115,8 @@ async def code_suggestions(
     prompt_registry: BasePromptRegistry,
     config: Config,
     stream_handler: StreamHandler = handle_stream,
+    completions_amazon_q_factory: Optional[CodeCompletions] = None,
+    generations_amazon_q_factory: Optional[CodeGenerations] = None,
 ):
     language_server_version = LanguageServerVersion.from_string(
         request.headers.get(X_GITLAB_LANGUAGE_SERVER_VERSION, None)
@@ -129,13 +147,30 @@ async def code_suggestions(
                 detail="Unauthorized to access code suggestions",
             )
 
+        if component.payload.model_provider == KindModelProvider.AMAZON_Q:
+            engine = completions_amazon_q_factory(
+                model__current_user=current_user,
+                model__auth_header=request.headers.get(AUTH_HEADER),
+                model__role_arn=payload.role_arn,
+            )
+        else:
+            engine = None
         return await code_completion(
             payload=component.payload,
             code_context=code_context,
             stream_handler=stream_handler,
             snowplow_event_context=snowplow_code_suggestion_context,
+            engine=engine,
         )
     if component.type == CodeEditorComponents.GENERATION:
+        if component.payload.model_provider == KindModelProvider.AMAZON_Q:
+            engine = generations_amazon_q_factory(
+                model__current_user=current_user,
+                model__auth_header=request.headers.get(AUTH_HEADER),
+                model__role_arn=payload.role_arn,
+            )
+        else:
+            engine = None
         return await code_generation(
             current_user=current_user,
             payload=component.payload,
@@ -143,6 +178,7 @@ async def code_suggestions(
             prompt_registry=prompt_registry,
             stream_handler=stream_handler,
             snowplow_event_context=snowplow_code_suggestion_context,
+            engine=engine,
         )
 
 
@@ -158,6 +194,7 @@ async def code_completion(
     ],
     code_context: list[CodeContextPayload] = None,
     snowplow_event_context: Optional[SnowplowEventContext] = None,
+    engine: CodeCompletions = None,
 ):
     kwargs = {}
 
@@ -165,6 +202,11 @@ async def code_completion(
         # TODO: As we migrate to v3 we can rewrite this to use prompt registry
         engine = completions_anthropic_factory(model__name=payload.model_name)
         kwargs.update({"raw_prompt": payload.prompt})
+    elif payload.model_provider == KindModelProvider.AMAZON_Q:
+        if engine is None:
+            raise ValueError(
+                "Engine must be provided when using Amazon Q as the model provider"
+            )
     else:
         engine = completions_legacy_factory()
 
@@ -240,9 +282,15 @@ async def code_generation(
     ],
     code_context: list[CodeContextPayload] = None,
     snowplow_event_context: Optional[SnowplowEventContext] = None,
+    engine: CodeGenerations = None,
 ):
     model_provider = payload.model_provider
-    if payload.prompt_id:
+    if payload.prompt_id and payload.model_provider == KindModelProvider.AMAZON_Q:
+        if engine is None:
+            raise ValueError(
+                "Engine must be provided when using Amazon Q as the model provider"
+            )
+    elif payload.prompt_id:
         # for backward compatibility, eventually prmpt_version should be a mandatory field
         prompt_version = payload.prompt_version or "^1.0.0"
         # For SaaS: prompt_version and prompt_id are mandatory fields

@@ -117,6 +117,7 @@ class CompletionRequest(BaseModel):
     prompt_components: Annotated[
         List[PromptComponent], Field(min_length=1, max_length=100)
     ]
+    role_arn: Optional[str] = None
 
 
 class ModelMetadata(BaseModel):
