@@ -44,6 +44,10 @@ def note_for_spins_role(spins, role)
   format(NOT_AVAILABLE_TEMPLATE, role: role)
 end
 
+def aaaa
+  puts "aaaa"
+end
+
 def note_for_spin_role(spin, role)
   return format(OPTIONAL_REVIEW_TEMPLATE, role: role.capitalize) if spin.optional_role == role
 
