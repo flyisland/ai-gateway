@@ -272,8 +272,8 @@ class CodeCompletions:
     ):
         if self.post_processor:
             return await self.post_processor(
-                prompt.prefix, suffix=prompt.suffix, lang_id=lang_id, score=score
-            ).process(response_text)
+                prompt.prefix, suffix=prompt.suffix, lang_id=lang_id
+            ).process(response_text, score=score)
 
         return response_text
 

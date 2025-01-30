@@ -59,7 +59,6 @@ class PostProcessor(PostProcessorBase):
         ] = None,
         exclude: Optional[list] = None,
         extras: Optional[list] = None,
-        score: Optional[float] = None,
         score_threshold: Optional[float] = None,
     ):
         self.code_context = code_context
@@ -68,7 +67,6 @@ class PostProcessor(PostProcessorBase):
         self.overrides = overrides if overrides else {}
         self.exclude = set(exclude) if exclude else []
         self.extras = extras if extras else []
-        self.score = score
         self.score_threshold = (
             score_threshold if score_threshold else SCORE_THRESHOLD_DISABLED
         )
@@ -77,7 +75,7 @@ class PostProcessor(PostProcessorBase):
     def ops(self) -> list[AliasOpsRecord]:
         return {
             PostProcessorOperation.FILTER_SCORE: partial(
-                filter_score, score=self.score, threshold=self.score_threshold
+                filter_score, threshold=self.score_threshold
             ),
             PostProcessorOperation.REMOVE_COMMENTS: partial(
                 remove_comment_only_completion, lang_id=self.lang_id
@@ -105,11 +103,15 @@ class PostProcessor(PostProcessorBase):
         }
 
     async def process(self, completion: str, **kwargs: Any) -> str:
+        score = kwargs.get("score")
+
         for processor in self._ordered_post_processors():
             if str(processor) in self.exclude:
                 continue
 
-            completion = await self._apply_post_processor(processor, completion)
+            completion = await self._apply_post_processor(
+                processor, completion, score=score
+            )
 
             if completion == "":
                 return ""
@@ -119,10 +121,13 @@ class PostProcessor(PostProcessorBase):
     def _ordered_post_processors(self):
         return ORDERED_POST_PROCESSORS + self.extras
 
-    async def _apply_post_processor(self, processor_key, completion):
+    async def _apply_post_processor(self, processor_key, completion, score=None):
         # Override post-processor if present in `overrides`, else use the given processor
         actual_processor_key = self.overrides.get(processor_key, processor_key)
         func = self.ops[actual_processor_key]
+
+        if actual_processor_key == PostProcessorOperation.FILTER_SCORE:
+            func = partial(func, score=score)
 
         if self._is_async(func):
             return await func(completion)
