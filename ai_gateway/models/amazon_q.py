@@ -29,7 +29,7 @@ class AmazonQModel(TextGenModelBase):
         self._role_arn = role_arn
         self._client_factory = client_factory
         self._metadata = ModelMetadata(
-            name="hello",
+            name=KindAmazonQModel.AMAZON_Q,
             engine=KindAmazonQModel.AMAZON_Q,
         )
 
