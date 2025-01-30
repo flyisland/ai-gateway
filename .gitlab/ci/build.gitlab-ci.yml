@@ -1,3 +1,9 @@
+install:
+  extends: .poetry
+  stage: build
+  script:
+    - poetry install
+
 build:ingest-image:
   stage: build
   extends:
@@ -35,3 +41,12 @@ build:self-hosted-ai-gateway-latest-image:
     - if: $CI_COMMIT_BRANCH && $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
   needs:
     - build-docker-model-gateway
+
+build-docker-model-gateway:
+  stage: build
+  extends:
+    - .kaniko_base
+  variables:
+    KANIKO_BUILD_FILE: Dockerfile
+    KANIKO_DESTINATION: "${TARGET_IMAGE}"
+    CLOUD_CONNECTOR_SERVICE_NAME: "${CLOUD_CONNECTOR_SERVICE_NAME}"
