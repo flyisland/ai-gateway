@@ -7,6 +7,7 @@ from gitlab_cloud_connector import CloudConnectorUser, UserClaims
 
 from ai_gateway.api.v3 import api_router
 from ai_gateway.feature_flags.context import current_feature_flag_context
+from ai_gateway.models.base import KindModelProvider
 from ai_gateway.tracking import SnowplowEventContext
 
 __all__ = [
@@ -34,7 +35,7 @@ def auth_user():
     return CloudConnectorUser(
         authenticated=True,
         claims=UserClaims(
-            scopes=["complete_code", "generate_code"],
+            scopes=["complete_code", "generate_code", "amazon_q_integration"],
             subject="1234",
             gitlab_realm="self-managed",
         ),
@@ -1049,3 +1050,131 @@ class TestUnauthorizedIssuer:
 
         assert response.status_code == 403
         assert response.json() == {"detail": "Unauthorized to access code suggestions"}
+
+
+class TestAmazonQIntegrationV3:
+    @pytest.mark.parametrize(
+        (
+            "mock_suggestions_output_text",
+            "mock_suggestions_model",
+            "mock_suggestions_engine",
+            "expected_response",
+        ),
+        [
+            # non-empty suggestions from model
+            (
+                "def search",
+                "amazon-q",
+                "amazon-q",
+                {
+                    "choices": [
+                        {
+                            "text": "def search",
+                            "index": 0,
+                            "finish_reason": "length",
+                        }
+                    ],
+                    "metadata": {
+                        "model": {
+                            "engine": "amazon-q",
+                            "name": "amazon-q",
+                            "lang": "python",
+                        },
+                        "enabled_feature_flags": ["flag_a", "flag_b"],
+                    },
+                },
+            ),
+            # empty suggestions from model
+            (
+                "",
+                "amazon-q",
+                "amazon-q",
+                {
+                    "choices": [],
+                    "metadata": {
+                        "model": {
+                            "engine": "amazon-q",
+                            "name": "amazon-q",
+                            "lang": "python",
+                        },
+                        "enabled_feature_flags": ["flag_a", "flag_b"],
+                    },
+                },
+            ),
+        ],
+    )
+    def test_successful_response(
+        self,
+        mock_client: TestClient,
+        mock_generations: Mock,
+        mock_suggestions_output_text: str,
+        expected_response: dict,
+        route: str,
+    ):
+        payload = {
+            "file_name": "main.py",
+            "content_above_cursor": "# Create a fast binary search\n",
+            "content_below_cursor": "\n",
+            "language_identifier": "python",
+            "model_provider": KindModelProvider.AMAZON_Q.value,
+            "prompt_id": "code_suggestions/generations",
+            "prompt_version": "^1.0.0",
+        }
+
+        prompt_component = {
+            "type": "code_editor_generation",
+            "payload": payload,
+        }
+
+        data = {"prompt_components": [prompt_component], "role_arn": "test:role"}
+
+        current_feature_flag_context.set({"flag_a", "flag_b"})
+
+        response = mock_client.post(
+            route,
+            headers={
+                "Authorization": "Bearer 12345",
+                "X-Gitlab-Authentication-Type": "oidc",
+                "X-GitLab-Instance-Id": "1234",
+                "X-GitLab-Realm": "self-managed",
+                "X-Gitlab-Global-User-Id": "test-user-id",
+            },
+            json=data,
+        )
+
+        assert response.status_code == 200
+
+        body = response.json()
+
+        assert body["choices"] == expected_response["choices"]
+
+        assert body["metadata"]["model"] == expected_response["metadata"]["model"]
+
+        assert body["metadata"]["timestamp"] > 0
+
+        assert set(body["metadata"]["enabled_feature_flags"]) == set(
+            expected_response["metadata"]["enabled_feature_flags"]
+        )
+
+        expected_snowplow_event = SnowplowEventContext(
+            prefix_length=30,
+            suffix_length=1,
+            language="python",
+            gitlab_realm="self-managed",
+            is_direct_connection=False,
+            gitlab_instance_id="1234",
+            gitlab_global_user_id="test-user-id",
+            gitlab_host_name="",
+            gitlab_saas_duo_pro_namespace_ids=[],
+            suggestion_source="network",
+            region="us-central1",
+        )
+        mock_generations.assert_called_with(
+            prefix=payload["content_above_cursor"],
+            file_name=payload["file_name"],
+            editor_lang=payload["language_identifier"],
+            model_provider=None,
+            stream=False,
+            snowplow_event_context=expected_snowplow_event,
+            prompt_enhancer=None,
+        )

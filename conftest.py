@@ -242,14 +242,6 @@ def mock_amazon_q_model(mock_output: TextGenModelOutput):
         yield mock
 
 @pytest.fixture
-def mock_amazon_q_model(mock_output: TextGenModelOutput):
-    with _mock_generate(
-        "ai_gateway.models.amazon_q.AmazonQModel", mock_output
-    ) as mock:
-        yield mock
-
-
-@pytest.fixture
 def mock_completions_legacy_output_texts():
     yield ["def search"]
 
@@ -410,7 +402,6 @@ def mock_litellm_acompletion_streamed():
         mock_acompletion.return_value = streamed_response
 
         yield mock_acompletion
-
 
 @pytest.fixture
 def model_response():
