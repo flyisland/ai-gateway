@@ -9,7 +9,6 @@ workflow:
 image: python:3.11.11
 
 stages:
-  - lint
   - build
   - test
   - deploy-review
