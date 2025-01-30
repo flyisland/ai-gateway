@@ -34,10 +34,10 @@ open htmlcov/index.html
 It's possible to run a single test file with next command:
 
 ```shell
-pytest {name of test file}
+poetry run pytest {name of test file}
 ```
 
-If you run into an error `command not found: pytest` try to run `make test` first. This command will install `pytest` and will make your shell ready to run the tests. 
+If you run into an error `command not found: pytest` try to run `make install-test-deps` first. This command will install `pytest` and will make your shell ready to run the tests. 
 
 ## Integration test
 
