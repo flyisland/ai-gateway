@@ -43,5 +43,3 @@ spec:
   load_balancing:
     external_load_balancer:
       backend_protocol: HTTPS
-  vpc_access:
-    enabled: true
