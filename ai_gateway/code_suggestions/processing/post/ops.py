@@ -231,30 +231,38 @@ async def fix_end_block_errors(
         suffix_first_line = suffix_first_line[:idx_suffix_new_line]
 
     completion_lookup = completion.rstrip()
-    if not completion_lookup.endswith(suffix_first_line):
+    # See if suffix exists in completion
+    if not completion_lookup.find(suffix_first_line):
         # Return the original copy of the completion.
         return completion
 
     try:
-        # Remove the suffix from the completion.
-        completion_lookup = completion_lookup[: -len(suffix_first_line)].rstrip()
+        # Start at last suffix existing in completion, trim everything after
+        # and see if it improves errors
+        min_errors = 9999
+        while (last_suffix_pos := completion_lookup.rfind(suffix_first_line)) != -1:
+          completion_lookup = completion_lookup[:last_suffix_pos]
 
-        # Check for errors in the original code
-        code_sample_before_suggestion = f"{prefix}{suffix}"
-        parser_before_suggestion = await CodeParser.from_language_id(
-            code_sample_before_suggestion, lang_id
-        )
-        errors_before_suggestion = len(parser_before_suggestion.errors())
+          # Check for errors in the original code
+          code_sample_before_suggestion = f"{prefix}{suffix}"
+          parser_before_suggestion = await CodeParser.from_language_id(
+              code_sample_before_suggestion, lang_id
+          )
+          before_errors = list(filter(lambda e: find_cursor_position(code_sample_before_suggestion, e.start) < len(code_sample_before_suggestion),parser_before_suggestion.errors()))
+          errors_before_suggestion = len(before_errors)
 
-        # Check if there are any new errors when inserting the code suggestion
-        code_sample_after_suggestion = f"{prefix}{completion_lookup}{suffix}"
-        parser_after_suggestion = await CodeParser.from_language_id(
-            code_sample_after_suggestion, lang_id
-        )
-        errors_after_suggestion = len(parser_after_suggestion.errors())
+          # Check if there are any new errors when inserting the code suggestion
+          code_sample_after_suggestion = f"{prefix}{completion_lookup}{suffix}"
+          parser_after_suggestion = await CodeParser.from_language_id(
+              code_sample_after_suggestion, lang_id
+          )
+          after_errors = list(filter(lambda e: find_cursor_position(code_sample_after_suggestion, e.start) < len(code_sample_after_suggestion), parser_after_suggestion.errors()))
+          errors_after_suggestion = len(after_errors)
 
-        if errors_after_suggestion <= errors_before_suggestion:
-            completion = completion_lookup
+          min_errors = errors_after_suggestion if errors_after_suggestion < min_errors else min_errors
+
+          if errors_after_suggestion <= errors_before_suggestion and errors_after_suggestion <= min_errors:
+              completion = completion_lookup
     except ValueError as e:
         log.warning(f"Failed to parse code: {e}")
 
