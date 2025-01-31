@@ -37,6 +37,7 @@ variables:
   SAST_EXCLUDED_PATHS: "tests, tmp, api"
 
   CLOUD_CONNECTOR_SERVICE_NAME: "gitlab-ai-gateway"
+  SECURE_LOG_LEVEL: "debug"
 
 include:
   - local: .gitlab/ci/build.gitlab-ci.yml
