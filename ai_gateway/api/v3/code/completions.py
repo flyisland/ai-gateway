@@ -95,7 +95,6 @@ async def completions(
         Depends(get_code_suggestions_generations_amazon_q_factory_provider),
     ],
 ):
-    print("DEBUG: [completions] start completions request")
     return await code_suggestions(
         request=request,
         payload=payload,
@@ -119,7 +118,6 @@ async def code_suggestions(
     completions_amazon_q_factory: Optional[CodeCompletions] = None,
     generations_amazon_q_factory: Optional[CodeGenerations] = None,
 ):
-    print("DEBUG: [code_suggestions] start")
     language_server_version = LanguageServerVersion.from_string(
         request.headers.get(X_GITLAB_LANGUAGE_SERVER_VERSION, None)
     )
@@ -139,11 +137,8 @@ async def code_suggestions(
         global_user_id=current_user.global_user_id,
         region=config.google_cloud_platform.location(),
     )
-    print(
-        "DEBUG: [code_suggestions] snowplow_code_suggestion_context",
-        snowplow_code_suggestion_context,
-    )
     if component.type == CodeEditorComponents.COMPLETION:
+        request_log.debug("[code_suggestions] starting code completion")
         if not current_user.can(
             GitLabUnitPrimitive.COMPLETE_CODE,
             disallowed_issuers=[CloudConnectorConfig().service_name],
@@ -154,8 +149,13 @@ async def code_suggestions(
             )
 
         if component.payload.model_provider == KindModelProvider.AMAZON_Q:
+            _validate_amazon_q_requirements(payload)
             engine = _create_amazon_q_engine(
-                completions_amazon_q_factory, component.payload, current_user, request
+                completions_amazon_q_factory,
+                component.payload,
+                current_user,
+                request,
+                payload.role_arn,
             )
         else:
             engine = None
@@ -167,7 +167,6 @@ async def code_suggestions(
             engine=engine,
         )
     if component.type == CodeEditorComponents.GENERATION:
-        print("DEBUG: [code_suggestions] start code generation logic")
         if not current_user.can(
             GitLabUnitPrimitive.GENERATE_CODE,
             disallowed_issuers=[CloudConnectorConfig().service_name],
@@ -178,9 +177,13 @@ async def code_suggestions(
             )
 
         if component.payload.model_provider == KindModelProvider.AMAZON_Q:
-            print("DEBUG: [code_suggestions] using AmazonQ model")
+            _validate_amazon_q_requirements(payload)
             engine = _create_amazon_q_engine(
-                generations_amazon_q_factory, component.payload, current_user, request
+                generations_amazon_q_factory,
+                component.payload,
+                current_user,
+                request,
+                payload.role_arn,
             )
         else:
             engine = None
@@ -297,11 +300,12 @@ async def code_generation(
     snowplow_event_context: Optional[SnowplowEventContext] = None,
     engine: CodeGenerations = None,
 ):
-    print("DEBUG: [code_generation] start")
     model_provider = payload.model_provider
     # TODO: Check if this check is correct
     if payload.prompt_id and payload.model_provider == KindModelProvider.AMAZON_Q:
-        print("DEBUG: [code_generation] checking engine for AmazonQ")
+        request_log.debug(
+            "Validating engine", engine=engine, model_provider=payload.model_provider
+        )
         if engine is None:
             raise ValueError(
                 "Engine must be provided when using Amazon Q as the model provider"
@@ -346,7 +350,7 @@ async def code_generation(
         snowplow_event_context=snowplow_event_context,
         prompt_enhancer=payload.prompt_enhancer,
     )
-    print("DEBUG: [code_generation] suggestion", suggestion)
+    request_log.debug("Suggestions", suggestion=suggestion)
     if isinstance(suggestion, AsyncIterator):
         return await stream_handler(suggestion, engine)
 
@@ -377,13 +381,13 @@ def _validate_amazon_q_requirements(payload):
         )
 
 
-def _create_amazon_q_engine(amazon_q_factory, payload, current_user, request):
+def _create_amazon_q_engine(amazon_q_factory, payload, current_user, request, role_arn):
     """Create Amazon Q engine with required parameters."""
+    request_log.debug("Creating Amazon Q engine", payload=payload)
     if payload.model_provider == KindModelProvider.AMAZON_Q:
-        _validate_amazon_q_requirements(payload)
         return amazon_q_factory(
             model__current_user=current_user,
             model__auth_header=request.headers.get(AUTH_HEADER),
-            model__role_arn=payload.role_arn,
+            model__role_arn=role_arn,
         )
     return None

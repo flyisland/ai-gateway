@@ -6,6 +6,7 @@ from fastapi.testclient import TestClient
 from gitlab_cloud_connector import CloudConnectorUser, UserClaims
 
 from ai_gateway.api.v3 import api_router
+from ai_gateway.config import Config, ConfigModelEndpoints, ConfigModelKeys
 from ai_gateway.feature_flags.context import current_feature_flag_context
 from ai_gateway.models.base import KindModelProvider
 from ai_gateway.tracking import SnowplowEventContext
@@ -40,6 +41,27 @@ def auth_user():
             gitlab_realm="self-managed",
         ),
     )
+
+
+@pytest.fixture
+def mock_config(assets_dir):
+    config = Config()
+    config.custom_models.enabled = True
+    config.model_keys = ConfigModelKeys(
+        fireworks_api_key="mock_fireworks_key",
+    )
+    config.self_signed_jwt.signing_key = open(
+        assets_dir / "keys" / "signing_key.pem"
+    ).read()
+    config.amazon_q.region = "us-west-2"
+    config.model_endpoints = ConfigModelEndpoints(
+        fireworks_current_region_endpoint={
+            "endpoint": "https://fireworks.endpoint",
+            "identifier": "qwen2p5-coder-7b",
+        }
+    )
+
+    yield config
 
 
 class TestEditorContentCompletion:
@@ -1116,7 +1138,7 @@ class TestAmazonQIntegrationV3:
             "content_above_cursor": "# Create a fast binary search\n",
             "content_below_cursor": "\n",
             "language_identifier": "python",
-            "model_provider": KindModelProvider.AMAZON_Q.value,
+            "model_provider": "amazon_q",
             "prompt_id": "code_suggestions/generations",
             "prompt_version": "^1.0.0",
         }
@@ -1173,7 +1195,7 @@ class TestAmazonQIntegrationV3:
             prefix=payload["content_above_cursor"],
             file_name=payload["file_name"],
             editor_lang=payload["language_identifier"],
-            model_provider=None,
+            model_provider=KindModelProvider.AMAZON_Q,
             stream=False,
             snowplow_event_context=expected_snowplow_event,
             prompt_enhancer=None,
