@@ -19,6 +19,7 @@ from ai_gateway.chat.agents.typing import (
     Message,
     TypeAgentEvent,
 )
+from ai_gateway.models.base import TokensConsumptionMetadata
 from ai_gateway.chat.tools.base import BaseTool
 from ai_gateway.feature_flags import FeatureFlag, is_feature_enabled
 from ai_gateway.models.base_chat import Role
@@ -120,6 +121,11 @@ class ReActPlainTextParser(BaseCumulativeTransformOutputParser):
 
         try:
             event = self._parse(text)
+            import pdb; pdb.set_trace()
+            # if event == AgentFinalAnswer:
+            #     tokens_consumption_metadata = TokensConsumptionMetadata(
+            #         cache_creation_input_tokens=
+            #     )
         except ValueError as e:
             if not partial:
                 msg = f"Invalid output: {text}"

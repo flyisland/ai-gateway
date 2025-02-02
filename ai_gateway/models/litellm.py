@@ -474,7 +474,7 @@ class LiteLlmTextGenModel(TextGenModelBase):
             ),
             cache_creation_input_tokens=(
                 suggestion.usage.cache_creation_input_tokens
-                if hasattr(suggestion, "usage") and hasattr(suggestion.usage, "cache_creation_input_tokens")
+                if hasattr(suggestion, "usage")
                 else 0
             ),
         )
