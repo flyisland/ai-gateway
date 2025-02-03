@@ -38,7 +38,6 @@ variables:
   CS_IMAGE: $TARGET_IMAGE
 
   CLOUD_CONNECTOR_SERVICE_NAME: "gitlab-ai-gateway"
-  SECURE_LOG_LEVEL: "debug"
 
 include:
   - local: .gitlab/ci/build.gitlab-ci.yml
