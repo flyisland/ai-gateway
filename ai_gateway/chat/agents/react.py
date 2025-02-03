@@ -10,6 +10,13 @@ from langchain_core.prompt_values import ChatPromptValue, PromptValue
 from langchain_core.runnables import Runnable, RunnableConfig
 from pydantic import BaseModel
 
+
+from ai_gateway.internal_events.context import InternalEventAdditionalProperties
+
+from ai_gateway.async_dependency_resolver import (
+    get_internal_event_client
+)
+
 from ai_gateway.chat.agents.typing import (
     AgentError,
     AgentFinalAnswer,
@@ -25,6 +32,7 @@ from ai_gateway.feature_flags import FeatureFlag, is_feature_enabled
 from ai_gateway.models.base_chat import Role
 from ai_gateway.prompts import Prompt, jinja2_formatter
 from ai_gateway.prompts.typing import ModelMetadata
+from conftest import internal_event_client
 
 __all__ = [
     "ReActAgentInputs",
@@ -122,10 +130,22 @@ class ReActPlainTextParser(BaseCumulativeTransformOutputParser):
         try:
             event = self._parse(text)
             import pdb; pdb.set_trace()
-            # if event == AgentFinalAnswer:
-            #     tokens_consumption_metadata = TokensConsumptionMetadata(
-            #         cache_creation_input_tokens=
-            #     )
+            if event == AgentFinalAnswer and is_feature_enabled(FeatureFlag.ENABLE_ANTHROPIC_PROMPT_CACHING):
+                tokens_consumption_metadata = TokensConsumptionMetadata(
+                    cache_creation_token_usage = result[0].message.usage_metadata['input_token_details']['cache_creation'],
+                    cache_read_token_usage = result[0].message.usage_metadata['input_token_details']['cache_read']
+                )
+
+                additonal_properties = InternalEventAdditionalProperties(
+                    label="cache_metrics",
+                    value = tokens_consumption_metadata
+                )
+
+                internal_event_client.track_event(
+                    f"anthropic_cache_usage",
+                    additonal_properties= additonal_properties
+
+                )
         except ValueError as e:
             if not partial:
                 msg = f"Invalid output: {text}"
