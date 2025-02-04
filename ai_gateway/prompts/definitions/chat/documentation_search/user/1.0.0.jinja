@@ -6,9 +6,12 @@ The following are provided:
 
 Given the above:
 
-If you know the answer, create a final answer.
-  * Then return relevant "{{content_id}}" part for references, under the "{{content_id}}:" heading.
-If you don't know the answer: start the response with "Unfortunately, I could not find any documentation", and don't try to make up an answer.
+- Take your time to analyze the question and provided <doc> context.
+- Prioritize using the provided <doc> information over your own knowledge when composing your answer. 
+  - Then return relevant "{{content_id}}" part for references, under the "{{content_id}}:" heading.
+- If the question asks for specific numeric values, try to fully rely on the <doc> information to find and answer.
+- Answer specifically what the question is asking. For example, if the question asks "What" do not answer with "How".
+- If you don't know the answer: start the response with "Unfortunately, I could not find any documentation", and don't try to make up an answer.
 
 ---
 
