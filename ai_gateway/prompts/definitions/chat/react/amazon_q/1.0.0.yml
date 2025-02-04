@@ -1,0 +1,17 @@
+---
+name: Amazon Q Chat agent
+model:
+  name: amazon_q
+  params:
+    model_class_provider: amazon_q
+unit_primitives:
+  - agent_quick_actions
+prompt_template:
+  system: |
+    {% include 'chat/react/system.jinja' %}
+  user: |
+    {% include 'chat/react/user.jinja' %}
+params:
+  timeout: 30
+  stop:
+    - "Observation:"

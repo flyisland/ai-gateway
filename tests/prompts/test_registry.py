@@ -571,6 +571,7 @@ class TestLocalPromptRegistry:
         model_factories: dict[ModelClassProvider, TypeModelFactory],
         internal_event_client: Mock,
         prompt_id: str,
+        user: StarletteUser,
         model_metadata: ModelMetadata | None,
         expected_name: str,
         expected_prompt_version: str,
@@ -589,6 +590,7 @@ class TestLocalPromptRegistry:
         prompt = registry.get(
             prompt_id,
             prompt_version=expected_prompt_version,
+            user=user
         )
         chain = cast(RunnableSequence, prompt.bound)
         binding = cast(RunnableBinding, chain.last)
@@ -686,6 +688,7 @@ class TestLocalPromptRegistry:
         model_factories: dict[ModelClassProvider, TypeModelFactory],
         prompts_registered: dict[str, PromptRegistered],
         internal_event_client: Mock,
+        user: StarletteUser,
     ):
         registry = LocalPromptRegistry.from_local_yaml(
             class_overrides={
@@ -697,7 +700,10 @@ class TestLocalPromptRegistry:
             custom_models_enabled=False,
         )
 
-        assert registry.get("chat/react", "^1.0.0").name == "Chat react custom prompt"
+        assert (
+            registry.get("chat/react", "^1.0.0", user=user).name
+            == "Chat react custom prompt"
+        )
 
     def test_get_prompt_config_no_compatible_versions(
         self,
