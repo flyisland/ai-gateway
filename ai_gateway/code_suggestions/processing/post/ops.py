@@ -208,9 +208,8 @@ async def fix_end_block_errors(
     stripping the suffix doesn't introduce additional errors compared to the original code.
     This makes it more effective at handling code that may have pre-existing issues.
 
-    This processor will find the shortest substring of the suffix that, when removed
-    from the completion, results in a version of the completion without introducing
-    any new parsing errors.
+    This processor will search through the completion for the suffix, if found it will stop
+    at each instance of the suffix to check if the completion before here reduces the amount of errors.
 
     Args:
         prefix: The code context before the completion
