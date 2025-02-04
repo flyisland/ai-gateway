@@ -95,6 +95,7 @@ async def completions(
         Depends(get_code_suggestions_generations_amazon_q_factory_provider),
     ],
 ):
+    request_log.debug("[v3/code/completions] payload", payload=payload)
     return await code_suggestions(
         request=request,
         payload=payload,
@@ -239,7 +240,7 @@ async def code_completion(
         snowplow_event_context=snowplow_event_context,
         **kwargs,
     )
-
+    request_log.debug("Code completion suggestions:", suggestions=suggestions)
     if not isinstance(suggestions, list):
         suggestions = [suggestions]
 

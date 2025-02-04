@@ -1086,8 +1086,8 @@ class TestAmazonQIntegrationV3:
             # non-empty suggestions from model
             (
                 "def search",
-                "amazon-q",
-                "amazon-q",
+                "amazon_q",
+                "amazon_q",
                 {
                     "choices": [
                         {
@@ -1098,8 +1098,8 @@ class TestAmazonQIntegrationV3:
                     ],
                     "metadata": {
                         "model": {
-                            "engine": "amazon-q",
-                            "name": "amazon-q",
+                            "engine": "amazon_q",
+                            "name": "amazon_q",
                             "lang": "python",
                         },
                         "enabled_feature_flags": ["flag_a", "flag_b"],
@@ -1109,14 +1109,14 @@ class TestAmazonQIntegrationV3:
             # empty suggestions from model
             (
                 "",
-                "amazon-q",
-                "amazon-q",
+                "amazon_q",
+                "amazon_q",
                 {
                     "choices": [],
                     "metadata": {
                         "model": {
-                            "engine": "amazon-q",
-                            "name": "amazon-q",
+                            "engine": "amazon_q",
+                            "name": "amazon_q",
                             "lang": "python",
                         },
                         "enabled_feature_flags": ["flag_a", "flag_b"],
@@ -1125,7 +1125,7 @@ class TestAmazonQIntegrationV3:
             ),
         ],
     )
-    def test_successful_response(
+    def test_code_generation_successful_response(
         self,
         mock_client: TestClient,
         mock_generations: Mock,
@@ -1199,4 +1199,112 @@ class TestAmazonQIntegrationV3:
             stream=False,
             snowplow_event_context=expected_snowplow_event,
             prompt_enhancer=None,
+        )
+
+    @pytest.mark.parametrize(
+        (
+            "mock_completions_amazonq_output_texts",
+            "mock_suggestions_model",
+            "mock_suggestions_engine",
+            "expected_response",
+        ),
+        [
+            # non-empty suggestions from model
+            (
+                ["def search", "println"],
+                "amazon_q",
+                "amazon_q",
+                {
+                    "choices": [
+                        {
+                            "text": "def search",
+                            "index": 0,
+                            "finish_reason": "length",
+                        },
+                        {
+                            "text": "println",
+                            "index": 0,
+                            "finish_reason": "length",
+                        },
+                    ],
+                    "metadata": {
+                        "model": {
+                            "engine": "amazon_q",
+                            "name": "amazon_q",
+                            "lang": "python",
+                        },
+                        "enabled_feature_flags": ["flag_a", "flag_b"],
+                    },
+                },
+            ),
+            # empty suggestions from model
+            (
+                [""],
+                "amazon_q",
+                "amazon_q",
+                {
+                    "choices": [],
+                    "metadata": {
+                        "model": {
+                            "engine": "amazon_q",
+                            "name": "amazon_q",
+                            "lang": "python",
+                        },
+                        "enabled_feature_flags": ["flag_a", "flag_b"],
+                    },
+                },
+            ),
+        ],
+    )
+    def test_code_completion_successful_response(
+        self,
+        mock_client: TestClient,
+        mock_completions: Mock,
+        mock_completions_amazonq_output_texts: str,
+        mock_completions_amazonq: Mock,
+        expected_response: dict,
+        route: str,
+    ):
+        payload = {
+            "file_name": "main.py",
+            "content_above_cursor": "# Create a fast binary search\n",
+            "content_below_cursor": "\n",
+            "language_identifier": "python",
+            "choices_count": 3,
+            "model_provider": "amazon_q",
+        }
+
+        prompt_component = {
+            "type": "code_editor_completion",
+            "payload": payload,
+        }
+
+        data = {"prompt_components": [prompt_component], "role_arn": "test:role"}
+
+        current_feature_flag_context.set({"flag_a", "flag_b"})
+
+        response = mock_client.post(
+            route,
+            headers={
+                "Authorization": "Bearer 12345",
+                "X-Gitlab-Authentication-Type": "oidc",
+                "X-GitLab-Instance-Id": "1234",
+                "X-GitLab-Realm": "self-managed",
+                "X-Gitlab-Global-User-Id": "test-user-id",
+            },
+            json=data,
+        )
+
+        assert response.status_code == 200
+
+        body = response.json()
+
+        assert body["choices"] == expected_response["choices"]
+
+        assert body["metadata"]["model"] == expected_response["metadata"]["model"]
+
+        assert body["metadata"]["timestamp"] > 0
+
+        assert set(body["metadata"]["enabled_feature_flags"]) == set(
+            expected_response["metadata"]["enabled_feature_flags"]
         )

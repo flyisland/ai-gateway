@@ -26,10 +26,6 @@ from ai_gateway.container import ContainerApplication
 from ai_gateway.experimentation.base import ExperimentTelemetry
 from ai_gateway.models.base import ModelMetadata, TokensConsumptionMetadata
 from ai_gateway.internal_events.client import InternalEventsClient
-from ai_gateway.models.base import (
-    ModelMetadata,
-    TokensConsumptionMetadata,
-)
 from ai_gateway.models.base_text import (
     TextGenModelBase,
     TextGenModelChunk,
@@ -40,6 +36,7 @@ from ai_gateway.prompts.config.base import ModelConfig, PromptConfig, PromptPara
 from ai_gateway.prompts.config.models import ChatLiteLLMParams, TypeModelParams
 from ai_gateway.prompts.typing import Model, TypeModelFactory
 from ai_gateway.safety_attributes import SafetyAttributes
+from ai_gateway.api.v3.code.typing import ModelMetadata as ModelMetadataV3
 
 pytest_plugins = ("pytest_asyncio",)
 
@@ -234,12 +231,12 @@ def mock_agent_model(mock_output: TextGenModelOutput):
     ) as mock:
         yield mock
 
+
 @pytest.fixture
 def mock_amazon_q_model(mock_output: TextGenModelOutput):
-    with _mock_generate(
-        "ai_gateway.models.amazon_q.AmazonQModel", mock_output
-    ) as mock:
+    with _mock_generate("ai_gateway.models.amazon_q.AmazonQModel", mock_output) as mock:
         yield mock
+
 
 @pytest.fixture
 def mock_completions_legacy_output_texts():
@@ -304,6 +301,37 @@ def mock_suggestions_output(
         lang_id=LanguageId.PYTHON,
         metadata=CodeSuggestionsOutput.Metadata(experiments=[]),
     )
+
+
+@pytest.fixture
+def mock_completions_amazonq(mock_completions_amazonq_output: list[TextGenModelOutput]):
+    with patch(
+        "ai_gateway.code_suggestions.CodeCompletions.execute",
+        return_value=mock_completions_amazonq_output,
+    ) as mock:
+        yield mock
+
+
+@pytest.fixture
+def mock_completions_amazonq_output(
+    mock_completions_amazonq_output_texts: list[str],
+    mock_suggestions_model: str,
+    mock_suggestions_engine: str,
+):
+    output = []
+    for output_txt in mock_completions_amazonq_output_texts:
+        output.append(
+            CodeSuggestionsOutput(
+                text=output_txt,
+                score=0,
+                model=ModelMetadata(
+                    name=mock_suggestions_model, engine=mock_suggestions_engine
+                ),
+                lang_id=LanguageId.PYTHON,
+                metadata=CodeSuggestionsOutput.Metadata(experiments=[]),
+            )
+        )
+    yield output
 
 
 @pytest.fixture
@@ -402,6 +430,7 @@ def mock_litellm_acompletion_streamed():
         mock_acompletion.return_value = streamed_response
 
         yield mock_acompletion
+
 
 @pytest.fixture
 def model_response():
@@ -546,4 +575,8 @@ def user_is_debug():
 
 @pytest.fixture
 def user(user_is_debug: bool, scopes: list[str]):
-    yield StarletteUser(CloudConnectorUser(authenticated=True, is_debug=user_is_debug, claims=UserClaims(scopes=scopes)))
+    yield StarletteUser(
+        CloudConnectorUser(
+            authenticated=True, is_debug=user_is_debug, claims=UserClaims(scopes=scopes)
+        )
+    )
