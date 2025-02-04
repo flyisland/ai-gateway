@@ -234,7 +234,6 @@ async def fix_end_block_errors(
         suffix_first_line = suffix_first_line[:idx_suffix_new_line]
 
     completion_lookup = completion
-    suffix_first_line = suffix_first_line
 
     # See if suffix exists in completion
     if completion_lookup.find(suffix_first_line) == -1:
