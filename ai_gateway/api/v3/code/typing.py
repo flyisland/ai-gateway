@@ -70,6 +70,7 @@ class EditorContentPayload(BaseModel):
         None, examples=[KindVertexTextModel.CODE_GECKO_002]
     )
     stream: Optional[bool] = False
+    role_arn: Optional[str] = None
 
 
 class EditorContentCompletionPayload(EditorContentPayload):
@@ -120,7 +121,6 @@ class CompletionRequest(BaseModel):
     prompt_components: Annotated[
         List[PromptComponent], Field(min_length=1, max_length=100)
     ]
-    role_arn: Optional[str] = None
 
 
 class ModelMetadata(BaseModel):

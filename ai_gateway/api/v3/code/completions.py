@@ -150,13 +150,13 @@ async def code_suggestions(
             )
 
         if component.payload.model_provider == KindModelProvider.AMAZON_Q:
-            _validate_amazon_q_requirements(payload)
+            _validate_amazon_q_requirements(component.payload)
             engine = _create_amazon_q_engine(
                 completions_amazon_q_factory,
                 component.payload,
                 current_user,
                 request,
-                payload.role_arn,
+                component.payload.role_arn,
             )
         else:
             engine = None
@@ -169,7 +169,7 @@ async def code_suggestions(
         )
     if component.type == CodeEditorComponents.GENERATION:
         if not current_user.can(
-            GitLabUnitPrimitive.GENERATE_CODE,
+            GitLabUnitPrimitive.AMAZON_Q_INTEGRATION,
             disallowed_issuers=[CloudConnectorConfig().service_name],
         ):
             raise HTTPException(
@@ -178,13 +178,13 @@ async def code_suggestions(
             )
 
         if component.payload.model_provider == KindModelProvider.AMAZON_Q:
-            _validate_amazon_q_requirements(payload)
+            _validate_amazon_q_requirements(component.payload)
             engine = _create_amazon_q_engine(
                 generations_amazon_q_factory,
                 component.payload,
                 current_user,
                 request,
-                payload.role_arn,
+                component.payload.role_arn,
             )
         else:
             engine = None

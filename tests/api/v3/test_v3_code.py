@@ -1141,6 +1141,7 @@ class TestAmazonQIntegrationV3:
             "model_provider": "amazon_q",
             "prompt_id": "code_suggestions/generations",
             "prompt_version": "^1.0.0",
+            "role_arn": "test:role",
         }
 
         prompt_component = {
@@ -1148,7 +1149,7 @@ class TestAmazonQIntegrationV3:
             "payload": payload,
         }
 
-        data = {"prompt_components": [prompt_component], "role_arn": "test:role"}
+        data = {"prompt_components": [prompt_component]}
 
         current_feature_flag_context.set({"flag_a", "flag_b"})
 
@@ -1272,6 +1273,7 @@ class TestAmazonQIntegrationV3:
             "language_identifier": "python",
             "choices_count": 3,
             "model_provider": "amazon_q",
+            "role_arn": "test:role",
         }
 
         prompt_component = {
@@ -1279,7 +1281,7 @@ class TestAmazonQIntegrationV3:
             "payload": payload,
         }
 
-        data = {"prompt_components": [prompt_component], "role_arn": "test:role"}
+        data = {"prompt_components": [prompt_component]}
 
         current_feature_flag_context.set({"flag_a", "flag_b"})
 
