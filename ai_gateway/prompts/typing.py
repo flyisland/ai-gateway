@@ -1,8 +1,8 @@
-from typing import Annotated, Any, Optional, Protocol, TypeAlias, Literal
+from typing import Annotated, Any, Literal, Optional, Protocol, TypeAlias
 
 from langchain_core.language_models.chat_models import BaseChatModel
 from langchain_core.runnables import RunnableBinding
-from pydantic import AnyUrl, BaseModel, StringConstraints, UrlConstraints, Field
+from pydantic import AnyUrl, BaseModel, StringConstraints, UrlConstraints
 
 # NOTE: Do not change this to `BaseChatModel | RunnableBinding`. You'd think that's just equivalent, right? WRONG. If
 # you do that, you'll get `object has no attribute 'get'` when you use a `RummableBinding`. Why? I have no idea.
@@ -13,11 +13,11 @@ Model: TypeAlias = RunnableBinding | BaseChatModel
 
 class AmazonQModelMetadata(BaseModel):
     provider: Literal["amazon_q"]
-    name: Literal["base"]
+    name: Literal["amazon_q"]
     role_arn: Annotated[str, StringConstraints(max_length=255)]
 
     def to_params(self) -> dict[str, str]:
-        return { "metadata": { "role_arn": self.role_arn } }
+        return {"role_arn": self.role_arn}
 
 
 class ModelMetadata(BaseModel):
@@ -53,7 +53,9 @@ class ModelMetadata(BaseModel):
         return params
 
 
+# pylint: disable=invalid-name
 TypeModelMetadata: TypeAlias = ModelMetadata | AmazonQModelMetadata
+# pylint: enable=invalid-name
 
 
 class TypeModelFactory(Protocol):

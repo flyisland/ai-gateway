@@ -13,6 +13,7 @@ from langchain_core.runnables import RunnableBinding, RunnableSequence
 from pydantic import BaseModel, HttpUrl
 from pyfakefs.fake_filesystem import FakeFilesystem
 
+from ai_gateway.api.auth_utils import StarletteUser
 from ai_gateway.integrations.amazon_q.chat import ChatAmazonQ
 from ai_gateway.prompts import LocalPromptRegistry, Prompt, PromptRegistered
 from ai_gateway.prompts.config import (
@@ -566,6 +567,7 @@ class TestLocalPromptRegistry:
         model_factories: dict[ModelClassProvider, TypeModelFactory],
         internal_event_client: Mock,
         prompt_id: str,
+        user: StarletteUser,
         model_metadata: ModelMetadata | None,
         expected_name: str,
         expected_class: Type[Prompt],
@@ -581,7 +583,7 @@ class TestLocalPromptRegistry:
             internal_event_client=internal_event_client,
         )
         prompt = registry.get(
-            prompt_id, prompt_version="^1.0.0", model_metadata=model_metadata
+            prompt_id, prompt_version="^1.0.0", model_metadata=model_metadata, user=user
         )
         chain = cast(RunnableSequence, prompt.bound)
         binding = cast(RunnableBinding, chain.last)
@@ -679,6 +681,7 @@ class TestLocalPromptRegistry:
         model_factories: dict[ModelClassProvider, TypeModelFactory],
         prompts_registered: dict[str, PromptRegistered],
         internal_event_client: Mock,
+        user: StarletteUser,
     ):
         registry = LocalPromptRegistry.from_local_yaml(
             class_overrides={
@@ -690,7 +693,10 @@ class TestLocalPromptRegistry:
             custom_models_enabled=False,
         )
 
-        assert registry.get("chat/react", "^1.0.0").name == "Chat react custom prompt"
+        assert (
+            registry.get("chat/react", "^1.0.0", user=user).name
+            == "Chat react custom prompt"
+        )
 
     @pytest.mark.parametrize("custom_models_enabled", [False])
     def test_invalid_get(

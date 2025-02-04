@@ -444,7 +444,6 @@ def _build_code_completions(
 ) -> tuple[CodeCompletions | CodeCompletionsLegacy, dict]:
     kwargs = {}
 
-
     if True:  # pylint: disable=using-constant-test
         model_metadata = ModelMetadata(
             name="amazon_q",

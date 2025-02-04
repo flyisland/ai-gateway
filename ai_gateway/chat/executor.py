@@ -48,6 +48,8 @@ class GLAgentRemoteExecutor(Generic[TypeAgentInputs, TypeAgentEvent]):
         self.tools_registry = tools_registry
         self.internal_event_client = internal_event_client
         self._tools: list[BaseTool] | None = None
+        self._tools = None
+        self._user = None
 
     @property
     def tools(self) -> list[BaseTool]:
@@ -71,7 +73,9 @@ class GLAgentRemoteExecutor(Generic[TypeAgentInputs, TypeAgentEvent]):
 
     async def stream(self, *, inputs: TypeAgentInputs) -> AsyncIterator[TypeAgentEvent]:
         inputs.tools = self.tools
-        agent: ReActAgent = self.agent_factory(user=self._user, model_metadata=inputs.model_metadata)
+        agent: ReActAgent = self.agent_factory(
+            user=self._user, model_metadata=inputs.model_metadata
+        )
 
         tools_by_name = self.tools_by_name
 

@@ -1,18 +1,24 @@
-import os
-
 from typing import Any, Dict, Iterator, List, Optional
 
 from langchain_core.callbacks.manager import CallbackManagerForLLMRun
 from langchain_core.language_models.chat_models import BaseChatModel
-from langchain_core.messages import AIMessage, BaseMessage, ChatMessageChunk
+from langchain_core.messages import (
+    AIMessage,
+    AIMessageChunk,
+    BaseMessage,
+    HumanMessage,
+    SystemMessage,
+)
 from langchain_core.outputs import ChatGeneration, ChatGenerationChunk, ChatResult
 
-from ai_gateway.integrations.amazon_q.errors import AWSException
-from langchain_core.messages import AIMessageChunk, SystemMessage, HumanMessage
+from ai_gateway.structured_logging import get_request_logger
 
 __all__ = [
     "ChatAmazonQ",
 ]
+
+
+request_log = get_request_logger("amazon_q")
 
 
 class ChatAmazonQ(BaseChatModel):
@@ -41,19 +47,16 @@ class ChatAmazonQ(BaseChatModel):
         message_stream = self._build_response(messages=messages)
         stream_output = message_stream["responseStream"]
         for event in stream_output:
-          # Assuming each event in the EventStream has a 'content' field
-          # You may need to adjust this based on the actual structure of your EventStream
-          print("message_stream event: ", event)
-          assistantResponseEvent = event.get('assistantResponseEvent', {})
-          content = assistantResponseEvent.get('content', '')
-          yield ChatGenerationChunk(message=AIMessageChunk(content=content))
-
+            # Assuming each event in the EventStream has a 'content' field
+            # You may need to adjust this based on the actual structure of your EventStream
+            request_log.info("message_stream event: ", event=event)
+            assistantResponseEvent = event.get("assistantResponseEvent", {})
+            content = assistantResponseEvent.get("content", "")
+            yield ChatGenerationChunk(message=AIMessageChunk(content=content))
 
     def _build_response(self, messages: List[BaseMessage]):
         current_user = self.metadata["user"]
-        # pylint: disable=direct-environment-variable-reference
-        role_arn = os.environ.get("AWS_ROLE_ARN")
-        # pylint: enable=direct-environment-variable-reference
+        role_arn = self.metadata["role_arn"]
 
         q_client = self.amazon_q_client_factory.get_client(
             current_user=current_user,
@@ -76,10 +79,10 @@ class ChatAmazonQ(BaseChatModel):
         history = []
         for message in messages:
             if isinstance(message, HumanMessage):
-                history.append({ "userInputMessage": message.content })
+                history.append({"userInputMessage": message.content})
 
             if isinstance(message, AIMessage):
-                history.append({ "assistantResponseMessage": message.content })
+                history.append({"assistantResponseMessage": message.content})
 
         return {
             "message": message_content,
