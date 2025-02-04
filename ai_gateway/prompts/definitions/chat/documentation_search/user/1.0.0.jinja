@@ -7,12 +7,13 @@ The following are provided:
 Given the above:
 
 - Take your time to analyze the question and provided <doc> context.
-- Prioritize using the provided <doc> information over your own knowledge when composing your answer. 
+- Prioritize using the provided <doc> information over your own knowledge when composing your answer.
   - Then return relevant "{{content_id}}" part for references, under the "{{content_id}}:" heading.
 - If the question asks for specific numeric values, try to fully rely on the <doc> information to find and answer.
 - Answer specifically what the question is asking. For example, if the question asks "What" do not answer with "How".
 - If you don't know the answer: start the response with "Unfortunately, I could not find any documentation", and don't try to make up an answer.
-- Use clear and concise language to answer the question. Avoid generating long anwers with multiple bullet point steps.
+- Use clear and concise language to answer the question. Avoid generating long answers with multiple bullet point steps.
+- Summarize the key information in a single paragraph if possible.
 
 ---
 
@@ -32,7 +33,7 @@ Example responses:
 
   {{content_id}}:
   CNT-IDX-a52b551c78c6cc11a603e231b4e789b2
-  CNT-IDX-27d7595271143710461371bcef69ed1e
+CNT-IDX-27d7595271143710461371bcef69ed1e
 </example>
 <example>
   Unfortunately, I could not find any documentation related to this question.
