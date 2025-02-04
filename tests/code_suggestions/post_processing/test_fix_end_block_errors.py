@@ -160,7 +160,7 @@ async def test_fix_end_block_errors_legacy(
         # completion has extra end block; the current approach can fix the error
         (GOLANG_SAMPLE_1, LanguageId.GO, ""),
         # the completion contains 2 extra end blocks; the current approach is not able to fix the error
-        (GOLANG_SAMPLE_2, LanguageId.GO, "}}"),
+        (GOLANG_SAMPLE_2, LanguageId.GO, ""),
         # completion has extra end block; the current approach can fix the error
         (GOLANG_SAMPLE_3, LanguageId.GO, '\tfmt.Println("hello")'),
         # completion is correct

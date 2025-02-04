@@ -230,9 +230,11 @@ async def fix_end_block_errors(
         # Hypothesis confirmed: keep only the first line within the variable.
         suffix_first_line = suffix_first_line[:idx_suffix_new_line]
 
-    completion_lookup = completion.rstrip()
+    completion_lookup = completion
+    suffix_first_line = suffix_first_line.strip()
+
     # See if suffix exists in completion
-    if not completion_lookup.find(suffix_first_line):
+    if completion_lookup.find(suffix_first_line) == -1:
         # Return the original copy of the completion.
         return completion
 
@@ -241,8 +243,7 @@ async def fix_end_block_errors(
         # and see if it improves errors
         min_errors = 9999
         while (last_suffix_pos := completion_lookup.rfind(suffix_first_line)) != -1:
-          completion_lookup = completion_lookup[:last_suffix_pos]
-
+          completion_lookup = completion_lookup[:last_suffix_pos].rstrip()
           # Check for errors in the original code
           code_sample_before_suggestion = f"{prefix}{suffix}"
           parser_before_suggestion = await CodeParser.from_language_id(
@@ -256,12 +257,11 @@ async def fix_end_block_errors(
           parser_after_suggestion = await CodeParser.from_language_id(
               code_sample_after_suggestion, lang_id
           )
-          after_errors = list(filter(lambda e: find_cursor_position(code_sample_after_suggestion, e.start) < len(code_sample_after_suggestion), parser_after_suggestion.errors()))
+          after_errors = list(filter(lambda e: find_cursor_position(code_sample_after_suggestion, e.start) < len(prefix), parser_after_suggestion.errors()))
           errors_after_suggestion = len(after_errors)
 
-          min_errors = errors_after_suggestion if errors_after_suggestion < min_errors else min_errors
-
           if errors_after_suggestion <= errors_before_suggestion and errors_after_suggestion <= min_errors:
+              min_errors = errors_after_suggestion
               completion = completion_lookup
     except ValueError as e:
         log.warning(f"Failed to parse code: {e}")
