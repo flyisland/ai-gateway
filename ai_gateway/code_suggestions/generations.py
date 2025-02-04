@@ -18,6 +18,7 @@ from ai_gateway.code_suggestions.prompts import PromptTemplate
 from ai_gateway.instrumentators import TextGenModelInstrumentator
 from ai_gateway.models import Message, ModelAPICallError, ModelAPIError
 from ai_gateway.models.agent_model import AgentModel
+from ai_gateway.models.amazon_q import AmazonQModel
 from ai_gateway.models.base_chat import ChatModelBase
 from ai_gateway.models.base_text import (
     TextGenModelBase,
@@ -129,6 +130,14 @@ class CodeGenerations:
                 elif isinstance(self.model, ChatModelBase):
                     res = await self.model.generate(
                         prompt.prefix, stream=stream, **kwargs
+                    )
+                elif isinstance(self.model, AmazonQModel):
+                    res = await self.model.generate(
+                        prompt.prefix,
+                        prompt.suffix,
+                        file_name,
+                        lang_id.name.lower(),
+                        **kwargs,
                     )
                 else:
                     res = await self.model.generate(
