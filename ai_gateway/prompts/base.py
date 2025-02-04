@@ -52,6 +52,10 @@ class Prompt(RunnableBinding[Input, Output]):
         disable_streaming: bool = False,
     ):
         model_kwargs = self._build_model_kwargs(config.params, model_metadata)
+
+        print("==================+")
+        print(model_kwargs)
+        print("==================+")
         model = self._build_model(model_factory, config.model, user, disable_streaming)
         prompt = self._build_prompt_template(config.prompt_template)
         chain = self._build_chain(
@@ -73,7 +77,7 @@ class Prompt(RunnableBinding[Input, Output]):
     ) -> Mapping[str, Any]:
         return {
             **(params.model_dump(exclude_none=True) if params else {}),
-            **(model_metadata_to_params(model_metadata) if model_metadata else {}),
+            **(model_metadata.to_params() if model_metadata else {}),
         }
 
     def _build_model(

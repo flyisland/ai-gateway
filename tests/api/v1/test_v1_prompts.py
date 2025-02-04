@@ -13,7 +13,7 @@ from ai_gateway.api.v1 import api_router
 from ai_gateway.config import Config
 from ai_gateway.prompts import Prompt
 from ai_gateway.prompts.config.base import PromptConfig
-from ai_gateway.prompts.typing import ModelMetadata, TypeModelFactory
+from ai_gateway.prompts.typing import ModelMetadata, TypeModelFactory, TypeModelMetadata
 
 
 class FakeModel(SimpleChatModel):
@@ -172,7 +172,7 @@ class TestPrompt:
         mock_track_internal_event,
         inputs: dict[str, str],
         prompt_version: Optional[str],
-        model_metadata: Optional[ModelMetadata],
+        model_metadata: Optional[TypeModelMetadata],
         expected_get_args: dict,
         expected_status: int,
         expected_response: Any,

@@ -69,7 +69,7 @@ class LocalPromptRegistry(BasePromptRegistry):
         model_metadata: Optional[ModelMetadata] = None,
     ) -> Prompt:
         if (
-            model_metadata
+            isinstance(model_metadata, ModelMetadata)
             and model_metadata.endpoint
             and not self.custom_models_enabled
         ):

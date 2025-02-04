@@ -25,7 +25,7 @@ from ai_gateway.chat.agents import (
 from ai_gateway.chat.agents.typing import AgentFinalAnswer, TypeAgentEvent
 from ai_gateway.config import Config
 from ai_gateway.models.base_chat import Role
-from ai_gateway.prompts.typing import Model, ModelMetadata
+from ai_gateway.prompts.typing import Model, TypeModelMetadata, ModelMetadata
 
 
 @pytest.fixture(scope="class")
@@ -260,7 +260,7 @@ class TestReActAgentStream:
         agent_options: AgentRequestOptions,
         actions: list[TypeAgentEvent],
         expected_actions: list[TypeAgentEvent],
-        model_metadata: ModelMetadata,
+        model_metadata: TypeModelMetadata,
         unavailable_resources: list[str],
     ):
         async def _agent_stream(*_args, **_kwargs) -> AsyncIterator[TypeAgentEvent]:
