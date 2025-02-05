@@ -1200,6 +1200,7 @@ class TestAmazonQIntegrationV3:
             stream=False,
             snowplow_event_context=expected_snowplow_event,
             prompt_enhancer=None,
+            suffix="\n",
         )
 
     @pytest.mark.parametrize(
