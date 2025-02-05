@@ -514,6 +514,7 @@ class TestEditorContentGeneration:
             stream=False,
             snowplow_event_context=expected_snowplow_event,
             prompt_enhancer=None,
+            suffix="\n",
         )
 
     @pytest.mark.parametrize(
@@ -665,6 +666,7 @@ class TestEditorContentGeneration:
             stream=False,
             snowplow_event_context=expected_snowplow_event,
             prompt_enhancer=prompt_enhancer,
+            suffix="\n",
         )
 
     @pytest.mark.parametrize(
