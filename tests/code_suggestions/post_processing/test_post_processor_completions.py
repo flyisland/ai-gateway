@@ -42,9 +42,9 @@ def mock_fix_end_block_errors():
 
 
 @pytest.fixture
-def mock_fix_end_block_errors_with_comparison():
+def mock_fix_end_block_errors_legacy():
     with patch(
-        "ai_gateway.code_suggestions.processing.post.completions.fix_end_block_errors_with_comparison"
+        "ai_gateway.code_suggestions.processing.post.completions.fix_end_block_errors_legacy"
     ) as mock:
         mock.return_value = "processed completion"
 
@@ -81,6 +81,16 @@ def mock_strip_asterisks():
         yield mock
 
 
+@pytest.fixture
+def mock_filter_score():
+    with patch(
+        "ai_gateway.code_suggestions.processing.post.completions.filter_score"
+    ) as mock:
+        mock.return_value = "processed completion"
+
+        yield mock
+
+
 class TestPostProcessorCompletions:
     @pytest.mark.asyncio
     async def test_process(
@@ -88,9 +98,10 @@ class TestPostProcessorCompletions:
         mock_remove_comment_only_completion: Mock,
         mock_trim_by_min_allowed_context: Mock,
         mock_fix_end_block_errors: Mock,
-        mock_fix_end_block_errors_with_comparison: Mock,
+        mock_fix_end_block_errors_legacy: Mock,
         mock_clean_model_reflection: Mock,
         mock_strip_whitespaces: Mock,
+        mock_filter_score: Mock,
     ):
         code_context = "test code context"
         lang_id = LanguageId.RUBY
@@ -102,11 +113,13 @@ class TestPostProcessorCompletions:
 
         mock_remove_comment_only_completion.assert_called_once()
         mock_trim_by_min_allowed_context.assert_called_once()
+
         mock_fix_end_block_errors.assert_called_once()
+        mock_fix_end_block_errors_legacy.assert_not_called()
+
         mock_clean_model_reflection.assert_called_once()
         mock_strip_whitespaces.assert_called_once()
-
-        mock_fix_end_block_errors_with_comparison.assert_not_called()
+        mock_filter_score.assert_not_called()
 
     @pytest.mark.asyncio
     async def test_process_with_custom_operations(
@@ -114,10 +127,11 @@ class TestPostProcessorCompletions:
         mock_remove_comment_only_completion: Mock,
         mock_trim_by_min_allowed_context: Mock,
         mock_fix_end_block_errors: Mock,
-        mock_fix_end_block_errors_with_comparison: Mock,
+        mock_fix_end_block_errors_legacy: Mock,
         mock_clean_model_reflection: Mock,
         mock_strip_whitespaces: Mock,
         mock_strip_asterisks: Mock,
+        mock_filter_score: Mock,
     ):
         code_context = "test code context"
         lang_id = LanguageId.RUBY
@@ -129,10 +143,11 @@ class TestPostProcessorCompletions:
             lang_id,
             suffix,
             overrides={
-                PostProcessorOperation.FIX_END_BLOCK_ERRORS: PostProcessorOperation.FIX_END_BLOCK_ERRORS_WITH_COMPARISON,
+                PostProcessorOperation.FIX_END_BLOCK_ERRORS: PostProcessorOperation.FIX_END_BLOCK_ERRORS_LEGACY,
             },
             extras=[
                 PostProcessorOperation.STRIP_ASTERISKS,
+                PostProcessorOperation.FILTER_SCORE,
             ],
         )
         await post_processor.process(completion)
@@ -141,11 +156,12 @@ class TestPostProcessorCompletions:
         mock_trim_by_min_allowed_context.assert_called_once()
 
         mock_fix_end_block_errors.assert_not_called()
-        mock_fix_end_block_errors_with_comparison.assert_called_once()
+        mock_fix_end_block_errors_legacy.assert_called_once()
 
         mock_clean_model_reflection.assert_called_once()
         mock_strip_whitespaces.assert_called_once()
         mock_strip_asterisks.assert_called_once()
+        mock_filter_score.assert_called_once()
 
     @pytest.mark.asyncio
     async def test_process_with_exclusions(
@@ -153,9 +169,10 @@ class TestPostProcessorCompletions:
         mock_remove_comment_only_completion: Mock,
         mock_trim_by_min_allowed_context: Mock,
         mock_fix_end_block_errors: Mock,
-        mock_fix_end_block_errors_with_comparison: Mock,
+        mock_fix_end_block_errors_legacy: Mock,
         mock_clean_model_reflection: Mock,
         mock_strip_whitespaces: Mock,
+        mock_filter_score: Mock,
     ):
         code_context = "test code context"
         lang_id = LanguageId.RUBY
@@ -169,8 +186,10 @@ class TestPostProcessorCompletions:
 
         mock_remove_comment_only_completion.assert_called_once()
         mock_trim_by_min_allowed_context.assert_called_once()
-        mock_fix_end_block_errors.assert_called_once()
-        mock_clean_model_reflection.assert_called_once()
 
+        mock_fix_end_block_errors.assert_called_once()
+        mock_fix_end_block_errors_legacy.assert_not_called()
+
+        mock_clean_model_reflection.assert_called_once()
         mock_strip_whitespaces.assert_not_called()
-        mock_fix_end_block_errors_with_comparison.assert_not_called()
+        mock_filter_score.assert_not_called()

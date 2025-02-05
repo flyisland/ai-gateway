@@ -9,12 +9,18 @@ from gitlab_cloud_connector import (
     GitLabFeatureCategory,
     GitLabUnitPrimitive,
 )
+from gitlab_cloud_connector.auth import AUTH_HEADER
 
 from ai_gateway.api.auth_utils import StarletteUser, get_current_user
 from ai_gateway.api.error_utils import capture_validation_errors
 from ai_gateway.api.feature_category import feature_category
-from ai_gateway.api.middleware import X_GITLAB_LANGUAGE_SERVER_VERSION
 from ai_gateway.api.snowplow_context import get_snowplow_code_suggestion_context
+from ai_gateway.api.v2.code.model_provider_handlers import (
+    AnthropicHandler,
+    FireworksHandler,
+    LegacyHandler,
+    LiteLlmHandler,
+)
 from ai_gateway.api.v2.code.typing import (
     CompletionsRequestV1,
     CompletionsRequestV2,
@@ -28,6 +34,7 @@ from ai_gateway.api.v2.code.typing import (
 )
 from ai_gateway.async_dependency_resolver import (
     get_code_suggestions_completions_agent_factory_provider,
+    get_code_suggestions_completions_amazon_q_factory_provider,
     get_code_suggestions_completions_anthropic_provider,
     get_code_suggestions_completions_fireworks_qwen_factory_provider,
     get_code_suggestions_completions_litellm_factory_provider,
@@ -49,7 +56,6 @@ from ai_gateway.code_suggestions import (
     CodeSuggestionsChunk,
 )
 from ai_gateway.code_suggestions.base import CodeSuggestionsOutput
-from ai_gateway.code_suggestions.language_server import LanguageServerVersion
 from ai_gateway.code_suggestions.processing.base import ModelEngineOutput
 from ai_gateway.code_suggestions.processing.ops import lang_from_filename
 from ai_gateway.config import Config
@@ -59,7 +65,7 @@ from ai_gateway.internal_events import InternalEventsClient
 from ai_gateway.models import KindAnthropicModel, KindModelProvider
 from ai_gateway.models.base import TokensConsumptionMetadata
 from ai_gateway.prompts import BasePromptRegistry
-from ai_gateway.prompts.typing import ModelMetadata, TypeModelMetadata
+from ai_gateway.prompts.typing import ModelMetadata
 from ai_gateway.structured_logging import get_request_logger
 from ai_gateway.tracking import SnowplowEvent, SnowplowEventContext
 from ai_gateway.tracking.errors import log_exception
@@ -114,6 +120,9 @@ async def completions(
     completions_fireworks_qwen_factory: Factory[CodeCompletions] = Depends(
         get_code_suggestions_completions_fireworks_qwen_factory_provider
     ),
+    completions_amazon_q_factory: Factory[CodeCompletions] = Depends(
+        get_code_suggestions_completions_amazon_q_factory_provider
+    ),
     completions_agent_factory: Factory[CodeCompletions] = Depends(
         get_code_suggestions_completions_agent_factory_provider
     ),
@@ -132,6 +141,7 @@ async def completions(
         completions_litellm_factory,
         completions_fireworks_qwen_factory,
         completions_agent_factory,
+        completions_amazon_q_factory,
         internal_event_client,
     )
 
@@ -180,6 +190,7 @@ async def completions(
             name=suggestions[0].model.name,
             lang=suggestions[0].lang,
             tokens_consumption_metadata=tokens_consumption_metadata,
+            region=config.google_cloud_platform.location(),
         ),
         experiments=suggestions[0].metadata.experiments,
         metadata=SuggestionsResponse.MetadataBase(
@@ -296,6 +307,7 @@ async def generations(
             engine=suggestion.model.engine,
             name=suggestion.model.name,
             lang=suggestion.lang,
+            region=config.google_cloud_platform.location(),
         ),
         metadata=SuggestionsResponse.MetadataBase(
             enabled_feature_flags=current_feature_flag_context.get(),
@@ -440,37 +452,24 @@ def _build_code_completions(
     completions_litellm_factory: Factory[CodeCompletions],
     completions_fireworks_qwen_factory: Factory[CodeCompletions],
     completions_agent_factory: Factory[CodeCompletions],
+    completions_amazon_q_factory: Factory[CodeCompletions],
     internal_event_client: InternalEventsClient,
 ) -> tuple[CodeCompletions | CodeCompletionsLegacy, dict]:
     kwargs = {}
 
-    if True:  # pylint: disable=using-constant-test
-        model_metadata = ModelMetadata(
-            name="amazon_q",
-            provider="amazon_q",
-        )
+    unit_primitive = GitLabUnitPrimitive.COMPLETE_CODE
+    tracking_event = f"request_{unit_primitive}"
 
-        code_completions = _resolve_agent_code_completions(
-            model_metadata=model_metadata,
-            current_user=current_user,
-            prompt_registry=prompt_registry,
-            completions_agent_factory=completions_agent_factory,
-        )
-
-        if payload.context:
-            kwargs.update({"code_context": [ctx.content for ctx in payload.context]})
-    elif payload.model_provider == KindModelProvider.ANTHROPIC:
+    if payload.model_provider == KindModelProvider.ANTHROPIC:
+        AnthropicHandler(payload, request, kwargs).update_completion_params()
         code_completions = completions_anthropic_factory(
             model__name=payload.model_name,
         )
-
-        # We support the prompt version 3 only with the Anthropic models
-        if payload.prompt_version == 3:
-            kwargs.update({"raw_prompt": payload.prompt})
     elif payload.model_provider in (
         KindModelProvider.LITELLM,
         KindModelProvider.MISTRALAI,
     ):
+        LiteLlmHandler(payload, request, kwargs).update_completion_params()
         code_completions = _resolve_code_completions_litellm(
             payload=payload,
             current_user=current_user,
@@ -479,16 +478,9 @@ def _build_code_completions(
             completions_litellm_factory=completions_litellm_factory,
         )
 
-        if payload.context:
-            kwargs.update({"code_context": [ctx.content for ctx in payload.context]})
-
         return code_completions, kwargs
     elif payload.model_provider == KindModelProvider.FIREWORKS:
-        kwargs.update({"max_output_tokens": 48, "context_max_percent": 0.3})
-
-        if payload.context:
-            kwargs.update({"code_context": [ctx.content for ctx in payload.context]})
-
+        FireworksHandler(payload, request, kwargs).update_completion_params()
         code_completions = _resolve_code_completions_litellm(
             payload=payload,
             current_user=current_user,
@@ -498,27 +490,28 @@ def _build_code_completions(
         )
 
         return code_completions, kwargs
+    elif payload.model_provider == KindModelProvider.AMAZON_Q:
+        unit_primitive = GitLabUnitPrimitive.AMAZON_Q_INTEGRATION
+        tracking_event = f"request_{unit_primitive}_complete_code"
+        code_completions = completions_amazon_q_factory(
+            model__current_user=current_user,
+            model__auth_header=request.headers.get(AUTH_HEADER),
+            model__role_arn=payload.role_arn,
+        )
     else:
         code_completions = completions_legacy_factory()
-        if payload.choices_count > 0:
-            kwargs.update({"candidate_count": payload.choices_count})
-
-        language_server_version = LanguageServerVersion.from_string(
-            request.headers.get(X_GITLAB_LANGUAGE_SERVER_VERSION, None)
-        )
-        if language_server_version.supports_advanced_context() and payload.context:
-            kwargs.update({"code_context": [ctx.content for ctx in payload.context]})
+        LegacyHandler(payload, request, kwargs).update_completion_params()
 
     # Providers that are handled via the prompt registry perform their own UP check and event tracking. If we reach
     # this point is because we're using some other legacy provider, and we need to perform these steps now
-    if not current_user.can(GitLabUnitPrimitive.AGENT_QUICK_ACTIONS):
+    if not current_user.can(unit_primitive):
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Unauthorized to access code completions",
         )
 
     internal_event_client.track_event(
-        f"request_{GitLabUnitPrimitive.COMPLETE_CODE}",
+        tracking_event,
         category=__name__,
     )
 
@@ -526,7 +519,7 @@ def _build_code_completions(
 
 
 def _resolve_agent_code_completions(
-    model_metadata: TypeModelMetadata,
+    model_metadata: ModelMetadata,
     current_user: StarletteUser,
     prompt_registry: BasePromptRegistry,
     completions_agent_factory: Factory[CodeCompletions],

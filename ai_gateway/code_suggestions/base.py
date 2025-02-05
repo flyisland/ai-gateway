@@ -10,6 +10,7 @@ from ai_gateway.code_suggestions.processing.ops import (
 )
 from ai_gateway.experimentation import ExperimentTelemetry
 from ai_gateway.models import (
+    KindAmazonQModel,
     KindAnthropicModel,
     KindLiteLlmModel,
     KindModelProvider,
@@ -25,6 +26,7 @@ __all__ = [
     "ModelProvider",
     "PROVIDERS_MODELS_MAP",
     "USE_CASES_MODELS_MAP",
+    "SAAS_PROMPT_MODEL_MAP",
 ]
 
 
@@ -45,6 +47,7 @@ PROVIDERS_MODELS_MAP = {
     KindModelProvider.LITELLM: set(KindLiteLlmModel),
     KindModelProvider.MISTRALAI: set(KindLiteLlmModel),
     KindModelProvider.FIREWORKS: set(KindLiteLlmModel),
+    KindModelProvider.AMAZON_Q: set(KindAmazonQModel),
 }
 
 USE_CASES_MODELS_MAP = {
@@ -61,6 +64,7 @@ USE_CASES_MODELS_MAP = {
         KindLiteLlmModel.CLAUDE_3,
         KindLiteLlmModel.GPT,
         KindLiteLlmModel.QWEN_2_5,
+        KindAmazonQModel.AMAZON_Q,
     },
     KindUseCase.CODE_GENERATIONS: {
         KindAnthropicModel.CLAUDE_2_0,
@@ -81,6 +85,30 @@ USE_CASES_MODELS_MAP = {
         KindLiteLlmModel.CLAUDE_3,
         KindLiteLlmModel.GPT,
         KindLiteLlmModel.CLAUDE_3_5,
+        KindAmazonQModel.AMAZON_Q,
+    },
+}
+
+SAAS_PROMPT_MODEL_MAP = {
+    "^1.0.0": {
+        "model_provider": ModelProvider.ANTHROPIC,
+        "model_version": KindAnthropicModel.CLAUDE_3_5_SONNET,
+    },
+    "1.0.0": {
+        "model_provider": ModelProvider.ANTHROPIC,
+        "model_version": KindAnthropicModel.CLAUDE_3_5_SONNET,
+    },
+    "1.0.1-dev": {
+        "model_provider": ModelProvider.ANTHROPIC,
+        "model_version": KindAnthropicModel.CLAUDE_3_5_SONNET_V2,
+    },
+    "2.0.0": {
+        "model_provider": ModelProvider.VERTEX_AI,
+        "model_version": KindAnthropicModel.CLAUDE_3_5_SONNET,
+    },
+    "2.0.1": {
+        "model_provider": ModelProvider.VERTEX_AI,
+        "model_version": KindAnthropicModel.CLAUDE_3_5_SONNET_V2,
     },
 }
 

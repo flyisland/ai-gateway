@@ -1,3 +1,4 @@
+from datetime import datetime
 from typing import Annotated, AsyncIterator
 
 from fastapi import APIRouter, Depends, HTTPException, Request, status
@@ -119,6 +120,7 @@ async def chat(
         agent_scratchpad=scratchpad,
         model_metadata=agent_request.model_metadata,
         unavailable_resources=agent_request.unavailable_resources,
+        current_date=datetime.now().strftime("%A, %B %d, %Y"),
     )
 
     gl_version = request.headers.get(X_GITLAB_VERSION_HEADER, "")

@@ -26,6 +26,7 @@ from ai_gateway.instrumentators import (
 )
 from ai_gateway.models import ChatModelBase, Message, ModelAPICallError, ModelAPIError
 from ai_gateway.models.agent_model import AgentModel
+from ai_gateway.models.amazon_q import AmazonQModel
 from ai_gateway.models.base import TokensConsumptionMetadata
 from ai_gateway.models.base_text import (
     TextGenModelBase,
@@ -199,6 +200,14 @@ class CodeCompletions:
                     res = await self.model.generate(
                         prompt.prefix, stream=stream, **kwargs
                     )
+                elif isinstance(self.model, AmazonQModel):
+                    res = await self.model.generate(
+                        prompt.prefix,
+                        prompt.suffix,
+                        file_name,
+                        lang_id.name.lower(),
+                        **kwargs,
+                    )
                 else:
                     res = await self.model.generate(
                         prompt.prefix, prompt.suffix, stream, **kwargs
@@ -250,7 +259,9 @@ class CodeCompletions:
         watch_container.register_model_score(response.score)
         watch_container.register_safety_attributes(response.safety_attributes)
 
-        response_text = await self._get_response_text(response.text, prompt, lang_id)
+        response_text = await self._get_response_text(
+            response.text, prompt, lang_id, response.score
+        )
 
         return CodeSuggestionsOutput(
             text=response_text,
@@ -266,12 +277,12 @@ class CodeCompletions:
         )
 
     async def _get_response_text(
-        self, response_text: str, prompt: Prompt, lang_id: LanguageId
+        self, response_text: str, prompt: Prompt, lang_id: LanguageId, score: float
     ):
         if self.post_processor:
             return await self.post_processor(
                 prompt.prefix, suffix=prompt.suffix, lang_id=lang_id
-            ).process(response_text)
+            ).process(response_text, score=score)
 
         return response_text
 

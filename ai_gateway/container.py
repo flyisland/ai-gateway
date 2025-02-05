@@ -63,6 +63,7 @@ class ContainerApplication(containers.DeclarativeContainer):
     pkg_models = providers.Container(
         ContainerModels,
         config=config,
+        integrations=integrations,
     )
     pkg_models_v2 = providers.Container(
         ContainerModelsV2,

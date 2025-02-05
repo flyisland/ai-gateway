@@ -68,6 +68,7 @@ class SuggestionsRequest(BaseModel):
     choices_count: Optional[int] = 0
     context: Annotated[List[CodeContextPayload], Field(max_length=100)] = []
     prompt_id: Optional[str] = None
+    role_arn: Optional[str] = None
 
 
 class CompletionsRequest(SuggestionsRequest):
@@ -131,6 +132,7 @@ class SuggestionsResponse(BaseModel):
         name: str
         lang: str
         tokens_consumption_metadata: Optional[TokensConsumptionMetadata] = None
+        region: Optional[str] = None
 
     class MetadataBase(BaseModel):
         enabled_feature_flags: Optional[list[str]] = None

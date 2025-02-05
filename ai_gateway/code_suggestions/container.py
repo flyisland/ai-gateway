@@ -34,7 +34,7 @@ class ContainerCodeGenerations(containers.DeclarativeContainer):
     vertex_code_bison = providers.Dependency(instance_of=TextGenModelBase)
     anthropic_claude = providers.Dependency(instance_of=TextGenModelBase)
     anthropic_claude_chat = providers.Dependency(instance_of=ChatModelBase)
-
+    amazon_q_model = providers.Dependency(instance_of=TextGenModelBase)
     litellm_chat = providers.Dependency(instance_of=ChatModelBase)
     agent_model = providers.Dependency(instance_of=TextGenModelBase)
 
@@ -83,6 +83,15 @@ class ContainerCodeGenerations(containers.DeclarativeContainer):
         snowplow_instrumentator=snowplow_instrumentator,
     )
 
+    amazon_q_factory = providers.Factory(
+        CodeGenerations,
+        model=providers.Factory(amazon_q_model),
+        tokenization_strategy=providers.Factory(
+            TokenizerTokenStrategy, tokenizer=tokenizer
+        ),
+        snowplow_instrumentator=snowplow_instrumentator,
+    )
+
     agent_factory = providers.Factory(
         CodeGenerations,
         model=providers.Factory(agent_model),
@@ -106,6 +115,7 @@ class ContainerCodeCompletions(containers.DeclarativeContainer):
     anthropic_claude_chat = providers.Dependency(instance_of=ChatModelBase)
     litellm = providers.Dependency(instance_of=TextGenModelBase)
     agent_model = providers.Dependency(instance_of=TextGenModelBase)
+    amazon_q_model = providers.Dependency(instance_of=TextGenModelBase)
     snowplow_instrumentator = providers.Dependency(instance_of=SnowplowInstrumentator)
 
     config = providers.Configuration(strict=True)
@@ -124,6 +134,9 @@ class ContainerCodeCompletions(containers.DeclarativeContainer):
         ),
         post_processor=providers.Factory(
             PostProcessorCompletions,
+            overrides={
+                PostProcessorOperation.FIX_END_BLOCK_ERRORS: PostProcessorOperation.FIX_END_BLOCK_ERRORS_LEGACY,
+            },
             exclude=config.excl_post_proc,
         ).provider,
         snowplow_instrumentator=snowplow_instrumentator,
@@ -157,15 +170,25 @@ class ContainerCodeCompletions(containers.DeclarativeContainer):
         ),
         post_processor=providers.Factory(
             PostProcessorCompletions,
-            overrides={
-                PostProcessorOperation.FIX_END_BLOCK_ERRORS: PostProcessorOperation.FIX_END_BLOCK_ERRORS_WITH_COMPARISON,
-            },
             exclude=config.excl_post_proc,
+            extras=[
+                PostProcessorOperation.FILTER_SCORE,
+            ],
+            score_threshold=config.fireworks_qwen_score_threshold,
         ).provider,
     )
+
     agent_factory = providers.Factory(
         CodeCompletions,
         model=providers.Factory(agent_model),
+        tokenization_strategy=providers.Factory(
+            TokenizerTokenStrategy, tokenizer=tokenizer
+        ),
+    )
+
+    amazon_q_factory = providers.Factory(
+        CodeCompletions,
+        model=providers.Factory(amazon_q_model),
         tokenization_strategy=providers.Factory(
             TokenizerTokenStrategy, tokenizer=tokenizer
         ),
@@ -189,6 +212,7 @@ class ContainerCodeSuggestions(containers.DeclarativeContainer):
         anthropic_claude_chat=models.anthropic_claude_chat,
         litellm_chat=models.litellm_chat,
         agent_model=models.agent_model,
+        amazon_q_model=models.amazon_q_model,
         snowplow_instrumentator=snowplow.instrumentator,
     )
 
@@ -200,6 +224,7 @@ class ContainerCodeSuggestions(containers.DeclarativeContainer):
         anthropic_claude_chat=models.anthropic_claude_chat,
         litellm=models.litellm,
         agent_model=models.agent_model,
+        amazon_q_model=models.amazon_q_model,
         config=config,
         snowplow_instrumentator=snowplow.instrumentator,
     )

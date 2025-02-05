@@ -60,6 +60,10 @@ async def get_code_suggestions_completions_fireworks_qwen_factory_provider():
     yield get_container_application().code_suggestions.completions.fireworks_qwen_factory
 
 
+async def get_code_suggestions_completions_amazon_q_factory_provider():
+    yield get_container_application().code_suggestions.completions.amazon_q_factory
+
+
 async def get_code_suggestions_completions_agent_factory_provider():
     yield get_container_application().code_suggestions.completions.agent_factory
 
@@ -74,6 +78,10 @@ async def get_code_suggestions_generations_vertex_provider():
 
 async def get_code_suggestions_generations_anthropic_factory_provider():
     yield get_container_application().code_suggestions.generations.anthropic_factory
+
+
+async def get_code_suggestions_generations_amazon_q_factory_provider():
+    yield get_container_application().code_suggestions.generations.amazon_q_factory
 
 
 async def get_code_suggestions_generations_anthropic_chat_factory_provider():

@@ -1,4 +1,6 @@
 import pytest
+from langchain_core.messages import SystemMessage
+from pydantic import AnyUrl
 from starlette_context import context, request_cycle_context
 from structlog.testing import capture_logs
 
@@ -14,13 +16,14 @@ from ai_gateway.chat.agents.react import (
 from ai_gateway.chat.agents.typing import (
     AdditionalContext,
     AgentStep,
-    Context,
     CurrentFile,
     Message,
 )
+from ai_gateway.chat.context.current_page import Context, IssueContext
 from ai_gateway.chat.tools.gitlab import IssueReader, MergeRequestReader
 from ai_gateway.feature_flags.context import current_feature_flag_context
 from ai_gateway.models.base_chat import Role
+from ai_gateway.prompts.typing import ModelMetadata
 
 
 @pytest.fixture
@@ -229,6 +232,24 @@ class TestReActAgent:
                     messages=[
                         Message(
                             role=Role.USER,
+                            content="Explain this issue",
+                            resource_content="Please use this information about identified issue",
+                            context=IssueContext(type="issue", title="Duo Chat issue"),
+                        ),
+                    ],
+                ),
+                "Thought: I'm thinking...\nFinal Answer: A",
+                [
+                    AgentFinalAnswer(
+                        text="A",
+                    ),
+                ],
+            ),
+            (
+                ReActAgentInputs(
+                    messages=[
+                        Message(
+                            role=Role.USER,
                             content="Explain this code",
                             current_file=CurrentFile(
                                 file_path="main.py",
@@ -306,6 +327,125 @@ class TestReActAgent:
 
         assert actual_actions == expected_actions
         assert cap_logs[-1]["event"] == "Response streaming"
+
+    @pytest.mark.asyncio
+    @pytest.mark.parametrize(
+        (
+            "feature_flag_enabled",
+            "inputs",
+        ),
+        [
+            (
+                True,
+                ReActAgentInputs(
+                    messages=[
+                        Message(
+                            role=Role.USER,
+                            content="What's the title of this issue?",
+                            resource_content="Please use this information about identified issue",
+                        ),
+                    ],
+                    agent_scratchpad=[],
+                    tools=[IssueReader()],
+                ),
+            ),
+            (
+                False,
+                ReActAgentInputs(
+                    messages=[
+                        Message(
+                            role=Role.USER,
+                            content="What's the title of this issue?",
+                            resource_content="Please use this information about identified issue",
+                        ),
+                    ],
+                    agent_scratchpad=[],
+                    tools=[IssueReader()],
+                ),
+            ),
+            (
+                False,
+                ReActAgentInputs(
+                    messages=[
+                        Message(
+                            role=Role.USER,
+                            content="What's the title of this issue?",
+                            resource_content="Please use this information about identified issue",
+                        ),
+                    ],
+                    agent_scratchpad=[],
+                    tools=[IssueReader()],
+                    model_metadata=ModelMetadata(
+                        name="model_family",
+                        provider="provider",
+                        endpoint=AnyUrl("https://api.example.com"),
+                        api_key="abcde",
+                        identifier="custom_provider/model/identifier",
+                    ),
+                ),
+            ),
+            (
+                True,
+                ReActAgentInputs(
+                    messages=[
+                        Message(
+                            role=Role.USER,
+                            content="What's the title of this issue?",
+                            resource_content="Please use this information about identified issue",
+                        ),
+                    ],
+                    agent_scratchpad=[],
+                    tools=[IssueReader()],
+                    model_metadata=ModelMetadata(
+                        name="mistral",
+                        provider="litellm",
+                        endpoint=AnyUrl("https://api.example.com"),
+                        api_key="abcde",
+                        identifier="litellm/mistral/identifier",
+                    ),
+                ),
+            ),
+            (
+                True,
+                ReActAgentInputs(
+                    messages=[
+                        Message(
+                            role=Role.USER,
+                            content="What's the title of this issue?",
+                            resource_content="Please use this information about identified issue",
+                        ),
+                    ],
+                    agent_scratchpad=[],
+                    tools=[IssueReader()],
+                    model_metadata=ModelMetadata(
+                        name="claude-3-5-sonnet-20240620",
+                        provider="anthropic",
+                        endpoint=AnyUrl("https://api.anthropic.com/v1/messages"),
+                        api_key=None,
+                        identifier="litellm/mistral/identifier",
+                    ),
+                ),
+            ),
+        ],
+    )
+    async def test_message_cache_control(
+        self, prompt: ReActAgent, feature_flag_enabled: bool, inputs: ReActAgentInputs
+    ):
+        if feature_flag_enabled:
+            current_feature_flag_context.set(["enable_anthropic_prompt_caching"])
+        else:
+            current_feature_flag_context.set([])
+
+        prompt_value = prompt.prompt_tpl.invoke(inputs)
+
+        for msg in prompt_value.messages:
+            if isinstance(msg, SystemMessage):
+                if feature_flag_enabled and inputs.model_metadata is None:
+                    content_dict = msg.content[0]
+                    assert content_dict["type"] == "text"
+                    assert content_dict["cache_control"] == {"type": "ephemeral"}
+                else:
+                    assert isinstance(msg.content, str)
 
     @pytest.mark.asyncio
     @pytest.mark.parametrize(

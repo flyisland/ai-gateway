@@ -1,4 +1,5 @@
 import json
+from datetime import datetime
 from typing import AsyncIterator
 from unittest.mock import Mock, PropertyMock, call, patch
 
@@ -17,12 +18,12 @@ from ai_gateway.chat.agents import (
     AgentBaseEvent,
     AgentStep,
     AgentToolAction,
-    Context,
     CurrentFile,
     Message,
     ReActAgentInputs,
 )
 from ai_gateway.chat.agents.typing import AgentFinalAnswer, TypeAgentEvent
+from ai_gateway.chat.context.current_page import Context, MergeRequestContext
 from ai_gateway.config import Config
 from ai_gateway.models.base_chat import Role
 from ai_gateway.prompts.typing import Model, ModelMetadata, TypeModelMetadata
@@ -31,6 +32,15 @@ from ai_gateway.prompts.typing import Model, ModelMetadata, TypeModelMetadata
 @pytest.fixture(scope="class")
 def fast_api_router():
     return api_router
+
+
+@pytest.fixture(autouse=True)
+def mock_date(mocker):
+    mock_datetime = mocker.patch(
+        "ai_gateway.api.v2.chat.agent.datetime", wraps=datetime
+    )
+    mock_datetime.now.return_value = datetime(2024, 12, 25)
+    return "Wednesday, December 25, 2024"
 
 
 @pytest.fixture
@@ -156,6 +166,27 @@ class TestReActAgentStream:
                 "thought\nFinal Answer: answer\n",
                 [AgentFinalAnswer(text=c) for c in "answer"],
             ),
+            (
+                AgentRequest(
+                    messages=[
+                        Message(
+                            role=Role.USER,
+                            content="What this MR changing?",
+                            context=MergeRequestContext(
+                                type="merge_request", title="Fixing database"
+                            ),
+                        ),
+                    ],
+                    options=AgentRequestOptions(
+                        agent_scratchpad=ReActAgentScratchpad(
+                            agent_type="react",
+                            steps=[],
+                        ),
+                    ),
+                ),
+                "thought\nFinal Answer: answer\n",
+                [AgentFinalAnswer(text=c) for c in "answer"],
+            ),
         ],
     )
     async def test_success(
@@ -262,6 +293,7 @@ class TestReActAgentStream:
         expected_actions: list[TypeAgentEvent],
         model_metadata: TypeModelMetadata,
         unavailable_resources: list[str],
+        mock_date,
     ):
         async def _agent_stream(*_args, **_kwargs) -> AsyncIterator[TypeAgentEvent]:
             for action in actions:
@@ -305,6 +337,7 @@ class TestReActAgentStream:
             agent_scratchpad=agent_scratchpad,
             model_metadata=model_metadata,
             unavailable_resources=unavailable_resources,
+            current_date=mock_date,
         )
 
         assert response.status_code == 200

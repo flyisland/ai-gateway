@@ -1,9 +1,10 @@
 from pathlib import Path
 from textwrap import dedent
 from typing import Sequence, Type, cast
-from unittest.mock import Mock
+from unittest.mock import Mock, patch
 
 import pytest
+import yaml
 from langchain_anthropic import ChatAnthropic
 from langchain_community.chat_models import ChatLiteLLM
 from langchain_core.messages import AIMessage, HumanMessage, SystemMessage
@@ -535,6 +536,7 @@ class TestLocalPromptRegistry:
             "expected_name",
             "expected_class",
             "expected_model",
+            "expected_prompt_version",
             "expected_model_class",
             "expected_kwargs",
             "default_prompt_env_config",
@@ -546,9 +548,10 @@ class TestLocalPromptRegistry:
                 "Claude 3 Code Generations Agent",
                 Prompt,
                 "claude-3-5-sonnet@20240620",
+                "2.0.0",
                 ChatLiteLLM,
                 {"stop": ["</new_code>"], "vertex_location": "us-east5"},
-                {"code_suggestions/generations": "vertex"},
+                {"code_suggestions/generations": "base"},
             ),
             (
                 "code_suggestions/generations",
@@ -556,6 +559,7 @@ class TestLocalPromptRegistry:
                 "Amazon Q Code Generations Agent",
                 Prompt,
                 "amazon_q",
+                "1.0.0",
                 ChatAmazonQ,
                 {"stop": ["</new_code>"]},
                 {},
@@ -570,6 +574,7 @@ class TestLocalPromptRegistry:
         user: StarletteUser,
         model_metadata: ModelMetadata | None,
         expected_name: str,
+        expected_prompt_version: str,
         expected_class: Type[Prompt],
         expected_model: str,
         expected_model_class: Type[Model],
@@ -583,7 +588,10 @@ class TestLocalPromptRegistry:
             internal_event_client=internal_event_client,
         )
         prompt = registry.get(
-            prompt_id, prompt_version="^1.0.0", model_metadata=model_metadata, user=user
+            prompt_id,
+            prompt_version=expected_prompt_version,
+            model_metadata=model_metadata,
+            user=user,
         )
         chain = cast(RunnableSequence, prompt.bound)
         binding = cast(RunnableBinding, chain.last)
@@ -698,6 +706,68 @@ class TestLocalPromptRegistry:
             == "Chat react custom prompt"
         )
 
+    def test_get_prompt_config_no_compatible_versions(
+        self,
+        prompts_registered: dict[str, PromptRegistered],
+        model_factories: dict[ModelClassProvider, TypeModelFactory],
+        internal_event_client: Mock,
+    ):
+        # Create a registry with a prompt that has versions 1.0.0 and 1.0.1
+        registry = LocalPromptRegistry(
+            prompts_registered={
+                "test/base": PromptRegistered(
+                    klass=Prompt,
+                    versions={
+                        "1.0.0": PromptConfig(
+                            name="Test prompt 1.0.0",
+                            model=ModelConfig(
+                                name="claude-2.1",
+                                params=ChatLiteLLMParams(
+                                    model_class_provider=ModelClassProvider.LITE_LLM,
+                                    top_p=0.1,
+                                    top_k=50,
+                                    max_tokens=256,
+                                    max_retries=10,
+                                    custom_llm_provider="vllm",
+                                ),
+                            ),
+                            unit_primitives=["explain_code"],
+                            prompt_template={"system": "Template1"},
+                        ),
+                        "1.0.1": PromptConfig(
+                            name="Test prompt 1.0.1",
+                            model=ModelConfig(
+                                name="claude-2.1",
+                                params=ChatLiteLLMParams(
+                                    model_class_provider=ModelClassProvider.LITE_LLM,
+                                    top_p=0.1,
+                                    top_k=50,
+                                    max_tokens=256,
+                                    max_retries=10,
+                                    custom_llm_provider="vllm",
+                                ),
+                            ),
+                            unit_primitives=["explain_code"],
+                            prompt_template={"system": "Template1"},
+                        ),
+                    },
+                ),
+            },
+            model_factories=model_factories,
+            default_prompts={},
+            internal_event_client=internal_event_client,
+            custom_models_enabled=True,
+            disable_streaming=True,
+        )
+
+        # Try to get a version 2.0.0 which doesn't exist
+        with pytest.raises(ValueError) as exc_info:
+            registry.get("test", "2.0.0")
+
+        assert (
+            str(exc_info.value) == "No prompt version found matching the query: 2.0.0"
+        )
+
     @pytest.mark.parametrize("custom_models_enabled", [False])
     def test_invalid_get(
         self, registry: LocalPromptRegistry, custom_models_enabled: bool
@@ -714,3 +784,79 @@ class TestLocalPromptRegistry:
             match="Endpoint override not allowed when custom models are disabled.",
         ):
             registry.get("chat/react", "^1.0.0", model_metadata=model_metadata)
+
+    def test_load_prompt_without_unit_primitive(
+        self,
+        mock_fs: FakeFilesystem,
+        model_factories,
+        internal_event_client: Mock,
+    ):
+        registry = LocalPromptRegistry.from_local_yaml(
+            class_overrides={},
+            model_factories=model_factories,
+            default_prompts={},
+            custom_models_enabled=True,
+            internal_event_client=internal_event_client,
+        )
+
+        yaml_content = """
+            name: TestPrompt No UP
+            model:
+                name: claude-3.5
+                params:
+                    model_class_provider: litellm
+            prompt_template:
+                system: test
+            """
+
+        with open("/tmp/test_prompt_no_up.yml", "w") as f:
+            f.write(yaml_content)
+
+        registry.prompts_registered.update(
+            {
+                "test/base": PromptRegistered(
+                    klass=Prompt,
+                    versions={"1.0.0": PromptConfig(**yaml.safe_load(yaml_content))},
+                ),  # type:ignore
+                "test/codestral": PromptRegistered(
+                    klass=Prompt,
+                    versions={"1.0.0": PromptConfig(**yaml.safe_load(yaml_content))},
+                ),  # type:ignore
+            }
+        )
+
+        prompt = registry.get("test", "1.0.0")
+        assert prompt.unit_primitives == []
+
+        prompt = registry.get(
+            "test",
+            "1.0.0",
+            ModelMetadata(
+                name="codestral",
+                endpoint=HttpUrl("http://localhost:4000/"),
+                provider="custom_openai",
+            ),
+        )
+        assert prompt.unit_primitives == []
+
+    def test_get_on_behalf_no_unit_primitive(
+        self,
+        registry: LocalPromptRegistry,
+        user: StarletteUser,
+        prompt: Prompt,
+        internal_event_client: Mock,
+    ):
+
+        test_registry = LocalPromptRegistry.from_local_yaml(
+            class_overrides={},
+            model_factories={},
+            default_prompts={},
+            internal_event_client=internal_event_client,
+        )
+        prompt.unit_primitives = []
+
+        with patch.object(test_registry, "get", return_value=prompt):
+
+            result_prompt = test_registry.get_on_behalf(user, prompt_id="test")
+
+            assert result_prompt == prompt

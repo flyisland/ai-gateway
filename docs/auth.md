@@ -2,7 +2,7 @@
 
 ## Authentication in AI Gateway
 
-AI Gateway uses OIDC (OpenID Connect) for authenticating incoming requests. Here is an overview of the process:
+AI Gateway uses OIDC Discovery for authenticating incoming requests. Here is an overview of the process:
 
 ```mermaid
 sequenceDiagram
@@ -12,11 +12,11 @@ sequenceDiagram
     participant G as OIDC providers
     participant AI as AI Gateway
 
-    C->>+G: requests JWT
-    G-->>-C: returns JWT
-    C->>+AI: POST /awesome-feature with JWT
-    AI->>+G: gets JWKS
-    G-->>-AI: returns JWKS
+    C->>+AI: POST /v1/code/completion with JWT
+    alt no validation keys cached
+      AI->>+G: gets JWKS
+      G-->>-AI: returns JWKS
+    end
     AI->>AI: attempts to decode JWT with JWKS
 
     alt success
@@ -28,24 +28,20 @@ sequenceDiagram
 
 Participants:
 
-- Clients ... VS Code extension, Language server and GitLab-Rails (e.g. `VertexAI::Client`).
-- OIDC providers ... Multi-tenant SaaS GitLab (`gitlab.com`) and Customer Dot (`customers.gitlab.com`).
-- AI Gateway ... GitLab-managed service to provide AI related features (`cloud.gitlab.com/ai`).
+- Clients: IDE extensions, Language server and GitLab-Rails (for example, `VertexAI::Client`).
+- OIDC providers: GitLab instance (Multi-tenant SaaS GitLab `gitlab.com` or self-hosted instance) and Customer Dot (`customers.gitlab.com`).
+- AI Gateway: GitLab-managed service to provide AI related features (`cloud.gitlab.com/ai`).
 
 Process flow:
 
-1. A client requests to an OIDC provider to issue a JWT (JSON Web Token).
-1. The OIDC provider authenticates the request and returns JWT.
-1. The client requests to the AI Gateway to access a feature with the JWT.
+1. The client sends a request to the AI Gateway with a JWT. The token is provided by the GitLab Rails application.
+1. To validate the token, the AI gateway must first obtain a JWKS key set. It will cache these keys for some time.
 1. AI Gateway attempts to decode the JWT with JWKS provided by trusted OIDC providers.
-   These JWKS are cached in AI Gateway so that it doesn't need to request to OIDC providers every time.
-1. Same
-1. Same
-1. If AI Gateway successfully decodes the JWT, the client request is authenticated and passed to the feature endpoints (e.g. `POST /v1/chat/agent`).
-   For further authorization process, see [authorization in AI Gateway](#authentication-in-ai-gateway).
+1. If AI Gateway successfully decodes the JWT, the client request is authenticated and passed to the feature endpoints
+   (for example, `POST /v1/chat/agent`). For further authorization process, see [authorization in AI Gateway](#authentication-in-ai-gateway).
 1. If AI Gateway fails to decode the JWT, AI Gateway returns an error response to the client, which could happen in the following cases:
    - The client got an JWT from an OIDC provider that is not trusted by AI Gateway.
-   - The client didn't include an JWT in the `Authorization` HTTP header e.g. `Authorization: Bearer <JWT>`.
+   - The client didn't include a JWT in the `Authorization` HTTP header.
    - The value of `X-Gitlab-Authentication-Type` HTTP header is not `oidc`.
    - The value of `X-Gitlab-Realm` HTTP header and the value of `gitlab_realm` JWT claim do not match.
    - The value of `X-Gitlab-Instance-Id` HTTP header and the value of `subject` JWT claim do not match.
@@ -53,19 +49,28 @@ Process flow:
 Notes:
 
 - Authentication happens in a middleware named `MiddlewareAuthentication`.
-  This middelware is processed for all incoming requests before passing them to feature endpoints.
+  This middleware is processed for all incoming requests before passing them to feature endpoints.
 - There is a case that a client and an OIDC provider co-exist in the same server.
-  For example, an OIDC provider as multi-tenant SaaS GitLab and a client as GitLab-Rails co-exist in `gitlab.com`.
+  For example, an OIDC provider as multi-tenant SaaS GitLab and a client as GitLab-Rails co-exist in `gitlab.com`
+  or when self-hosting the AI gateway.
 
 ### OIDC providers
 
-The endpoint `/.well-known/openid-configuration` is to get the JWKS URI. We then
-call this URI to fetch the JWKS. We cache the JWKS for 24 hours and use it to validate
-the authenticity of the suggestion requests.
+The AI gateway needs to fetch validation keys (JSON Web Key Set / JWKS) from OIDC providers to validate access tokens.
+To that end, it will dial the endpoint `/.well-known/openid-configuration` for each configured provider
+to first obtain the JWKS URI. We then call this URI to fetch the JWKS.
+We cache the JWKS for 24 hours and use it to validate the authenticity of all requests.
 
 ### Configure OIDC providers in AI Gateway
 
-To test OIDC, set the following in `.env`:
+Which OIDC providers should be used depends on who provides tokens in the first place:
+
+- When it's the Customers Portal (CDot) from which your access tokens are synced, set `AIGW_CUSTOMER_PORTAL_URL`
+- When it's your local GitLab instance that self-issues access tokens, set `AIGW_GITLAB_URL`
+
+You can also set both. Cloud Connector will try to fetch keys from all configured OIDC providers and merge their key sets.
+
+For example, to use OIDC, set the following in `.env`:
 
 ```shell
 # To test multi-tenant SaaS GitLab instance as OIDC provider
@@ -74,6 +79,18 @@ AIGW_GITLAB_URL=http://<your-gdk-address>/    # e.g. http://gdk.test:3000/
 
 # To test CustomersDot as OIDC provider
 AIGW_CUSTOMER_PORTAL_URL=http://<your-customer-dot-address> # e.g. http://127.0.0.1:5000
+```
+
+### Ensure `CLOUD_CONNECTOR_SERVICE_NAME` is set
+
+**NOTE:** This is only necessary if you don't use the Docker container.
+
+When validating tokens, we verify that the token `aud` claim (audience) matches the system name the token is sent to.
+
+For the AI gateway, make sure to set the following in `.env`:
+
+```shell
+CLOUD_CONNECTOR_SERVICE_NAME="gitlab-ai-gateway"
 ```
 
 #### Bypass JWT verification for testing

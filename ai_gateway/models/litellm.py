@@ -345,10 +345,20 @@ class LiteLlmTextGenModel(TextGenModelBase):
                     watcher.register_error,
                 )
 
+        score = 10**5  # default high value if model doesn't provide score
+
+        # For fireworks/qwen, use logprob of first token as score
+        # using original_response - see https://github.com/BerriAI/litellm/issues/7974
+        if self.provider == KindModelProvider.FIREWORKS and suggestion.get(
+            "_hidden_params"
+        ):
+            score = suggestion._hidden_params["original_response"]["choices"][0][
+                "logprobs"
+            ].token_logprobs[0]
+
         return TextGenModelOutput(
             text=self._extract_suggestion_text(suggestion),
-            # Give a high value, the model doesn't return scores.
-            score=10**5,
+            score=score,
             safety_attributes=SafetyAttributes(),
             metadata=self._extract_suggestion_metadata(suggestion),
         )
@@ -397,7 +407,7 @@ class LiteLlmTextGenModel(TextGenModelBase):
             "top_p": top_p,
             "stream": stream,
             "timeout": self.specifications.get("timeout", 30.0),
-            "stop": self._get_stop_tokens(),
+            "stop": self._get_stop_tokens(suffix),
         }
 
         completion_args = completion_args | self.model_metadata_to_params()
@@ -419,6 +429,7 @@ class LiteLlmTextGenModel(TextGenModelBase):
             completion_args["client"] = self.async_fireworks_client
             # disable prompt caching
             completion_args["prompt_cache_max_len"] = 0
+            completion_args["logprobs"] = 1
 
         return await acompletion(**completion_args)
 
@@ -443,8 +454,30 @@ class LiteLlmTextGenModel(TextGenModelBase):
             ),
         )
 
-    def _get_stop_tokens(self):
+    def _use_suffix_as_stop_token(self) -> bool:
+        return self.provider == KindModelProvider.FIREWORKS
+
+    def _get_stop_tokens(self, suffix) -> list[str]:
+        if self._use_suffix_as_stop_token():
+            suffix_stop_token = self._get_suffix_stop_token(suffix)
+            if suffix_stop_token:
+                return self.stop_tokens + [suffix_stop_token]
+
         return self.stop_tokens
+
+    def _get_suffix_stop_token(self, suffix) -> str:
+        if not suffix or not suffix.strip():
+            return ""
+
+        suffix_lines = suffix.split("\n")
+        if len(suffix_lines) > 1:
+            # For multi-line suffixes, we return the first line
+            # that is not empty or all white spaces
+            for line in suffix_lines:
+                if line.strip():
+                    return line
+
+        return suffix.strip()
 
     @classmethod
     def from_model_name(
