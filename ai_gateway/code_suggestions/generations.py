@@ -39,6 +39,14 @@ TPL_GENERATION_BASE = """
     "\n"
 )
 
+TPL_GENERATION_AMAZON_Q = """
+```
+{prefix}
+```
+""".strip(
+    "\n"
+)
+
 
 class CodeGenerations:
     def __init__(
@@ -60,22 +68,33 @@ class CodeGenerations:
         self.snowplow_instrumentator = snowplow_instrumentator
 
     def _get_prompt(
-        self, prefix: str, file_name: str, lang_id: Optional[LanguageId] = None
+        self,
+        prefix: str,
+        file_name: str,
+        lang_id: Optional[LanguageId] = None,
+        suffix: Optional[str] = None,
     ) -> Prompt:
         if self.prompt:
             return self.prompt
-
+        if isinstance(self.model, AmazonQModel):
+            prompt_template = PromptTemplate(TPL_GENERATION_AMAZON_Q)
+        else:
+            prompt_template = PromptTemplate(TPL_GENERATION_BASE)
         # We use either the language name or the file extension
         # if we couldn't determine the language before
         lang_repl = (
             lang_id.name.lower() if lang_id else Path(file_name).suffix.replace(".", "")
         )
-
         self.prompt_builder.add_template(
-            PromptTemplate(TPL_GENERATION_BASE),
+            prompt_template,
             lang=lang_repl,
         )
-        self.prompt_builder.add_content(prefix)
+        if suffix is None:
+            self.prompt_builder.add_content(prefix)
+        else:
+            self.prompt_builder.add_content(
+                prefix, suffix=suffix, suffix_reserved_percent=0.5
+            )
         prompt = self.prompt_builder.build()
 
         return prompt
@@ -95,9 +114,10 @@ class CodeGenerations:
         **kwargs: Any,
     ) -> Union[CodeSuggestionsOutput, AsyncIterator[CodeSuggestionsChunk]]:
         lang_id = resolve_lang_id(file_name, editor_lang)
+        suffix = kwargs.pop("suffix", None)
         increment_lang_counter(file_name, lang_id, editor_lang)
 
-        prompt = self._get_prompt(prefix, file_name, lang_id)
+        prompt = self._get_prompt(prefix, file_name, lang_id, suffix)
 
         self.snowplow_instrumentator.watch(
             SnowplowEvent(

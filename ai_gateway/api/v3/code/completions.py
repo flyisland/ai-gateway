@@ -301,6 +301,7 @@ async def code_generation(
     snowplow_event_context: Optional[SnowplowEventContext] = None,
     engine: CodeGenerations = None,
 ):
+    request_log.debug("Executing code generation", payload=payload)
     model_provider = payload.model_provider
     # TODO: Check if this check is correct
     if payload.prompt_id and payload.model_provider == KindModelProvider.AMAZON_Q:
@@ -350,6 +351,7 @@ async def code_generation(
         stream=payload.stream,
         snowplow_event_context=snowplow_event_context,
         prompt_enhancer=payload.prompt_enhancer,
+        suffix=payload.content_below_cursor,
     )
     request_log.debug("Suggestions", suggestion=suggestion)
     if isinstance(suggestion, AsyncIterator):
