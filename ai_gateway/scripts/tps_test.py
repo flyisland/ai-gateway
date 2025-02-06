@@ -5,6 +5,7 @@ from random import choices
 
 from litellm import completion
 
+# List of countries to fill the prompt 'Tell me the history of {country}'
 countries = [
     "Afghanistan",
     "Albania",
@@ -253,7 +254,7 @@ def compute_tps():
     parser.add_argument(
         "--model-endpoint",
         required=False,
-        default="http://localhost:4000",
+        default=None,
         help="Endpoint of the model. Example: http://localhost:4000. "
         "When using a model from an online provider like Bedrock, "
         "this can be left empty.",
