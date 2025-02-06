@@ -1,0 +1,25 @@
+name: Amazon Q Code Completions
+model:
+  name: amazon_q
+  params:
+    model_class_provider: amazon_q
+unit_primitives:
+  - agent_quick_actions
+prompt_template:
+  system: |
+    {% include 'code_suggestions/completions/system.jinja' %}
+  user: |
+    <PREFIX>
+    {{prefix}}
+    </PREFIX>
+    <cursor />
+    <SUFFIX>
+    {{suffix}}
+    </SUFFIX>
+params:
+  timeout: 60
+  stop:
+    - "[INST]"
+    - "[/INST]"
+    - "</PREFIX>"
+    - "</SUFFIX>"

@@ -6,6 +6,7 @@ import pytest
 from dependency_injector import containers, providers
 from pydantic import AnyUrl
 
+from ai_gateway.api.auth_utils import StarletteUser
 from ai_gateway.chat.agents.react import ReActAgent
 from ai_gateway.config import Config
 from ai_gateway.prompts import Prompt
@@ -18,7 +19,9 @@ def mock_config():
     yield Config(custom_models={"enabled": True, "disable_streaming": True})
 
 
-def test_container(mock_container: containers.DeclarativeContainer):
+def test_container(
+    mock_container: containers.DeclarativeContainer, user: StarletteUser
+):
     prompts = cast(providers.Container, mock_container.pkg_prompts)
     registry = cast(LocalPromptRegistry, prompts.prompt_registry())
 
@@ -51,6 +54,7 @@ def test_container(mock_container: containers.DeclarativeContainer):
             prompt = registry.get(
                 str(prompt_id),
                 f"={version}",  # Make a strict constraint so we can check every existing version
+                user=user,
                 model_metadata=model_metadata,
             )
             assert isinstance(prompt, Prompt)

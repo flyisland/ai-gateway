@@ -9,6 +9,7 @@ from gitlab_cloud_connector import (
     GitLabFeatureCategory,
     GitLabUnitPrimitive,
 )
+from gitlab_cloud_connector.auth import AUTH_HEADER
 
 from ai_gateway.api.auth_utils import StarletteUser, get_current_user
 from ai_gateway.api.feature_category import feature_category
@@ -27,7 +28,12 @@ from ai_gateway.api.v3.code.typing import (
     StreamModelEngine,
     StreamSuggestionsResponse,
 )
-from ai_gateway.async_dependency_resolver import get_config, get_container_application
+from ai_gateway.async_dependency_resolver import (
+    get_code_suggestions_completions_amazon_q_factory_provider,
+    get_code_suggestions_generations_amazon_q_factory_provider,
+    get_config,
+    get_container_application,
+)
 from ai_gateway.code_suggestions import (
     CodeCompletions,
     CodeCompletionsLegacy,
@@ -80,13 +86,24 @@ async def completions(
     current_user: Annotated[StarletteUser, Depends(get_current_user)],
     prompt_registry: Annotated[BasePromptRegistry, Depends(get_prompt_registry)],
     config: Annotated[Config, Depends(get_config)],
+    completions_amazon_q_factory: Annotated[
+        CodeCompletions,
+        Depends(get_code_suggestions_completions_amazon_q_factory_provider),
+    ],
+    generations_amazon_q_factory: Annotated[
+        CodeGenerations,
+        Depends(get_code_suggestions_generations_amazon_q_factory_provider),
+    ],
 ):
+    request_log.debug("[v3/code/completions] payload", payload=payload)
     return await code_suggestions(
         request=request,
         payload=payload,
         current_user=current_user,
         prompt_registry=prompt_registry,
         config=config,
+        completions_amazon_q_factory=completions_amazon_q_factory,
+        generations_amazon_q_factory=generations_amazon_q_factory,
     )
 
 
@@ -99,7 +116,18 @@ async def code_suggestions(
     prompt_registry: BasePromptRegistry,
     config: Config,
     stream_handler: StreamHandler = handle_stream,
+    completions_amazon_q_factory: Optional[CodeCompletions] = None,
+    generations_amazon_q_factory: Optional[CodeGenerations] = None,
 ):
+    if not current_user.can(
+        GitLabUnitPrimitive.AGENT_QUICK_ACTIONS,
+        disallowed_issuers=[CloudConnectorConfig().service_name],
+    ):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Unauthorized to access code suggestions",
+        )
+
     language_server_version = LanguageServerVersion.from_string(
         request.headers.get(X_GITLAB_LANGUAGE_SERVER_VERSION, None)
     )
@@ -120,6 +148,7 @@ async def code_suggestions(
         region=config.google_cloud_platform.location(),
     )
     if component.type == CodeEditorComponents.COMPLETION:
+        request_log.debug("[code_suggestions] starting code completion")
         if not current_user.can(
             GitLabUnitPrimitive.COMPLETE_CODE,
             disallowed_issuers=[CloudConnectorConfig().service_name],
@@ -129,13 +158,45 @@ async def code_suggestions(
                 detail="Unauthorized to access code suggestions",
             )
 
+        if component.payload.model_provider == KindModelProvider.AMAZON_Q:
+            _validate_amazon_q_requirements(component.payload)
+            engine = _create_amazon_q_engine(
+                completions_amazon_q_factory,
+                component.payload,
+                current_user,
+                request,
+                component.payload.role_arn,
+            )
+        else:
+            engine = None
         return await code_completion(
             payload=component.payload,
             code_context=code_context,
             stream_handler=stream_handler,
             snowplow_event_context=snowplow_code_suggestion_context,
+            engine=engine,
         )
     if component.type == CodeEditorComponents.GENERATION:
+        if not current_user.can(
+            GitLabUnitPrimitive.AMAZON_Q_INTEGRATION,
+            disallowed_issuers=[CloudConnectorConfig().service_name],
+        ):
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Unauthorized to access code suggestions",
+            )
+
+        if component.payload.model_provider == KindModelProvider.AMAZON_Q:
+            _validate_amazon_q_requirements(component.payload)
+            engine = _create_amazon_q_engine(
+                generations_amazon_q_factory,
+                component.payload,
+                current_user,
+                request,
+                component.payload.role_arn,
+            )
+        else:
+            engine = None
         return await code_generation(
             current_user=current_user,
             payload=component.payload,
@@ -143,6 +204,7 @@ async def code_suggestions(
             prompt_registry=prompt_registry,
             stream_handler=stream_handler,
             snowplow_event_context=snowplow_code_suggestion_context,
+            engine=engine,
         )
 
 
@@ -158,6 +220,7 @@ async def code_completion(
     ],
     code_context: list[CodeContextPayload] = None,
     snowplow_event_context: Optional[SnowplowEventContext] = None,
+    engine: CodeCompletions = None,
 ):
     kwargs = {}
 
@@ -165,6 +228,11 @@ async def code_completion(
         # TODO: As we migrate to v3 we can rewrite this to use prompt registry
         engine = completions_anthropic_factory(model__name=payload.model_name)
         kwargs.update({"raw_prompt": payload.prompt})
+    elif payload.model_provider == KindModelProvider.AMAZON_Q:
+        if engine is None:
+            raise ValueError(
+                "Engine must be provided when using Amazon Q as the model provider"
+            )
     else:
         engine = completions_legacy_factory()
 
@@ -181,7 +249,7 @@ async def code_completion(
         snowplow_event_context=snowplow_event_context,
         **kwargs,
     )
-
+    request_log.debug("Code completion suggestions:", suggestions=suggestions)
     if not isinstance(suggestions, list):
         suggestions = [suggestions]
 
@@ -240,9 +308,19 @@ async def code_generation(
     ],
     code_context: list[CodeContextPayload] = None,
     snowplow_event_context: Optional[SnowplowEventContext] = None,
+    engine: CodeGenerations = None,
 ):
     model_provider = payload.model_provider
-    if payload.prompt_id:
+    # TODO: Check if this check is correct
+    if payload.prompt_id and payload.model_provider == KindModelProvider.AMAZON_Q:
+        request_log.debug(
+            "Validating engine", engine=engine, model_provider=payload.model_provider
+        )
+        if engine is None:
+            raise ValueError(
+                "Engine must be provided when using Amazon Q as the model provider"
+            )
+    elif payload.prompt_id:
         # for backward compatibility, eventually prmpt_version should be a mandatory field
         prompt_version = payload.prompt_version or "^1.0.0"
         # For SaaS: prompt_version and prompt_id are mandatory fields
@@ -282,7 +360,7 @@ async def code_generation(
         snowplow_event_context=snowplow_event_context,
         prompt_enhancer=payload.prompt_enhancer,
     )
-
+    request_log.debug("Suggestions", suggestion=suggestion)
     if isinstance(suggestion, AsyncIterator):
         return await stream_handler(suggestion, engine)
 
@@ -302,3 +380,24 @@ async def code_generation(
             enabled_feature_flags=current_feature_flag_context.get(),
         ),
     )
+
+
+def _validate_amazon_q_requirements(payload):
+    """Validate required parameters for Amazon Q requests."""
+    if not payload.role_arn:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="role_arn is required for Amazon Q",
+        )
+
+
+def _create_amazon_q_engine(amazon_q_factory, payload, current_user, request, role_arn):
+    """Create Amazon Q engine with required parameters."""
+    request_log.debug("Creating Amazon Q engine", payload=payload)
+    if payload.model_provider == KindModelProvider.AMAZON_Q:
+        return amazon_q_factory(
+            model__current_user=current_user,
+            model__auth_header=request.headers.get(AUTH_HEADER),
+            model__role_arn=role_arn,
+        )
+    return None

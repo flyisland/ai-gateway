@@ -67,10 +67,11 @@ def fast_api_router():
 @pytest.fixture
 def auth_user(request):
     duo_seat_count_claim_present = getattr(request, "param", True)
-    claims = UserClaims(scopes=["complete_code"])
+    claims = UserClaims(scopes=["complete_code", "agent_quick_actions"])
     if duo_seat_count_claim_present:
         claims = UserClaims(
-            scopes=["complete_code"], duo_seat_count=DUO_SEAT_COUNT_CLAIM_TEST_VALUE
+            scopes=["complete_code", "agent_quick_actions"],
+            duo_seat_count=DUO_SEAT_COUNT_CLAIM_TEST_VALUE,
         )
     return CloudConnectorUser(authenticated=True, claims=claims)
 
@@ -139,7 +140,7 @@ def test_user_access_token_success(
     assert decoded_token["iat"] <= current_time_posix
     assert decoded_token["jti"]
     assert decoded_token["gitlab_realm"] == gitlab_realm
-    assert decoded_token["scopes"] == ["complete_code"]
+    assert decoded_token["scopes"] == ["agent_quick_actions"]
     assert decoded_token["gitlab_instance_id"] == "1234"
     assert parsed_response["expires_at"] == decoded_token["exp"]
 
@@ -251,7 +252,7 @@ class TestUnauthorizedIssuer:
         return CloudConnectorUser(
             authenticated=True,
             claims=UserClaims(
-                scopes=["complete_code"],
+                scopes=["complete_code", "agent_quick_actions"],
                 issuer="gitlab-ai-gateway",
                 duo_seat_count=DUO_SEAT_COUNT_CLAIM_TEST_VALUE,
             ),

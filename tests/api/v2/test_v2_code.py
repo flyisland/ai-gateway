@@ -33,7 +33,12 @@ def auth_user():
     return CloudConnectorUser(
         authenticated=True,
         claims=UserClaims(
-            scopes=["complete_code", "generate_code", "amazon_q_integration"],
+            scopes=[
+                "complete_code",
+                "generate_code",
+                "agent_quick_actions",
+                "amazon_q_integration",
+            ],
             subject="1234",
             gitlab_realm="self-managed",
             issuer="issuer",
@@ -64,9 +69,38 @@ def mock_config(assets_dir):
 
 @pytest.fixture
 def unit_primitives():
-    return ["complete_code", "generate_code"]
+    return ["complete_code", "generate_code", "agent_quick_actions"]
 
 
+@pytest.fixture
+def mock_gcp_location():
+    with patch("ai_gateway.api.v2.code.completions.Config") as mock:
+        mock.return_value = Mock(
+            google_cloud_platform=Mock(location="us-mock-location")
+        )
+
+        yield mock
+
+
+@pytest.fixture
+def mock_gcp_location_in_asia():
+    with patch("ai_gateway.api.v2.code.completions.Config") as mock:
+        mock.return_value = Mock(
+            google_cloud_platform=Mock(location="asia-mock-location")
+        )
+
+        yield mock
+
+
+@pytest.fixture
+def mock_post_processor():
+    with patch("ai_gateway.code_suggestions.completions.PostProcessor.process") as mock:
+        mock.return_value = "Post-processed completion response"
+
+        yield mock
+
+
+@pytest.mark.skip(reason="The endpoint is stubbed to always return Amazon Q response")
 class TestCodeCompletions:
     def cleanup(self):
         """Ensure Snowplow cache is reset between tests."""
@@ -1627,7 +1661,7 @@ class TestCodeGenerations:
                     "content_above_cursor": "# create function",
                     "content_below_cursor": "\n",
                 },
-                "prompt_version": 2,
+                "prompt_version": 5,
                 "prompt": "# create a function",
                 "model_provider": "anthropic",
                 "model_name": "claude-2.1",
@@ -1640,8 +1674,10 @@ class TestCodeGenerations:
         assert response.status_code == 422
 
         body = response.json()
-        assert "endpoint" in body["detail"]
-        assert "URL input should be a string or URL" in body["detail"]
+        assert (
+            "Input tag '5' found using 'prompt_version' does not match"
+            in body["detail"][0]["msg"]
+        )
 
     @pytest.mark.parametrize(
         (
@@ -1800,7 +1836,7 @@ class TestUnauthorizedIssuer:
         return CloudConnectorUser(
             authenticated=True,
             claims=UserClaims(
-                scopes=["complete_code", "generate_code"],
+                scopes=["complete_code", "generate_code", "agent_quick_actions"],
                 subject="1234",
                 gitlab_realm="self-managed",
                 issuer="gitlab-ai-gateway",

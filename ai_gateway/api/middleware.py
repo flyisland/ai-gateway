@@ -14,6 +14,7 @@ from gitlab_cloud_connector import (
     CloudConnectorUser,
 )
 from gitlab_cloud_connector import authenticate as cloud_connector_authenticate
+from gitlab_cloud_connector.auth import AUTH_HEADER
 from langsmith.run_helpers import tracing_context
 from starlette.authentication import (
     AuthCredentials,
@@ -273,7 +274,8 @@ class MiddlewareAuthentication(Middleware):
                 raise AuthenticationError(cloud_connector_error.error_message)
 
             return AuthCredentials(cloud_connector_user.claims.scopes), StarletteUser(
-                cloud_connector_user
+                cloud_connector_user,
+                conn.headers.get(AUTH_HEADER),
             )
 
         @timing("auth_duration_s")

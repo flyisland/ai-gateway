@@ -47,11 +47,15 @@ class Prompt(RunnableBinding[Input, Output]):
         self,
         model_factory: TypeModelFactory,
         config: PromptConfig,
+        user: StarletteUser,
         model_metadata: Optional[ModelMetadata] = None,
         disable_streaming: bool = False,
     ):
-        model_kwargs = self._build_model_kwargs(config.params, model_metadata)
-        model = self._build_model(model_factory, config.model, disable_streaming)
+        model_kwargs = self._build_model_kwargs(config.params, model_metadata, user)
+
+        model = self._build_model(
+            model_factory, config.model, model_kwargs, disable_streaming
+        )
         prompt = self._build_prompt_template(config.prompt_template)
         chain = self._build_chain(
             cast(Runnable[Input, Output], prompt | model.bind(**model_kwargs))
@@ -69,20 +73,24 @@ class Prompt(RunnableBinding[Input, Output]):
         self,
         params: PromptParams | None,
         model_metadata: Optional[ModelMetadata] | None,
+        user: StarletteUser,
     ) -> Mapping[str, Any]:
         return {
             **(params.model_dump(exclude_none=True) if params else {}),
-            **(model_metadata_to_params(model_metadata) if model_metadata else {}),
+            **(model_metadata.to_params() if model_metadata else {}),
+            **{"user": user},
         }
 
     def _build_model(
         self,
         model_factory: TypeModelFactory,
         config: ModelConfig,
+        model_metadata: Mapping[str, Any],
         disable_streaming: bool,
     ) -> Model:
         return model_factory(
             model=config.name,
+            metadata=model_metadata,
             disable_streaming=disable_streaming,
             **config.params.model_dump(
                 exclude={"model_class_provider"}, exclude_none=True, by_alias=True
@@ -168,7 +176,7 @@ class BasePromptRegistry(ABC):
         model_metadata: Optional[ModelMetadata] = None,
         internal_event_category=__name__,
     ) -> Prompt:
-        prompt = self.get(prompt_id, prompt_version or "^1.0.0", model_metadata)
+        prompt = self.get(prompt_id, prompt_version or "^1.0.0", user, model_metadata)
 
         for unit_primitive in prompt.unit_primitives:
             if not user.can(unit_primitive):
