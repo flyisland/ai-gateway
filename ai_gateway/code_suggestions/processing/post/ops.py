@@ -240,21 +240,21 @@ async def fix_end_block_errors(
         # Return the original copy of the completion.
         return completion
 
-    # Check for errors in the original code
-    code_sample_before_suggestion = f"{prefix}{suffix}"
-    parser_before_suggestion = await CodeParser.from_language_id(
-        code_sample_before_suggestion, lang_id
-    )
-    before_errors = list(
-        filter(
-            lambda e: find_cursor_position(code_sample_before_suggestion, e.start)
-            < len(code_sample_before_suggestion),
-            parser_before_suggestion.errors(),
-        )
-    )
-    errors_before_suggestion = len(before_errors)
-
     try:
+        # Check for errors in the original code
+        code_sample_before_suggestion = f"{prefix}{suffix}"
+        parser_before_suggestion = await CodeParser.from_language_id(
+            code_sample_before_suggestion, lang_id
+        )
+        before_errors = list(
+            filter(
+                lambda e: find_cursor_position(code_sample_before_suggestion, e.start)
+                < len(code_sample_before_suggestion),
+                parser_before_suggestion.errors(),
+            )
+        )
+        errors_before_suggestion = len(before_errors)
+
         # Start at last suffix existing in completion, trim everything after
         # and see if it improves errors
         least_error_count = 9999
