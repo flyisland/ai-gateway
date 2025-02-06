@@ -55,8 +55,8 @@ class ChatAmazonQ(BaseChatModel):
             yield ChatGenerationChunk(message=AIMessageChunk(content=content))
 
     def _build_response(self, messages: List[BaseMessage]):
-        current_user = self.metadata["user"]
-        role_arn = self.metadata["role_arn"]
+        current_user = self.metadata["user"]  # type: ignore
+        role_arn = self.metadata["role_arn"]  # type: ignore
 
         q_client = self.amazon_q_client_factory.get_client(
             current_user=current_user,
@@ -69,10 +69,10 @@ class ChatAmazonQ(BaseChatModel):
         return q_client.send_chat_message(send_message_params)
 
     def _calculate_send_message_params(self, messages: List[BaseMessage]):
-        if messages and isinstance(messages[0], SystemMessage):
-            system_message = messages.pop(0)
+        if messages and isinstance(messages[0], SystemMessage):  # type: ignore
+            system_message = messages.pop(0)  # type: ignore
             if messages:
-                messages[0].content = system_message.content + messages[0].content
+                messages[0].content = system_message.content + messages[0].content  # type: ignore
 
         message_content = messages.pop().content if messages else ""
 

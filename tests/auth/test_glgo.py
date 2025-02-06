@@ -1,6 +1,7 @@
 import json
 import os
 from datetime import datetime, timedelta, timezone
+from unittest import mock
 from unittest.mock import MagicMock, patch
 
 import pytest
@@ -37,52 +38,79 @@ class TestGlgoAuthority:
     def glgo_authority(self, base_url, signing_key):
         return GlgoAuthority(signing_key=signing_key, glgo_base_url=base_url)
 
-    def test_kid(self, base_url, signing_key, kid):
-        glgo_authority = GlgoAuthority(signing_key=signing_key, glgo_base_url=base_url)
+    @pytest.mark.parametrize(
+        ("cc_endpoint_enabled", "expected_kid"),
+        [
+            ("True", "7zzcwTGSip6wDUBxSOzfHDnRGcdlJwiMWE0Y4jnnUtY"),
+            ("False", None),
+        ],
+    )
+    def test_kid(self, base_url, signing_key, cc_endpoint_enabled, expected_kid):
+        with mock.patch.dict(
+            os.environ, {"CC_ENDPOINT_ENABLED": cc_endpoint_enabled}, clear=True
+        ):
+            glgo_authority = GlgoAuthority(
+                signing_key=signing_key, glgo_base_url=base_url
+            )
 
-        assert glgo_authority.kid == kid
+            assert glgo_authority.kid == expected_kid
 
     @patch("requests.post")
+    @pytest.mark.parametrize(
+        ("cc_endpoint_enabled", "expected_endpoint"),
+        [
+            ("False", "https://example.com/aws/token"),
+            ("True", "https://example.com/cc/token"),
+        ],
+    )
     def test_token_success(
         self,
         requests_mock,
         base_url,
         signing_key,
-        endpoint,
         public_key,
-        kid,
+        cc_endpoint_enabled,
+        expected_endpoint,
     ):
-        glgo_authority = GlgoAuthority(signing_key=signing_key, glgo_base_url=base_url)
+        with mock.patch.dict(
+            os.environ, {"CC_ENDPOINT_ENABLED": cc_endpoint_enabled}, clear=True
+        ):
 
-        mock_response = MagicMock()
-        mock_response.status_code = 200
-        mock_response.json.return_value = {"token": "mock-token"}
-        requests_mock.return_value = mock_response
+            glgo_authority = GlgoAuthority(
+                signing_key=signing_key, glgo_base_url=base_url
+            )
 
-        token = glgo_authority.token(
-            user_id="test-user", cloud_connector_token="mock-cloud-token"
-        )
+            mock_response = MagicMock()
+            mock_response.status_code = 200
+            mock_response.json.return_value = {"token": "mock-token"}
+            requests_mock.return_value = mock_response
 
-        assert token == "mock-token"
-        requests_mock.assert_called_once()
+            token = glgo_authority.token(
+                user_id="test-user", cloud_connector_token="mock-cloud-token"
+            )
 
-        kwargs = requests_mock.call_args.kwargs
-        assert kwargs["url"] == endpoint
-        assert kwargs["json"] == {"user_id": "test-user"}
+            assert token == "mock-token"
+            requests_mock.assert_called_once()
 
-        _, _, token = kwargs["headers"]["Authorization"].partition(" ")
+            kwargs = requests_mock.call_args.kwargs
+            assert kwargs["url"] == expected_endpoint
+            assert kwargs["json"] == {"user_id": "test-user"}
 
-        jwt_token = jwt.decode(token, public_key, audience="glgo")
-        current_time = datetime.now(timezone.utc)
-        current_time_posix = int(current_time.timestamp())
+            _, _, token = kwargs["headers"]["Authorization"].partition(" ")
+            if cc_endpoint_enabled == "True":
+                jwt_token = jwt.decode(token, public_key, audience="glgo")
+                current_time = datetime.now(timezone.utc)
+                current_time_posix = int(current_time.timestamp())
 
-        assert jwt_token["cct"] == "mock-cloud-token"
-        assert jwt_token["iss"] == "https://cloud.gitlab.com"
-        assert jwt_token["uid"] == "test-user"
-        assert jwt_token["exp"] > current_time_posix
-        assert jwt_token["exp"] <= int((current_time + timedelta(hours=1)).timestamp())
-        assert jwt_token["nbf"] <= current_time_posix
-        assert jwt_token["iat"] <= current_time_posix
+                assert jwt_token["cct"] == "mock-cloud-token"
+                assert jwt_token["iss"] == "https://cloud.gitlab.com"
+                assert jwt_token["uid"] == "test-user"
+                assert jwt_token["exp"] > current_time_posix
+                assert jwt_token["exp"] <= int(
+                    (current_time + timedelta(hours=1)).timestamp()
+                )
+                assert jwt_token["nbf"] <= current_time_posix
+                assert jwt_token["iat"] <= current_time_posix
 
     @patch("requests.post")
     def test_token_failure(self, requests_mock, base_url, signing_key, endpoint):

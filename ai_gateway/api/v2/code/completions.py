@@ -1,9 +1,9 @@
 from time import time
-from typing import Annotated, AsyncIterator, Optional, Tuple, Union
+from typing import Annotated, AsyncIterator, Optional, Tuple
 
 import anthropic
 from dependency_injector.providers import Factory
-from fastapi import APIRouter, Body, Depends, HTTPException, Request, status
+from fastapi import APIRouter, Depends, HTTPException, Request, status
 from gitlab_cloud_connector import (
     CloudConnectorConfig,
     GitLabFeatureCategory,

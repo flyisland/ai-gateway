@@ -164,6 +164,7 @@ class BasePromptRegistry(ABC):
         self,
         prompt_id: str,
         prompt_version: str,
+        user: StarletteUser,
         model_metadata: Optional[ModelMetadata] = None,
     ) -> Prompt:
         pass

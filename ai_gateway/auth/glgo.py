@@ -32,7 +32,6 @@ class GlgoAuthority:
             self.kid = None
             self.token_endpoint = f"{glgo_base_url}/aws/token"
 
-
     def token(self, user_id: str, cloud_connector_token: Optional[str]):
         # token = self._build_token(user_id, cloud_connector_token)
         if self._is_cc_endpoint_enabled():
