@@ -39,14 +39,6 @@ TPL_GENERATION_BASE = """
     "\n"
 )
 
-TPL_GENERATION_AMAZON_Q = """
-```
-{prefix}
-```
-""".strip(
-    "\n"
-)
-
 
 class CodeGenerations:
     def __init__(
@@ -68,33 +60,22 @@ class CodeGenerations:
         self.snowplow_instrumentator = snowplow_instrumentator
 
     def _get_prompt(
-        self,
-        prefix: str,
-        file_name: str,
-        lang_id: Optional[LanguageId] = None,
-        suffix: Optional[str] = None,
+        self, prefix: str, file_name: str, lang_id: Optional[LanguageId] = None
     ) -> Prompt:
         if self.prompt:
             return self.prompt
-        if isinstance(self.model, AmazonQModel):
-            prompt_template = PromptTemplate(TPL_GENERATION_AMAZON_Q)
-        else:
-            prompt_template = PromptTemplate(TPL_GENERATION_BASE)
+
         # We use either the language name or the file extension
         # if we couldn't determine the language before
         lang_repl = (
             lang_id.name.lower() if lang_id else Path(file_name).suffix.replace(".", "")
         )
+
         self.prompt_builder.add_template(
-            prompt_template,
+            PromptTemplate(TPL_GENERATION_BASE),
             lang=lang_repl,
         )
-        if suffix is None:
-            self.prompt_builder.add_content(prefix)
-        else:
-            self.prompt_builder.add_content(
-                prefix, suffix=suffix, suffix_reserved_percent=0.5
-            )
+        self.prompt_builder.add_content(prefix)
         prompt = self.prompt_builder.build()
 
         return prompt
@@ -111,13 +92,13 @@ class CodeGenerations:
         stream: bool = False,
         snowplow_event_context: Optional[SnowplowEventContext] = None,
         prompt_enhancer: Optional[dict] = None,
+        suffix: Optional[str] = None,
         **kwargs: Any,
     ) -> Union[CodeSuggestionsOutput, AsyncIterator[CodeSuggestionsChunk]]:
         lang_id = resolve_lang_id(file_name, editor_lang)
-        suffix = kwargs.pop("suffix", None)
         increment_lang_counter(file_name, lang_id, editor_lang)
 
-        prompt = self._get_prompt(prefix, file_name, lang_id, suffix)
+        prompt = self._get_prompt(prefix, file_name, lang_id)
 
         self.snowplow_instrumentator.watch(
             SnowplowEvent(
@@ -153,8 +134,8 @@ class CodeGenerations:
                     )
                 elif isinstance(self.model, AmazonQModel):
                     res = await self.model.generate(
-                        prompt.prefix,
-                        prompt.suffix,
+                        prefix,
+                        suffix if suffix else "",
                         file_name,
                         lang_id.name.lower(),
                         **kwargs,
