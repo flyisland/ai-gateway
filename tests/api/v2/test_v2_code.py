@@ -33,12 +33,7 @@ def auth_user():
     return CloudConnectorUser(
         authenticated=True,
         claims=UserClaims(
-            scopes=[
-                "complete_code",
-                "generate_code",
-                "amazon_q_integration",
-                "agent_quick_actions",
-            ],
+            scopes=["complete_code", "generate_code", "amazon_q_integration"],
             subject="1234",
             gitlab_realm="self-managed",
             issuer="issuer",
@@ -69,7 +64,7 @@ def mock_config(assets_dir):
 
 @pytest.fixture
 def unit_primitives():
-    return ["complete_code", "generate_code", "agent_quick_actions"]
+    return ["complete_code", "generate_code"]
 
 
 class TestCodeCompletions:

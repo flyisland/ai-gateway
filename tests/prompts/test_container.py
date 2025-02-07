@@ -38,11 +38,14 @@ def test_container(mock_container: containers.DeclarativeContainer):
         prompt_id = prompt_id_with_model_name.parent
         model_name = prompt_id_with_model_name.name
 
-        model_metadata = ModelMetadata(
-            name=str(model_name),
-            endpoint=AnyUrl("http://localhost:4000"),
-            provider="",
-        )
+        if model_name == "base":
+            model_metadata = None
+        else:
+            model_metadata = ModelMetadata(
+                name=str(model_name),
+                endpoint=AnyUrl("http://localhost:4000"),
+                provider="",
+            )
 
         for version in versions:
             prompt = registry.get(

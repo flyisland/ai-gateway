@@ -328,8 +328,7 @@ async def code_generation(
     )
     request_log.debug("Code generation suggestions", suggestions=suggestions)
 
-    # Handle empty or None suggestions
-    if not suggestions:
+    if suggestions is None or len(suggestions) == 0:
         return CompletionResponse(
             choices=[],
             metadata=ResponseMetadataBase(

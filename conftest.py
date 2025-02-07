@@ -345,7 +345,7 @@ def mock_completions_legacy(mock_completions_legacy_output: list[ModelEngineOutp
 
 @contextmanager
 def _mock_execute(klass: str, mock_suggestions_output: CodeSuggestionsOutput):
-    with patch(f"{klass}.execute", return_value=[mock_suggestions_output]) as mock:
+    with patch(f"{klass}.execute", return_value=mock_suggestions_output) as mock:
         yield mock
 
 
@@ -410,10 +410,8 @@ def mock_litellm_acompletion():
                 ),
             ],
             _hidden_params={
-                "original_response": {
-                    "choices": [{"logprobs": AsyncMock(token_logprobs=[999])}]
-                }
-            },
+                "original_response": {"choices": [{"logprobs": AsyncMock(token_logprobs=[999])}]}
+                },
             usage=AsyncMock(completion_tokens=999),
         )
 
