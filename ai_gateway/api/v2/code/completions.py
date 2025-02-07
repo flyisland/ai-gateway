@@ -165,9 +165,6 @@ async def completions(
         **kwargs,
     )
 
-    if not isinstance(suggestions, list):
-        suggestions = [suggestions]
-
     if isinstance(suggestions[0], AsyncIterator):
         return await _handle_stream(suggestions[0])
 
@@ -271,7 +268,7 @@ async def generations(
         code_generations.with_prompt_prepared(payload.prompt)
 
     with TelemetryInstrumentator().watch(payload.telemetry):
-        suggestions = await code_generations.execute(
+        suggestion = await code_generations.execute(
             prefix=payload.current_file.content_above_cursor,
             file_name=payload.current_file.file_name,
             editor_lang=payload.current_file.language_identifier,
@@ -280,8 +277,6 @@ async def generations(
             snowplow_event_context=snowplow_event_context,
         )
 
-    # Handle first suggestion for now
-    suggestion = suggestions[0] if isinstance(suggestions, list) else suggestions
     if isinstance(suggestion, AsyncIterator):
         return await _handle_stream(suggestion)
 

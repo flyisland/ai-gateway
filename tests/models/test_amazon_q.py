@@ -35,8 +35,7 @@ async def test_amazon_q_model_generate():
         "CodeRecommendations": [{"content": "Generated Code"}]
     }
 
-    resp = await model.generate("prefix", "suffix", "file.py", "Python")
-    output = resp[0]
+    output = await model.generate("prefix", "suffix", "file.py", "Python")
 
     assert isinstance(output, TextGenModelOutput)
     assert output.text == "Generated Code"

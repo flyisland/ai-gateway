@@ -442,7 +442,7 @@ class TestCodeCompletions:
             ),
         )
 
-        output = await use_case.execute(
+        actual = await use_case.execute(
             prefix=prefix,
             suffix=suffix,
             file_name=file_name,
@@ -451,7 +451,6 @@ class TestCodeCompletions:
             code_context=code_context,
             context_max_percent=context_max_percent,
         )
-        actual = output[0]
 
         use_case.prompt_builder.add_content.assert_called_with(
             prefix,
@@ -588,10 +587,10 @@ class TestCodeCompletions:
 
         use_case.prompt_builder.wrap.return_value = mock_prompt
 
-        output = await use_case.execute(
+        actual = await use_case.execute(
             prefix, suffix, file_name, editor_lang=editor_lang, raw_prompt=prompt
         )
-        actual = output[0]
+
         assert expected_output == actual.text
         assert expected_language_id == actual.lang_id
         assert isinstance(
@@ -686,4 +685,4 @@ class TestCodeCompletions:
         )
         mock_post_process.assert_called_with("Unprocessed completion output", score=0)
 
-        assert actual[0].text == "Post-processed completion output"
+        assert actual.text == "Post-processed completion output"
