@@ -167,6 +167,7 @@ async def completions(
 
     if isinstance(suggestions[0], AsyncIterator):
         return await _handle_stream(suggestions[0])
+
     choices, tokens_consumption_metadata = _completion_suggestion_choices(suggestions)
     return SuggestionsResponse(
         id="id",
@@ -591,6 +592,4 @@ async def _execute_code_completion(
             **kwargs,
         )
 
-    if isinstance(code_completions, CodeCompletions):
-        return [output]
     return output

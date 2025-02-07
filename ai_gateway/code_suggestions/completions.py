@@ -173,7 +173,7 @@ class CodeCompletions:
         code_context: Optional[list] = None,
         stream: bool = False,
         **kwargs: Any,
-    ) -> Union[CodeSuggestionsOutput, AsyncIterator[CodeSuggestionsChunk]]:
+    ) -> Union[list[CodeSuggestionsOutput], AsyncIterator[CodeSuggestionsChunk]]:
         lang_id = resolve_lang_id(file_name, editor_lang)
         increment_lang_counter(file_name, lang_id, editor_lang)
 
@@ -213,13 +213,18 @@ class CodeCompletions:
                         prompt.prefix, prompt.suffix, stream, **kwargs
                     )
 
-                if res:
-                    if isinstance(res, AsyncIterator):
-                        return self._handle_stream(res)
+                # Early return if response is empty
+                if not res:
+                    return []
 
-                    return await self._handle_sync(
-                        prompt, res, lang_id, watch_container
-                    )
+                # Handle streaming response
+                if isinstance(res, AsyncIterator):
+                    return self._handle_stream(res)
+
+                # Handle synchronous response
+                res = res if isinstance(res, list) else [res]
+
+                return await self._handle_sync(prompt, res, lang_id, watch_container)
             except ModelAPICallError as ex:
                 watch_container.register_model_exception(str(ex), ex.code)
                 raise
@@ -251,30 +256,35 @@ class CodeCompletions:
     async def _handle_sync(
         self,
         prompt: Prompt,
-        response: TextGenModelOutput,
+        responses: list[TextGenModelOutput],
         lang_id: Optional[LanguageId],
         watch_container: TextGenModelInstrumentator.WatchContainer,
-    ) -> CodeSuggestionsOutput:
-        watch_container.register_model_output_length(response.text)
-        watch_container.register_model_score(response.score)
-        watch_container.register_safety_attributes(response.safety_attributes)
+    ) -> list[CodeSuggestionsOutput]:
+        output: list[CodeSuggestionsOutput] = []
+        for response in responses:
+            watch_container.register_model_output_length(response.text)
+            watch_container.register_model_score(response.score)
+            watch_container.register_safety_attributes(response.safety_attributes)
 
-        response_text = await self._get_response_text(
-            response.text, prompt, lang_id, response.score
-        )
+            response_text = await self._get_response_text(
+                response.text, prompt, lang_id, response.score
+            )
 
-        return CodeSuggestionsOutput(
-            text=response_text,
-            score=response.score,
-            model=self.model.metadata,
-            lang_id=lang_id,
-            metadata=CodeSuggestionsOutput.Metadata(
-                experiments=[],
-                tokens_consumption_metadata=self._get_tokens_consumption_metadata(
-                    prompt, response
-                ),
-            ),
-        )
+            output.append(
+                CodeSuggestionsOutput(
+                    text=response_text,
+                    score=response.score,
+                    model=self.model.metadata,
+                    lang_id=lang_id,
+                    metadata=CodeSuggestionsOutput.Metadata(
+                        experiments=[],
+                        tokens_consumption_metadata=self._get_tokens_consumption_metadata(
+                            prompt, response
+                        ),
+                    ),
+                )
+            )
+        return output
 
     async def _get_response_text(
         self, response_text: str, prompt: Prompt, lang_id: LanguageId, score: float

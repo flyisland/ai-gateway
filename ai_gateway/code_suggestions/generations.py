@@ -92,7 +92,7 @@ class CodeGenerations:
         snowplow_event_context: Optional[SnowplowEventContext] = None,
         prompt_enhancer: Optional[dict] = None,
         **kwargs: Any,
-    ) -> Union[CodeSuggestionsOutput, AsyncIterator[CodeSuggestionsChunk]]:
+    ) -> Union[list[CodeSuggestionsOutput], AsyncIterator[CodeSuggestionsChunk]]:
         lang_id = resolve_lang_id(file_name, editor_lang)
         increment_lang_counter(file_name, lang_id, editor_lang)
 
@@ -134,22 +134,24 @@ class CodeGenerations:
                     res = await self.model.generate(
                         prompt.prefix, "", stream=stream, **kwargs
                     )
+                # Early return if response is empty
+                if not res:
+                    return []
 
-                if isinstance(res, list):
-                    res = res[0]
+                # Handle streaming response
+                if isinstance(res, AsyncIterator):
+                    return self._handle_stream(res, snowplow_event_context)
 
-                if res:
-                    if isinstance(res, AsyncIterator):
-                        return self._handle_stream(res, snowplow_event_context)
-
-                    return await self._handle_sync(
-                        response=res,
-                        lang_id=lang_id,
-                        model_provider=model_provider,
-                        prefix=prefix,
-                        watch_container=watch_container,
-                        snowplow_event_context=snowplow_event_context,
-                    )
+                # Handle synchronous response
+                responses = res if isinstance(res, list) else [res]
+                return await self._handle_sync(
+                    responses=responses,
+                    lang_id=lang_id,
+                    model_provider=model_provider,
+                    prefix=prefix,
+                    watch_container=watch_container,
+                    snowplow_event_context=snowplow_event_context,
+                )
 
             except ModelAPICallError as ex:
                 watch_container.register_model_exception(str(ex), ex.code)
@@ -186,36 +188,41 @@ class CodeGenerations:
 
     async def _handle_sync(
         self,
-        response: TextGenModelOutput,
+        responses: list[TextGenModelOutput],
         lang_id: Optional[LanguageId],
         prefix: str,
         watch_container: TextGenModelInstrumentator.WatchContainer,
         model_provider: Optional[str] = None,
         snowplow_event_context: Optional[SnowplowEventContext] = None,
-    ) -> CodeSuggestionsOutput:
-        watch_container.register_model_output_length(response.text)
-        watch_container.register_model_score(response.score)
-        watch_container.register_safety_attributes(response.safety_attributes)
+    ) -> list[CodeSuggestionsOutput]:
+        output: list[CodeSuggestionsOutput] = []
+        for response in responses:
+            watch_container.register_model_output_length(response.text)
+            watch_container.register_model_score(response.score)
+            watch_container.register_safety_attributes(response.safety_attributes)
 
-        processor = (
-            PostProcessorAnthropic
-            if model_provider == ModelProvider.ANTHROPIC
-            else PostProcessor
-        )
-        generation = await processor(prefix).process(response.text)
-
-        self.snowplow_instrumentator.watch(
-            SnowplowEvent(
-                context=snowplow_event_context,
-                action="tokens_per_user_request_response",
-                label="code_generation",
-                value=self.tokenization_strategy.estimate_length(response.text)[0],
+            processor = (
+                PostProcessorAnthropic
+                if model_provider == ModelProvider.ANTHROPIC
+                else PostProcessor
             )
-        )
+            generation = await processor(prefix).process(response.text)
 
-        return CodeSuggestionsOutput(
-            text=generation,
-            score=response.score,
-            model=self.model.metadata,
-            lang_id=lang_id,
-        )
+            self.snowplow_instrumentator.watch(
+                SnowplowEvent(
+                    context=snowplow_event_context,
+                    action="tokens_per_user_request_response",
+                    label="code_generation",
+                    value=self.tokenization_strategy.estimate_length(response.text)[0],
+                )
+            )
+
+            output.append(
+                CodeSuggestionsOutput(
+                    text=generation,
+                    score=response.score,
+                    model=self.model.metadata,
+                    lang_id=lang_id,
+                )
+            )
+        return output

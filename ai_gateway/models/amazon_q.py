@@ -44,7 +44,7 @@ class AmazonQModel(TextGenModelBase):
         filename: str,
         language: str,
         **kwargs,
-    ) -> TextGenModelOutput:
+    ) -> list[TextGenModelOutput]:
         q_client = self._client_factory.get_client(
             current_user=self._current_user,
             auth_header=self._auth_header,
@@ -54,7 +54,7 @@ class AmazonQModel(TextGenModelBase):
         request_payload = {
             "fileContext": {
                 "leftFileContent": prefix,
-                "rightFileContent": suffix,
+                "rightFileContent": suffix if suffix else "",
                 "filename": filename,
                 "programmingLanguage": {
                     "languageName": language,
@@ -65,12 +65,29 @@ class AmazonQModel(TextGenModelBase):
 
         response = q_client.generate_code_recommendations(request_payload)
 
-        recommendations = response.get("CodeRecommendations") or []
-        recommendation = recommendations[0] or {}
+        recommendations = response.get("CodeRecommendations", [])
 
-        return TextGenModelOutput(
-            text=recommendation["content"],
-            # Give a high value, the model doesn't return scores.
-            score=10**5,
-            safety_attributes=SafetyAttributes(),
-        )
+        return self._process_recommendations(recommendations)
+
+    def _process_recommendations(
+        self, recommendations: list
+    ) -> list[TextGenModelOutput]:
+        """
+        Process code recommendations and convert them to TextGenModelOutput objects.
+
+        Args:
+            response (dict): Response from q_client.generate_code_recommendations
+
+        Returns:
+            list[TextGenModelOutput]: List of processed recommendations
+        """
+        # Use list comprehension instead of for loop
+        return [
+            TextGenModelOutput(
+                text=rec.get("content", ""),
+                score=10
+                ** 5,  # Constant value could be defined as a class/module constant
+                safety_attributes=SafetyAttributes(),
+            )
+            for rec in recommendations
+        ]

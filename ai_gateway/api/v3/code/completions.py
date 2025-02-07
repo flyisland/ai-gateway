@@ -81,6 +81,7 @@ async def completions(
     prompt_registry: Annotated[BasePromptRegistry, Depends(get_prompt_registry)],
     config: Annotated[Config, Depends(get_config)],
 ):
+    request_log.debug("[v3/code/completions] processing request", payload=payload)
     return await code_suggestions(
         request=request,
         payload=payload,
@@ -136,6 +137,7 @@ async def code_suggestions(
             snowplow_event_context=snowplow_code_suggestion_context,
         )
     if component.type == CodeEditorComponents.GENERATION:
+        request_log.debug("[code_suggestions] starting code generation")
         return await code_generation(
             current_user=current_user,
             payload=component.payload,
@@ -209,7 +211,7 @@ def _completion_suggestion_choices(suggestions: list) -> list:
     choices = []
     for suggestion in suggestions:
         request_log.debug(
-            "code completion suggestion:",
+            "code suggestion:",
             suggestion=suggestion,
             score=suggestion.score,
             language=suggestion.lang,
@@ -273,7 +275,7 @@ async def code_generation(
         if payload.prompt:
             engine.with_prompt_prepared(payload.prompt)
 
-    suggestion = await engine.execute(
+    suggestions = await engine.execute(
         prefix=payload.content_above_cursor,
         file_name=payload.file_name,
         editor_lang=payload.language_identifier,
@@ -282,22 +284,36 @@ async def code_generation(
         snowplow_event_context=snowplow_event_context,
         prompt_enhancer=payload.prompt_enhancer,
     )
+    request_log.debug("Code generation suggestions", suggestions=suggestions)
 
-    if isinstance(suggestion, AsyncIterator):
-        return await stream_handler(suggestion, engine)
+    if suggestions is None or len(suggestions) == 0:
+        return CompletionResponse(
+            choices=[],
+            metadata=ResponseMetadataBase(
+                timestamp=int(time()),
+                model=ModelMetadata(
+                    engine=engine.model.engine,
+                    name=engine.model.name,
+                    lang=engine.lang,
+                ),
+                enabled_feature_flags=current_feature_flag_context.get(),
+            ),
+        )
 
-    choices = (
-        [CompletionResponse.Choice(text=suggestion.text)] if suggestion.text else []
-    )
+    if not isinstance(suggestions, list):
+        suggestions = [suggestions]
+
+    if isinstance(suggestions[0], AsyncIterator):
+        return await stream_handler(suggestions[0], engine)
 
     return CompletionResponse(
-        choices=choices,
+        choices=_completion_suggestion_choices(suggestions),
         metadata=ResponseMetadataBase(
             timestamp=int(time()),
             model=ModelMetadata(
-                engine=suggestion.model.engine,
-                name=suggestion.model.name,
-                lang=suggestion.lang,
+                engine=suggestions[0].model.engine,
+                name=suggestions[0].model.name,
+                lang=suggestions[0].lang,
             ),
             enabled_feature_flags=current_feature_flag_context.get(),
         ),
