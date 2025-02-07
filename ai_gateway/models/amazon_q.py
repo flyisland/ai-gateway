@@ -34,6 +34,10 @@ class AmazonQModel(TextGenModelBase):
         )
 
     @property
+    def input_token_limit(self) -> int:
+        return 20480
+
+    @property
     def metadata(self) -> ModelMetadata:
         return self._metadata
 
