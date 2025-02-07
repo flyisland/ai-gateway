@@ -304,37 +304,6 @@ def mock_suggestions_output(
 
 
 @pytest.fixture
-def mock_completions_amazonq(mock_completions_amazonq_output: list[TextGenModelOutput]):
-    with patch(
-        "ai_gateway.code_suggestions.CodeCompletions.execute",
-        return_value=mock_completions_amazonq_output,
-    ) as mock:
-        yield mock
-
-
-@pytest.fixture
-def mock_completions_amazonq_output(
-    mock_completions_amazonq_output_texts: list[str],
-    mock_suggestions_model: str,
-    mock_suggestions_engine: str,
-):
-    output = []
-    for output_txt in mock_completions_amazonq_output_texts:
-        output.append(
-            CodeSuggestionsOutput(
-                text=output_txt,
-                score=0,
-                model=ModelMetadata(
-                    name=mock_suggestions_model, engine=mock_suggestions_engine
-                ),
-                lang_id=LanguageId.PYTHON,
-                metadata=CodeSuggestionsOutput.Metadata(experiments=[]),
-            )
-        )
-    yield output
-
-
-@pytest.fixture
 def mock_completions_legacy(mock_completions_legacy_output: list[ModelEngineOutput]):
     with patch(
         "ai_gateway.code_suggestions.CodeCompletionsLegacy.execute",
