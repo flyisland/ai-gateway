@@ -9,7 +9,6 @@ from gitlab_cloud_connector import (
     GitLabFeatureCategory,
     GitLabUnitPrimitive,
 )
-from gitlab_cloud_connector.auth import AUTH_HEADER
 
 from ai_gateway.api.auth_utils import StarletteUser, get_current_user
 from ai_gateway.api.feature_category import feature_category
@@ -82,7 +81,6 @@ async def completions(
     prompt_registry: Annotated[BasePromptRegistry, Depends(get_prompt_registry)],
     config: Annotated[Config, Depends(get_config)],
 ):
-    request_log.debug("[v3/code/completions] payload", payload=payload)
     return await code_suggestions(
         request=request,
         payload=payload,
@@ -169,7 +167,6 @@ async def code_completion(
     ],
     code_context: list[CodeContextPayload] = None,
     snowplow_event_context: Optional[SnowplowEventContext] = None,
-    engine: CodeCompletions = None,
 ):
     kwargs = {}
 
@@ -189,7 +186,6 @@ async def code_completion(
 
         engine = completions_amazon_q_factory(
             model__current_user=current_user,
-            model__auth_header=request.headers.get(AUTH_HEADER),
             model__role_arn=payload.role_arn,
         )
     else:
@@ -271,7 +267,6 @@ async def code_generation(
     ],
     code_context: list[CodeContextPayload] = None,
     snowplow_event_context: Optional[SnowplowEventContext] = None,
-    engine: CodeGenerations = None,
 ):
     request_log.debug("Executing code generation", payload=payload)
     model_provider = payload.model_provider
@@ -287,7 +282,6 @@ async def code_generation(
 
         engine = generations_amazon_q_factory(
             model__current_user=current_user,
-            model__auth_header=request.headers.get(AUTH_HEADER),
             model__role_arn=payload.role_arn,
         )
     elif payload.prompt_id:
