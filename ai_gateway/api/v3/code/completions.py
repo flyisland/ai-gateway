@@ -120,7 +120,6 @@ async def code_suggestions(
         region=config.google_cloud_platform.location(),
     )
     if component.type == CodeEditorComponents.COMPLETION:
-        request_log.debug("[code_suggestions] starting code completion")
         if not current_user.can(
             GitLabUnitPrimitive.COMPLETE_CODE,
             disallowed_issuers=[CloudConnectorConfig().service_name],

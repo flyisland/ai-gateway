@@ -36,7 +36,6 @@ from ai_gateway.prompts.config.base import ModelConfig, PromptConfig, PromptPara
 from ai_gateway.prompts.config.models import ChatLiteLLMParams, TypeModelParams
 from ai_gateway.prompts.typing import Model, TypeModelFactory
 from ai_gateway.safety_attributes import SafetyAttributes
-from ai_gateway.api.v3.code.typing import ModelMetadata as ModelMetadataV3
 
 pytest_plugins = ("pytest_asyncio",)
 
