@@ -137,6 +137,14 @@ class AmazonQClient:
             raise
 
     @raise_aws_errors
+    def send_chat_message(self, payload):
+
+        try:
+            return self._send_message(payload)
+        except ClientError as ex:
+            raise ex
+
+    @raise_aws_errors
     def _create_o_auth_app_connection(self, **params):
         self.client.create_o_auth_app_connection(**params)
 
@@ -155,7 +163,20 @@ class AmazonQClient:
             event=payload,
         )
 
+    def _send_message(self, payload):
+        print("DEBUG [AmazonQClient]: _send_message payload", payload)
+        return self.client.send_message(
+            message=payload["message"],
+            conversationId=payload["conversation_id"],
+            history=payload["history"]
+        )
+
     def _retry_send_event(self, error, code, payload):
+        self._is_retry(error, code)
+
+        return self._send_event(payload)
+
+    def _is_retry(self, error, code):
         match str(error.response.get("reason")):
             case AccessDeniedExceptionReason.GITLAB_EXPIRED_IDENTITY:
                 self.client.create_auth_grant(code=code)
@@ -166,5 +187,3 @@ class AmazonQClient:
                     status_code=status.HTTP_403_FORBIDDEN,
                     detail=str(error),
                 )
-
-        return self._send_event(payload)
