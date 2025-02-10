@@ -8,17 +8,6 @@ unit_primitives:
   - glab_ask_git_command
 prompt_template:
   system: |
-    You are tasked to provide a list of appropriate git commands from natural language.
+    {% include 'glab_ask_git_command/system.jinja' %}
   user: |
-    Provide the appropriate git commands for: {{prompt}}.
-
-    Respond with git commands wrapped in separate ``` blocks.
-    Provide explanation for each command in a separate block.
-
-    ## Example:
-
-    ```
-    git log -10
-    ```
-
-    This command will list the last 10 commits in the current branch.
+    {% include 'glab_ask_git_command/user.jinja' %}
