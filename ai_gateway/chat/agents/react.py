@@ -20,6 +20,7 @@ from ai_gateway.chat.agents.typing import (
     TypeAgentEvent,
 )
 from ai_gateway.chat.tools.base import BaseTool
+from ai_gateway.feature_flags.context import FeatureFlag, is_feature_enabled
 from ai_gateway.models.base_chat import Role
 from ai_gateway.prompts import Prompt, jinja2_formatter
 from ai_gateway.prompts.typing import ModelMetadataType
