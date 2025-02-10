@@ -1,213 +1,323 @@
-import boto3
-from botocore.exceptions import ClientError
-from fastapi import HTTPException, status
-from q_developer_boto3 import boto3 as q_boto3
+"""
+This module contains unit tests for the Amazon Q Client and its factory.
+It tests the functionality of creating clients, handling authentication,
+and managing OAuth applications. The tests cover success scenarios as well
+as various error conditions using mock objects to simulate AWS services.
+
+
+"""
+
+from typing import Dict
+from unittest.mock import Mock, patch
+
+import pytest
+from botocore.exceptions import ClientError, ParamValidationError
+from fastapi import HTTPException
 
 from ai_gateway.api.auth_utils import StarletteUser
 from ai_gateway.auth.glgo import GlgoAuthority
-from ai_gateway.integrations.amazon_q.errors import (
-    AccessDeniedExceptionReason,
-    AWSException,
-    raise_aws_errors,
-)
-from ai_gateway.structured_logging import get_request_logger
-from ai_gateway.tracking import log_exception
-
-request_log = get_request_logger("amazon_q")
-
-__all__ = [
-    "AmazonQClientFactory",
-    "AmazonQClient",
-]
+from ai_gateway.integrations.amazon_q.client import AmazonQClient, AmazonQClientFactory
+from ai_gateway.integrations.amazon_q.errors import AWSException
 
 
-class AmazonQClientFactory:
-    def __init__(
+# Fixtures
+@pytest.fixture
+def mock_glgo_authority() -> Mock:
+    """
+    Creates a mock GlgoAuthority with a mocked token method.
+
+    Returns:
+        Mock: Mocked GlgoAuthority instance
+    """
+    return Mock(spec=GlgoAuthority)
+
+
+@pytest.fixture
+def mock_current_user() -> Mock:
+    """
+    Creates a mock user with test credentials and claims.
+
+    Returns:
+        Mock: Mocked StarletteUser instance
+    """
+    user = Mock(spec=StarletteUser)
+    user.global_user_id = "test_user_id"
+    user.cloud_connector_token = "test_token"
+    user.claims = Mock()
+    user.claims.subject = "test_subject"
+    return user
+
+
+@pytest.fixture
+def mock_credentials() -> Dict[str, str]:
+    """
+    Provides mock AWS credentials.
+
+    Returns:
+        Dict[str, str]: Dictionary containing mock AWS credentials
+    """
+    return {
+        "AccessKeyId": "test_access_key",
+        "SecretAccessKey": "test_secret_key",
+        "SessionToken": "test_session_token",
+    }
+
+
+@pytest.fixture
+def client_factory(mock_glgo_authority: Mock) -> AmazonQClientFactory:
+    """
+    Creates an AmazonQClientFactory instance with mocked dependencies.
+
+    Args:
+        mock_glgo_authority: Mocked GlgoAuthority instance
+
+    Returns:
+        AmazonQClientFactory: Configured client factory for testing
+    """
+    with patch("boto3.client") as mock_boto3_client:
+        mock_boto3_client.return_value = Mock()
+        factory = AmazonQClientFactory(
+            glgo_authority=mock_glgo_authority,
+            endpoint_url="https://test-endpoint",
+            region="us-west-2",
+        )
+        factory.sts_client = mock_boto3_client.return_value
+        return factory
+
+
+@pytest.fixture
+def amazon_q_client(mock_credentials: Dict[str, str]) -> AmazonQClient:
+    """
+    Creates an AmazonQClient instance with mocked credentials.
+
+    Args:
+        mock_credentials: Dictionary of mock AWS credentials
+
+    Returns:
+        AmazonQClient: Configured client for testing
+    """
+    with patch("q_developer_boto3.boto3.client") as mock_q_boto3_client:
+        client = AmazonQClient(
+            url="https://test-endpoint",
+            region="us-west-2",
+            credentials=mock_credentials,
+        )
+        client.client = mock_q_boto3_client.return_value
+        return client
+
+
+class TestAmazonQClientFactory:
+    """Test suite for AmazonQClientFactory class."""
+
+    def test_get_client_success(
         self,
-        glgo_authority: GlgoAuthority,
-        endpoint_url: str,
-        region: str,
-    ):
-        self.glgo_authority = glgo_authority
-        self.sts_client = boto3.client("sts", region)
-        self.endpoint_url = endpoint_url
-        self.region = region
+        client_factory: AmazonQClientFactory,
+        mock_current_user: Mock,
+        mock_credentials: Dict[str, str],
+    ) -> None:
+        """Tests successful client creation with valid credentials."""
+        # Mock the token method at the authority level
+        client_factory.glgo_authority = Mock(spec=GlgoAuthority)
+        client_factory.glgo_authority.token.return_value = "test_token"
 
-    def get_client(self, current_user: StarletteUser, role_arn: str):
-        token = self._get_glgo_token(current_user)
-        credentials = self._get_aws_credentials(current_user, token, role_arn)
+        client_factory.sts_client.assume_role_with_web_identity.return_value = {
+            "Credentials": mock_credentials
+        }
 
-        return AmazonQClient(
-            url=self.endpoint_url,
-            region=self.region,
-            credentials=credentials,
+        client = client_factory.get_client(mock_current_user, "test_role_arn")
+
+        assert isinstance(client, AmazonQClient)
+        client_factory.glgo_authority.token.assert_called_once_with(
+            user_id="test_user_id",
+            cloud_connector_token="test_token",
+        )
+        client_factory.sts_client.assume_role_with_web_identity.assert_called_once_with(
+            RoleArn="test_role_arn",
+            RoleSessionName="test_subject",
+            WebIdentityToken="test_token",
+            DurationSeconds=43200,
         )
 
-    def _get_glgo_token(
-        self,
-        current_user: StarletteUser,
-    ):
-        user_id = current_user.global_user_id
-        print("DEBUG-AmazonQClientFactory: user_id", user_id)
-        if not user_id:
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST, detail="User Id is missing"
-            )
+    def test_get_client_missing_user_id(
+        self, client_factory: AmazonQClientFactory
+    ) -> None:
+        """Tests error handling when user ID is missing."""
+        mock_user = Mock(spec=StarletteUser)
+        mock_user.global_user_id = None
 
-        try:
-            token = self.glgo_authority.token(
-                user_id=user_id,
-                cloud_connector_token=current_user.cloud_connector_token,
-            )
-            request_log.info("Obtained Glgo token", source=__name__, user_id=user_id)
-            return token
-        except Exception as ex:
-            log_exception(ex)
-            raise HTTPException(
-                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                detail="Cannot obtain OIDC token",
-            )
+        with pytest.raises(HTTPException) as exc_info:
+            client_factory.get_client(mock_user, "test_role_arn")
 
-    @raise_aws_errors
-    def _get_aws_credentials(
-        self,
-        current_user: StarletteUser,
-        token: str,
-        role_arn: str,
-    ):
-        if current_user.claims is not None:
-            session_name = f"{current_user.claims.subject}"
-        else:
-            request_log.warn(
-                "No user claims found, setting session name to placeholder"
-            )
-            session_name = "placeholder"
+        assert exc_info.value.status_code == 400
+        assert exc_info.value.detail == "User Id is missing"
 
-        return self.sts_client.assume_role_with_web_identity(
-            RoleArn=role_arn,
-            RoleSessionName=session_name,
-            WebIdentityToken=token,
-            DurationSeconds=43200,  # 12 Hour expiration
-        )["Credentials"]
+    def test_get_glgo_token_failure(
+        self, client_factory: AmazonQClientFactory, mock_current_user: Mock
+    ) -> None:
+        """Tests error handling when GLGO token retrieval fails."""
+        # Mock the authority at the instance level
+        client_factory.glgo_authority = Mock(spec=GlgoAuthority)
+        client_factory.glgo_authority.token.side_effect = Exception("Token error")
+
+        with pytest.raises(HTTPException) as exc_info:
+            client_factory._get_glgo_token(mock_current_user)
+
+        assert exc_info.value.status_code == 500
+        assert exc_info.value.detail == "Cannot obtain OIDC token"
 
 
-class AmazonQClient:
-    def __init__(self, url: str, region: str, credentials: dict):
-        self.client = q_boto3.client(
-            "q",
-            region_name=region,
-            endpoint_url=url,
-            aws_access_key_id=credentials["AccessKeyId"],
-            aws_secret_access_key=credentials["SecretAccessKey"],
-            aws_session_token=credentials["SessionToken"],
-        )
+class TestAmazonQClient:
+    """Test suite for AmazonQClient class."""
 
-    @raise_aws_errors
-    def create_or_update_auth_application(self, application_request):
-        params = dict(
-            clientId=application_request.client_id,
-            clientSecret=application_request.client_secret,
-            instanceUrl=application_request.instance_url,
-            redirectUrl=application_request.redirect_url,
-        )
+    def test_send_event_success(self, amazon_q_client: AmazonQClient) -> None:
+        """Tests successful event sending."""
+        mock_request = Mock()
+        mock_request.payload.model_dump_json.return_value = '{"test": "data"}'
+        mock_request.code = "test_code"
 
-        try:
-            request_log.info("Creating OAuth Application Connection.")
+        # Configure mock to return successfully
+        amazon_q_client.client.send_event.return_value = {"Success": True}
 
-            self._create_o_auth_app_connection(**params)
-        except AWSException as ex:
-            if ex.is_conflict():
-                request_log.info(
-                    "OAuth Application Exists. Updating OAuth Application Connection."
-                )
+        # Should not raise any exception
+        amazon_q_client.send_event(mock_request)
 
-                self.client.update_o_auth_app_connection(**params)
-            else:
-                raise ex
-
-    @raise_aws_errors
-    def send_event(self, event_request):
-        payload = event_request.payload.model_dump_json(exclude_none=True)
-
-        try:
-            self._send_event(payload)
-        except ClientError as ex:
-            if ex.__class__.__name__ == "AccessDeniedException":
-                return self._retry_send_event(ex, event_request.code, payload)
-
-            raise
-
-    @raise_aws_errors
-    def send_chat_message(self, payload):
-
-        try:
-            return self._send_message(payload)
-        except ClientError as ex:
-            # if ex.__class__.__name__ == "AccessDeniedException":
-            #     return self._retry_send_message(ex, event_request.code, payload)
-
-            raise ex
-
-    @raise_aws_errors
-    def send_inline_code_message(self, payload):
-
-        try:
-            return self._generate_code_recommendations(payload)
-        except ClientError as ex:
-            # if ex.__class__.__name__ == "AccessDeniedException":
-            #     return self._retry_generate_code_recommendations(ex, event_request.code, payload)
-            raise ex
-
-    @raise_aws_errors
-    def _create_o_auth_app_connection(self, **params):
-        self.client.create_o_auth_app_connection(**params)
-
-    def _send_event(self, payload):
-        self.client.send_event(
+        amazon_q_client.client.send_event.assert_called_once_with(
             providerId="GITLAB",
             eventId="Quick Action",
             eventVersion="1.0",
-            event=payload,
+            event='{"test": "data"}',
         )
 
-    def _send_message(self, payload):
-        print("DEBUG [AmazonQClient]: _send_message payload", payload)
-        return self.client.send_message(
-            message=payload["message"],
-            conversationId=payload["conversation_id"],
-            # history=payload["history"]
+    def test_send_event_access_denied(self, amazon_q_client: AmazonQClient) -> None:
+        """Tests failure handling when sending events with access denied."""
+        mock_request = Mock()
+        mock_request.payload.model_dump_json.return_value = '{"test": "data"}'
+        mock_request.code = "test_code"
+
+        # Configure mock to raise ClientError with AccessDeniedException
+        error_response = {
+            "Error": {"Code": "AccessDeniedException", "Message": "Access denied"}
+        }
+        amazon_q_client.client.send_event.side_effect = ClientError(
+            error_response, "SendEvent"
         )
 
-    def _generate_code_recommendations(self, payload):
-        print("DEBUG [AmazonQClient]: _generate_code_recommendations payload", payload)
-        return self.client.generate_code_recommendations(
-            fileContext=payload["fileContext"],
-            maxResults=payload["maxResults"],
+        # Should raise AWSException
+        with pytest.raises(AWSException) as exc_info:
+            amazon_q_client.send_event(mock_request)
+
+        assert "AccessDeniedException" in str(exc_info.value)
+        assert "Access denied" in str(exc_info.value)
+
+    def test_create_or_update_auth_application_success(
+        self, amazon_q_client: AmazonQClient
+    ) -> None:
+        """Tests successful creation of OAuth application."""
+        mock_request = Mock()
+        mock_request.client_id = "test_client_id"
+        mock_request.client_secret = "test_secret"
+        mock_request.instance_url = "test_url"
+        mock_request.redirect_url = "test_redirect"
+
+        amazon_q_client.create_or_update_auth_application(mock_request)
+
+        amazon_q_client.client.create_o_auth_app_connection.assert_called_once_with(
+            clientId="test_client_id",
+            clientSecret="test_secret",
+            instanceUrl="test_url",
+            redirectUrl="test_redirect",
         )
 
-    def _retry_send_event(self, error, code, payload):
-        self._is_retry(error, code)
+    def test_create_or_update_auth_application_conflict(
+        self, amazon_q_client: AmazonQClient
+    ) -> None:
+        """Tests handling of conflict when creating OAuth application."""
+        mock_request = Mock()
+        mock_request.client_id = "test_client_id"
+        mock_request.client_secret = "test_secret"
+        mock_request.instance_url = "test_url"
+        mock_request.redirect_url = "test_redirect"
 
-        return self._send_event(payload)
+        # First call raises conflict, second call (update) succeeds
+        error_response = {
+            "Error": {"Code": "ConflictException", "Message": "Resource already exists"}
+        }
+        amazon_q_client.client.create_o_auth_app_connection.side_effect = ClientError(
+            error_response, "CreateOAuthAppConnection"
+        )
 
-    def _retry_send_message(self, error, code, payload):
-        self._is_retry(error, code)
+        amazon_q_client.create_or_update_auth_application(mock_request)
 
-        return self._send_message(payload)
+        amazon_q_client.client.update_o_auth_app_connection.assert_called_once_with(
+            clientId="test_client_id",
+            clientSecret="test_secret",
+            instanceUrl="test_url",
+            redirectUrl="test_redirect",
+        )
 
-    def _retry_generate_code_recommendations(self, error, code, payload):
-        self._is_retry(error, code)
+    def test_create_or_update_auth_application_access_denied(
+        self, amazon_q_client: AmazonQClient
+    ) -> None:
+        """Tests access denied error handling for OAuth application creation."""
+        mock_request = Mock()
+        mock_request.client_id = "test_client_id"
+        mock_request.client_secret = "test_secret"
+        mock_request.instance_url = "test_url"
+        mock_request.redirect_url = "test_redirect"
 
-        return self._generate_code_recommendations(payload)
+        error_response = {
+            "Error": {"Code": "AccessDeniedException", "Message": "Access denied"}
+        }
+        amazon_q_client.client.create_o_auth_app_connection.side_effect = ClientError(
+            error_response, "CreateOAuthAppConnection"
+        )
 
-    def _is_retry(self, error, code):
-        match str(error.response.get("reason")):
-            case AccessDeniedExceptionReason.GITLAB_EXPIRED_IDENTITY:
-                self.client.create_auth_grant(code=code)
-            case AccessDeniedExceptionReason.GITLAB_INVALID_IDENTITY:
-                self.client.update_auth_grant(code=code)
-            case _:
-                return HTTPException(
-                    status_code=status.HTTP_403_FORBIDDEN,
-                    detail=str(error),
-                )
+        with pytest.raises(AWSException) as exc_info:
+            amazon_q_client.create_or_update_auth_application(mock_request)
+
+        assert "AccessDeniedException" in str(exc_info.value)
+        assert "Access denied" in str(exc_info.value)
+
+    def test_send_event_validation_error(self, amazon_q_client: AmazonQClient) -> None:
+        """Tests parameter validation error handling."""
+        mock_request = Mock()
+        mock_request.payload.model_dump_json.return_value = '{"test": "data"}'
+        mock_request.code = "test_code"
+
+        # Configure mock to raise ParamValidationError
+        amazon_q_client.client.send_event.side_effect = ParamValidationError(
+            report="Invalid parameters"
+        )
+
+        with pytest.raises(HTTPException) as exc_info:
+            amazon_q_client.send_event(mock_request)
+
+        assert exc_info.value.status_code == 400
+        assert "Invalid parameters" in str(exc_info.value.detail)
+
+    @pytest.fixture
+    def mock_aws_credentials(self):
+        """Fixture for mock AWS credentials."""
+        return {
+            "AccessKeyId": "test_access_key",
+            "SecretAccessKey": "test_secret_key",
+            "SessionToken": "test_session_token",
+        }
+
+    def test_client_initialization(self, mock_aws_credentials):
+        """Tests client initialization with credentials."""
+        with patch("boto3.client") as mock_boto3_client:
+            client = AmazonQClient(
+                url="https://test-endpoint",
+                region="us-west-2",
+                credentials=mock_aws_credentials,
+            )
+
+            mock_boto3_client.assert_called_once_with(
+                "q",
+                region_name="us-west-2",
+                endpoint_url="https://test-endpoint",
+                aws_access_key_id="test_access_key",
+                aws_secret_access_key="test_secret_key",
+                aws_session_token="test_session_token",
+            )
