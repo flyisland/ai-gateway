@@ -48,7 +48,6 @@ class AmazonQClientFactory:
         current_user: StarletteUser,
     ):
         user_id = current_user.global_user_id
-        print("DEBUG-AmazonQClientFactory: user_id", user_id)
         if not user_id:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST, detail="User Id is missing"
@@ -138,29 +137,15 @@ class AmazonQClient:
             raise
 
     @raise_aws_errors
-    def send_chat_message(self, payload):
-
-        try:
-            return self._send_message(payload)
-        except ClientError as ex:
-            # if ex.__class__.__name__ == "AccessDeniedException":
-            #     return self._retry_send_message(ex, event_request.code, payload)
-
-            raise ex
-
-    @raise_aws_errors
-    def send_inline_code_message(self, payload):
-
-        try:
-            return self._generate_code_recommendations(payload)
-        except ClientError as ex:
-            # if ex.__class__.__name__ == "AccessDeniedException":
-            #     return self._retry_generate_code_recommendations(ex, event_request.code, payload)
-            raise ex
-
-    @raise_aws_errors
     def _create_o_auth_app_connection(self, **params):
         self.client.create_o_auth_app_connection(**params)
+
+    @raise_aws_errors
+    def generate_code_recommendations(self, payload):
+        return self.client.generate_code_recommendations(
+            fileContext=payload["fileContext"],
+            maxResults=payload["maxResults"],
+        )
 
     def _send_event(self, payload):
         self.client.send_event(
@@ -170,37 +155,7 @@ class AmazonQClient:
             event=payload,
         )
 
-    def _send_message(self, payload):
-        print("DEBUG [AmazonQClient]: _send_message payload", payload)
-        return self.client.send_message(
-            message=payload["message"],
-            conversationId=payload["conversation_id"],
-            # history=payload["history"]
-        )
-
-    def _generate_code_recommendations(self, payload):
-        print("DEBUG [AmazonQClient]: _generate_code_recommendations payload", payload)
-        return self.client.generate_code_recommendations(
-            fileContext=payload["fileContext"],
-            maxResults=payload["maxResults"],
-        )
-
     def _retry_send_event(self, error, code, payload):
-        self._is_retry(error, code)
-
-        return self._send_event(payload)
-
-    def _retry_send_message(self, error, code, payload):
-        self._is_retry(error, code)
-
-        return self._send_message(payload)
-
-    def _retry_generate_code_recommendations(self, error, code, payload):
-        self._is_retry(error, code)
-
-        return self._generate_code_recommendations(payload)
-
-    def _is_retry(self, error, code):
         match str(error.response.get("reason")):
             case AccessDeniedExceptionReason.GITLAB_EXPIRED_IDENTITY:
                 self.client.create_auth_grant(code=code)
@@ -211,3 +166,5 @@ class AmazonQClient:
                     status_code=status.HTTP_403_FORBIDDEN,
                     detail=str(error),
                 )
+
+        return self._send_event(payload)
