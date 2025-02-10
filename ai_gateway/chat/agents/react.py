@@ -20,10 +20,10 @@ from ai_gateway.chat.agents.typing import (
     TypeAgentEvent,
 )
 from ai_gateway.chat.tools.base import BaseTool
-from ai_gateway.feature_flags import FeatureFlag, is_feature_enabled
+from ai_gateway.feature_flags.context import FeatureFlag, is_feature_enabled
 from ai_gateway.models.base_chat import Role
 from ai_gateway.prompts import Prompt, jinja2_formatter
-from ai_gateway.prompts.typing import ModelMetadata
+from ai_gateway.prompts.typing import ModelMetadataType
 
 __all__ = [
     "ReActAgentInputs",
@@ -41,7 +41,7 @@ request_log = get_request_logger("react")
 class ReActAgentInputs(BaseModel):
     messages: list[Message]
     agent_scratchpad: Optional[list[AgentStep]] = None
-    model_metadata: Optional[ModelMetadata] = None
+    model_metadata: Optional[ModelMetadataType] = None
     unavailable_resources: Optional[list[str]] = None
     tools: Optional[list[BaseTool]] = None
     current_date: Optional[str] = None
@@ -165,6 +165,12 @@ class ReActPromptTemplate(Runnable[ReActAgentInputs, PromptValue]):
 
         for m in input.messages:
             if m.role is Role.USER:
+                print(
+                    "HumanMessage",
+                    HumanMessage(
+                        jinja2_formatter(self.prompt_template["user"], message=m)
+                    ),
+                )
                 messages.append(
                     HumanMessage(
                         jinja2_formatter(self.prompt_template["user"], message=m)
@@ -178,14 +184,16 @@ class ReActPromptTemplate(Runnable[ReActAgentInputs, PromptValue]):
         if not isinstance(messages[-1], HumanMessage):
             raise ValueError("Last message must be a human message")
 
-        messages.append(
-            AIMessage(
-                jinja2_formatter(
-                    self.prompt_template["assistant"],
-                    agent_scratchpad=input.agent_scratchpad,
+        if "assistant" in self.prompt_template:
+            messages.append(
+                AIMessage(
+                    jinja2_formatter(
+                        self.prompt_template["assistant"],
+                        agent_scratchpad=input.agent_scratchpad,
+                    )
                 )
             )
-        )
+
         return ChatPromptValue(messages=messages)
 
 

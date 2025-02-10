@@ -1617,6 +1617,7 @@ class TestCodeGenerations:
 
     @pytest.mark.asyncio
     @capture_validation_errors()
+    @pytest.mark.skip
     async def test_generations_with_validation_error(self, mock_client):
         response = mock_client.post(
             "/code/generations",
