@@ -15,6 +15,7 @@ from pydantic import BaseModel, HttpUrl
 from pyfakefs.fake_filesystem import FakeFilesystem
 
 from ai_gateway.api.auth_utils import StarletteUser
+from ai_gateway.integrations.amazon_q.chat import ChatAmazonQ
 from ai_gateway.prompts import LocalPromptRegistry, Prompt, PromptRegistered
 from ai_gateway.prompts.config import (
     ChatAnthropicParams,
@@ -23,11 +24,23 @@ from ai_gateway.prompts.config import (
     ModelConfig,
     PromptConfig,
 )
+from ai_gateway.prompts.config.models import ChatAmazonQParams
 from ai_gateway.prompts.typing import Model, ModelMetadata, TypeModelFactory
 
 
 class MockPromptClass(Prompt):
     pass
+
+
+def get_mock_amazon_q_client():
+    mock_client = Mock()
+    # Configure mock responses if needed
+    mock_client.invoke_model.return_value = {"body": Mock(), "statusCode": 200}
+    return mock_client
+
+
+# Make the mock factory available to your test configuration
+mock_amazon_q_client_factory = get_mock_amazon_q_client
 
 
 @pytest.fixture
@@ -131,16 +144,55 @@ params:
     - Bar
 """,
     )
+    fs.create_file(
+        prompts_definitions_dir / "chat" / "react" / "amazon_q.yml",
+        contents="""
+---
+name: Amazon Q React prompt
+model:
+  name: amazon_q
+  params:
+    model_class_provider: amazon_q
+    temperature: 0.1
+    top_p: 0.8
+    top_k: 40
+    max_tokens: 256
+    max_retries: 6
+unit_primitives:
+  - agent_quick_actions
+prompt_template:
+  system: Template1
+  user: Template2
+params:
+  timeout: 60
+  stop:
+    - Foo
+    - Bar
+""",
+    )
     yield fs
 
 
 @pytest.fixture
 def model_factories():
+    """Fixture to provide model factory functions."""
+    mock_amazon_q_client = Mock()
+
+    def create_amazon_q_model(model: str, **kwargs) -> ChatAmazonQ:
+        return ChatAmazonQ(
+            model=model, amazon_q_client_factory=lambda: mock_amazon_q_client, **kwargs
+        )
+
+    def create_anthropic_model(model: str, **kwargs) -> ChatAnthropic:
+        return ChatAnthropic(model=model, **kwargs)  # type: ignore[call-arg]
+
+    def create_litellm_model(model: str, **kwargs) -> ChatLiteLLM:
+        return ChatLiteLLM(model=model, **kwargs)
+
     yield {
-        ModelClassProvider.ANTHROPIC: lambda model, **kwargs: ChatAnthropic(model=model, **kwargs),  # type: ignore[call-arg]
-        ModelClassProvider.LITE_LLM: lambda model, **kwargs: ChatLiteLLM(
-            model=model, **kwargs
-        ),
+        ModelClassProvider.AMAZON_Q: create_amazon_q_model,
+        ModelClassProvider.ANTHROPIC: create_anthropic_model,
+        ModelClassProvider.LITE_LLM: create_litellm_model,
     }
 
 
@@ -210,6 +262,28 @@ def prompts_registered():
                 ),
             },
         ),
+        "chat/react": PromptRegistered(
+            klass=Prompt,
+            versions={
+                "amazon_q": PromptConfig(
+                    name="Amazon Q React prompt",
+                    model=ModelConfig(
+                        name="amazon_q",
+                        params=ChatAmazonQParams(
+                            model_class_provider=ModelClassProvider.AMAZON_Q,
+                            temperature=0.1,
+                            top_p=0.8,
+                            top_k=40,
+                            max_tokens=256,
+                            max_retries=6,
+                        ),
+                    ),
+                    unit_primitives=["agent_quick_actions"],
+                    prompt_template={"system": "Template1", "user": "Template2"},
+                    params={"timeout": 60, "stop": ["Foo", "Bar"]},
+                ),
+            },
+        ),
         "chat/react/custom": PromptRegistered(
             klass=MockPromptClass,
             versions={
@@ -229,9 +303,9 @@ def prompts_registered():
                     unit_primitives=["duo_chat"],
                     prompt_template={"system": "Template1", "user": "Template2"},
                     params={
+                        "vertex_location": "us-east1",
                         "timeout": 60,
                         "stop": ["Foo", "Bar"],
-                        "vertex_location": "us-east1",
                     },
                 ),
             },
@@ -445,11 +519,13 @@ class TestLocalPromptRegistry:
         expected_model: str,
         expected_kwargs: dict,
         expected_model_params: dict,
+        user: StarletteUser,
     ):
 
         prompt = registry.get(
             prompt_id,
             prompt_version=prompt_version,
+            user=user,
             model_metadata=model_metadata,
         )
 
@@ -501,11 +577,11 @@ class TestLocalPromptRegistry:
             ),
             (
                 "code_suggestions/generations",
-                "Claude 3 Code Generations Agent",
+                "Amazon Q Code Generations Agent",
                 Prompt,
-                "claude-3-5-sonnet-20240620",
+                "amazon_q",
                 "1.0.0",
-                ChatAnthropic,
+                ChatAmazonQ,
                 {"stop": ["</new_code>"]},
                 {},
             ),
@@ -523,6 +599,7 @@ class TestLocalPromptRegistry:
         expected_model_class: Type[Model],
         expected_kwargs: dict,
         default_prompt_env_config: dict[str, str],
+        user: StarletteUser,
     ):
         registry = LocalPromptRegistry.from_local_yaml(
             class_overrides={},
@@ -533,6 +610,7 @@ class TestLocalPromptRegistry:
         prompt = registry.get(
             prompt_id,
             prompt_version=expected_prompt_version,
+            user=user,
         )
         chain = cast(RunnableSequence, prompt.bound)
         binding = cast(RunnableBinding, chain.last)
@@ -630,6 +708,7 @@ class TestLocalPromptRegistry:
         model_factories: dict[ModelClassProvider, TypeModelFactory],
         prompts_registered: dict[str, PromptRegistered],
         internal_event_client: Mock,
+        user: StarletteUser,
     ):
         registry = LocalPromptRegistry.from_local_yaml(
             class_overrides={
@@ -641,13 +720,17 @@ class TestLocalPromptRegistry:
             custom_models_enabled=False,
         )
 
-        assert registry.get("chat/react", "^1.0.0").name == "Chat react custom prompt"
+        assert (
+            registry.get("chat/react", "^1.0.0", user).name
+            == "Chat react custom prompt"
+        )
 
     def test_get_prompt_config_no_compatible_versions(
         self,
         prompts_registered: dict[str, PromptRegistered],
         model_factories: dict[ModelClassProvider, TypeModelFactory],
         internal_event_client: Mock,
+        user: StarletteUser,
     ):
         # Create a registry with a prompt that has versions 1.0.0 and 1.0.1
         registry = LocalPromptRegistry(
@@ -699,7 +782,7 @@ class TestLocalPromptRegistry:
 
         # Try to get a version 2.0.0 which doesn't exist
         with pytest.raises(ValueError) as exc_info:
-            registry.get("test", "2.0.0")
+            registry.get("test", "2.0.0", user)
 
         assert (
             str(exc_info.value) == "No prompt version found matching the query: 2.0.0"
@@ -707,7 +790,10 @@ class TestLocalPromptRegistry:
 
     @pytest.mark.parametrize("custom_models_enabled", [False])
     def test_invalid_get(
-        self, registry: LocalPromptRegistry, custom_models_enabled: bool
+        self,
+        registry: LocalPromptRegistry,
+        custom_models_enabled: bool,
+        user: StarletteUser,
     ):
         model_metadata = ModelMetadata(
             name="custom",
@@ -720,13 +806,14 @@ class TestLocalPromptRegistry:
             ValueError,
             match="Endpoint override not allowed when custom models are disabled.",
         ):
-            registry.get("chat/react", "^1.0.0", model_metadata=model_metadata)
+            registry.get("chat/react", "^1.0.0", user, model_metadata=model_metadata)
 
     def test_load_prompt_without_unit_primitive(
         self,
         mock_fs: FakeFilesystem,
         model_factories,
         internal_event_client: Mock,
+        user: StarletteUser,
     ):
         registry = LocalPromptRegistry.from_local_yaml(
             class_overrides={},
@@ -762,12 +849,13 @@ class TestLocalPromptRegistry:
             }
         )
 
-        prompt = registry.get("test", "1.0.0")
+        prompt = registry.get("test", "1.0.0", user)
         assert prompt.unit_primitives == []
 
         prompt = registry.get(
             "test",
             "1.0.0",
+            user,
             ModelMetadata(
                 name="codestral",
                 endpoint=HttpUrl("http://localhost:4000/"),

@@ -14,7 +14,7 @@ from ai_gateway.chat.agents import (
 from ai_gateway.chat.base import BaseToolsRegistry
 from ai_gateway.chat.tools import BaseTool
 from ai_gateway.internal_events import InternalEventsClient
-from ai_gateway.prompts.typing import ModelMetadata
+from ai_gateway.prompts.typing import ModelMetadataType
 
 __all__ = [
     "TypeAgentFactory",
@@ -32,10 +32,11 @@ class TypeAgentFactory(Protocol[TypeAgentEvent]):
     def __call__(
         self,
         *,
-        model_metadata: ModelMetadata,
+        model_metadata: ModelMetadataType,
     ) -> Runnable[TypeAgentInputs, TypeAgentEvent]: ...
 
 
+# pylint: disable=attribute-defined-outside-init
 class GLAgentRemoteExecutor(Generic[TypeAgentInputs, TypeAgentEvent]):
     def __init__(
         self,
@@ -48,6 +49,7 @@ class GLAgentRemoteExecutor(Generic[TypeAgentInputs, TypeAgentEvent]):
         self.tools_registry = tools_registry
         self.internal_event_client = internal_event_client
         self._tools: list[BaseTool] | None = None
+        self._user: StarletteUser | None = None
 
     @property
     def tools(self) -> list[BaseTool]:
@@ -66,10 +68,13 @@ class GLAgentRemoteExecutor(Generic[TypeAgentInputs, TypeAgentEvent]):
         # Reason: https://github.com/tiangolo/fastapi/discussions/10138
         if not user.is_debug:
             self._tools = self.tools_registry.get_on_behalf(user, gl_version)
+        self._user = user
 
     async def stream(self, *, inputs: TypeAgentInputs) -> AsyncIterator[TypeAgentEvent]:
         inputs.tools = self.tools
-        agent: ReActAgent = self.agent_factory(model_metadata=inputs.model_metadata)
+        agent: ReActAgent = self.agent_factory(
+            user=self._user, model_metadata=inputs.model_metadata
+        )
 
         tools_by_name = self.tools_by_name
 
@@ -77,7 +82,7 @@ class GLAgentRemoteExecutor(Generic[TypeAgentInputs, TypeAgentEvent]):
             tools_by_name.keys()
         )
 
-        log.info("Processed inputs", source=__name__, inputs=inputs)
+        # log.info("Processed inputs", source=__name__, inputs=inputs)
 
         async for event in agent.astream(inputs):
             if isinstance(event, AgentToolAction):

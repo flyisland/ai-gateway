@@ -1,14 +1,14 @@
 ---
-name: Claude 3 Code Generations Agent
+name: Amazon Q Code Generations Agent
 model:
-  name: claude-3-5-sonnet-20240620
+  name: amazon_q
   params:
-    model_class_provider: anthropic
+    model_class_provider: amazon_q
     temperature: 0.2
     max_tokens: 2048
     max_retries: 1
 unit_primitives:
-  - generate_code
+  - amazon_q_integration
 prompt_template:
   system: |
     {% include 'code_suggestions/generations/jinja_template/dotcom/system.jinja' %}

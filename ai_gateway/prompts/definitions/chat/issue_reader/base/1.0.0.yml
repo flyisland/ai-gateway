@@ -1,14 +1,11 @@
 ---
-name: Claude 3 Issue reader agent
+name: Amazon Q Issue reader agent
 model:
-  name: claude-3-5-sonnet-20241022
+  name: amazon_q
   params:
-    model_class_provider: anthropic
-    temperature: 0.1
-    max_tokens: 2_048
-    max_retries: 1
+    model_class_provider: amazon_q
 unit_primitives:
-  - ask_issue
+  - amazon_q_integration
 prompt_template:
   system: |
     {% include 'chat/issue_reader/system.jinja' %}
