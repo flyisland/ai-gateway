@@ -122,20 +122,20 @@ class LocalPromptRegistry(BasePromptRegistry):
         prompts_registered = {}
 
         # Parse model config YAML files
-        for config_file in model_configs_dir.glob("*.yml"):
-            with open(config_file, "r") as fp:
-                model_configs[config_file.stem] = BaseModelConfig(**yaml.safe_load(fp))
+        model_configs = {
+            file.stem: cls._parse_base_model(file)
+            for file in model_configs_dir.glob("*.yml")
+        }
 
-        # raise Exception(model_configs)
         # Iterate over each folder
         for path in prompts_definitions_dir.glob("**"):
             versions = {}
 
             # Iterate over each version file
-            for version in path.glob("*.yml"):
-                versions[version.stem] = cls._process_version_file(
-                    version, model_configs
-                )
+            versions = {
+                version.stem: cls._process_version_file(version, model_configs)
+                for version in path.glob("*.yml")
+            }
 
             # If there were no yml files in this folder, skip it
             if not versions:
@@ -163,6 +163,25 @@ class LocalPromptRegistry(BasePromptRegistry):
             custom_models_enabled,
             disable_streaming,
         )
+
+    @classmethod
+    def _parse_base_model(cls, file_name: Path) -> BaseModelConfig:
+        """Parses a YAML file and converts its content to a BaseModelConfig object.
+
+        This method reads the specified YAML file, extracts the configuration
+        parameters, and constructs a BaseModelConfig object. It handles the
+        conversion of YAML data types to appropriate Python types.
+
+        Args:
+            file (Path): A Path object pointing to the YAML file to be parsed.
+
+        Returns:
+            BaseModelConfig: An instance of BaseModelConfig containing the
+            parsed configuration data.
+        """
+
+        with open(file_name, "r") as fp:
+            return BaseModelConfig(**yaml.safe_load(fp))
 
     @classmethod
     def _process_version_file(
