@@ -7,8 +7,8 @@ from starlette_context import context, request_cycle_context
 
 from ai_gateway.api.middleware import (
     X_GITLAB_CLIENT_NAME,
-    X_GITLAB_CLIENT_VERSION,
     X_GITLAB_CLIENT_TYPE,
+    X_GITLAB_CLIENT_VERSION,
     X_GITLAB_FEATURE_ENABLED_BY_NAMESPACE_IDS_HEADER,
     X_GITLAB_FEATURE_ENABLEMENT_TYPE_HEADER,
     X_GITLAB_GLOBAL_USER_ID_HEADER,
