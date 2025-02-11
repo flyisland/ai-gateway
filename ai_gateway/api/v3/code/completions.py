@@ -202,6 +202,21 @@ async def code_completion(
         snowplow_event_context=snowplow_event_context,
         **kwargs,
     )
+
+    if not suggestions:
+        return CompletionResponse(
+            choices=[],
+            metadata=ResponseMetadataBase(
+                timestamp=int(time()),
+                model=ModelMetadata(
+                    engine=payload.model_provider,
+                    name=payload.model_provider,
+                    lang=payload.language_identifier,
+                ),
+                enabled_feature_flags=current_feature_flag_context.get(),
+            ),
+        )
+
     if not isinstance(suggestions, list):
         suggestions = [suggestions]
 
@@ -321,36 +336,38 @@ async def code_generation(
         suffix=payload.content_below_cursor,
     )
 
+    current_time = int(time())
     # Handle empty or None suggestions
     if not suggestions:
         return CompletionResponse(
             choices=[],
-            metadata=ResponseMetadataBase(
-                timestamp=int(time()),
-                model=ModelMetadata(
-                    engine=engine.model.engine,
-                    name=engine.model.name,
-                    lang=engine.lang,
-                ),
-                enabled_feature_flags=current_feature_flag_context.get(),
+            metadata=_create_response_metadata(
+                engine.model, payload.language_identifier, current_time
             ),
         )
 
     if not isinstance(suggestions, list):
         suggestions = [suggestions]
 
+    # Handle streaming case
     if isinstance(suggestions[0], AsyncIterator):
         return await stream_handler(suggestions[0], engine)
 
     return CompletionResponse(
         choices=_completion_suggestion_choices(suggestions),
-        metadata=ResponseMetadataBase(
-            timestamp=int(time()),
-            model=ModelMetadata(
-                engine=suggestions[0].model.engine,
-                name=suggestions[0].model.name,
-                lang=suggestions[0].lang,
-            ),
-            enabled_feature_flags=current_feature_flag_context.get(),
+        metadata=_create_response_metadata(
+            suggestions[0].model, suggestions[0].lang, current_time
         ),
+    )
+
+
+def _create_response_metadata(model, lang, timestamp):
+    return ResponseMetadataBase(
+        timestamp=timestamp,
+        model=ModelMetadata(
+            engine=model.engine,
+            name=model.name,
+            lang=lang,
+        ),
+        enabled_feature_flags=current_feature_flag_context.get(),
     )

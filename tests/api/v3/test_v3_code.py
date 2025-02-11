@@ -1243,7 +1243,7 @@ class TestAmazonQIntegrationV3:
             ),
             # empty suggestions from model
             (
-                [""],
+                [],
                 "amazon_q",
                 "amazon_q",
                 {
