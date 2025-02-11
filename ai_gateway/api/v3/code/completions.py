@@ -131,7 +131,6 @@ async def code_suggestions(
             )
 
         return await code_completion(
-            request=request,
             payload=component.payload,
             current_user=current_user,
             code_context=code_context,
@@ -141,7 +140,6 @@ async def code_suggestions(
     if component.type == CodeEditorComponents.GENERATION:
         request_log.debug("[code_suggestions] starting code generation")
         return await code_generation(
-            request=request,
             current_user=current_user,
             payload=component.payload,
             code_context=code_context,
@@ -153,7 +151,6 @@ async def code_suggestions(
 
 @inject
 async def code_completion(
-    request: Request,
     payload: EditorContentCompletionPayload,
     current_user: StarletteUser,
     stream_handler: StreamHandler,
@@ -205,7 +202,6 @@ async def code_completion(
         snowplow_event_context=snowplow_event_context,
         **kwargs,
     )
-    request_log.debug("Code completion suggestions:", suggestions=suggestions)
     if not isinstance(suggestions, list):
         suggestions = [suggestions]
 
@@ -249,7 +245,6 @@ def _completion_suggestion_choices(suggestions: list) -> list:
 
 @inject
 async def code_generation(
-    request: Request,
     payload: EditorContentGenerationPayload,
     current_user: StarletteUser,
     prompt_registry: BasePromptRegistry,
@@ -269,7 +264,6 @@ async def code_generation(
     code_context: list[CodeContextPayload] = None,
     snowplow_event_context: Optional[SnowplowEventContext] = None,
 ):
-    request_log.debug("Executing code generation", payload=payload)
     model_provider = payload.model_provider
     if model_provider == KindModelProvider.AMAZON_Q:
         if not current_user.can(
@@ -326,7 +320,6 @@ async def code_generation(
         prompt_enhancer=payload.prompt_enhancer,
         suffix=payload.content_below_cursor,
     )
-    request_log.debug("Code generation suggestions", suggestions=suggestions)
 
     # Handle empty or None suggestions
     if not suggestions:
