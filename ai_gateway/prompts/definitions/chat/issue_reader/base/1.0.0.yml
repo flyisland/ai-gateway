@@ -11,7 +11,5 @@ prompt_template:
     {% include 'chat/issue_reader/system.jinja' %}
   user: |
     {% include 'chat/issue_reader/user.jinja' %}
-  assistant: |
-    {% include 'chat/issue_reader/assistant.jinja' %}
 params:
   timeout: 60

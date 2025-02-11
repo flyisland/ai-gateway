@@ -11,7 +11,5 @@ prompt_template:
     {% include 'chat/merge_request_reader/system.jinja' %}
   user: |
     {% include 'chat/merge_request_reader/user.jinja' %}
-  assistant: |
-    {% include 'chat/merge_request_reader/assistant.jinja' %}
 params:
   timeout: 60
