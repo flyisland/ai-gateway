@@ -18,9 +18,6 @@
     "tle_gitlab"
   ],
   "ignoreDeps": ["errata-ai/vale", "DavidAnson/markdownlint-cli2", "node", "ruby"],
-  "constraints": {
-    "isort": "5.13.2"
-  },
   "packageRules": [
     {
       "matchPackageNames": ["isort"],
