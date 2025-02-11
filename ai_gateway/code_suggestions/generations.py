@@ -144,24 +144,21 @@ class CodeGenerations:
                     res = await self.model.generate(
                         prompt.prefix, "", stream=stream, **kwargs
                     )
-                # Early return if response is empty
-                if not res:
-                    return []
+                if res:
+                    # Handle streaming response
+                    if isinstance(res, AsyncIterator):
+                        return self._handle_stream(res, snowplow_event_context)
 
-                # Handle streaming response
-                if isinstance(res, AsyncIterator):
-                    return self._handle_stream(res, snowplow_event_context)
-
-                # Handle synchronous response
-                responses = res if isinstance(res, list) else [res]
-                return await self._handle_sync(
-                    responses=responses,
-                    lang_id=lang_id,
-                    model_provider=model_provider,
-                    prefix=prefix,
-                    watch_container=watch_container,
-                    snowplow_event_context=snowplow_event_context,
-                )
+                    # Handle synchronous response
+                    responses = res if isinstance(res, list) else [res]
+                    return await self._handle_sync(
+                        responses=responses,
+                        lang_id=lang_id,
+                        model_provider=model_provider,
+                        prefix=prefix,
+                        watch_container=watch_container,
+                        snowplow_event_context=snowplow_event_context,
+                    )
 
             except ModelAPICallError as ex:
                 watch_container.register_model_exception(str(ex), ex.code)
@@ -171,9 +168,11 @@ class CodeGenerations:
                 watch_container.register_model_exception(str(ex), -1)
                 raise
 
-        return CodeSuggestionsOutput(
-            text="", score=0, model=self.model.metadata, lang_id=lang_id
-        )
+        return [
+            CodeSuggestionsOutput(
+                text="", score=0, model=self.model.metadata, lang_id=lang_id
+            )
+        ]
 
     async def _handle_stream(
         self,

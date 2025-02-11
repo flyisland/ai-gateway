@@ -213,18 +213,17 @@ class CodeCompletions:
                         prompt.prefix, prompt.suffix, stream, **kwargs
                     )
 
-                # Early return if response is empty
-                if not res:
-                    return []
+                if res:
+                    # Handle streaming response
+                    if isinstance(res, AsyncIterator):
+                        return self._handle_stream(res)
 
-                # Handle streaming response
-                if isinstance(res, AsyncIterator):
-                    return self._handle_stream(res)
+                    # Handle synchronous response
+                    res = res if isinstance(res, list) else [res]
 
-                # Handle synchronous response
-                res = res if isinstance(res, list) else [res]
-
-                return await self._handle_sync(prompt, res, lang_id, watch_container)
+                    return await self._handle_sync(
+                        prompt, res, lang_id, watch_container
+                    )
             except ModelAPICallError as ex:
                 watch_container.register_model_exception(str(ex), ex.code)
                 raise
@@ -233,18 +232,20 @@ class CodeCompletions:
                 watch_container.register_model_exception(str(ex), -1)
                 raise
 
-        return CodeSuggestionsOutput(
-            text="",
-            score=0,
-            model=self.model.metadata,
-            lang_id=lang_id,
-            metadata=CodeSuggestionsOutput.Metadata(
-                experiments=[],
-                tokens_consumption_metadata=self._get_tokens_consumption_metadata(
-                    prompt
+        return [
+            CodeSuggestionsOutput(
+                text="",
+                score=0,
+                model=self.model.metadata,
+                lang_id=lang_id,
+                metadata=CodeSuggestionsOutput.Metadata(
+                    experiments=[],
+                    tokens_consumption_metadata=self._get_tokens_consumption_metadata(
+                        prompt
+                    ),
                 ),
-            ),
-        )
+            )
+        ]
 
     async def _handle_stream(
         self, response: AsyncIterator[TextGenModelChunk]
