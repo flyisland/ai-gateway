@@ -116,9 +116,10 @@ class LocalPromptRegistry(BasePromptRegistry):
         """
 
         base_path = Path(__file__).parent
-        prompts_definitions_dir =  base_path / "definitions"
-        model_configs_dir = base_path  / "model_configs" # New directory for model configs
-        model_configs = {}  # New dictionary to store model configs
+        prompts_definitions_dir = base_path / "definitions"
+        model_configs_dir = (
+            base_path / "model_configs"
+        )  # New directory for model configs
         prompts_registered = {}
 
         # Parse model config YAML files
@@ -129,8 +130,6 @@ class LocalPromptRegistry(BasePromptRegistry):
 
         # Iterate over each folder
         for path in prompts_definitions_dir.glob("**"):
-            versions = {}
-
             # Iterate over each version file
             versions = {
                 version.stem: cls._process_version_file(version, model_configs)
