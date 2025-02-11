@@ -166,9 +166,7 @@ class AmazonQClient:
     def _send_message(self, payload):
         print("DEBUG [AmazonQClient]: _send_message payload", payload)
         return self.client.send_message(
-            message=payload["message"],
-            conversationId=payload["conversation_id"],
-            history=payload["history"],
+            message=payload["message"], conversationId=payload["conversation_id"]
         )
 
     def _retry_send_event(self, error, code, payload):
