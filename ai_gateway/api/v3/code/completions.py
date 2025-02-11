@@ -120,6 +120,7 @@ async def code_suggestions(
         region=config.google_cloud_platform.location(),
     )
     if component.type == CodeEditorComponents.COMPLETION:
+        request_log.debug("[code_suggestions] starting code completion")
         if not current_user.can(
             GitLabUnitPrimitive.COMPLETE_CODE,
             disallowed_issuers=[CloudConnectorConfig().service_name],
@@ -137,6 +138,7 @@ async def code_suggestions(
             snowplow_event_context=snowplow_code_suggestion_context,
         )
     if component.type == CodeEditorComponents.GENERATION:
+        request_log.debug("[code_suggestions] starting code generation")
         return await code_generation(
             current_user=current_user,
             payload=component.payload,
@@ -200,6 +202,21 @@ async def code_completion(
         snowplow_event_context=snowplow_event_context,
         **kwargs,
     )
+
+    if not suggestions:
+        return CompletionResponse(
+            choices=[],
+            metadata=ResponseMetadataBase(
+                timestamp=int(time()),
+                model=ModelMetadata(
+                    engine=payload.model_provider,
+                    name=payload.model_provider,
+                    lang=payload.language_identifier,
+                ),
+                enabled_feature_flags=current_feature_flag_context.get(),
+            ),
+        )
+
     if not isinstance(suggestions, list):
         suggestions = [suggestions]
 
@@ -227,7 +244,7 @@ def _completion_suggestion_choices(suggestions: list) -> list:
     choices = []
     for suggestion in suggestions:
         request_log.debug(
-            "code completion suggestion:",
+            "code suggestion:",
             suggestion=suggestion,
             score=suggestion.score,
             language=suggestion.lang,
@@ -308,7 +325,7 @@ async def code_generation(
         if payload.prompt:
             engine.with_prompt_prepared(payload.prompt)
 
-    suggestion = await engine.execute(
+    suggestions = await engine.execute(
         prefix=payload.content_above_cursor,
         file_name=payload.file_name,
         editor_lang=payload.language_identifier,
@@ -318,22 +335,39 @@ async def code_generation(
         prompt_enhancer=payload.prompt_enhancer,
         suffix=payload.content_below_cursor,
     )
-    if isinstance(suggestion, AsyncIterator):
-        return await stream_handler(suggestion, engine)
 
-    choices = (
-        [CompletionResponse.Choice(text=suggestion.text)] if suggestion.text else []
-    )
+    current_time = int(time())
+    # Handle empty or None suggestions
+    if not suggestions:
+        return CompletionResponse(
+            choices=[],
+            metadata=_create_response_metadata(
+                engine.model, payload.language_identifier, current_time
+            ),
+        )
+
+    if not isinstance(suggestions, list):
+        suggestions = [suggestions]
+
+    # Handle streaming case
+    if isinstance(suggestions[0], AsyncIterator):
+        return await stream_handler(suggestions[0], engine)
 
     return CompletionResponse(
-        choices=choices,
-        metadata=ResponseMetadataBase(
-            timestamp=int(time()),
-            model=ModelMetadata(
-                engine=suggestion.model.engine,
-                name=suggestion.model.name,
-                lang=suggestion.lang,
-            ),
-            enabled_feature_flags=current_feature_flag_context.get(),
+        choices=_completion_suggestion_choices(suggestions),
+        metadata=_create_response_metadata(
+            suggestions[0].model, suggestions[0].lang, current_time
         ),
+    )
+
+
+def _create_response_metadata(model, lang, timestamp):
+    return ResponseMetadataBase(
+        timestamp=timestamp,
+        model=ModelMetadata(
+            engine=model.engine,
+            name=model.name,
+            lang=lang,
+        ),
+        enabled_feature_flags=current_feature_flag_context.get(),
     )

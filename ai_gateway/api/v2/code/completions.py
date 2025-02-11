@@ -143,46 +143,71 @@ async def completions(
             region=config.google_cloud_platform.location(),
         )
         snowplow_instrumentator.watch(SnowplowEvent(context=snowplow_event_context))
+
+        request_log.info(
+            "code completion input:",
+            model_name=payload.model_name,
+            model_provider=payload.model_provider,
+            prompt=payload.prompt if hasattr(payload, "prompt") else None,
+            prefix=payload.current_file.content_above_cursor,
+            suffix=payload.current_file.content_below_cursor,
+            current_file_name=payload.current_file.file_name,
+            stream=payload.stream,
+        )
+
+        suggestions = await _execute_code_completion(
+            payload=payload,
+            code_completions=code_completions,
+            snowplow_event_context=snowplow_event_context,
+            **kwargs,
+        )
+
+        # Handle empty or none suggestion
+        if not suggestions:
+            return SuggestionsResponse(
+                id="id",
+                created=int(time()),
+                model=SuggestionsResponse.Model(
+                    engine=payload.model_name,
+                    name=payload.model_name,
+                    lang=language_name,
+                    region=config.google_cloud_platform.location(),
+                ),
+                experiments=[],
+                metadata=SuggestionsResponse.MetadataBase(
+                    enabled_feature_flags=current_feature_flag_context.get(),
+                ),
+                choices=[],
+            )
+
+        if not isinstance(suggestions, list):
+            suggestions = [suggestions]
+
+        if isinstance(suggestions[0], AsyncIterator):
+            return await _handle_stream(suggestions[0])
+
+        choices, tokens_consumption_metadata = _completion_suggestion_choices(
+            suggestions
+        )
+        return SuggestionsResponse(
+            id="id",
+            created=int(time()),
+            model=SuggestionsResponse.Model(
+                engine=suggestions[0].model.engine,
+                name=suggestions[0].model.name,
+                lang=suggestions[0].lang,
+                tokens_consumption_metadata=tokens_consumption_metadata,
+                region=config.google_cloud_platform.location(),
+            ),
+            experiments=suggestions[0].metadata.experiments,
+            metadata=SuggestionsResponse.MetadataBase(
+                enabled_feature_flags=current_feature_flag_context.get(),
+            ),
+            choices=choices,
+        )
     except Exception as e:
         log_exception(e)
-
-    request_log.info(
-        "code completion input:",
-        model_name=payload.model_name,
-        model_provider=payload.model_provider,
-        prompt=payload.prompt if hasattr(payload, "prompt") else None,
-        prefix=payload.current_file.content_above_cursor,
-        suffix=payload.current_file.content_below_cursor,
-        current_file_name=payload.current_file.file_name,
-        stream=payload.stream,
-    )
-
-    suggestions = await _execute_code_completion(
-        payload=payload,
-        code_completions=code_completions,
-        snowplow_event_context=snowplow_event_context,
-        **kwargs,
-    )
-
-    if isinstance(suggestions[0], AsyncIterator):
-        return await _handle_stream(suggestions[0])
-    choices, tokens_consumption_metadata = _completion_suggestion_choices(suggestions)
-    return SuggestionsResponse(
-        id="id",
-        created=int(time()),
-        model=SuggestionsResponse.Model(
-            engine=suggestions[0].model.engine,
-            name=suggestions[0].model.name,
-            lang=suggestions[0].lang,
-            tokens_consumption_metadata=tokens_consumption_metadata,
-            region=config.google_cloud_platform.location(),
-        ),
-        experiments=suggestions[0].metadata.experiments,
-        metadata=SuggestionsResponse.MetadataBase(
-            enabled_feature_flags=current_feature_flag_context.get(),
-        ),
-        choices=choices,
-    )
+        raise e
 
 
 @router.post("/code/generations")
@@ -266,7 +291,7 @@ async def generations(
         code_generations.with_prompt_prepared(payload.prompt)
 
     with TelemetryInstrumentator().watch(payload.telemetry):
-        suggestion = await code_generations.execute(
+        suggestions = await code_generations.execute(
             prefix=payload.current_file.content_above_cursor,
             file_name=payload.current_file.file_name,
             editor_lang=payload.current_file.language_identifier,
@@ -275,6 +300,8 @@ async def generations(
             snowplow_event_context=snowplow_event_context,
         )
 
+    # Handle first suggestion for now
+    suggestion = suggestions[0] if isinstance(suggestions, list) else suggestions
     if isinstance(suggestion, AsyncIterator):
         return await _handle_stream(suggestion)
 
@@ -589,6 +616,4 @@ async def _execute_code_completion(
             **kwargs,
         )
 
-    if isinstance(code_completions, CodeCompletions):
-        return [output]
     return output

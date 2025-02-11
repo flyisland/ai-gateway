@@ -36,6 +36,7 @@ from ai_gateway.prompts.config.base import ModelConfig, PromptConfig, PromptPara
 from ai_gateway.prompts.config.models import ChatLiteLLMParams, TypeModelParams
 from ai_gateway.prompts.typing import Model, TypeModelFactory
 from ai_gateway.safety_attributes import SafetyAttributes
+from ai_gateway.api.v3.code.typing import ModelMetadata as ModelMetadataV3
 
 pytest_plugins = ("pytest_asyncio",)
 
@@ -303,6 +304,37 @@ def mock_suggestions_output(
 
 
 @pytest.fixture
+def mock_completions_amazonq(mock_completions_amazonq_output: list[TextGenModelOutput]):
+    with patch(
+        "ai_gateway.code_suggestions.CodeCompletions.execute",
+        return_value=mock_completions_amazonq_output,
+    ) as mock:
+        yield mock
+
+
+@pytest.fixture
+def mock_completions_amazonq_output(
+    mock_completions_amazonq_output_texts: list[str],
+    mock_suggestions_model: str,
+    mock_suggestions_engine: str,
+):
+    output = []
+    for output_txt in mock_completions_amazonq_output_texts:
+        output.append(
+            CodeSuggestionsOutput(
+                text=output_txt,
+                score=0,
+                model=ModelMetadata(
+                    name=mock_suggestions_model, engine=mock_suggestions_engine
+                ),
+                lang_id=LanguageId.PYTHON,
+                metadata=CodeSuggestionsOutput.Metadata(experiments=[]),
+            )
+        )
+    yield output
+
+
+@pytest.fixture
 def mock_completions_legacy(mock_completions_legacy_output: list[ModelEngineOutput]):
     with patch(
         "ai_gateway.code_suggestions.CodeCompletionsLegacy.execute",
@@ -313,7 +345,7 @@ def mock_completions_legacy(mock_completions_legacy_output: list[ModelEngineOutp
 
 @contextmanager
 def _mock_execute(klass: str, mock_suggestions_output: CodeSuggestionsOutput):
-    with patch(f"{klass}.execute", return_value=mock_suggestions_output) as mock:
+    with patch(f"{klass}.execute", return_value=[mock_suggestions_output]) as mock:
         yield mock
 
 
@@ -378,8 +410,10 @@ def mock_litellm_acompletion():
                 ),
             ],
             _hidden_params={
-                "original_response": {"choices": [{"logprobs": AsyncMock(token_logprobs=[999])}]}
-                },
+                "original_response": {
+                    "choices": [{"logprobs": AsyncMock(token_logprobs=[999])}]
+                }
+            },
             usage=AsyncMock(completion_tokens=999),
         )
 

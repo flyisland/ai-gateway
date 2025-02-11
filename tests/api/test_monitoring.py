@@ -82,7 +82,7 @@ def test_ready(
     assert mock_llm_text.mock_calls == [call("def hello_world():", None, False)]
 
     # Assert the attributes of the mock code generations object
-    assert mock_generations.return_value.model.name == "claude-3-haiku-20240307"
+    assert mock_generations.return_value[0].model.name == "claude-3-haiku-20240307"
 
 
 def model_failure(*args, **kwargs):
@@ -143,7 +143,7 @@ def test_ready_anthropic_failure(
     ]
 
     # Assert the attributes of the mock code generations object
-    assert mock_generations.return_value.model.name == "claude-3-haiku-20240307"
+    assert mock_generations.return_value[0].model.name == "claude-3-haiku-20240307"
 
     assert response.status_code == 503
 
