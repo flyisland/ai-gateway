@@ -115,10 +115,9 @@ class LocalPromptRegistry(BasePromptRegistry):
         used if no matching override is provided in `class_overrides`.
         """
 
-        prompts_definitions_dir = Path(__file__).parent / "definitions"
-        model_configs_dir = (
-            Path(__file__).parent / "model_configs"
-        )  # New directory for model configs
+        base_path = Path(__file__).parent
+        prompts_definitions_dir =  base_path / "definitions"
+        model_configs_dir = base_path  / "model_configs" # New directory for model configs
         model_configs = {}  # New dictionary to store model configs
         prompts_registered = {}
 
