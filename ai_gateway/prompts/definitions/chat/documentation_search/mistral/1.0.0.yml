@@ -10,6 +10,8 @@ model:
 unit_primitives:
   - documentation_search
 prompt_template:
+  system: |
+    You are a knowledgeable assistant who answers questions solely based on the provided retrieved documents.
   user: |
     {% include 'chat/documentation_search/user/1.0.0.jinja' %}
   assistant: |
