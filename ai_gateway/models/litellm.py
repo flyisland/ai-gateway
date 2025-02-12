@@ -229,6 +229,21 @@ class LiteLlmChatModel(ChatModelBase):
                 if hasattr(suggestion, "usage")
                 else 0
             ),
+            input_tokens=(
+                suggestion.usage.prompt_tokens - (suggestion.usage.cache_read_input_tokens or 0) - (suggestion.usage.cache_creation_input_tokens or 0)
+                if hasattr(suggestion, "usage")
+                else 0
+            ),
+            cached_tokens=(
+                suggestion.usage.prompt_token_details
+                if hasattr(suggestion, "usage") and hasattr(suggestion.usage, "cache_creation_input_tokens")
+                else 0
+            ),
+            cache_read_input_tokens=(
+                suggestion.usage.cache_read_input_tokens
+                if hasattr(suggestion, "usage") and hasattr(suggestion.usage, "cache_read_input_tokens")
+                else 0
+            ),
         )
 
     @classmethod
@@ -444,6 +459,16 @@ class LiteLlmTextGenModel(TextGenModelBase):
         return TokensConsumptionMetadata(
             output_tokens=(
                 suggestion.usage.completion_tokens
+                if hasattr(suggestion, "usage")
+                else 0
+            ),
+            cached_tokens=(
+                suggestion.usage.prompt_tokens_details.cached_tokens
+                if hasattr(suggestion, "usage") and hasattr(suggestion.usage.prompt_tokens_details, "cached_tokens")
+                else 0
+            ),
+            cache_creation_input_tokens=(
+                suggestion.usage.cache_creation_input_tokens
                 if hasattr(suggestion, "usage")
                 else 0
             ),
