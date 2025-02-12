@@ -201,11 +201,12 @@ class CodeCompletions:
                         prompt.prefix, stream=stream, **kwargs
                     )
                 elif isinstance(self.model, AmazonQModel):
+                    lang = editor_lang.lower() if editor_lang else lang_id.name.lower()
                     res = await self.model.generate(
                         prompt.prefix,
                         prompt.suffix,
                         file_name,
-                        lang_id.name.lower(),
+                        lang,
                         **kwargs,
                     )
                 else:
