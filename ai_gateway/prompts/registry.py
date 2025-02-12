@@ -200,15 +200,28 @@ class LocalPromptRegistry(BasePromptRegistry):
             prompt_config_params = yaml.safe_load(fp)
             general_model_name = prompt_config_params["model"]["name"]
             config_for_general_model = model_configs.get(general_model_name, None)
+
             if config_for_general_model:
-                prompt_config_params["model"].update(
-                    {
-                        "name": config_for_general_model.name,
-                        "params": {
-                            **(config_for_general_model.params.model_dump() or {}),
-                            **prompt_config_params["model"]["params"],
-                        },
-                    }
+                prompt_config_params = cls._patch_model_configuration(
+                    config_for_general_model, prompt_config_params
                 )
 
-        return PromptConfig(**prompt_config_params)
+            return PromptConfig(**prompt_config_params)
+
+    @classmethod
+    def _patch_model_configuration(
+        cls, config_for_general_model: BaseModelConfig, prompt_config_params: dict
+    ) -> dict:
+        params = {
+            **config_for_general_model.params.model_dump(),
+            **prompt_config_params["model"]["params"],
+        }
+
+        return {
+            **prompt_config_params,
+            "model": {
+                **prompt_config_params["model"],
+                "name": config_for_general_model.name,
+                "params": params,
+            },
+        }
