@@ -98,7 +98,6 @@ class MessageProcessor:
             List[BaseMessage]: Processed copy of messages with system messages handled
         """
         messages_copy = messages.copy()
-        print("messages_copy", messages_copy)
         self._handle_system_message(messages_copy)
         return messages_copy
 
@@ -116,14 +115,13 @@ class MessageProcessor:
         """
         if messages and isinstance(messages[0], SystemMessage):
             system_message = messages.pop(0)
-            print("system_message", system_message)
             print(
                 "messages and system_message.content is not None",
                 messages and system_message.content is not None,
             )
             if messages and system_message.content is not None:
                 # Create new content by concatenating strings
-                new_content = f"{system_message.content}\n{messages[0].content}"
+                new_content = f"{messages[0].content}"
                 messages[0].content = new_content
 
     def _extract_content(self, messages: List[BaseMessage]) -> str:
