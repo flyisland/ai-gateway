@@ -140,6 +140,7 @@ name: claude-2.1
 params:
   temperature: 0.9
   max_tokens: 200
+  model_class_provider: test
 """,
     )
     yield fs

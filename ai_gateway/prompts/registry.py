@@ -215,7 +215,7 @@ class LocalPromptRegistry(BasePromptRegistry):
     ) -> dict:
         params = {
             **config_for_general_model.params.model_dump(),
-            **prompt_config_params["model"]["params"],
+            **prompt_config_params["model"].get("params", {}),
         }
 
         return {
