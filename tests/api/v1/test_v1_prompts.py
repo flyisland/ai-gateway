@@ -1,5 +1,5 @@
 from typing import Any, List, Optional, Type
-from unittest.mock import patch
+from unittest.mock import ANY, patch
 
 import pytest
 from fastapi import HTTPException
@@ -9,11 +9,12 @@ from langchain_core.language_models.chat_models import SimpleChatModel
 from langchain_core.messages import BaseMessage
 from pydantic import AnyUrl
 
+from ai_gateway.api.auth_utils import StarletteUser
 from ai_gateway.api.v1 import api_router
 from ai_gateway.config import Config
 from ai_gateway.prompts import Prompt
 from ai_gateway.prompts.config.base import PromptConfig
-from ai_gateway.prompts.typing import ModelMetadata, TypeModelFactory
+from ai_gateway.prompts.typing import ModelMetadata, TypeModelFactory, TypeModelMetadata
 
 
 class FakeModel(SimpleChatModel):
@@ -118,7 +119,12 @@ class TestPrompt:
                 {"name": "John", "age": 20},
                 None,
                 None,
-                ("test", "^1.0.0", None),
+                (
+                    "test",
+                    "^1.0.0",
+                    ANY,
+                    None,
+                ),
                 200,
                 "Hi John!",
                 ["1.0.0"],
@@ -128,7 +134,12 @@ class TestPrompt:
                 {"name": "John", "age": 20},
                 "^2.0.0",
                 None,
-                ("test", "^2.0.0", None),
+                (
+                    "test",
+                    "^2.0.0",
+                    ANY,
+                    None,
+                ),
                 200,
                 "Hi John!",
                 ["2.0.0"],
@@ -146,6 +157,7 @@ class TestPrompt:
                 (
                     "test",
                     "^1.0.0",
+                    ANY,
                     ModelMetadata(
                         name="mistral",
                         provider="litellm",
@@ -162,7 +174,12 @@ class TestPrompt:
                 {"name": "John", "age": 20},
                 "^2.0.0",
                 None,
-                ("test", "^2.0.0", None),
+                (
+                    "test",
+                    "^2.0.0",
+                    ANY,
+                    None,
+                ),
                 400,
                 {"detail": "No prompt version found matching the query"},
                 [],
@@ -172,7 +189,12 @@ class TestPrompt:
                 {"name": "John", "age": 20},
                 None,
                 None,
-                ("test", "^1.0.0", None),
+                (
+                    "test",
+                    "^1.0.0",
+                    ANY,
+                    None,
+                ),
                 404,
                 {"detail": "Prompt 'test' not found"},
                 None,
@@ -182,7 +204,12 @@ class TestPrompt:
                 {"name": "John"},
                 None,
                 None,
-                ("test", "^1.0.0", None),
+                (
+                    "test",
+                    "^1.0.0",
+                    ANY,
+                    None,
+                ),
                 422,
                 {
                     "detail": "\"Input to ChatPromptTemplate is missing variables {'age'}.  Expected: ['age', 'name'] Received: ['name']"
@@ -199,7 +226,7 @@ class TestPrompt:
         mock_track_internal_event,
         inputs: dict[str, str],
         prompt_version: Optional[str],
-        model_metadata: Optional[ModelMetadata],
+        model_metadata: Optional[TypeModelMetadata],
         expected_get_args: dict,
         expected_status: int,
         expected_response: Any,
@@ -242,6 +269,7 @@ class TestPrompt:
         self,
         mock_client,
         mock_registry_get,
+        user: StarletteUser,
     ):
         response = mock_client.post(
             "/prompts/test",
@@ -256,7 +284,7 @@ class TestPrompt:
             },
         )
 
-        mock_registry_get.assert_called_with("test", "^2.0.0", None)
+        mock_registry_get.assert_called_with("test", "^2.0.0", ANY, None)
         assert response.status_code == 200
         assert response.text == "Hi John!"
         assert response.headers["content-type"] == "text/event-stream; charset=utf-8"
@@ -311,6 +339,6 @@ class TestMisdirectedRequest:
                 and model_metadata.model_dump(mode="json"),
             },
         )
-        mock_registry_get.assert_called_with("test", "^1.0.0", model_metadata)
+        mock_registry_get.assert_called_with("test", "^1.0.0", ANY, model_metadata)
         assert response.status_code == 421
         assert response.json() == {"detail": "401: Unauthorized"}

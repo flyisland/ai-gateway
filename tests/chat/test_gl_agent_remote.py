@@ -1,4 +1,4 @@
-from unittest.mock import AsyncMock, Mock, call
+from unittest.mock import ANY, AsyncMock, Mock, call
 
 import pytest
 from gitlab_cloud_connector import CloudConnectorUser, UserClaims
@@ -126,7 +126,9 @@ class TestGLAgentRemoteExecutor:
             else:
                 assert context.get("duo_chat.agent_available_tools") == ["issue_reader"]
 
-        agent_factory.assert_called_once_with(model_metadata=inputs.model_metadata)
+        agent_factory.assert_called_once_with(
+            user=ANY, model_metadata=inputs.model_metadata
+        )
         agent.astream.assert_called_once_with(inputs)
         assert actual_actions == agent_events
 

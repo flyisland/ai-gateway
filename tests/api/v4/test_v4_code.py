@@ -130,10 +130,10 @@ class TestEditorContentGenerationStream:
             (
                 "code_suggestions/generations",
                 None,
-                "^1.0.0",
+                "1.0.0",
                 {
                     "engine": "agent",
-                    "name": "Claude 3 Code Generations Agent",
+                    "name": "Amazon Q Code Generations Agent",
                 },
                 {"flag_a", "flag_b"},
             ),

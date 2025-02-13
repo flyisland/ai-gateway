@@ -137,6 +137,14 @@ class AmazonQClient:
             raise
 
     @raise_aws_errors
+    def send_chat_message(self, payload):
+        return self.client.send_message(
+            message=payload["message"],
+            conversationId=payload["conversation_id"],
+            history=payload["history"],
+        )
+
+    @raise_aws_errors
     def _create_o_auth_app_connection(self, **params):
         self.client.create_o_auth_app_connection(**params)
 

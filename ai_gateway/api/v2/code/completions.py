@@ -60,7 +60,7 @@ from ai_gateway.internal_events import InternalEventsClient
 from ai_gateway.models import KindAnthropicModel, KindModelProvider
 from ai_gateway.models.base import TokensConsumptionMetadata
 from ai_gateway.prompts import BasePromptRegistry
-from ai_gateway.prompts.typing import ModelMetadata
+from ai_gateway.prompts.typing import ModelMetadata, TypeModelMetadata
 from ai_gateway.structured_logging import get_request_logger
 from ai_gateway.tracking import SnowplowEvent, SnowplowEventContext
 from ai_gateway.tracking.errors import log_exception
@@ -503,7 +503,7 @@ def _build_code_completions(
 
 
 def _resolve_agent_code_completions(
-    model_metadata: ModelMetadata,
+    model_metadata: TypeModelMetadata,
     current_user: StarletteUser,
     prompt_registry: BasePromptRegistry,
     completions_agent_factory: Factory[CodeCompletions],

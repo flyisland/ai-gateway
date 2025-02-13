@@ -26,7 +26,12 @@ from ai_gateway.chat.agents.typing import AgentFinalAnswer, TypeAgentEvent
 from ai_gateway.chat.context.current_page import Context, MergeRequestContext
 from ai_gateway.config import Config
 from ai_gateway.models.base_chat import Role
-from ai_gateway.prompts.typing import Model, ModelMetadata
+from ai_gateway.prompts.typing import (
+    AmazonQModelMetadata,
+    Model,
+    ModelMetadata,
+    TypeModelMetadata,
+)
 
 
 @pytest.fixture(scope="class")
@@ -47,7 +52,7 @@ def mock_date(mocker):
 def auth_user():
     return CloudConnectorUser(
         authenticated=True,
-        claims=UserClaims(scopes=["duo_chat"]),
+        claims=UserClaims(scopes=["duo_chat", "agent_quick_actions"]),
     )
 
 
@@ -162,6 +167,23 @@ class TestReActAgentStream:
                         api_key="token",
                     ),
                     unavailable_resources=["Mystery Resource 1", "Mystery Resource 2"],
+                ),
+                "thought\nFinal Answer: answer\n",
+                [AgentFinalAnswer(text=c) for c in "answer"],
+            ),
+            (
+                AgentRequest(
+                    messages=[
+                        Message(
+                            role=Role.USER,
+                            content="How can I write hello world in python?",
+                        ),
+                    ],
+                    model_metadata=AmazonQModelMetadata(
+                        name="amazon_q",
+                        provider="amazon_q",
+                        role_arn="arn:aws:iam::123456789112:role/GitLabDuoRole",
+                    ),
                 ),
                 "thought\nFinal Answer: answer\n",
                 [AgentFinalAnswer(text=c) for c in "answer"],
@@ -291,7 +313,7 @@ class TestReActAgentStream:
         agent_options: AgentRequestOptions,
         actions: list[TypeAgentEvent],
         expected_actions: list[TypeAgentEvent],
-        model_metadata: ModelMetadata,
+        model_metadata: TypeModelMetadata,
         unavailable_resources: list[str],
         mock_date,
     ):
@@ -355,7 +377,8 @@ class TestReActAgentStream:
         [
             (
                 CloudConnectorUser(
-                    authenticated=True, claims=UserClaims(scopes=["duo_chat"])
+                    authenticated=True,
+                    claims=UserClaims(scopes=["duo_chat", "agent_quick_actions"]),
                 ),
                 AgentRequest(messages=[Message(role=Role.USER, content="Hi")]),
                 200,
@@ -374,7 +397,13 @@ class TestReActAgentStream:
             (
                 CloudConnectorUser(
                     authenticated=True,
-                    claims=UserClaims(scopes=["duo_chat", "include_file_context"]),
+                    claims=UserClaims(
+                        scopes=[
+                            "duo_chat",
+                            "include_file_context",
+                            "agent_quick_actions",
+                        ]
+                    ),
                 ),
                 AgentRequest(
                     messages=[
@@ -396,7 +425,8 @@ class TestReActAgentStream:
             ),
             (
                 CloudConnectorUser(
-                    authenticated=True, claims=UserClaims(scopes=["duo_chat"])
+                    authenticated=True,
+                    claims=UserClaims(scopes=["duo_chat", "agent_quick_actions"]),
                 ),
                 AgentRequest(
                     messages=[
@@ -413,7 +443,8 @@ class TestReActAgentStream:
             ),
             (
                 CloudConnectorUser(
-                    authenticated=True, claims=UserClaims(scopes=["duo_chat"])
+                    authenticated=True,
+                    claims=UserClaims(scopes=["duo_chat", "agent_quick_actions"]),
                 ),
                 AgentRequest(
                     messages=[
@@ -430,7 +461,8 @@ class TestReActAgentStream:
             ),
             (
                 CloudConnectorUser(
-                    authenticated=True, claims=UserClaims(scopes=["duo_chat"])
+                    authenticated=True,
+                    claims=UserClaims(scopes=["duo_chat", "agent_quick_actions"]),
                 ),
                 AgentRequest(
                     messages=[
