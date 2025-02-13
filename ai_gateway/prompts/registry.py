@@ -198,13 +198,14 @@ class LocalPromptRegistry(BasePromptRegistry):
 
         with open(version_file, "r") as fp:
             prompt_config_params = yaml.safe_load(fp)
-            general_model_name = prompt_config_params["model"]["name"]
-            config_for_general_model = model_configs.get(general_model_name, None)
 
-            if config_for_general_model:
-                prompt_config_params = cls._patch_model_configuration(
-                    config_for_general_model, prompt_config_params
-                )
+            if "config_file" in prompt_config_params["model"]:
+                model_config = prompt_config_params["model"]["config_file"]
+                config_for_general_model = model_configs.get(model_config)
+                if config_for_general_model:
+                    prompt_config_params = cls._patch_model_configuration(
+                        config_for_general_model, prompt_config_params
+                    )
 
             return PromptConfig(**prompt_config_params)
 
@@ -220,7 +221,6 @@ class LocalPromptRegistry(BasePromptRegistry):
         return {
             **prompt_config_params,
             "model": {
-                **prompt_config_params["model"],
                 "name": config_for_general_model.name,
                 "params": params,
             },

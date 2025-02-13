@@ -1,7 +1,7 @@
 ---
 name: Claude 3 Generate Description
 model:
-  name: conversation_performant
+  config_file: conversation_performant
   params:
     model_class_provider: litellm
 unit_primitives:

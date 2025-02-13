@@ -59,7 +59,7 @@ prompt_template:
 ---
 name: Test prompt 1.0.1
 model:
-  name: conversation_quick
+  config_file: conversation_quick
   params:
     model_class_provider: litellm
     top_p: 0.1
