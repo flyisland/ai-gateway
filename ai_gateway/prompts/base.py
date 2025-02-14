@@ -13,7 +13,7 @@ from ai_gateway.api.auth_utils import StarletteUser
 from ai_gateway.instrumentators.model_requests import ModelRequestInstrumentator
 from ai_gateway.internal_events.client import InternalEventsClient
 from ai_gateway.prompts.config.base import ModelConfig, PromptConfig, PromptParams
-from ai_gateway.prompts.typing import Model, ModelMetadata, TypeModelFactory
+from ai_gateway.prompts.typing import Model, TypeModelMetadata, TypeModelFactory
 
 __all__ = [
     "Prompt",
@@ -48,11 +48,11 @@ class Prompt(RunnableBinding[Input, Output]):
         model_factory: TypeModelFactory,
         config: PromptConfig,
         user: StarletteUser,
-        model_metadata: Optional[ModelMetadata] = None,
+        model_metadata: Optional[TypeModelMetadata] = None,
         disable_streaming: bool = False,
     ):
-        model_kwargs = self._build_model_kwargs(config.params, model_metadata)
-        model = self._build_model(model_factory, config.model, user, disable_streaming)
+        model_kwargs = self._build_model_kwargs(config.params, user, model_metadata)
+        model = self._build_model(model_factory, config.model, disable_streaming)
         prompt = self._build_prompt_template(config.prompt_template)
         chain = self._build_chain(
             cast(Runnable[Input, Output], prompt | model.bind(**model_kwargs))
@@ -69,23 +69,22 @@ class Prompt(RunnableBinding[Input, Output]):
     def _build_model_kwargs(
         self,
         params: PromptParams | None,
-        model_metadata: Optional[ModelMetadata] | None,
+        user: StarletteUser,
+        model_metadata: Optional[TypeModelMetadata] | None,
     ) -> Mapping[str, Any]:
         return {
             **(params.model_dump(exclude_none=True) if params else {}),
-            **(model_metadata.to_params() if model_metadata else {}),
+            **(model_metadata.to_params(user) if model_metadata else {}),
         }
 
     def _build_model(
         self,
         model_factory: TypeModelFactory,
         config: ModelConfig,
-        user: StarletteUser,
         disable_streaming: bool,
     ) -> Model:
         return model_factory(
             model=config.name,
-            metadata={"user": user},
             disable_streaming=disable_streaming,
             **config.params.model_dump(
                 exclude={"model_class_provider"}, exclude_none=True, by_alias=True
@@ -160,7 +159,7 @@ class BasePromptRegistry(ABC):
         prompt_id: str,
         prompt_version: str,
         user: StarletteUser,
-        model_metadata: Optional[ModelMetadata] = None,
+        model_metadata: Optional[TypeModelMetadata] = None,
     ) -> Prompt:
         pass
 
@@ -169,7 +168,7 @@ class BasePromptRegistry(ABC):
         user: StarletteUser,
         prompt_id: str,
         prompt_version: Optional[str] = None,
-        model_metadata: Optional[ModelMetadata] = None,
+        model_metadata: Optional[TypeModelMetadata] = None,
         internal_event_category=__name__,
     ) -> Prompt:
         prompt = self.get(prompt_id, prompt_version or "^1.0.0", user, model_metadata)
@@ -185,29 +184,3 @@ class BasePromptRegistry(ABC):
             )
 
         return prompt
-
-
-def model_metadata_to_params(model_metadata: ModelMetadata) -> dict[str, str]:
-    params = {
-        "api_base": str(model_metadata.endpoint).removesuffix("/"),
-        "api_key": str(model_metadata.api_key),
-        "model": model_metadata.name,
-        "custom_llm_provider": model_metadata.provider,
-    }
-
-    if not model_metadata.identifier:
-        return params
-
-    provider, _, model_name = model_metadata.identifier.partition("/")
-
-    if model_name:
-        params["custom_llm_provider"] = provider
-        params["model"] = model_name
-
-        if provider == "bedrock":
-            del params["api_base"]
-    else:
-        params["custom_llm_provider"] = "custom_openai"
-        params["model"] = model_metadata.identifier
-
-    return params

@@ -9,7 +9,7 @@ from ai_gateway.api.auth_utils import StarletteUser
 from ai_gateway.internal_events.client import InternalEventsClient
 from ai_gateway.prompts.base import BasePromptRegistry, Prompt
 from ai_gateway.prompts.config import ModelClassProvider, PromptConfig
-from ai_gateway.prompts.typing import ModelMetadata, TypeModelFactory
+from ai_gateway.prompts.typing import ModelMetadata, TypeModelMetadata, TypeModelFactory
 
 __all__ = ["LocalPromptRegistry", "PromptRegistered"]
 
@@ -43,7 +43,7 @@ class LocalPromptRegistry(BasePromptRegistry):
     def _resolve_id(
         self,
         prompt_id: str,
-        model_metadata: Optional[ModelMetadata] = None,
+        model_metadata: Optional[TypeModelMetadata] = None,
     ) -> str:
         if model_metadata:
             return f"{prompt_id}/{model_metadata.name}"
@@ -75,7 +75,7 @@ class LocalPromptRegistry(BasePromptRegistry):
         prompt_id: str,
         prompt_version: str,
         user: StarletteUser,
-        model_metadata: Optional[ModelMetadata] = None,
+        model_metadata: Optional[TypeModelMetadata] = None,
     ) -> Prompt:
         if (
             isinstance(model_metadata, ModelMetadata)
