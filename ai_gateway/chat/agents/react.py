@@ -175,7 +175,7 @@ class ReActPromptTemplate(Runnable[ReActAgentInputs, PromptValue]):
                     AIMessage(
                         jinja2_formatter(
                             self.prompt_template["assistant"],
-                            agent_scratchpad=m.agent_steps,
+                            agent_scratchpad=m.agent_scratchpad,
                             final_answer=m.content,
                         )
                     )

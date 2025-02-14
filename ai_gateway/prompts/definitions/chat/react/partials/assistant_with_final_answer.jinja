@@ -1,7 +1,7 @@
 {# Stuffing the assistant message as a chat history with the raw context retrieved at that time #}
 {%- if agent_scratchpad %}
-    {%- for pad in agent_scratchpad -%}
-        Observation: {{ pad.observation }}
-        {%- endfor %}
-    {%- endif %}
+{%- for pad in agent_scratchpad -%}
+Observation: {{ pad.observation }}
+{%- endfor %}
+{%- endif %}
 Final Answer: {{ content }}

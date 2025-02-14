@@ -165,7 +165,7 @@ class TestReActAgent:
                         Message(
                             role=Role.ASSISTANT,
                             content="Use print function",
-                            agent_steps=[
+                            agent_scratchpad=[
                                 AgentStep(
                                     action=AgentToolAction(
                                         thought="thought",
@@ -198,7 +198,7 @@ class TestReActAgent:
                         Message(
                             role=Role.ASSISTANT,
                             content="PoC ReAct",
-                            agent_steps=[
+                            agent_scratchpad=[
                                 AgentStep(
                                     action=AgentToolAction(
                                         thought="thought",
@@ -525,16 +525,16 @@ class TestReActAgent:
         assert str(exc_info.value) == error_message
 
     @pytest.mark.asyncio
-    async def test_message_agent_steps_validation(self):
+    async def test_message_agent_scratchpad_validation(self):
         with pytest.raises(fastapi.HTTPException) as exc_info:
             Message(
                 role=Role.USER,
                 content="test",
-                agent_steps=[AgentStep(action=None, observation="test")],
+                agent_scratchpad=[AgentStep(action=None, observation="test")],
             )
 
         assert exc_info.value.status_code == 400
         assert (
             exc_info.value.detail
-            == "agent_steps can only be present when role is ASSISTANT"
+            == "agent_scratchpad can only be present when role is ASSISTANT"
         )

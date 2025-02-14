@@ -86,13 +86,13 @@ class Message(BaseModel):
     context: Optional[CurrentPageContext] = None
     current_file: Optional[CurrentFile] = None
     additional_context: Optional[list[AdditionalContext]] = None
-    agent_steps: Optional[list[AgentStep]] = None
+    agent_scratchpad: Optional[list[AgentStep]] = None
 
     @model_validator(mode="after")
-    def validate_agent_steps_role(self) -> Self:
-        if self.agent_steps is not None and self.role != Role.ASSISTANT:
+    def validate_agent_scratchpad_role(self) -> Self:
+        if self.agent_scratchpad is not None and self.role != Role.ASSISTANT:
             raise fastapi.HTTPException(
                 status_code=400,
-                detail="agent_steps can only be present when role is ASSISTANT",
+                detail="agent_scratchpad can only be present when role is ASSISTANT",
             )
         return self
