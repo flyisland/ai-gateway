@@ -86,7 +86,7 @@ class Message(BaseModel):
     context: Optional[CurrentPageContext] = None
     current_file: Optional[CurrentFile] = None
     additional_context: Optional[list[AdditionalContext]] = None
-    agent_steps: Optional[list[AgentStep]] = None
+    agent_scratchpad: Optional[list[AgentStep]] = None
 
     @model_validator(mode="after")
     def validate_agent_steps_role(self) -> Self:
