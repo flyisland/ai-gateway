@@ -13,7 +13,7 @@ from ai_gateway.api.auth_utils import StarletteUser
 from ai_gateway.instrumentators.model_requests import ModelRequestInstrumentator
 from ai_gateway.internal_events.client import InternalEventsClient
 from ai_gateway.prompts.config.base import ModelConfig, PromptConfig, PromptParams
-from ai_gateway.prompts.typing import Model, TypeModelMetadata, TypeModelFactory
+from ai_gateway.prompts.typing import Model, TypeModelFactory, TypeModelMetadata
 
 __all__ = [
     "Prompt",

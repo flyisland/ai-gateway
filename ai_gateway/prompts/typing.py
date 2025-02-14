@@ -3,6 +3,7 @@ from typing import Annotated, Any, Dict, Literal, Optional, Protocol, TypeAlias
 from langchain_core.language_models.chat_models import BaseChatModel
 from langchain_core.runnables import RunnableBinding
 from pydantic import AnyUrl, BaseModel, StringConstraints, UrlConstraints
+
 from ai_gateway.api.auth_utils import StarletteUser
 
 Model: TypeAlias = RunnableBinding | BaseChatModel
@@ -13,7 +14,7 @@ class AmazonQModelMetadata(BaseModel):
     name: Literal["amazon_q"]
     role_arn: Annotated[str, StringConstraints(max_length=255)]
 
-    def to_params(self, user: StarletteUser) -> Dict[str, Dict[str, str]]:
+    def to_params(self, user: Optional[StarletteUser] = None) -> Dict[str, Any]:
         return {"role_arn": self.role_arn, "user": user}
 
 
@@ -24,7 +25,7 @@ class ModelMetadata(BaseModel):
     api_key: Optional[Annotated[str, StringConstraints(max_length=255)]] = None
     identifier: Optional[Annotated[str, StringConstraints(max_length=255)]] = None
 
-    def to_params(self, user: StarletteUser) -> Dict[str, str]:
+    def to_params(self, user: Optional[StarletteUser] = None) -> Dict[str, Any]:
         params: Dict[str, str] = {}
 
         if self.endpoint:
@@ -51,7 +52,7 @@ class ModelMetadata(BaseModel):
         return params
 
 
-TypeModelMetadata: TypeAlias = ModelMetadata | AmazonQModelMetadata
+TypeModelMetadata = ModelMetadata | AmazonQModelMetadata
 
 
 class TypeModelFactory(Protocol):

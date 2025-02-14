@@ -9,7 +9,7 @@ from ai_gateway.api.auth_utils import StarletteUser
 from ai_gateway.internal_events.client import InternalEventsClient
 from ai_gateway.prompts.base import BasePromptRegistry, Prompt
 from ai_gateway.prompts.config import ModelClassProvider, PromptConfig
-from ai_gateway.prompts.typing import ModelMetadata, TypeModelMetadata, TypeModelFactory
+from ai_gateway.prompts.typing import ModelMetadata, TypeModelFactory, TypeModelMetadata
 
 __all__ = ["LocalPromptRegistry", "PromptRegistered"]
 

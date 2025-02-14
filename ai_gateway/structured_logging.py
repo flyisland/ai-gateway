@@ -174,7 +174,9 @@ def sanitize_logs(_, __, event_dict: EventDict) -> EventDict:
             model_metadata = copy.copy(sanitized_inputs.model_metadata)
 
             if isinstance(model_metadata, ModelMetadata):
-              model_metadata.api_key = sanitized_value if model_metadata.api_key else None
+                model_metadata.api_key = (
+                    sanitized_value if model_metadata.api_key else None
+                )
 
             sanitized_inputs.model_metadata = model_metadata
 

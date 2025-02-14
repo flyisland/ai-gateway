@@ -22,7 +22,6 @@ Example Usage:
         print(chunk.content)
 """
 
-import os
 from dataclasses import field
 from typing import Any, Dict, Iterator, List, Optional, cast
 
@@ -69,7 +68,6 @@ class ChatAmazonQ(BaseChatModel):
         Post-initialization setup.
         Called after dataclass initialization.
         """
-        self.metadata: Dict[str, Any] = {}
         super().__init__()
 
     @property
@@ -146,7 +144,7 @@ class ChatAmazonQ(BaseChatModel):
         messages: List[BaseMessage],
         user: StarletteUser,
         role_arn: str,
-        **kwargs: Any
+        **kwargs: Any,
     ):
         """
         Build a response from the given messages.
@@ -157,9 +155,10 @@ class ChatAmazonQ(BaseChatModel):
         Returns:
             str: The built response from Amazon Q
         """
-        q_client: Any = self._create_client(user, role_arn)
+        current_user: StarletteUser = self._get_current_user(user)
+        q_client: Any = self._get_client(current_user, role_arn)
         processed_message: ProcessedMessage = self._process_messages(
-            messages, user
+            messages, current_user
         )
         return self._send_chat_message(q_client, processed_message)
 
@@ -336,9 +335,29 @@ class ChatAmazonQ(BaseChatModel):
         """
         return self.response_handler.create_error_chunk(str(error))
 
-    def _create_client(
-        self, current_user: StarletteUser, role_arn: str
-    ) -> Any:
+    # Section 5: Client Management
+    def _get_current_user(self, user: StarletteUser) -> StarletteUser:
+        """
+        Get the current user from metadata.
+
+        Returns:
+            StarletteUser: The current user making the request
+        """
+        return user
+
+    def _get_client(self, current_user: StarletteUser, role_arn: str) -> Any:
+        """
+        Get an Amazon Q client for the current user.
+
+        Args:
+            current_user: The current user
+
+        Returns:
+            Any: Configured Amazon Q client
+        """
+        return self._create_client(current_user, role_arn)
+
+    def _create_client(self, current_user: StarletteUser, role_arn: str) -> Any:
         """
         Create an Amazon Q client.
 
