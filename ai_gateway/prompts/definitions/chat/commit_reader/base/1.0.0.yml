@@ -1,15 +1,20 @@
 ---
-name: Amazon Q Commit Reader agent
+name: Claude 3 Commit Reader agent
 model:
-  name: amazon_q
+  name: claude-3-5-sonnet-20241022
   params:
-    model_class_provider: amazon_q
+    model_class_provider: anthropic
+    temperature: 0.0
+    max_tokens: 2_048
+    max_retries: 1
 unit_primitives:
-  - amazon_q_integration
+  - duo_chat
 prompt_template:
   system: |
     {% include 'chat/commit_reader/system.jinja' %}
   user: |
     {% include 'chat/commit_reader/user.jinja' %}
+  assistant: |
+    {% include 'chat/commit_reader/assistant.jinja' %}
 params:
   timeout: 60
