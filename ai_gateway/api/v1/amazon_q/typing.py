@@ -1,4 +1,4 @@
-from typing import Annotated, Literal, Optional, Union
+from typing import Annotated, Literal, Optional, Union, Any
 
 from pydantic import BaseModel, Field, StringConstraints
 
@@ -50,9 +50,14 @@ class EventIssuePayload(EventRequestPayload):
     issue_iid: Annotated[str, StringConstraints(max_length=1024)]
 
 
+class EventHookPayload(BaseModel):
+    source: Literal["system_hook"]
+    data: dict[str, Any]
+
+
 class EventRequest(BaseModel):
     role_arn: Annotated[str, StringConstraints(max_length=2048)]
     code: Annotated[str, StringConstraints(max_length=255)]
-    payload: Union[EventMergeRequestPayload, EventIssuePayload] = Field(
+    payload: Union[EventMergeRequestPayload, EventIssuePayload, EventHookPayload] = Field(
         discriminator="source"
     )
