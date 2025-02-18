@@ -55,7 +55,7 @@ from ai_gateway.code_suggestions.base import CodeSuggestionsOutput
 from ai_gateway.code_suggestions.processing.base import ModelEngineOutput
 from ai_gateway.code_suggestions.processing.ops import lang_from_filename
 from ai_gateway.config import Config
-from ai_gateway.feature_flags.context import current_feature_flag_context
+from ai_gateway.feature_flags.context import current_feature_flag_context, is_feature_enabled
 from ai_gateway.instrumentators.base import TelemetryInstrumentator
 from ai_gateway.internal_events import InternalEventsClient
 from ai_gateway.models import KindAnthropicModel, KindModelProvider
@@ -471,9 +471,28 @@ def _build_code_completions(
         )
 
         return code_completions, kwargs
+    elif payload.model_provider == KindModelProvider.FIREWORKS or (not _allow_vertex_codestral() and is_feature_enabled('disable_code_gecko_default')):
+        FireworksHandler(payload, request, kwargs).update_completion_params()
+        code_completions = _resolve_code_completions_litellm(
+            payload=payload,
+            current_user=current_user,
+            prompt_registry=prompt_registry,
+            completions_agent_factory=completions_agent_factory,
+            completions_litellm_factory=completions_fireworks_qwen_factory,
+        )
+
+        return code_completions, kwargs
+    elif payload.model_provider == KindModelProvider.AMAZON_Q:
+        unit_primitive = GitLabUnitPrimitive.AMAZON_Q_INTEGRATION
+        tracking_event = f"request_{unit_primitive}_complete_code"
+        code_completions = completions_amazon_q_factory(
+            model__current_user=current_user,
+            model__role_arn=payload.role_arn,
+        )
     elif (
-        payload.model_provider == KindModelProvider.VERTEX_AI
-        and payload.model_name == KindVertexTextModel.CODESTRAL_2501
+        ((payload.model_provider == KindModelProvider.VERTEX_AI
+        and payload.model_name == KindVertexTextModel.CODESTRAL_2501)
+        or is_feature_enabled('disable_code_gecko_default'))
         # Codestral is currently not supported in asia-* locations
         # This is a temporary change to allow rollout of Codestral to all internal users
         # while we are looking into getting support for Codestral in Asia
@@ -498,24 +517,6 @@ def _build_code_completions(
         )
         if payload.context:
             kwargs.update({"code_context": [ctx.content for ctx in payload.context]})
-    elif payload.model_provider == KindModelProvider.FIREWORKS:
-        FireworksHandler(payload, request, kwargs).update_completion_params()
-        code_completions = _resolve_code_completions_litellm(
-            payload=payload,
-            current_user=current_user,
-            prompt_registry=prompt_registry,
-            completions_agent_factory=completions_agent_factory,
-            completions_litellm_factory=completions_fireworks_qwen_factory,
-        )
-
-        return code_completions, kwargs
-    elif payload.model_provider == KindModelProvider.AMAZON_Q:
-        unit_primitive = GitLabUnitPrimitive.AMAZON_Q_INTEGRATION
-        tracking_event = f"request_{unit_primitive}_complete_code"
-        code_completions = completions_amazon_q_factory(
-            model__current_user=current_user,
-            model__role_arn=payload.role_arn,
-        )
     else:
         code_completions = completions_legacy_factory()
         LegacyHandler(payload, request, kwargs).update_completion_params()
