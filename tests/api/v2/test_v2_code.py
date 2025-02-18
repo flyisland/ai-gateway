@@ -773,12 +773,14 @@ class TestCodeCompletions:
             (
                 1,
                 None,
+                [],
                 "vertex-ai",
-                "codestral@2405",
+                "codestral-2501",
                 None,
                 None,
                 None,
                 True,
+                False,
                 False,
                 200,
                 [
@@ -792,12 +794,14 @@ class TestCodeCompletions:
             (
                 2,
                 None,
+                [],
                 "vertex-ai",
-                "codestral@2405",
+                "codestral-2501",
                 None,
                 None,
                 None,
                 True,
+                False,
                 False,
                 200,
                 [
@@ -913,7 +917,7 @@ class TestCodeCompletions:
             (
                 "def search",
                 "vertex-ai",
-                "codestral@2405",
+                "codestral-2501",
                 {
                     "temperature": 0.7,
                     "max_output_tokens": 64,
@@ -924,7 +928,7 @@ class TestCodeCompletions:
             (
                 "def search",
                 "vertex-ai",
-                "codestral@2405",
+                "codestral-2501",
                 {
                     "temperature": 0.7,
                     "max_output_tokens": 64,
@@ -1191,13 +1195,13 @@ class TestCodeCompletions:
                 "content_below_cursor": "\n",
             },
             "model_provider": "vertex-ai",
-            "model_name": "codestral@2405",
+            "model_name": "codestral-2501",
         }
 
         response = self._send_code_completions_request(mock_client, params)
 
         mock_litellm_acompletion.assert_called_with(
-            model="vertex_ai/codestral@2405",
+            model="vertex_ai/codestral-2501",
             messages=[{"content": "foo", "role": Role.USER}],
             suffix="\n",
             text_completion=True,
@@ -1210,11 +1214,11 @@ class TestCodeCompletions:
             stop=["\n\n", "\n+++++"],
         )
 
-        mock_post_processor.assert_called_with("Test text completion response")
+        mock_post_processor.assert_called_with("Test text completion response", score=10**5)
 
         result = response.json()
         assert result["model"]["engine"] == "vertex-ai"
-        assert result["model"]["name"] == "vertex_ai/codestral@2405"
+        assert result["model"]["name"] == "vertex_ai/codestral-2501"
         assert result["choices"][0]["text"] == "Post-processed completion response"
 
     def test_vertex_codestral_with_prompt(self, mock_client, mock_agent_model: Mock):
@@ -1229,7 +1233,7 @@ class TestCodeCompletions:
             },
             "prompt": "bar",
             "model_provider": "vertex-ai",
-            "model_name": "codestral@2405",
+            "model_name": "codestral-2501",
         }
 
         response = self._send_code_completions_request(mock_client, params)
@@ -1260,7 +1264,7 @@ class TestCodeCompletions:
                 "content_below_cursor": "\n",
             },
             "model_provider": "vertex-ai",
-            "model_name": "codestral@2405",
+            "model_name": "codestral-2501",
         }
 
         self._send_code_completions_request(mock_client, params)
@@ -1288,7 +1292,7 @@ class TestCodeCompletions:
             },
             "prompt_version": 2,
             "model_provider": "codestral",
-            "model_name": "codestral@2405",
+            "model_name": "codestral-2501",
         }
 
         response = self._send_code_completions_request(mock_client, params)
@@ -1299,9 +1303,9 @@ class TestCodeCompletions:
         expected_error_message = [
             {
                 "ctx": {"error": {}},
-                "input": "codestral@2405",
+                "input": "codestral-2501",
                 "loc": ["body", 2, "model_name"],
-                "msg": "Value error, model codestral@2405 is not supported by use case code completions and provider codestral",
+                "msg": "Value error, model codestral-2501 is not supported by use case code completions and provider codestral",
                 "type": "value_error",
             }
         ]

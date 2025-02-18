@@ -67,7 +67,7 @@ class TestKindLiteLlmModel:
             KindVertexTextModel.CODESTRAL_2501.text_model(
                 provider=KindModelProvider.VERTEX_AI
             )
-            == "vertex_ai/codestral@2405"
+            == "vertex_ai/codestral-2501"
         )
 
 
@@ -973,7 +973,7 @@ class TestLiteLlmTextGenModel:
         )
 
         mock_litellm_acompletion.assert_called_with(
-            model="vertex_ai/codestral@2405",
+            model="vertex_ai/codestral-2501",
             messages=[{"content": "func hello(name){", "role": Role.USER}],
             suffix="}",
             text_completion=True,
@@ -1092,7 +1092,7 @@ class TestLiteLlmTextGenModel:
                 None,
             ),
             (
-                "codestral@2405",
+                "codestral-2501",
                 KindModelProvider.VERTEX_AI,
                 True,
                 None,
