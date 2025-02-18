@@ -55,7 +55,10 @@ from ai_gateway.code_suggestions.base import CodeSuggestionsOutput
 from ai_gateway.code_suggestions.processing.base import ModelEngineOutput
 from ai_gateway.code_suggestions.processing.ops import lang_from_filename
 from ai_gateway.config import Config
-from ai_gateway.feature_flags.context import current_feature_flag_context, is_feature_enabled
+from ai_gateway.feature_flags.context import (
+    current_feature_flag_context,
+    is_feature_enabled,
+)
 from ai_gateway.instrumentators.base import TelemetryInstrumentator
 from ai_gateway.internal_events import InternalEventsClient
 from ai_gateway.models import KindAnthropicModel, KindModelProvider
@@ -471,7 +474,10 @@ def _build_code_completions(
         )
 
         return code_completions, kwargs
-    elif payload.model_provider == KindModelProvider.FIREWORKS or (not _allow_vertex_codestral() and is_feature_enabled('disable_code_gecko_default')):
+    elif payload.model_provider == KindModelProvider.FIREWORKS or (
+        not _allow_vertex_codestral()
+        and is_feature_enabled("disable_code_gecko_default")
+    ):
         FireworksHandler(payload, request, kwargs).update_completion_params()
         code_completions = _resolve_code_completions_litellm(
             payload=payload,
@@ -490,13 +496,14 @@ def _build_code_completions(
             model__role_arn=payload.role_arn,
         )
     elif (
-        ((payload.model_provider == KindModelProvider.VERTEX_AI
-        and payload.model_name == KindVertexTextModel.CODESTRAL_2501)
-        or is_feature_enabled('disable_code_gecko_default'))
+        (
+            (
+                payload.model_provider == KindModelProvider.VERTEX_AI
+                and payload.model_name == KindVertexTextModel.CODESTRAL_2501
+            )
+            or is_feature_enabled("disable_code_gecko_default")
+        )
         # Codestral is currently not supported in asia-* locations
-        # This is a temporary change to allow rollout of Codestral to all internal users
-        # while we are looking into getting support for Codestral in Asia
-        # https://gitlab.com/gitlab-org/modelops/applied-ml/code-suggestions/ai-assist/-/issues/635
         and _allow_vertex_codestral()
     ):
         code_completions = _resolve_code_completions_vertex_codestral(
