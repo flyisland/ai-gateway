@@ -103,7 +103,7 @@ MODEL_STOP_TOKENS = {
     ],
     # Ref: https://docs.litellm.ai/docs/providers/vertex#mistral-api
     # This model is served by Vertex AI but accessed through LiteLLM abstraction
-    KindVertexTextModel.CODESTRAL_2405: ["\n\n", "\n+++++"],
+    KindVertexTextModel.CODESTRAL_2501: ["\n\n", "\n+++++"],
     KindLiteLlmModel.QWEN_2_5: [
         "<|fim_prefix|>",
         "<|fim_suffix|>",
@@ -118,7 +118,7 @@ MODEL_STOP_TOKENS = {
 }
 
 MODEL_SPECIFICATIONS = {
-    KindVertexTextModel.CODESTRAL_2405: {
+    KindVertexTextModel.CODESTRAL_2501: {
         "timeout": 60,
         "completion_type": ModelCompletionType.TEXT,
     },
@@ -489,7 +489,7 @@ class LiteLlmTextGenModel(TextGenModelBase):
 
     def _is_vertex_codestral(self):
         return (
-            self._is_vertex() and self.model_name == KindVertexTextModel.CODESTRAL_2405
+            self._is_vertex() and self.model_name == KindVertexTextModel.CODESTRAL_2501
         )
 
     def _get_vertex_model_location(self):

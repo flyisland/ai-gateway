@@ -182,7 +182,7 @@ class ContainerCodeCompletions(containers.DeclarativeContainer):
         CodeCompletions,
         model=providers.Factory(
             litellm,
-            name=KindVertexTextModel.CODESTRAL_2405,
+            name=KindVertexTextModel.CODESTRAL_2501,
             provider=KindModelProvider.VERTEX_AI,
         ),
         tokenization_strategy=providers.Factory(
@@ -190,9 +190,6 @@ class ContainerCodeCompletions(containers.DeclarativeContainer):
         ),
         post_processor=providers.Factory(
             PostProcessorCompletions,
-            overrides={
-                PostProcessorOperation.FIX_END_BLOCK_ERRORS: PostProcessorOperation.FIX_END_BLOCK_ERRORS_WITH_COMPARISON,
-            },
             extras=[PostProcessorOperation.STRIP_ASTERISKS],
             exclude=config.excl_post_proc,
         ).provider,

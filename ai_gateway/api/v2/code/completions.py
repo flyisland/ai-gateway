@@ -132,6 +132,7 @@ async def completions(
         completions_fireworks_qwen_factory,
         completions_agent_factory,
         completions_amazon_q_factory,
+        completions_litellm_vertex_codestral_factory,
         internal_event_client,
     )
 
@@ -443,6 +444,7 @@ def _build_code_completions(
     completions_fireworks_qwen_factory: Factory[CodeCompletions],
     completions_agent_factory: Factory[CodeCompletions],
     completions_amazon_q_factory: Factory[CodeCompletions],
+    completions_litellm_vertex_codestral_factory: Factory[CodeCompletions],
     internal_event_client: InternalEventsClient,
 ) -> tuple[CodeCompletions | CodeCompletionsLegacy, dict]:
     kwargs = {}
@@ -471,7 +473,7 @@ def _build_code_completions(
         return code_completions, kwargs
     elif (
         payload.model_provider == KindModelProvider.VERTEX_AI
-        and payload.model_name == KindVertexTextModel.CODESTRAL_2405
+        and payload.model_name == KindVertexTextModel.CODESTRAL_2501
         # Codestral is currently not supported in asia-* locations
         # This is a temporary change to allow rollout of Codestral to all internal users
         # while we are looking into getting support for Codestral in Asia

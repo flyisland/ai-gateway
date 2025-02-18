@@ -64,7 +64,7 @@ class TestKindLiteLlmModel:
             == "text-completion-codestral/codestral"
         )
         assert (
-            KindVertexTextModel.CODESTRAL_2405.text_model(
+            KindVertexTextModel.CODESTRAL_2501.text_model(
                 provider=KindModelProvider.VERTEX_AI
             )
             == "vertex_ai/codestral@2405"
@@ -961,7 +961,7 @@ class TestLiteLlmTextGenModel:
         mock_litellm_acompletion: Mock,
     ):
         lite_llm_vertex_codestral_model = LiteLlmTextGenModel.from_model_name(
-            name=KindVertexTextModel.CODESTRAL_2405,
+            name=KindVertexTextModel.CODESTRAL_2501,
             provider=KindModelProvider.VERTEX_AI,
         )
 
@@ -996,7 +996,7 @@ class TestLiteLlmTextGenModel:
         mock_litellm_acompletion: Mock,
     ):
         lite_llm_vertex_codestral_model = LiteLlmTextGenModel.from_model_name(
-            name=KindVertexTextModel.CODESTRAL_2405,
+            name=KindVertexTextModel.CODESTRAL_2501,
             provider=KindModelProvider.VERTEX_AI,
         )
 
@@ -1053,7 +1053,7 @@ class TestLiteLlmTextGenModel:
         mock_litellm_acompletion: Mock,
     ):
         lite_llm_vertex_codestral_model = LiteLlmTextGenModel.from_model_name(
-            name=KindVertexTextModel.CODESTRAL_2405,
+            name=KindVertexTextModel.CODESTRAL_2501,
             provider=KindModelProvider.VERTEX_AI,
         )
 
