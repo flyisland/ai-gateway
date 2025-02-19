@@ -171,15 +171,15 @@ class ReActPromptTemplate(Runnable[ReActAgentInputs, PromptValue]):
                     )
                 )
             elif m.role is Role.ASSISTANT:
-                messages.append(
-                    AIMessage(
-                        jinja2_formatter(
-                            self.prompt_template["assistant"],
-                            agent_scratchpad=m.agent_scratchpad,
-                            final_answer=m.content,
-                        )
+                if m.agent_scratchpad:
+                    content = jinja2_formatter(
+                        self.prompt_template["assistant"],
+                        agent_scratchpad=m.agent_scratchpad,
+                        final_answer=m.content,
                     )
-                )
+                else:
+                    content = m.content
+                messages.append(AIMessage(content))
             else:
                 raise ValueError("Unsupported message")
 
