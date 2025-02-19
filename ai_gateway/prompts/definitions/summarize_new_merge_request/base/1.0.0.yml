@@ -2,6 +2,9 @@
 name: Claude 3.5 Summarize New Merge Request
 model:
   config_file: conversation_claude_3_sonnet_v1
+  params:
+    max_tokens: 2000
+    temperature: 0
 unit_primitives:
   - summarize_new_merge_request
 prompt_template:
