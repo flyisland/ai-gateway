@@ -16,7 +16,7 @@ from structlog.testing import capture_logs
 from ai_gateway.api.error_utils import capture_validation_errors
 from ai_gateway.api.v2 import api_router
 from ai_gateway.config import Config, ConfigModelEndpoints, ConfigModelKeys
-from ai_gateway.feature_flags.context import current_feature_flag_context
+from ai_gateway.feature_flags.context import FeatureFlag, current_feature_flag_context
 from ai_gateway.models.base_chat import Message, Role
 from ai_gateway.tracking.container import ContainerTracking
 from ai_gateway.tracking.instrumentator import SnowplowInstrumentator
@@ -1294,7 +1294,7 @@ class TestCodeCompletions:
             },
             "prompt_version": 2,
             "model_provider": "codestral",
-            "model_name": "codestral-2501",
+            "model_name": "dummy_model",
         }
 
         response = self._send_code_completions_request(mock_client, params)
@@ -1305,9 +1305,9 @@ class TestCodeCompletions:
         expected_error_message = [
             {
                 "ctx": {"error": {}},
-                "input": "codestral-2501",
+                "input": "dummy_model",
                 "loc": ["body", 2, "model_name"],
-                "msg": "Value error, model codestral-2501 is not supported by use case code completions and provider codestral",
+                "msg": "Value error, model dummy_model is not supported by use case code completions and provider codestral",
                 "type": "value_error",
             }
         ]
@@ -1331,11 +1331,11 @@ class TestCodeCompletions:
                 "content_below_cursor": "\n",
             },
         }
-        current_feature_flag_context.set({"disable_code_gecko_default"})
+        current_feature_flag_context.set({FeatureFlag.DISABLE_CODE_GECKO_DEFAULT})
 
         response = self._send_code_completions_request(mock_client, params)
 
-        current_feature_flag_context.set({})
+        current_feature_flag_context.set([])
 
         mock_litellm_acompletion.assert_called_with(
             model="vertex_ai/codestral-2501",
@@ -1377,9 +1377,9 @@ class TestCodeCompletions:
                 "content_below_cursor": "\n",
             },
         }
-        current_feature_flag_context.set({"disable_code_gecko_default"})
+        current_feature_flag_context.set({FeatureFlag.DISABLE_CODE_GECKO_DEFAULT})
         response = self._send_code_completions_request(mock_client, params)
-        current_feature_flag_context.set({})
+        current_feature_flag_context.set([])
 
         mock_litellm_acompletion.assert_called_with(
             messages=[
