@@ -43,5 +43,6 @@ class ContainerSearches(containers.DeclarativeContainer):
             client=grpc_client_vertex,
             project=config.vertex_search.project,
             fallback_datastore_version=config.vertex_search.fallback_datastore_version,
+            pinned_datastore_version=config.vertex_search.pinned_datastore_version,
         ),
     )

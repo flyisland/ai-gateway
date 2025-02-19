@@ -79,15 +79,21 @@ class VertexAISearch(Searcher):
         client: discoveryengine.SearchServiceAsyncClient,
         project: str,
         fallback_datastore_version: str,
+        pinned_datastore_version: str,
         *args: Any,
         **kwargs: Any,
     ):
         self.client = client
         self.project = project
         self.fallback_datastore_version = fallback_datastore_version
+        self.pinned_datastore_version = pinned_datastore_version
 
     async def search_with_retry(self, *args, **kwargs):
         try:
+            # If pinned datastore version is enabled, use it instead of the one in the request
+            if self.pinned_datastore_version:
+                kwargs["gl_version"] = self.pinned_datastore_version
+
             try:
                 return await self.search(*args, **kwargs)
             except DataStoreNotFound as ex:

@@ -148,6 +148,7 @@ class ConfigVertexTextModel(ConfigGoogleCloudPlatform):
 
 class ConfigVertexSearch(ConfigGoogleCloudPlatform):
     fallback_datastore_version: str = ""
+    pinned_datastore_version: str = ""
 
 
 class ConfigAmazonQ(BaseModel):
