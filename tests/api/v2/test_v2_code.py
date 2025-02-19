@@ -58,7 +58,6 @@ def mock_config(assets_dir):
             "identifier": "qwen2p5-coder-7b",
         }
     )
-    config.excl_post_proc = []
 
     yield config
 
@@ -1336,6 +1335,8 @@ class TestCodeCompletions:
 
         response = self._send_code_completions_request(mock_client, params)
 
+        current_feature_flag_context.set({})
+
         mock_litellm_acompletion.assert_called_with(
             model="vertex_ai/codestral-2501",
             messages=[{"content": "foo", "role": Role.USER}],
@@ -1378,6 +1379,7 @@ class TestCodeCompletions:
         }
         current_feature_flag_context.set({"disable_code_gecko_default"})
         response = self._send_code_completions_request(mock_client, params)
+        current_feature_flag_context.set({})
 
         mock_litellm_acompletion.assert_called_with(
             messages=[
