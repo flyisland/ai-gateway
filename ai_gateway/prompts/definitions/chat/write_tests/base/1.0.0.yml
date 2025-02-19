@@ -1,12 +1,11 @@
 ---
-name: Claude 3 Write Tests agent
+name: Amazon Q Write Tests agent
 model:
-  config_file: conversation_performant
+  name: amazon_q
   params:
-    temperature: 0.1
-    max_tokens: 2_048
+    model_class_provider: amazon_q
 unit_primitives:
-  - write_tests
+  - amazon_q_integration
 prompt_template:
   system: |
     {% include 'chat/write_tests/system.jinja' %}

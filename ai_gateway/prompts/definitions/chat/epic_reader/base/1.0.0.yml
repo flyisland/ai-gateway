@@ -1,18 +1,15 @@
 ---
-name: Claude 3 Epic reader agent
+name: Amazon Q Epic reader agent
 model:
-  config_file: conversation_performant
+  name: amazon_q
   params:
-    temperature: 0.1
-    max_tokens: 2_048
+    model_class_provider: amazon_q
 unit_primitives:
-  - ask_epic
+  - amazon_q_integration
 prompt_template:
   system: |
     {% include 'chat/epic_reader/system.jinja' %}
   user: |
     {% include 'chat/epic_reader/user.jinja' %}
-  assistant: |
-    {% include 'chat/epic_reader/assistant.jinja' %}
 params:
   timeout: 60
