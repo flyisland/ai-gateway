@@ -407,6 +407,7 @@ def mock_litellm_acompletion():
                 AsyncMock(
                     message=AsyncMock(content="Test response"),
                     text="Test text completion response",
+                    logprobs= AsyncMock(token_logprobs=[999]),
                 ),
             ],
             _hidden_params={

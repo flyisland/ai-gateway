@@ -67,7 +67,6 @@ USE_CASES_MODELS_MAP = {
         KindAmazonQModel.AMAZON_Q,
     },
     KindUseCase.CODE_GENERATIONS: {
-        KindAnthropicModel.CLAUDE_2_0,
         KindAnthropicModel.CLAUDE_2_1,
         KindVertexTextModel.CODE_BISON_002,
         KindAnthropicModel.CLAUDE_3_SONNET,
@@ -91,15 +90,11 @@ USE_CASES_MODELS_MAP = {
 SAAS_PROMPT_MODEL_MAP = {
     "^1.0.0": {
         "model_provider": ModelProvider.ANTHROPIC,
-        "model_version": KindAnthropicModel.CLAUDE_3_5_SONNET,
+        "model_version": KindAnthropicModel.CLAUDE_3_5_SONNET_V2,
     },
     "1.0.0": {
         "model_provider": ModelProvider.ANTHROPIC,
         "model_version": KindAnthropicModel.CLAUDE_3_5_SONNET,
-    },
-    "1.0.1-dev": {
-        "model_provider": ModelProvider.ANTHROPIC,
-        "model_version": KindAnthropicModel.CLAUDE_3_5_SONNET_V2,
     },
     "2.0.0": {
         "model_provider": ModelProvider.VERTEX_AI,
