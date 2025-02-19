@@ -191,7 +191,7 @@ class ContainerCodeCompletions(containers.DeclarativeContainer):
         post_processor=providers.Factory(
             PostProcessorCompletions,
             extras=[PostProcessorOperation.STRIP_ASTERISKS],
-            exclude=config.excl_post_proc,
+            exclude=config.excl_post_process,
         ).provider,
     )
 
