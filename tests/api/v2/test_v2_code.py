@@ -58,6 +58,7 @@ def mock_config(assets_dir):
             "identifier": "qwen2p5-coder-7b",
         }
     )
+    config.excl_post_proc = []
 
     yield config
 
