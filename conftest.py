@@ -304,22 +304,22 @@ def mock_suggestions_output(
 
 
 @pytest.fixture
-def mock_completions_amazonq(mock_completions_amazonq_output: list[TextGenModelOutput]):
+def mock_completions_amazonq(mock_suggestion_amazonq_output: list[TextGenModelOutput]):
     with patch(
         "ai_gateway.code_suggestions.CodeCompletions.execute",
-        return_value=mock_completions_amazonq_output,
+        return_value=mock_suggestion_amazonq_output,
     ) as mock:
         yield mock
 
 
 @pytest.fixture
-def mock_completions_amazonq_output(
-    mock_completions_amazonq_output_texts: list[str],
+def mock_suggestion_amazonq_output(
+    mock_suggestion_amazonq_output_texts: list[str],
     mock_suggestions_model: str,
     mock_suggestions_engine: str,
 ):
     output = []
-    for output_txt in mock_completions_amazonq_output_texts:
+    for output_txt in mock_suggestion_amazonq_output_texts:
         output.append(
             CodeSuggestionsOutput(
                 text=output_txt,
@@ -332,6 +332,15 @@ def mock_completions_amazonq_output(
             )
         )
     yield output
+
+
+@pytest.fixture
+def mock_generation_amazonq(mock_suggestion_amazonq_output: list[TextGenModelOutput]):
+    with patch(
+        "ai_gateway.code_suggestions.CodeGenerations.execute",
+        return_value=mock_suggestion_amazonq_output,
+    ) as mock:
+        yield mock
 
 
 @pytest.fixture

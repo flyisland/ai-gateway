@@ -1079,7 +1079,7 @@ class TestUnauthorizedIssuer:
 class TestAmazonQIntegrationV3:
     @pytest.mark.parametrize(
         (
-            "mock_suggestions_output_text",
+            "mock_suggestion_amazonq_output_texts",
             "mock_suggestions_model",
             "mock_suggestions_engine",
             "expected_response",
@@ -1087,7 +1087,7 @@ class TestAmazonQIntegrationV3:
         [
             # non-empty suggestions from model
             (
-                "def search",
+                ["def search"],
                 "amazon_q",
                 "amazon_q",
                 {
@@ -1110,7 +1110,7 @@ class TestAmazonQIntegrationV3:
             ),
             # empty suggestions from model
             (
-                "",
+                [""],
                 "amazon_q",
                 "amazon_q",
                 {
@@ -1130,8 +1130,8 @@ class TestAmazonQIntegrationV3:
     def test_code_generation_successful_response(
         self,
         mock_client: TestClient,
-        mock_generations: Mock,
-        mock_suggestions_output_text: str,
+        mock_generation_amazonq: Mock,
+        mock_suggestion_amazonq_output_texts: list[str],
         expected_response: dict,
         route: str,
     ):
@@ -1194,7 +1194,7 @@ class TestAmazonQIntegrationV3:
             suggestion_source="network",
             region="us-central1",
         )
-        mock_generations.assert_called_with(
+        mock_generation_amazonq.assert_called_with(
             prefix=payload["content_above_cursor"],
             file_name=payload["file_name"],
             editor_lang=payload["language_identifier"],
@@ -1207,7 +1207,7 @@ class TestAmazonQIntegrationV3:
 
     @pytest.mark.parametrize(
         (
-            "mock_completions_amazonq_output_texts",
+            "mock_suggestion_amazonq_output_texts",
             "mock_suggestions_model",
             "mock_suggestions_engine",
             "expected_response",
@@ -1263,8 +1263,7 @@ class TestAmazonQIntegrationV3:
     def test_code_completion_successful_response(
         self,
         mock_client: TestClient,
-        mock_completions: Mock,
-        mock_completions_amazonq_output_texts: str,
+        mock_suggestion_amazonq_output_texts: str,
         mock_completions_amazonq: Mock,
         expected_response: dict,
         route: str,
