@@ -47,11 +47,16 @@ test:enforce_prompt_versioning:
   variables:
     PROMPT_DEFINTIONS_DIR: "ai_gateway/prompts/definitions"
   script:
-    - apk add --no-cache git
     - |
       changed_files=$(git diff --name-only $CI_COMMIT_BEFORE_SHA $CI_COMMIT_SHA -- '${PROMPT_DEFINTIONS_DIR}*.yml')
       for file in $changed_files; do
-        if [[ ! $file =~ -alpha\.yml$ && ! $file =~ -beta\.yml$ && ! $file =~ -rc\.yml$ ]]; then
+        # Skip files that are newly created
+        if ! git ls-tree -r $CI_COMMIT_BEFORE_SHA | grep -q "$(basename $file)"; then
+          echo "Skipping newly created file: $file"
+          continue
+        fi
+        
+        if [[ ! $file =~ -alpha\.yml$ && ! $file =~ -beta\.yml$ && ! $file =~ -rc\.yml$ && ! $file =~ -dev\.yml$]]; then
           echo "Error: Changes to stable prompt file $file are not allowed."
           exit 1
         fi
