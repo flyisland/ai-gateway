@@ -1,5 +1,6 @@
 # test_chat.py
 import asyncio
+from dataclasses import dataclass
 from typing import Any, Dict, Iterator, List, Optional
 from unittest.mock import AsyncMock, MagicMock, Mock, patch
 
@@ -17,6 +18,11 @@ from ai_gateway.integrations.amazon_q.message_processor import (
 )
 from ai_gateway.integrations.amazon_q.response_handlers import ResponseHandler
 
+
+@dataclass
+class StreamResponse:
+    content: str = ""
+    error: str = ""
 
 @pytest.fixture
 def mock_user() -> StarletteUser:
@@ -293,3 +299,132 @@ def event_loop():
     loop = asyncio.new_event_loop()
     yield loop
     loop.close()
+
+
+
+    def test_process_stream_events_success():
+        # Setup
+        chat_model = ChatAmazonQ(amazon_q_client_factory=Mock())
+
+        # Mock response handler
+        chat_model.response_handler = Mock()
+        chat_model.response_handler.process_stream_event.return_value = StreamResponse(content="Hello")
+        chat_model.response_handler.create_content_chunk.return_value = ChatGenerationChunk(text="Hello")
+
+        mock_stream = [{"type": "content", "chunk": {"content": "Hello"}}]
+
+        # Execute
+        chunks = list(chat_model._process_stream_events(mock_stream))
+
+        # Assert
+        assert len(chunks) == 1
+        assert isinstance(chunks[0], ChatGenerationChunk)
+        chat_model.response_handler.process_stream_event.assert_called_once()
+        chat_model.response_handler.create_content_chunk.assert_called_once_with("Hello")
+
+    def test_process_stream_events_invalid_event():
+        # Setup
+        chat_model = ChatAmazonQ(amazon_q_client_factory=Mock())
+
+        # Mock response handler
+        chat_model.response_handler = Mock()
+        chat_model.response_handler.create_error_chunk.return_value = ChatGenerationChunk(text="Invalid event format: not a dictionary")
+
+        mock_stream = ["not a dictionary"]
+
+        # Execute
+        chunks = list(chat_model._process_stream_events(mock_stream))
+
+        # Assert
+        assert len(chunks) == 1
+        chat_model.response_handler.create_error_chunk.assert_called_once_with("Invalid event format: not a dictionary")
+
+    def test_process_stream_events_error_response():
+        # Setup
+        chat_model = ChatAmazonQ(amazon_q_client_factory=Mock())
+
+        # Mock response handler
+        chat_model.response_handler = Mock()
+        chat_model.response_handler.process_stream_event.return_value = StreamResponse(error="Error occurred")
+        chat_model.response_handler.create_error_chunk.return_value = ChatGenerationChunk(text="Error occurred")
+
+        mock_stream = [{"type": "error", "error": {"message": "Error occurred"}}]
+
+        # Execute
+        chunks = list(chat_model._process_stream_events(mock_stream))
+
+        # Assert
+        assert len(chunks) == 1
+        chat_model.response_handler.process_stream_event.assert_called_once()
+        chat_model.response_handler.create_error_chunk.assert_called_once_with("Error occurred")
+
+    def test_process_stream_events_multiple_chunks():
+        # Setup
+        chat_model = ChatAmazonQ(amazon_q_client_factory=Mock())
+
+        # Mock response handler
+        chat_model.response_handler = Mock()
+        responses = [
+            StreamResponse(content="Hello"),
+            StreamResponse(content="World")
+        ]
+        chat_model.response_handler.process_stream_event.side_effect = responses
+        chat_model.response_handler.create_content_chunk.side_effect = [
+            ChatGenerationChunk(text="Hello"),
+            ChatGenerationChunk(text="World")
+        ]
+
+        mock_stream = [
+            {"type": "content", "chunk": {"content": "Hello"}},
+            {"type": "content", "chunk": {"content": "World"}}
+        ]
+
+        # Execute
+        chunks = list(chat_model._process_stream_events(mock_stream))
+
+        # Assert
+        assert len(chunks) == 2
+        assert chat_model.response_handler.process_stream_event.call_count == 2
+        assert chat_model.response_handler.create_content_chunk.call_count == 2
+
+    def test_process_stream_events_empty_stream():
+        # Setup
+        chat_model = ChatAmazonQ(amazon_q_client_factory=Mock())
+        chat_model.response_handler = Mock()
+
+        # Execute
+        chunks = list(chat_model._process_stream_events([]))
+
+        # Assert
+        assert len(chunks) == 0
+        chat_model.response_handler.process_stream_event.assert_not_called()
+        chat_model.response_handler.create_content_chunk.assert_not_called()
+        chat_model.response_handler.create_error_chunk.assert_not_called()
+
+    def test_process_stream_events_mixed_responses():
+      # Setup
+      chat_model = ChatAmazonQ(amazon_q_client_factory=Mock())
+
+      # Mock response handler
+      chat_model.response_handler = Mock()
+      responses = [
+          StreamResponse(content="Success"),
+          StreamResponse(error="An error occurred")
+      ]
+      chat_model.response_handler.process_stream_event.side_effect = responses
+      chat_model.response_handler.create_content_chunk.return_value = ChatGenerationChunk(text="Success")
+      chat_model.response_handler.create_error_chunk.return_value = ChatGenerationChunk(text="An error occurred")
+
+      mock_stream = [
+          {"type": "content", "chunk": {"content": "Success"}},
+          {"type": "error", "error": {"message": "An error occurred"}}
+      ]
+
+      # Execute
+      chunks = list(chat_model._process_stream_events(mock_stream))
+
+      # Assert
+      assert len(chunks) == 2
+      assert chat_model.response_handler.process_stream_event.call_count == 2
+      chat_model.response_handler.create_content_chunk.assert_called_once_with("Success")
+      chat_model.response_handler.create_error_chunk.assert_called_once_with("An error occurred")

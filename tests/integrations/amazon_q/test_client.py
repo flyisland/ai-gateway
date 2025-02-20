@@ -321,3 +321,84 @@ class TestAmazonQClient:
                 aws_secret_access_key="test_secret_key",
                 aws_session_token="test_session_token",
             )
+
+    def test_send_message_success(self, amazon_q_client: AmazonQClient) -> None:
+        """Tests successful message sending."""
+        payload = {
+            "message": "Hello, this is a test message",
+            "conversation_id": "conv-123",
+        }
+
+        expected_response = {"messageId": "msg-123", "status": "success"}
+
+        amazon_q_client.client.send_message.return_value = expected_response
+
+        response = amazon_q_client.send_chat_message(payload)
+
+        amazon_q_client.client.send_message.assert_called_once_with(
+            message="Hello, this is a test message", conversationId="conv-123"
+        )
+        assert response == expected_response
+
+    def test_send_message_empty_message(self, amazon_q_client: AmazonQClient) -> None:
+        """Tests sending empty message."""
+        payload = {"message": "", "conversation_id": "conv-123"}
+
+        amazon_q_client.client.send_message.return_value = {"messageId": "msg-123"}
+
+        response = amazon_q_client.send_chat_message(payload)
+
+        amazon_q_client.client.send_message.assert_called_once_with(
+            message="", conversationId="conv-123"
+        )
+        assert response["messageId"] == "msg-123"
+
+    def test_send_message_long_message(self, amazon_q_client: AmazonQClient) -> None:
+        """Tests sending a long message."""
+        long_message = "x" * 1000  # 1000 character message
+        payload = {"message": long_message, "conversation_id": "conv-123"}
+
+        amazon_q_client.client.send_message.return_value = {"messageId": "msg-123"}
+
+        response = amazon_q_client.send_chat_message(payload)
+
+        amazon_q_client.client.send_message.assert_called_once_with(
+            message=long_message, conversationId="conv-123"
+        )
+        assert response["messageId"] == "msg-123"
+
+    def test_send_message_special_characters(
+        self, amazon_q_client: AmazonQClient
+    ) -> None:
+        """Tests sending message with special characters."""
+        payload = {
+            "message": "Special chars: !@#$%^&*()\n\t",
+            "conversation_id": "conv-123",
+        }
+
+        amazon_q_client.client.send_message.return_value = {"messageId": "msg-123"}
+
+        response = amazon_q_client.send_chat_message(payload)
+
+        amazon_q_client.client.send_message.assert_called_once_with(
+            message="Special chars: !@#$%^&*()\n\t", conversationId="conv-123"
+        )
+        assert response["messageId"] == "msg-123"
+
+    def test_send_message_unicode_characters(
+        self, amazon_q_client: AmazonQClient
+    ) -> None:
+        """Tests sending message with unicode characters."""
+        payload = {
+            "message": "Unicode test: 你好 안녕하세요 👋 🌟",
+            "conversation_id": "conv-123",
+        }
+
+        amazon_q_client.client.send_message.return_value = {"messageId": "msg-123"}
+
+        response = amazon_q_client.send_chat_message(payload)
+
+        amazon_q_client.client.send_message.assert_called_once_with(
+            message="Unicode test: 你好 안녕하세요 👋 🌟", conversationId="conv-123"
+        )
+        assert response["messageId"] == "msg-123"
