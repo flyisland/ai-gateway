@@ -75,6 +75,7 @@ class LocalPromptRegistry(BasePromptRegistry):
         prompt_version: str,
         model_metadata: Optional[ModelMetadata] = None,
     ) -> Prompt:
+        import pdb;pdb.set_trace()
         if (
             model_metadata
             and model_metadata.endpoint
