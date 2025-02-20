@@ -47,7 +47,6 @@ test:enforce_prompt_versioning:
   variables:
     PROMPT_DEFINTIONS_DIR: "ai_gateway/prompts/definitions"
   script:
-    - apk add --no-cache git
     - |
       changed_files=$(git diff --name-only $CI_COMMIT_BEFORE_SHA $CI_COMMIT_SHA -- '${PROMPT_DEFINTIONS_DIR}*.yml')
       for file in $changed_files; do
