@@ -38,6 +38,7 @@ variables:
   CS_IMAGE: $TARGET_IMAGE
 
   CLOUD_CONNECTOR_SERVICE_NAME: "gitlab-ai-gateway"
+  PROMPT_DEFINTIONS_DIR: "ai_gateway/prompts/definitions"
 
 include:
   - local: .gitlab/ci/build.gitlab-ci.yml
@@ -114,3 +115,23 @@ tag-self-hosted:
       git push origin "self-hosted-${GITLAB_VERSION}"
   rules:
     - if: $GITLAB_VERSION
+
+check_prompt_changes:
+  stage: validate
+  script:
+    - |
+      changed_files=$(git diff --name-only $CI_COMMIT_BEFORE_SHA $CI_COMMIT_SHA -- '${PROMPT_DEFINTIONS_DIR}*.yml')
+      for file in $changed_files; do
+        if [[ ! $file =~ -alpha\.yml$ && ! $file =~ -beta\.yml$ && ! $file =~ -rc\.yml$ ]]; then
+          echo "Error: Changes to stable prompt file $file are not allowed."
+          exit 1
+        fi
+      done
+    - echo "All changes are in allowed files."
+  rules:
+    - if: $CI_PIPELINE_SOURCE == "merge_request_event"
+    - if: $CI_PIPELINE_SOURCE == "schedule"
+    - if: $CI_PIPELINE_SOURCE == "push"
+      changes:
+        - "${PROMPT_DEFINTIONS_DIR}*.yml"
+
