@@ -3,5 +3,7 @@
 {%- for pad in agent_scratchpad -%}
 Observation: {{ pad.observation }}
 {%- endfor %}
-{%- endif %}
 Final Answer: {{ final_answer }}
+{%- else -%}
+{{ final_answer }}
+{%- endif %}
