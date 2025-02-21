@@ -2,7 +2,7 @@
 {%- if agent_scratchpad %}
 {%- for pad in agent_scratchpad -%}
 Observation: {{ pad.observation }}
-{%- endfor %}
+{% endfor -%}
 Final Answer: {{ final_answer }}
 {%- else -%}
 {{ final_answer }}
