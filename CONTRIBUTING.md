@@ -1,3 +1,3 @@
-## Guidelines for contributing to the project
+# Guidelines for contributing to the project
 
 WIP
