@@ -14,13 +14,14 @@ from ai_gateway.instrumentators.model_requests import ModelRequestInstrumentator
 from ai_gateway.internal_events.client import InternalEventsClient
 from ai_gateway.prompts.config.base import ModelConfig, PromptConfig, PromptParams
 from ai_gateway.prompts.typing import Model, ModelMetadata, TypeModelFactory
+from ai_gateway.structured_logging import get_request_logger
 
 __all__ = [
     "Prompt",
     "BasePromptRegistry",
     "jinja2_formatter",
 ]
-
+request_log = get_request_logger("search")
 Input = TypeVar("Input")
 Output = TypeVar("Output")
 
@@ -108,7 +109,9 @@ class Prompt(RunnableBinding[Input, Output]):
         **kwargs: Optional[Any],
     ) -> Output:
         with self.instrumentator.watch(stream=False):
-            return await super().ainvoke(input, config, **kwargs)
+            response = await super().ainvoke(input, config, **kwargs)
+            request_log.info("Response received", response=response)
+            return response
 
     async def astream(
         self,
@@ -118,6 +121,7 @@ class Prompt(RunnableBinding[Input, Output]):
     ) -> AsyncIterator[Output]:
         with self.instrumentator.watch(stream=True) as watcher:
             async for item in super().astream(input, config, **kwargs):
+                request_log.info("Response received", response=item)
                 yield item
 
             await watcher.afinish()

@@ -10,11 +10,19 @@ from langchain_core.prompts import ChatPromptTemplate
 from langchain_core.runnables import Runnable
 from litellm.exceptions import Timeout
 from pydantic import HttpUrl
+from structlog.testing import capture_logs
 
+from ai_gateway.feature_flags.context import current_feature_flag_context
 from ai_gateway.models.v2.anthropic_claude import ChatAnthropic
 from ai_gateway.prompts.base import Prompt, model_metadata_to_params
 from ai_gateway.prompts.config.base import PromptParams
 from ai_gateway.prompts.typing import Model, ModelMetadata
+
+
+@pytest.fixture(autouse=True)
+def stub_feature_flags():
+    current_feature_flag_context.set(["expanded_ai_logging"])
+    yield
 
 
 class TestPrompt:
@@ -46,8 +54,13 @@ class TestPrompt:
     async def test_ainvoke(
         self, mock_watch: mock.Mock, prompt: Prompt, model_response: str
     ):
-        response = await prompt.ainvoke({"name": "Duo", "content": "What's up?"})
+        with capture_logs() as cap_logs:
 
+            response = await prompt.ainvoke({"name": "Duo", "content": "What's up?"})
+
+        assert len(cap_logs) == 1
+        assert cap_logs[0]["event"] == "Response received"
+        assert cap_logs[0]["response"].content == model_response
         assert response.content == model_response
 
         mock_watch.assert_called_with(stream=False)
@@ -62,11 +75,14 @@ class TestPrompt:
         mock_watcher = mock.AsyncMock()
         mock_watch.return_value.__enter__.return_value = mock_watcher
         response = ""
+        with capture_logs() as cap_logs:
+            async for c in prompt.astream({"name": "Duo", "content": "What's up?"}):
+                response += c.content
 
-        async for c in prompt.astream({"name": "Duo", "content": "What's up?"}):
-            response += c.content
-
-            mock_watcher.afinish.assert_not_awaited()  # Make sure we don't finish prematurely
+                mock_watcher.afinish.assert_not_awaited()  # Make sure we don't finish prematurely
+        for i, c in enumerate(model_response):
+            assert cap_logs[i]["event"] == "Response received"
+            assert cap_logs[i]["response"].content == c
 
         assert response == model_response
 
