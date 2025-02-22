@@ -1,3 +1,5 @@
+import json
+
 import boto3
 from botocore.exceptions import ClientError
 from fastapi import HTTPException, status
@@ -164,9 +166,7 @@ class AmazonQClient:
         print("DEBUG [AmazonQClient]: send_event payload", payload)
         print("DEBUG [AmazonQClient]: event_id", event_id)
         try:
-            # DELETE ME
-            if event_id == "Quick Action":
-                self._send_event(event_id, payload)
+            self._send_event(event_id, payload)
         except ClientError as ex:
             if ex.__class__.__name__ == "AccessDeniedException":
                 return self._retry_send_event(ex, event_request.code, payload, event_id)
@@ -201,7 +201,6 @@ class AmazonQClient:
         )
 
     def _send_message(self, payload):
-        print("DEBUG [AmazonQClient]: _send_message payload", payload)
         return self.client.send_message(
             message=payload["message"], conversationId=payload["conversation_id"]
         )
@@ -242,14 +241,17 @@ class AmazonQClient:
         payload = event_request.payload
 
         if payload.__class__.__name__ == "EventHookPayload":
-            return safe_process_json(
-                payload.data, EXCLUDE_EVENT_ATTRIBUTES, ignore_null=True
+            updated_payload = safe_process_json(
+                payload.model_dump(exclude_none=True),
+                EXCLUDE_EVENT_ATTRIBUTES,
+                ignore_null=True,
             )
+            return json.dumps(updated_payload)
         elif payload.__class__.__name__ in [
             "EventMergeRequestPayload",
             "EventIssuePayload",
         ]:
-            return payload.model_dump(exclude_none=True)
+            return payload.model_dump_json(exclude_none=True)
 
         request_log.warn("Unknown event payload, ignore")
         return None

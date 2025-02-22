@@ -7,11 +7,12 @@ as various error conditions using mock objects to simulate AWS services.
 
 """
 
+import json
 from typing import Dict
 from unittest.mock import Mock, patch
 
 import pytest
-from botocore.exceptions import ClientError, ParamValidationError
+from botocore.exceptions import ClientError
 from fastapi import HTTPException
 
 from ai_gateway.api.auth_utils import StarletteUser
@@ -478,20 +479,23 @@ class TestAmazonQClient:
             (
                 "event_request_hook",
                 {
-                    "project_id": 1,
-                    "ref": "refs/heads/main",
-                    "checkout_sha": "abc123",
-                    "user_id": 1,
-                    "user_name": "Test User",
-                    "repository": {
-                        "name": "test-repo",
-                        "url": "git@gitlab.com:group/project.git",
-                        "description": "test repository",
-                        "homepage": "https://gitlab.com/group/project",
-                    },
-                    "project": {
-                        "id": 20,
-                        "name": "Project1",
+                    "source": "system_hook",
+                    "data": {
+                        "project_id": 1,
+                        "ref": "refs/heads/main",
+                        "checkout_sha": "abc123",
+                        "user_id": 1,
+                        "user_name": "Test User",
+                        "repository": {
+                            "name": "test-repo",
+                            "url": "git@gitlab.com:group/project.git",
+                            "description": "test repository",
+                            "homepage": "https://gitlab.com/group/project",
+                        },
+                        "project": {
+                            "id": 20,
+                            "name": "Project1",
+                        },
                     },
                 },
                 ["object_kind"],  # Exclude 'object_kind' from the result
@@ -500,21 +504,24 @@ class TestAmazonQClient:
             (
                 "event_request_hook",
                 {
-                    "object_kind": "merge_request",
-                    "project_id": 1,
-                    "ref": "refs/heads/main",
-                    "checkout_sha": "abc123",
-                    "user_id": 1,
-                    "user_name": "Test User",
-                    "repository": {
-                        "name": "test-repo",
-                        "url": "git@gitlab.com:group/project.git",
-                        "description": "test repository",
-                        "homepage": "https://gitlab.com/group/project",
-                    },
-                    "project": {
-                        "id": 20,
-                        "name": "Project1",
+                    "source": "system_hook",
+                    "data": {
+                        "object_kind": "merge_request",
+                        "project_id": 1,
+                        "ref": "refs/heads/main",
+                        "checkout_sha": "abc123",
+                        "user_id": 1,
+                        "user_name": "Test User",
+                        "repository": {
+                            "name": "test-repo",
+                            "url": "git@gitlab.com:group/project.git",
+                            "description": "test repository",
+                            "homepage": "https://gitlab.com/group/project",
+                        },
+                        "project": {
+                            "id": 20,
+                            "name": "Project1",
+                        },
                     },
                 },
                 [],  # No exclusions
@@ -592,6 +599,7 @@ class TestAmazonQClient:
 
         # Process the payload
         result = amazon_q_client._get_payload(event_request)
+        result = json.loads(result) if result else result
 
         # Verify the result
         assert result == expected_result
