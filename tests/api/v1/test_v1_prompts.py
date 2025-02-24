@@ -12,7 +12,7 @@ from pydantic import AnyUrl
 from ai_gateway.api.v1 import api_router
 from ai_gateway.config import Config
 from ai_gateway.prompts import Prompt
-from ai_gateway.prompts.typing import ModelMetadata, ModelMetadataType
+from ai_gateway.prompts.typing import ModelMetadata, TypeModelMetadata
 
 
 class FakeModel(SimpleChatModel):
@@ -199,7 +199,7 @@ class TestPrompt:
         mock_track_internal_event,
         inputs: dict[str, str],
         prompt_version: Optional[str],
-        model_metadata: Optional[ModelMetadataType],
+        model_metadata: Optional[ModelMetadata],
         expected_get_args: dict,
         expected_status: int,
         expected_response: ANY,

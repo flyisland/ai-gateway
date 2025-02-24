@@ -17,18 +17,9 @@ def message_processor() -> MessageProcessor:
     return MessageProcessor()
 
 
-@pytest.fixture
-def mock_user() -> StarletteUser:
-    user = Mock(spec=StarletteUser)
-    user.global_user_id = "test-user-123"
-    return user
-
-
-def test_process_empty_messages(
-    message_processor: MessageProcessor, mock_user: StarletteUser
-) -> None:
+def test_process_empty_messages(message_processor: MessageProcessor) -> None:
     messages: List[BaseMessage] = []
-    result = message_processor.process_messages(messages, mock_user)
+    result = message_processor.process_messages(messages, "test-user-123")
 
     assert isinstance(result, ProcessedMessage)
     assert result.content == ""
@@ -36,27 +27,23 @@ def test_process_empty_messages(
     assert result.history == []
 
 
-def test_process_single_human_message(
-    message_processor: MessageProcessor, mock_user: StarletteUser
-) -> None:
+def test_process_single_human_message(message_processor: MessageProcessor) -> None:
     messages: List[BaseMessage] = [HumanMessage(content="Hello")]
-    result = message_processor.process_messages(messages, mock_user)
+    result = message_processor.process_messages(messages, "test-user-123")
 
     assert result.content == "Hello"
     assert result.conversation_id == "test-user-123"
     assert result.history == []
 
 
-def test_process_conversation_with_history(
-    message_processor: MessageProcessor, mock_user: StarletteUser
-) -> None:
+def test_process_conversation_with_history(message_processor: MessageProcessor) -> None:
     messages: List[BaseMessage] = [
         HumanMessage(content="Hello"),
         AIMessage(content="Hi there!"),
         HumanMessage(content="How are you?"),
     ]
 
-    result = message_processor.process_messages(messages, mock_user)
+    result = message_processor.process_messages(messages, "test-user-123")
 
     assert result.content == "How are you?"
     assert len(result.history) == 2
@@ -64,28 +51,24 @@ def test_process_conversation_with_history(
     assert result.history[1] == {"assistantResponseMessage": "Hi there!"}
 
 
-def test_handle_empty_content(
-    message_processor: MessageProcessor, mock_user: StarletteUser
-) -> None:
+def test_handle_empty_content(message_processor: MessageProcessor) -> None:
     messages: List[BaseMessage] = [HumanMessage(content="")]
-    result = message_processor.process_messages(messages, mock_user)
+    result = message_processor.process_messages(messages, "test-user-123")
 
     assert result.content == ""
     assert result.history == []
 
 
-def test_handle_missing_content(
-    message_processor: MessageProcessor, mock_user: StarletteUser
-) -> None:
+def test_handle_missing_content(message_processor: MessageProcessor) -> None:
     messages: List[BaseMessage] = []
-    result = message_processor.process_messages(messages, mock_user)
+    result = message_processor.process_messages(messages, "test-user-123")
 
     assert result.content == ""
     assert result.history == []
 
 
 def test_create_history_alternating_messages(
-    message_processor: MessageProcessor, mock_user: StarletteUser
+    message_processor: MessageProcessor,
 ) -> None:
     messages: List[BaseMessage] = [
         HumanMessage(content="Message 1"),
@@ -95,7 +78,7 @@ def test_create_history_alternating_messages(
         HumanMessage(content="Current message"),
     ]
 
-    result = message_processor.process_messages(messages, mock_user)
+    result = message_processor.process_messages(messages, "test-user-123")
 
     expected_history: List[HistoryItem] = [
         {"userInputMessage": "Message 1"},
@@ -108,11 +91,9 @@ def test_create_history_alternating_messages(
     assert result.history == expected_history
 
 
-def test_conversation_id_generation(
-    message_processor: MessageProcessor, mock_user: StarletteUser
-) -> None:
+def test_conversation_id_generation(message_processor: MessageProcessor) -> None:
     messages: List[BaseMessage] = [HumanMessage(content="Test message")]
-    result = message_processor.process_messages(messages, mock_user)
+    result = message_processor.process_messages(messages, "test-user-123")
 
     assert result.conversation_id == "test-user-123"
 
