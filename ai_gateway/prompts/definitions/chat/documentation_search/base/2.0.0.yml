@@ -5,7 +5,7 @@ model:
   params:
     temperature: 0.1
 unit_primitives:
-  - ask_documentation
+  - documentation_search
 prompt_template:
   system: |
     {% include 'chat/documentation_search/system.jinja' %}
