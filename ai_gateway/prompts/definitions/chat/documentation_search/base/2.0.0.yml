@@ -7,8 +7,6 @@ model:
 unit_primitives:
   - documentation_search
 prompt_template:
-  system: |
-    {% include 'chat/documentation_search/system.jinja' %}
   user: |
     {% include 'chat/documentation_search/user.jinja' %}
   assistant: |
