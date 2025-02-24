@@ -22,7 +22,6 @@ Example Usage:
         print(chunk.content)
 """
 
-import os
 from dataclasses import field
 from typing import Any, Dict, Iterator, List, Optional, cast
 
@@ -69,7 +68,6 @@ class ChatAmazonQ(BaseChatModel):
         Post-initialization setup.
         Called after dataclass initialization.
         """
-        self.metadata: Dict[str, Any] = {}
         super().__init__()
 
     @property
@@ -102,7 +100,7 @@ class ChatAmazonQ(BaseChatModel):
         Returns:
             ChatResult: Generated response wrapped in a ChatResult object
         """
-        message: str = self._build_response(messages=messages)
+        message: str = self._build_response(messages=messages, **kwargs)
         return self._create_chat_result(message)
 
     def _create_chat_result(self, message: str) -> ChatResult:
@@ -141,7 +139,14 @@ class ChatAmazonQ(BaseChatModel):
         """
         return {"token_usage": 100, "model": "amazon_q"}
 
-    def _build_response(self, messages: List[BaseMessage]):
+    def _build_response(
+        self,
+        messages: List[BaseMessage],
+        user: StarletteUser,
+        role_arn: str,
+        conversation_id: str,
+        **kwargs: Any,
+    ):
         """
         Build a response from the given messages.
 
@@ -151,15 +156,15 @@ class ChatAmazonQ(BaseChatModel):
         Returns:
             str: The built response from Amazon Q
         """
-        current_user: StarletteUser = self._get_current_user()
-        q_client: Any = self._get_client(current_user)
+        current_user: StarletteUser = self._get_current_user(user)
+        q_client: Any = self._get_client(current_user, role_arn)
         processed_message: ProcessedMessage = self._process_messages(
-            messages, current_user
+            messages, conversation_id
         )
         return self._send_chat_message(q_client, processed_message)
 
     def _process_messages(
-        self, messages: List[BaseMessage], current_user: StarletteUser
+        self, messages: List[BaseMessage], conversation_id: str
     ) -> ProcessedMessage:
         """
         Process the input messages for the current user.
@@ -171,7 +176,7 @@ class ChatAmazonQ(BaseChatModel):
         Returns:
             ProcessedMessage: Processed message ready for sending
         """
-        return self.message_processor.process_messages(messages, current_user)
+        return self.message_processor.process_messages(messages, conversation_id)
 
     def _create_chat_message_params(
         self, processed_message: ProcessedMessage
@@ -212,7 +217,7 @@ class ChatAmazonQ(BaseChatModel):
             ChatGenerationChunk: Chunks of the generated response
         """
         try:
-            response: Dict[str, Any] = self._build_response(messages=messages)
+            response: Dict[str, Any] = self._build_response(messages=messages, **kwargs)
             yield from self._handle_stream(response["responseStream"])
         except Exception as e:
             yield from self._handle_stream_error(e)
@@ -332,16 +337,16 @@ class ChatAmazonQ(BaseChatModel):
         return self.response_handler.create_error_chunk(str(error))
 
     # Section 5: Client Management
-    def _get_current_user(self) -> StarletteUser:
+    def _get_current_user(self, user: StarletteUser) -> StarletteUser:
         """
         Get the current user from metadata.
 
         Returns:
             StarletteUser: The current user making the request
         """
-        return self.metadata["user"]
+        return user
 
-    def _get_client(self, current_user: StarletteUser) -> Any:
+    def _get_client(self, current_user: StarletteUser, role_arn: str) -> Any:
         """
         Get an Amazon Q client for the current user.
 
@@ -351,21 +356,9 @@ class ChatAmazonQ(BaseChatModel):
         Returns:
             Any: Configured Amazon Q client
         """
-        role_arn: Optional[str] = self._get_role_arn()
         return self._create_client(current_user, role_arn)
 
-    def _get_role_arn(self) -> Optional[str]:
-        """
-        Get the AWS role ARN from environment variables.
-
-        Returns:
-            Optional[str]: The role ARN if configured
-        """
-        return os.environ.get("AWS_ROLE_ARN")
-
-    def _create_client(
-        self, current_user: StarletteUser, role_arn: Optional[str]
-    ) -> Any:
+    def _create_client(self, current_user: StarletteUser, role_arn: str) -> Any:
         """
         Create an Amazon Q client.
 

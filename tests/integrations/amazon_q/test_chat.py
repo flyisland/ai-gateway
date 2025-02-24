@@ -38,7 +38,6 @@ def chat_client(mock_user: StarletteUser) -> ChatAmazonQ:
         message_processor=MessageProcessor(),
         response_handler=ResponseHandler(),
     )
-    client.metadata = {"user": mock_user}
     return client
 
 
@@ -55,8 +54,6 @@ def mock_messages() -> List[BaseMessage]:
 class TestChatAmazonQInitialization:
     def test_post_init(self, chat_client: ChatAmazonQ) -> None:
         """Test post initialization setup."""
-        assert isinstance(chat_client.metadata, dict)
-        assert "user" in chat_client.metadata
         assert chat_client._llm_type == "amazon_q"
         assert chat_client._identifying_params == {"model": "amazon_q"}
 
@@ -68,28 +65,23 @@ class TestChatAmazonQInitialization:
             message_processor=MessageProcessor(),
             response_handler=ResponseHandler(),
         )
-        # Initialize metadata with mock user
-        custom_client.metadata = {"user": mock_user}
 
         assert custom_client._identifying_params["model"] == "custom_model"
-        assert isinstance(custom_client.metadata, dict)
-        assert custom_client.metadata["user"] == mock_user
 
 
 class TestChatAmazonQMessageGeneration:
     def test_process_messages(
         self,
         chat_client: ChatAmazonQ,
-        mock_user: StarletteUser,
         mock_messages: List[BaseMessage],
     ) -> None:
         """Test message processing."""
-        result = chat_client._process_messages(mock_messages, current_user=mock_user)
+        result = chat_client._process_messages(mock_messages, conversation_id="id")
 
         # Verify the processed message properties
         assert isinstance(result, ProcessedMessage)
         assert result.content == "AI message"  # The last message content
-        assert hasattr(result, "conversation_id")
+        assert result.conversation_id == "id"
         assert isinstance(result.history, list)
         assert len(result.history) > 0
         assert "userInputMessage" in result.history[0]
@@ -230,16 +222,20 @@ class TestChatAmazonQResponseHandling:
 
 class TestChatAmazonQEdgeCases:
     @pytest.mark.asyncio
-    async def test_empty_messages(self, chat_client: ChatAmazonQ) -> None:
+    async def test_empty_messages(self, mock_user, chat_client: ChatAmazonQ) -> None:
         """Test empty message list handling."""
         with pytest.raises(ValueError):
-            await chat_client._agenerate([])
+            await chat_client._agenerate(
+                [], user=mock_user, role_arn="role-arn", conversation_id="id"
+            )
 
     @pytest.mark.asyncio
-    async def test_invalid_message_type(self, chat_client: ChatAmazonQ) -> None:
+    async def test_invalid_message_type(
+        self, mock_user, chat_client: ChatAmazonQ
+    ) -> None:
         """Test invalid message type handling."""
         with pytest.raises(AttributeError):
-            await chat_client._agenerate([{"invalid": "message"}])  # type: ignore
+            await chat_client._agenerate([{"invalid": "message"}], user=mock_user, role_arn="role-arn", conversation_id="id")  # type: ignore
 
     @pytest.mark.asyncio
     async def test_large_message(self, chat_client: ChatAmazonQ) -> None:
@@ -261,13 +257,7 @@ class TestChatAmazonQAuthentication:
         self, chat_client: ChatAmazonQ, mock_user: StarletteUser
     ) -> None:
         """Test current user retrieval."""
-        assert chat_client._get_current_user() == mock_user
-
-    def test_missing_user(self, chat_client: ChatAmazonQ) -> None:
-        """Test missing user handling."""
-        chat_client.metadata = {}
-        with pytest.raises(KeyError):
-            chat_client._get_current_user()
+        assert chat_client._get_current_user(mock_user) == mock_user
 
 
 @pytest.mark.asyncio
@@ -281,7 +271,9 @@ async def test_build_response(chat_client: ChatAmazonQ, mock_user: StarletteUser
     mock_client.send_chat_message = AsyncMock(return_value=mock_response)
 
     with patch.object(chat_client, "_get_client", return_value=mock_client):
-        response = await chat_client._build_response(test_messages)
+        response = await chat_client._build_response(
+            test_messages, user=mock_user, role_arn="role-arn", conversation_id="id"
+        )
         assert mock_client.send_chat_message.called
         assert mock_client.send_chat_message.return_value == mock_response
         assert response == mock_response
