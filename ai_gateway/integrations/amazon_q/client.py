@@ -27,6 +27,7 @@ __all__ = [
 QUICK_ACTION_EVENT_ID = "Quick Action"
 EXCLUDE_EVENT_ATTRIBUTES = [
     "homepage",
+    "email",
     "url",
     "ssh_url",
     "http_url",
