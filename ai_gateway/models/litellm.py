@@ -254,7 +254,7 @@ class LiteLlmChatModel(ChatModelBase):
         provider_endpoints: Optional[dict] = None,
         async_fireworks_client: Optional[AsyncOpenAI] = None,
     ):
-        if not custom_models_enabled and provider == KindModelProvider.LITELLM:
+        if not custom_models_enabled:
             if endpoint is not None or api_key is not None:
                 raise ValueError("specifying custom models endpoint is disabled")
 
@@ -488,13 +488,9 @@ class LiteLlmTextGenModel(TextGenModelBase):
         provider_endpoints: Optional[dict] = None,
         async_fireworks_client: Optional[AsyncOpenAI] = None,
     ):
-        if endpoint is not None or api_key is not None:
-            if not custom_models_enabled and provider == KindModelProvider.LITELLM:
+        if not custom_models_enabled:
+            if endpoint is not None or api_key is not None:
                 raise ValueError("specifying custom models endpoint is disabled")
-            if provider == KindModelProvider.VERTEX_AI:
-                raise ValueError(
-                    "specifying api endpoint or key for vertex-ai provider is disabled"
-                )
 
         if provider == KindModelProvider.MISTRALAI:
             api_key = provider_keys.get("mistral_api_key")
