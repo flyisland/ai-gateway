@@ -1,0 +1,17 @@
+---
+name: Claude 3 Documentation Search agent
+model:
+  config_file: claude_3_7
+  params:
+    temperature: 0.1
+unit_primitives:
+  - ask_documentation
+prompt_template:
+  system: |
+    {% include 'chat/documentation_search/system.jinja' %}
+  user: |
+    {% include 'chat/documentation_search/user.jinja' %}
+  assistant: |
+    {% include 'chat/documentation_search/assistant.jinja' %}
+params:
+  timeout: 60

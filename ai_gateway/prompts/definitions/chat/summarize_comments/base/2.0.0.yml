@@ -1,0 +1,15 @@
+---
+name: Claude 3 Summarize Comments agent
+model: 
+  config_file: claude_3_7
+unit_primitives:
+  - summarize_comments
+prompt_template:
+  system: |
+    {% include 'chat/summarize_comments/system.jinja' %}
+  user: |
+    {% include 'chat/summarize_comments/user.jinja' %}
+  assistant: |
+    {% include 'chat/summarize_comments/assistant.jinja' %}
+params:
+  timeout: 60
