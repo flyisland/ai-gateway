@@ -96,7 +96,7 @@ SAAS_PROMPT_MODEL_MAP = {
         "model_provider": ModelProvider.ANTHROPIC,
         "model_version": KindAnthropicModel.CLAUDE_3_5_SONNET,
     },
-    "1.0.2-dev": {
+    "3.0.2-dev": {
         "model_provider": ModelProvider.ANTHROPIC,
         "model_version": KindAnthropicModel.CLAUDE_3_7_SONNET,
     },
