@@ -1,5 +1,5 @@
 ---
-name: Claude 3 Write Tests agent
+name: Claude 3.7 Write Tests agent
 model: 
   config_file: claude_3_7
   params:
@@ -12,7 +12,5 @@ prompt_template:
     {% include 'chat/write_tests/system.jinja' %}
   user: |
     {% include 'chat/write_tests/user.jinja' %}
-  assistant: |
-    {% include 'chat/write_tests/assistant.jinja' %}
 params:
   timeout: 60

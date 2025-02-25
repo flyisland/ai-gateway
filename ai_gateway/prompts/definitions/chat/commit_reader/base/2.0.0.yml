@@ -1,11 +1,11 @@
 ---
-name: Claude 3 Commit Reader agent
+name: Claude 3.7 Commit Reader agent
 model:
   config_file: claude_3_7
   params:
     max_tokens: 2_048
 unit_primitives:
-  - ask_commit
+  - duo_chat
 prompt_template:
   system: |
     {% include 'chat/commit_reader/system.jinja' %}

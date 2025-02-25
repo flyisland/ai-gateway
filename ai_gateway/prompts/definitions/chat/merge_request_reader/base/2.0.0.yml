@@ -1,5 +1,5 @@
 ---
-name: Claude 3 Merge Request Reader agent
+name: Claude 3.7 Merge Request Reader agent
 model: 
   config_file: claude_3_7
   params:    

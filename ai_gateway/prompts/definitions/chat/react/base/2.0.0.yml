@@ -1,5 +1,5 @@
 ---
-name: Claude 3 React agent
+name: Claude 3.7 React agent
 model:
   config_file: claude_3_7
   params:
@@ -15,4 +15,6 @@ prompt_template:
   assistant: |
     {% include 'chat/react/assistant.jinja' %}
 params:
-  timeout: 60
+  timeout: 30
+  stop:
+    - "Observation:"

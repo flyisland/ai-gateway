@@ -1,5 +1,5 @@
 ---
-name: Claude 3 Documentation Search agent
+name: Claude 3.7 Documentation Search agent
 model:
   config_file: claude_3_7
   params:

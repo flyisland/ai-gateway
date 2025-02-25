@@ -1,5 +1,5 @@
 ---
-name: Claude 3 Explain Code agent
+name: Claude 3.7 Explain Code agent
 model:
   config_file: claude_3_7
   params:

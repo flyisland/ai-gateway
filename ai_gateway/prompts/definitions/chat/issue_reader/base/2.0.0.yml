@@ -1,5 +1,5 @@
 ---
-name: Claude 3 Issue Reader agent
+name: Claude 3.7 Issue Reader agent
 model:
   config_file: claude_3_7
   params:

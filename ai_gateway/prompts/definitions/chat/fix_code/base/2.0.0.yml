@@ -1,5 +1,5 @@
 ---
-name: Claude 3 Fix Code agent
+name: Claude 3.7 Fix Code agent
 model:
   config_file: claude_3_7
   params:
@@ -12,7 +12,5 @@ prompt_template:
     {% include 'chat/fix_code/system.jinja' %}
   user: |
     {% include 'chat/fix_code/user.jinja' %}
-  assistant: |
-    {% include 'chat/fix_code/assistant.jinja' %}
 params:
   timeout: 60
