@@ -89,6 +89,7 @@ async def get_prompt_registry():
     yield get_container_application().pkg_prompts.prompt_registry()
 
 
+# test for dangerbot message change
 @router.post("/completions")
 @router.post("/code/completions")
 @feature_category(GitLabFeatureCategory.CODE_SUGGESTIONS)
