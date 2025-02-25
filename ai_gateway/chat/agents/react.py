@@ -23,7 +23,6 @@ from ai_gateway.chat.tools.base import BaseTool
 from ai_gateway.feature_flags import FeatureFlag, is_feature_enabled
 from ai_gateway.models.base_chat import Role
 from ai_gateway.prompts import Prompt, jinja2_formatter
-from ai_gateway.prompts.typing import TypeModelMetadata
 from ai_gateway.prompts.config import ModelClassProvider, ModelConfig
 
 __all__ = [
@@ -42,7 +41,6 @@ request_log = get_request_logger("react")
 class ReActAgentInputs(BaseModel):
     messages: list[Message]
     agent_scratchpad: Optional[list[AgentStep]] = None
-    model_metadata: Optional[TypeModelMetadata] = None
     unavailable_resources: Optional[list[str]] = None
     tools: Optional[list[BaseTool]] = None
     current_date: Optional[str] = None
