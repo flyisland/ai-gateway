@@ -5,6 +5,7 @@ import structlog
 import yaml
 from poetry.core.constraints.version import Version, parse_constraint
 
+from ai_gateway.api.auth_utils import StarletteUser
 from ai_gateway.internal_events.client import InternalEventsClient
 from ai_gateway.prompts.base import BasePromptRegistry, Prompt
 from ai_gateway.prompts.config import BaseModelConfig, ModelClassProvider, PromptConfig
@@ -73,6 +74,7 @@ class LocalPromptRegistry(BasePromptRegistry):
         self,
         prompt_id: str,
         prompt_version: str,
+        user: StarletteUser,
         model_metadata: Optional[TypeModelMetadata] = None,
     ) -> Prompt:
         if (
@@ -108,6 +110,7 @@ class LocalPromptRegistry(BasePromptRegistry):
         return prompt_registered.klass(
             model_factory,
             config,
+            user,
             model_metadata,
             disable_streaming=self.disable_streaming,
         )

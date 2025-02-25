@@ -1207,7 +1207,7 @@ class TestAmazonQIntegrationV3:
 
     @pytest.mark.parametrize(
         (
-            "mock_suggestions_output_text",
+            "mock_completions_amazonq_output_texts",
             "mock_suggestions_model",
             "mock_suggestions_engine",
             "expected_response",
@@ -1215,13 +1215,18 @@ class TestAmazonQIntegrationV3:
         [
             # non-empty suggestions from model
             (
-                "def search",
+                ["def search", "println"],
                 "amazon_q",
                 "amazon_q",
                 {
                     "choices": [
                         {
                             "text": "def search",
+                            "index": 0,
+                            "finish_reason": "length",
+                        },
+                        {
+                            "text": "println",
                             "index": 0,
                             "finish_reason": "length",
                         },
@@ -1238,7 +1243,7 @@ class TestAmazonQIntegrationV3:
             ),
             # empty suggestions from model
             (
-                "",
+                [],
                 "amazon_q",
                 "amazon_q",
                 {
@@ -1259,7 +1264,8 @@ class TestAmazonQIntegrationV3:
         self,
         mock_client: TestClient,
         mock_completions: Mock,
-        mock_suggestions_output_text: str,
+        mock_completions_amazonq_output_texts: str,
+        mock_completions_amazonq: Mock,
         expected_response: dict,
         route: str,
     ):

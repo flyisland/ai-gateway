@@ -1,4 +1,4 @@
-from typing import Annotated, Literal, Optional, Union
+from typing import Annotated, Any, List, Literal, Optional, Union
 
 from pydantic import BaseModel, Field, StringConstraints
 
@@ -55,9 +55,40 @@ class EventIssuePayload(EventRequestPayload):
     issue_iid: Annotated[str, StringConstraints(max_length=1024)]
 
 
+class EventHookPayload(BaseModel):
+    source: Literal["system_hook"]
+    data: dict[str, Any]
+
+
 class EventRequest(BaseModel):
     role_arn: Annotated[str, StringConstraints(max_length=2048)]
     code: Annotated[str, StringConstraints(max_length=255)]
-    payload: Union[EventMergeRequestPayload, EventIssuePayload] = Field(
-        discriminator="source"
+    payload: Union[EventMergeRequestPayload, EventIssuePayload, EventHookPayload] = (
+        Field(discriminator="source")
     )
+
+
+class ProgrammingLanguage(BaseModel):
+    languageName: str
+
+
+class FileContext(BaseModel):
+    leftFileContent: Optional[str]
+    rightFileContent: Optional[str]
+    filename: str
+    programmingLanguage: ProgrammingLanguage
+
+
+class CodeSuggestionRequest(BaseModel):
+    fileContext: FileContext
+    maxResults: int
+
+
+class CodeRecommendation(BaseModel):
+    content: str
+    mostRelevantMissingImports: List[str] = Field(default_factory=list)
+    references: List[str] = Field(default_factory=list)
+
+
+class CodeSuggestionResponse(BaseModel):
+    CodeRecommendations: List[CodeRecommendation]

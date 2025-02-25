@@ -11,3 +11,5 @@ prompt_template:
     {% include 'chat/summarize_comments/system.jinja' %}
   user: |
     {% include 'chat/summarize_comments/user.jinja' %}
+params:
+  timeout: 60

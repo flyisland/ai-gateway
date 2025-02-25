@@ -11,3 +11,5 @@ prompt_template:
     {% include 'chat/epic_reader/system.jinja' %}
   user: |
     {% include 'chat/epic_reader/user.jinja' %}
+params:
+  timeout: 60

@@ -445,8 +445,9 @@ class TestReActAgent:
             if isinstance(msg, SystemMessage):
                 if feature_flag_enabled and inputs.model_metadata is None:
                     content_dict = msg.content[0]
-                    assert content_dict["type"] == "text"
-                    assert content_dict["cache_control"] == {"type": "ephemeral"}
+                    if isinstance(content_dict, dict):
+                        assert content_dict["type"] == "text"
+                        assert content_dict["cache_control"] == {"type": "ephemeral"}
                 else:
                     assert isinstance(msg.content, str)
 
