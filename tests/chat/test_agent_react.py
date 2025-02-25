@@ -460,7 +460,7 @@ class TestReActAgent:
 
         for msg in prompt_value.messages:
             if isinstance(msg, SystemMessage):
-                if feature_flag_enabled and inputs.model_metadata is None:
+                if feature_flag_enabled and prompt.prompt_tpl == "anthropic":
                     content_dict = msg.content[0]
                     assert content_dict["type"] == "text"
                     assert content_dict["cache_control"] == {"type": "ephemeral"}

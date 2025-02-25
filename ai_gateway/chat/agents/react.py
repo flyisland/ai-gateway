@@ -24,6 +24,7 @@ from ai_gateway.feature_flags import FeatureFlag, is_feature_enabled
 from ai_gateway.models.base_chat import Role
 from ai_gateway.prompts import Prompt, jinja2_formatter
 from ai_gateway.prompts.typing import TypeModelMetadata
+from ai_gateway.prompts.config import ModelClassProvider, ModelConfig
 
 __all__ = [
     "ReActAgentInputs",
@@ -131,8 +132,9 @@ class ReActPlainTextParser(BaseCumulativeTransformOutputParser):
 
 
 class ReActPromptTemplate(Runnable[ReActAgentInputs, PromptValue]):
-    def __init__(self, prompt_template: dict[str, str]):
+    def __init__(self, prompt_template: dict[str, str], model_config: ModelConfig):
         self.prompt_template = prompt_template
+        self.model_config = model_config
 
     def invoke(
         self,
@@ -151,7 +153,8 @@ class ReActPromptTemplate(Runnable[ReActAgentInputs, PromptValue]):
             )
             if (
                 is_feature_enabled(FeatureFlag.ENABLE_ANTHROPIC_PROMPT_CACHING)
-                and input.model_metadata is None
+                and self.model_config.params.model_class_provider
+                == ModelClassProvider.ANTHROPIC
             ):
                 content = [
                     {
@@ -209,8 +212,10 @@ class ReActAgent(Prompt[ReActAgentInputs, TypeAgentEvent]):
         return chain | ReActPlainTextParser()
 
     @classmethod
-    def _build_prompt_template(cls, prompt_template: dict[str, str]) -> Runnable:
-        return ReActPromptTemplate(prompt_template)
+    def _build_prompt_template(
+        cls, prompt_template: dict[str, str], model_config: ModelConfig
+    ) -> Runnable:
+        return ReActPromptTemplate(prompt_template, model_config)
 
     async def astream(
         self,
