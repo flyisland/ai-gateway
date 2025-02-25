@@ -1,5 +1,5 @@
 from time import time
-from typing import Annotated, AsyncIterator, Optional
+from typing import Annotated, AsyncIterator
 
 from dependency_injector.providers import Factory
 from dependency_injector.wiring import Provide, inject
@@ -61,7 +61,7 @@ async def get_prompt_registry():
 
 async def handle_stream(
     stream: AsyncIterator[CodeSuggestionsChunk],
-    engine: StreamModelEngine,
+    metadata: ResponseMetadataBase,
 ) -> StreamSuggestionsResponse:
     async def _stream_response_generator():
         async for chunk in stream:
@@ -154,6 +154,7 @@ async def code_completion(
     payload: EditorContentCompletionPayload,
     current_user: StarletteUser,
     stream_handler: StreamHandler,
+    snowplow_event_context: SnowplowEventContext,
     completions_legacy_factory: Factory[CodeCompletionsLegacy] = Provide[
         ContainerApplication.code_suggestions.completions.vertex_legacy.provider
     ],
@@ -164,7 +165,6 @@ async def code_completion(
         ContainerApplication.code_suggestions.completions.amazon_q_factory.provider
     ],
     code_context: list[CodeContextPayload] = None,
-    snowplow_event_context: Optional[SnowplowEventContext] = None,
 ):
     kwargs = {}
 
@@ -221,7 +221,8 @@ async def code_completion(
         suggestions = [suggestions]
 
     if isinstance(suggestions[0], AsyncIterator):
-        return await stream_handler(suggestions[0], engine)
+        stream_metadata = _get_stream_metadata(engine, snowplow_event_context)
+        return await stream_handler(suggestions[0], stream_metadata)
 
     return CompletionResponse(
         choices=_completion_suggestion_choices(suggestions),
@@ -264,6 +265,7 @@ async def code_generation(
     current_user: StarletteUser,
     prompt_registry: BasePromptRegistry,
     stream_handler: StreamHandler,
+    snowplow_event_context: SnowplowEventContext,
     generations_vertex_factory: Factory[CodeGenerations] = Provide[
         ContainerApplication.code_suggestions.generations.vertex.provider
     ],
@@ -277,7 +279,6 @@ async def code_generation(
         ContainerApplication.code_suggestions.generations.amazon_q_factory.provider
     ],
     code_context: list[CodeContextPayload] = None,
-    snowplow_event_context: Optional[SnowplowEventContext] = None,
 ):
     model_provider = payload.model_provider
     if model_provider == KindModelProvider.AMAZON_Q:
@@ -351,7 +352,8 @@ async def code_generation(
 
     # Handle streaming case
     if isinstance(suggestions[0], AsyncIterator):
-        return await stream_handler(suggestions[0], engine)
+        stream_metadata = _get_stream_metadata(engine, snowplow_event_context)
+        return await stream_handler(suggestions[0], stream_metadata)
 
     return CompletionResponse(
         choices=_completion_suggestion_choices(suggestions),
@@ -370,4 +372,19 @@ def _create_response_metadata(model, lang, timestamp):
             lang=lang,
         ),
         enabled_feature_flags=current_feature_flag_context.get(),
+    )
+
+
+def _get_stream_metadata(
+    engine: StreamModelEngine,
+    snowplow_event_context: SnowplowEventContext,
+) -> ResponseMetadataBase:
+    return ResponseMetadataBase(
+        timestamp=int(time()),
+        model=ModelMetadata(
+            engine=engine.model.metadata.engine,
+            name=engine.model.metadata.name,
+        ),
+        enabled_feature_flags=current_feature_flag_context.get(),
+        region=snowplow_event_context.region,
     )
