@@ -45,6 +45,7 @@ async def invoke(
     current_user: Annotated[StarletteUser, Depends(get_current_user)],
     prompt_registry: Annotated[BasePromptRegistry, Depends(get_prompt_registry)],
 ):
+    import pdb;pdb.set_trace()
     try:
         prompt = prompt_registry.get_on_behalf(
             current_user,
