@@ -1,8 +1,16 @@
 {{file_content}}
-Here is the code user selected:
-<selected_code>
-  {{selected_text}}
-</selected_code>
+
+{% if is_terminal %}
+  Here is the terminal output user selected:
+  <selected_terminal_output>
+    {{selected_text}}
+  </selected_terminal_output>
+{% else %}
+  Here is the code user selected:
+  <selected_code>
+    {{selected_text}}
+  </selected_code>
+{% endif %}
 
 {{input}}
 Any code blocks in response should be formatted in markdown.
