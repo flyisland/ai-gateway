@@ -5,6 +5,8 @@ from dependency_injector import containers, providers
 from ai_gateway.chat.agents import ReActAgent, TypeAgentEvent
 from ai_gateway.chat.executor import GLAgentRemoteExecutor, TypeAgentFactory
 from ai_gateway.chat.toolset import DuoChatToolsRegistry
+from ai_gateway.feature_flags import FeatureFlag, is_feature_enabled
+
 
 if TYPE_CHECKING:
     from ai_gateway.prompts import BasePromptRegistry
@@ -18,6 +20,8 @@ def _react_agent_factory(
     prompt_registry: "BasePromptRegistry",
 ) -> TypeAgentFactory[TypeAgentEvent]:
     def _fn(**kwargs) -> ReActAgent:
+        if is_feature_enabled(FeatureFlag.CLAUDE_3_7_SONNET_ROLLOUT):
+            return prompt_registry.get("chat/react", "^2.0.0", **kwargs)
         return prompt_registry.get("chat/react", "^1.0.0", **kwargs)
 
     return _fn
