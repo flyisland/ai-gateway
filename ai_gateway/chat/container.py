@@ -18,7 +18,7 @@ def _react_agent_factory(
     prompt_registry: "BasePromptRegistry",
 ) -> TypeAgentFactory[TypeAgentEvent]:
     def _fn(**kwargs) -> ReActAgent:
-        return prompt_registry.get("chat/react", "^2.0.0", **kwargs)
+        return prompt_registry.get("chat/react", "^1.0.0", **kwargs)
 
     return _fn
 

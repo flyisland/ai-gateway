@@ -11,7 +11,5 @@ prompt_template:
     {% include 'chat/explain_code/system.jinja' %}
   user: |
     {% include 'chat/explain_code/user.jinja' %}
-  assistant: |
-    {% include 'chat/explain_code/assistant.jinja' %}
 params:
   timeout: 60
