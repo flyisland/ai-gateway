@@ -11,7 +11,7 @@ Refer to the Handbook instructions on [running end-to-end tests against your GDK
 MSG
 
 # These are paths to files that may cause a change in the Code Suggestions API
-CODE_SUGGESTIONS_API_PATH = %r{^ai_gateway/api/v\d+/code/}
+CODE_SUGGESTIONS_API_PATH = %r{^ai_gateway/api/v\d+/code/typing.py}
 CODE_SUGGESTIONS_PROMPT_PATH = %r{^ai_gateway/prompts/definitions/code_suggestions/}
 
 # Check for changes in files that may cause a change in the Code Suggestions API
