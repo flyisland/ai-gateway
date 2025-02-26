@@ -11,3 +11,5 @@ prompt_template:
     {% include 'chat/commit_reader/system.jinja' %}
   user: |
     {% include 'chat/commit_reader/user.jinja' %}
+params:
+  timeout: 60

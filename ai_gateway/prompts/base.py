@@ -47,10 +47,11 @@ class Prompt(RunnableBinding[Input, Output]):
         self,
         model_factory: TypeModelFactory,
         config: PromptConfig,
+        user: StarletteUser,
         model_metadata: Optional[TypeModelMetadata] = None,
         disable_streaming: bool = False,
     ):
-        model_kwargs = self._build_model_kwargs(config.params, model_metadata)
+        model_kwargs = self._build_model_kwargs(config.params, user, model_metadata)
         model = self._build_model(model_factory, config.model, disable_streaming)
         prompt = self._build_prompt_template(config.prompt_template)
         chain = self._build_chain(
@@ -68,11 +69,12 @@ class Prompt(RunnableBinding[Input, Output]):
     def _build_model_kwargs(
         self,
         params: PromptParams | None,
+        user: StarletteUser,
         model_metadata: Optional[TypeModelMetadata] | None,
     ) -> Mapping[str, Any]:
         return {
             **(params.model_dump(exclude_none=True) if params else {}),
-            **(model_metadata.to_params() if model_metadata else {}),
+            **(model_metadata.to_params(user) if model_metadata else {}),
         }
 
     def _build_model(
@@ -156,6 +158,7 @@ class BasePromptRegistry(ABC):
         self,
         prompt_id: str,
         prompt_version: str,
+        user: StarletteUser,
         model_metadata: Optional[TypeModelMetadata] = None,
     ) -> Prompt:
         pass
@@ -168,7 +171,7 @@ class BasePromptRegistry(ABC):
         model_metadata: Optional[TypeModelMetadata] = None,
         internal_event_category=__name__,
     ) -> Prompt:
-        prompt = self.get(prompt_id, prompt_version or "^1.0.0", model_metadata)
+        prompt = self.get(prompt_id, prompt_version or "^1.0.0", user, model_metadata)
 
         for unit_primitive in prompt.unit_primitives:
             if not user.can(unit_primitive):

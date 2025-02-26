@@ -4,10 +4,8 @@ from langchain_core.language_models.chat_models import BaseChatModel
 from langchain_core.runnables import RunnableBinding
 from pydantic import AnyUrl, BaseModel, StringConstraints, UrlConstraints
 
-# NOTE: Do not change this to `BaseChatModel | RunnableBinding`. You'd think that's just equivalent, right? WRONG. If
-# you do that, you'll get `object has no attribute 'get'` when you use a `RummableBinding`. Why? I have no idea.
-# https://docs.python.org/3/library/stdtypes.html#types-union makes no mention of the order mattering. This might be
-# a bug with Pydantic's type validations
+from ai_gateway.api.auth_utils import StarletteUser
+
 Model: TypeAlias = RunnableBinding | BaseChatModel
 
 
@@ -15,19 +13,24 @@ class AmazonQModelMetadata(BaseModel):
     provider: Literal["amazon_q"]
     name: Literal["amazon_q"]
     role_arn: Annotated[str, StringConstraints(max_length=255)]
+    conversation_id: Annotated[str, StringConstraints(max_length=255)]
 
-    def to_params(self) -> Dict[str, Any]:
-        return {"role_arn": self.role_arn}
+    def to_params(self, user: Optional[StarletteUser] = None) -> Dict[str, Any]:
+        return {
+            "role_arn": self.role_arn,
+            "user": user,
+            "conversation_id": self.conversation_id,
+        }
 
 
 class ModelMetadata(BaseModel):
     name: Annotated[str, StringConstraints(max_length=255)]
     provider: Annotated[str, StringConstraints(max_length=255)]
-    endpoint: Annotated[AnyUrl, UrlConstraints(max_length=255)]
-    api_key: Optional[Annotated[str, StringConstraints(max_length=1000)]] = None
-    identifier: Optional[Annotated[str, StringConstraints(max_length=1000)]] = None
+    endpoint: Optional[Annotated[AnyUrl, UrlConstraints(max_length=255)]] = None
+    api_key: Optional[Annotated[str, StringConstraints(max_length=255)]] = None
+    identifier: Optional[Annotated[str, StringConstraints(max_length=255)]] = None
 
-    def to_params(self) -> Dict[str, Any]:
+    def to_params(self, user: Optional[StarletteUser] = None) -> Dict[str, Any]:
         params: Dict[str, str] = {}
 
         if self.endpoint:

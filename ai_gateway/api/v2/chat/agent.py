@@ -63,9 +63,9 @@ def authorize_agent_request(
     agent_request: AgentRequest,
     internal_event_client: InternalEventsClient,
 ):
-    if current_user.can(GitLabUnitPrimitive.DUO_CHAT):
+    if current_user.can(GitLabUnitPrimitive.AMAZON_Q_INTEGRATION):
         internal_event_client.track_event(
-            f"request_{GitLabUnitPrimitive.DUO_CHAT}",
+            f"request_{GitLabUnitPrimitive.AMAZON_Q_INTEGRATION}",
             category=__name__,
         )
     else:

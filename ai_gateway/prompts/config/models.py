@@ -8,6 +8,7 @@ __all__ = [
     "TypeModelParams",
     "BaseModelParams",
     "ChatLiteLLMParams",
+    "ChatAmazonQParams",
     "ChatAnthropicParams",
     "ChatAmazonQParams",
 ]
