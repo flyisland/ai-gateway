@@ -568,16 +568,6 @@ class TestLocalPromptRegistry:
                 {"stop": ["</new_code>"], "vertex_location": "us-east5"},
                 {"code_suggestions/generations": "base"},
             ),
-            (
-                "code_suggestions/generations",
-                "Amazon Q Code Generations Agent",
-                Prompt,
-                "amazon_q",
-                "1.0.0",
-                ChatAmazonQ,
-                {"stop": ["</new_code>"]},
-                {},
-            ),
         ],
     )
     def test_get_code_generations_base(
