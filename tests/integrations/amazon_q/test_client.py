@@ -1,10 +1,9 @@
-import json
 from typing import Any, Dict, Optional
 from unittest.mock import MagicMock, Mock, patch
 
 import pytest
 from botocore.exceptions import ClientError
-from fastapi import HTTPException, status
+from fastapi import HTTPException
 from pydantic import BaseModel
 
 from ai_gateway.api.auth_utils import StarletteUser
@@ -15,12 +14,7 @@ from ai_gateway.api.v1.amazon_q.typing import (
     EventRequest,
 )
 from ai_gateway.auth.glgo import GlgoAuthority
-from ai_gateway.integrations.amazon_q.client import (
-    QUICK_ACTION_EVENT_ID,
-    SYSTEM_HOOK_EVENT_MAP,
-    AmazonQClient,
-    AmazonQClientFactory,
-)
+from ai_gateway.integrations.amazon_q.client import AmazonQClient, AmazonQClientFactory
 from ai_gateway.integrations.amazon_q.errors import AWSException
 
 

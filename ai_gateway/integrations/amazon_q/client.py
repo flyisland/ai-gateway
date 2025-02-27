@@ -21,26 +21,6 @@ __all__ = [
 ]
 
 
-QUICK_ACTION_EVENT_ID = "Quick Action"
-EXCLUDE_EVENT_ATTRIBUTES = [
-    "homepage",
-    "email",
-    "url",
-    "ssh_url",
-    "http_url",
-    "web_url",
-    "avatar_url",
-    "git_ssh_url",
-    "git_http_url",
-    "avatar_url",
-]
-
-SYSTEM_HOOK_EVENT_MAP = {
-    "merge_request": "Merge Request Hook",
-    "pipeline": "Pipeline Hook",
-}
-
-
 class AmazonQClientFactory:
     def __init__(
         self,
