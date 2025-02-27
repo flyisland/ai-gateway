@@ -68,6 +68,11 @@ def authorize_agent_request(
             f"request_{GitLabUnitPrimitive.DUO_CHAT}",
             category=__name__,
         )
+    if current_user.can(GitLabUnitPrimitive.AMAZON_Q_INTEGRATION):
+        internal_event_client.track_event(
+            f"request_{GitLabUnitPrimitive.AMAZON_Q_INTEGRATION}",
+            category=__name__,
+        )
     else:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
