@@ -56,13 +56,14 @@ class EventIssuePayload(EventRequestPayload):
 
 
 class EventHookPayload(BaseModel):
-    source: Literal["system_hook"]
+    source: Literal["web_hook"]
     data: dict[str, Any]
 
 
 class EventRequest(BaseModel):
     role_arn: Annotated[str, StringConstraints(max_length=2048)]
     code: Annotated[str, StringConstraints(max_length=255)]
+    event_id: Annotated[str, StringConstraints(max_length=255)]
     payload: Union[EventMergeRequestPayload, EventIssuePayload, EventHookPayload] = (
         Field(discriminator="source")
     )
