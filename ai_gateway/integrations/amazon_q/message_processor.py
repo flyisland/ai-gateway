@@ -20,6 +20,8 @@ from typing import List, Optional, TypedDict
 
 from langchain_core.messages import AIMessage, BaseMessage, HumanMessage, SystemMessage
 
+from ai_gateway.api.auth_utils import StarletteUser
+
 
 class HistoryItem(TypedDict, total=False):
     """Type definition for history items"""
@@ -56,9 +58,7 @@ class MessageProcessor:
     """
 
     def process_messages(
-        self,
-        messages: List[BaseMessage],
-        conversation_id: str,
+        self, messages: List[BaseMessage], user: StarletteUser
     ) -> ProcessedMessage:
         """
         Process a list of messages and prepare them for sending to Amazon Q.
@@ -80,6 +80,7 @@ class MessageProcessor:
         messages_copy = self._copy_messages(messages)
         content = self._extract_content(messages_copy)
         history = self._create_history(messages_copy)
+        conversation_id = self._create_conversation_id(user)
 
         return self._create_processed_message(content, conversation_id, history)
 
@@ -120,7 +121,7 @@ class MessageProcessor:
             )
             if messages and system_message.content is not None:
                 # Create new content by concatenating strings
-                new_content = f"{system_message.content}\n{messages[0].content}"
+                new_content = f"{messages[0].content}"
                 messages[0].content = new_content
 
     def _extract_content(self, messages: List[BaseMessage]) -> str:
@@ -169,6 +170,21 @@ class MessageProcessor:
                 history.append({"assistantResponseMessage": str(message.content)})
 
         return history
+
+    def _create_conversation_id(self, user: StarletteUser) -> str:
+        """
+        Generate a unique conversation identifier for the current user.
+
+        Creates a conversation ID based on the user's global identifier
+        to maintain conversation context.
+
+        Args:
+            user (StarletteUser): The current user
+
+        Returns:
+            str: Generated conversation ID
+        """
+        return str(user.global_user_id)
 
     def _create_processed_message(
         self, content: str, conversation_id: str, history: List[HistoryItem]
