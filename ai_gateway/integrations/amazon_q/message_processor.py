@@ -120,7 +120,7 @@ class MessageProcessor:
             )
             if messages and system_message.content is not None:
                 # Create new content by concatenating strings
-                new_content = f"{messages[0].content}"
+                new_content = f"{system_message.content}\n{messages[0].content}"
                 messages[0].content = new_content
 
     def _extract_content(self, messages: List[BaseMessage]) -> str:

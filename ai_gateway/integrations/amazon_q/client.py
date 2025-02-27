@@ -203,7 +203,7 @@ class AmazonQClient:
 
     def _send_message(self, payload):
         return self.client.send_message(
-            message=payload["message"], conversationId=payload["conversation_id"]
+            message=payload["message"]
         )
 
     def _retry_send_event(self, error, code, payload, event_id):
