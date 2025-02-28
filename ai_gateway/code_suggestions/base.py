@@ -60,6 +60,7 @@ USE_CASES_MODELS_MAP = {
         KindLiteLlmModel.CODELLAMA,
         KindLiteLlmModel.CODESTRAL,
         KindLiteLlmModel.DEEPSEEKCODER,
+        KindLiteLlmModel.LLAMA3,
         KindLiteLlmModel.MISTRAL,
         KindLiteLlmModel.MIXTRAL,
         KindLiteLlmModel.CLAUDE_3,
