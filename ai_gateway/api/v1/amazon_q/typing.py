@@ -63,7 +63,9 @@ class EventHookPayload(BaseModel):
 class EventRequest(BaseModel):
     role_arn: Annotated[str, StringConstraints(max_length=2048)]
     code: Annotated[str, StringConstraints(max_length=255)]
-    event_id: Annotated[str, StringConstraints(max_length=255)]
+    event_id: Optional[Annotated[str, StringConstraints(max_length=255)]] = (
+        "Quick Action"
+    )
     payload: Union[EventMergeRequestPayload, EventIssuePayload, EventHookPayload] = (
         Field(discriminator="source")
     )
