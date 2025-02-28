@@ -79,7 +79,7 @@ class AdditionalContext(BaseModel):
         "issue",
         "dependency",
         "local_git",
-        "terminal"
+        "terminal",
     ]
     id: Optional[str] = None
     content: Optional[str] = None
