@@ -1,5 +1,5 @@
 from typing import Iterator
-from unittest.mock import Mock, call
+from unittest.mock import Mock, call, patch
 
 import pytest
 from dependency_injector import containers
@@ -158,5 +158,26 @@ def test_ready_fireworks_failure(
 ):
     mock_llm_text.side_effect = model_failure
     response = client.get("/monitoring/ready")
+
+    assert response.status_code == 503
+
+
+def test_ready_cloud_connector_failure(
+    client: TestClient,
+    mock_generations: Mock,
+    mock_completions_legacy: Mock,
+    mock_llm_text: Mock,
+    mock_config: Config,
+):
+    # Ensure custom_models.enabled is False so it doesn't bypass the check
+    if not hasattr(mock_config, "custom_models"):
+        mock_config.custom_models = Mock()
+        mock_config.custom_models.enabled = False
+    else:
+        mock_config.custom_models.enabled = False
+
+    # Ensure cloud_connector_ready from the CC lib is false
+    with patch("ai_gateway.api.monitoring.cloud_connector_ready", return_value=False):
+        response = client.get("/monitoring/ready")
 
     assert response.status_code == 503

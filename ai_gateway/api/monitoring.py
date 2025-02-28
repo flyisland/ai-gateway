@@ -2,8 +2,9 @@ import functools
 from typing import Annotated, Any, Awaitable, Callable
 
 from dependency_injector.providers import Factory
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, Request
 from fastapi_health import health
+from gitlab_cloud_connector import cloud_connector_ready
 
 from ai_gateway.async_dependency_resolver import (
     get_code_suggestions_completions_litellm_factory_provider,
@@ -139,6 +140,18 @@ async def validate_fireworks_available(
     return True
 
 
+async def validate_cloud_connector_ready(request: Request = None) -> bool:
+    config = request.app.extra["extra"]["config"]
+    if config.custom_models.enabled:
+        return True  # always pass for Self-Hosted-Models
+
+    provider = request.app.state.cloud_connector_auth_provider
+    if not provider:
+        return False  # we always expect provider to be set
+
+    return cloud_connector_ready(provider)
+
+
 router.add_api_route("/healthz", health([]))
 router.add_api_route(
     "/ready",
@@ -147,6 +160,7 @@ router.add_api_route(
             validate_vertex_available,
             validate_anthropic_available,
             validate_fireworks_available,
+            validate_cloud_connector_ready,
         ]
     ),
 )
