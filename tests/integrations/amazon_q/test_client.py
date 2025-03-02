@@ -115,98 +115,6 @@ def amazon_q_client(mock_credentials: Dict[str, str]) -> AmazonQClient:
         return client
 
 
-@pytest.fixture
-def event_merge_request_payload():
-    """Fixture for EventMergeRequestPayload"""
-    return EventMergeRequestPayload(
-        source="merge_request",
-        merge_request_id="1",
-        merge_request_iid="1",
-        command="dev",
-        role_arn="arn:aws:iam::123456789012:role/test-role",
-        project_path="a/b/c",
-        project_id="123",
-        note_id="1",
-        discussion_id="1",
-        source_branch="dev",
-        target_branch="main",
-        last_commit_id="123",
-    )
-
-
-@pytest.fixture
-def event_issue_payload():
-    """Fixture for EventIssuePayload"""
-    return EventIssuePayload(
-        source="issue",
-        issue_id="1",
-        issue_iid="1",
-        command="dev",
-        role_arn="arn:aws:iam::123456789012:role/test-role",
-        project_path="a/b/c",
-        project_id="123",
-        note_id="1",
-        discussion_id="1",
-    )
-
-
-@pytest.fixture
-def event_hook_payload():
-    """Fixture for EventHookPayload"""
-    return EventHookPayload(
-        source="system_hook",
-        data={
-            "object_kind": "merge_request",
-            "project_id": 1,
-            "ref": "refs/heads/main",
-            "checkout_sha": "abc123",
-            "user_id": 1,
-            "user_name": "Test User",
-            "repository": {
-                "name": "test-repo",
-                "url": "git@gitlab.com:group/project.git",
-                "description": "test repository",
-                "homepage": "https://gitlab.com/group/project",
-            },
-            "project": {
-                "id": 20,
-                "name": "Project1",
-                "description": None,
-            },
-        },
-    )
-
-
-@pytest.fixture
-def event_request_merge(event_merge_request_payload):
-    """Fixture for EventRequest with merge request payload"""
-    return EventRequest(
-        role_arn="arn:aws:iam::123456789012:role/test-role",
-        code="test-code",
-        payload=event_merge_request_payload,
-    )
-
-
-@pytest.fixture
-def event_request_issue(event_issue_payload):
-    """Fixture for EventRequest with issue payload"""
-    return EventRequest(
-        role_arn="arn:aws:iam::123456789012:role/test-role",
-        code="test-code",
-        payload=event_issue_payload,
-    )
-
-
-@pytest.fixture
-def event_request_hook(event_hook_payload):
-    """Fixture for EventRequest with system hook payload"""
-    return EventRequest(
-        role_arn="arn:aws:iam::123456789012:role/test-role",
-        code="test-code",
-        payload=event_hook_payload,
-    )
-
-
 class TestAmazonQClientFactory:
     @pytest.fixture
     def mock_glgo_authority(self):
@@ -488,10 +396,6 @@ class TestAmazonQClient:
         [
             # Happy path - successful event sending
             ("Quick Action", '{"test": "data"}', None, None),
-            # Test missing event ID
-            (None, '{"test": "data"}', None, HTTPException),
-            # Test missing payload
-            ("Quick Action", None, None, HTTPException),
             # Test AccessDeniedException with retry
             (
                 "Quick Action",

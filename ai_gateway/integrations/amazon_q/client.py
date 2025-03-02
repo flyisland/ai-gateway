@@ -141,18 +141,6 @@ class AmazonQClient:
         event_id = event_request.event_id
         payload = event_request.payload.model_dump_json(exclude_none=True)
 
-        if not event_id:
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail="Event ID cannot be resolved",
-            )
-
-        if not payload:
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail="Unknown payload",
-            )
-
         try:
             self._send_event(event_id, payload)
         except ClientError as ex:
