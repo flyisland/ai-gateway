@@ -18,13 +18,13 @@ from ai_gateway.api.auth_utils import StarletteUser
 from ai_gateway.integrations.amazon_q.chat import ChatAmazonQ
 from ai_gateway.prompts import LocalPromptRegistry, Prompt, PromptRegistered
 from ai_gateway.prompts.config import (
+    ChatAmazonQParams,
     ChatAnthropicParams,
     ChatLiteLLMParams,
     ModelClassProvider,
     ModelConfig,
     PromptConfig,
 )
-from ai_gateway.prompts.config.models import ChatAmazonQParams
 from ai_gateway.prompts.typing import Model, ModelMetadata, TypeModelFactory
 
 
@@ -118,6 +118,27 @@ params:
 """,
     )
     fs.create_file(
+        prompts_definitions_dir / "chat" / "react" / "amazon_q" / "1.0.0.yml",
+        contents="""
+---
+name: Amazon Q React prompt
+model:
+  name: amazon_q
+  params:
+    model_class_provider: amazon_q
+unit_primitives:
+  - amazon_q_integration
+prompt_template:
+  system: Template1
+  user: Template2
+params:
+  timeout: 60
+  stop:
+    - Foo
+    - Bar
+""",
+    )
+    fs.create_file(
         prompts_definitions_dir / "chat" / "react" / "custom" / "1.0.0.yml",
         contents="""
 ---
@@ -138,32 +159,6 @@ prompt_template:
   user: Template2
 params:
   vertex_location: us-east1
-  timeout: 60
-  stop:
-    - Foo
-    - Bar
-""",
-    )
-    fs.create_file(
-        prompts_definitions_dir / "chat" / "react" / "amazon_q.yml",
-        contents="""
----
-name: Amazon Q React prompt
-model:
-  name: amazon_q
-  params:
-    model_class_provider: amazon_q
-    temperature: 0.1
-    top_p: 0.8
-    top_k: 40
-    max_tokens: 256
-    max_retries: 6
-unit_primitives:
-  - agent_quick_actions
-prompt_template:
-  system: Template1
-  user: Template2
-params:
   timeout: 60
   stop:
     - Foo
@@ -262,25 +257,23 @@ def prompts_registered():
                 ),
             },
         ),
-        "chat/react": PromptRegistered(
-            klass=Prompt,
+        "chat/react/amazon_q": PromptRegistered(
+            klass=MockPromptClass,
             versions={
-                "amazon_q": PromptConfig(
+                "1.0.0": PromptConfig(
                     name="Amazon Q React prompt",
                     model=ModelConfig(
                         name="amazon_q",
                         params=ChatAmazonQParams(
                             model_class_provider=ModelClassProvider.AMAZON_Q,
-                            temperature=0.1,
-                            top_p=0.8,
-                            top_k=40,
-                            max_tokens=256,
-                            max_retries=6,
                         ),
                     ),
-                    unit_primitives=["agent_quick_actions"],
+                    unit_primitives=["amazon_q_integration"],
                     prompt_template={"system": "Template1", "user": "Template2"},
-                    params={"timeout": 60, "stop": ["Foo", "Bar"]},
+                    params={
+                        "timeout": 60,
+                        "stop": ["Foo", "Bar"],
+                    },
                 ),
             },
         ),
@@ -574,16 +567,6 @@ class TestLocalPromptRegistry:
                 ChatLiteLLM,
                 {"stop": ["</new_code>"], "vertex_location": "us-east5"},
                 {"code_suggestions/generations": "base"},
-            ),
-            (
-                "code_suggestions/generations",
-                "Amazon Q Code Generations Agent",
-                Prompt,
-                "amazon_q",
-                "1.0.0",
-                ChatAmazonQ,
-                {"stop": ["</new_code>"]},
-                {},
             ),
         ],
     )

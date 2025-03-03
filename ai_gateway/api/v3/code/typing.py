@@ -133,6 +133,7 @@ class ResponseMetadataBase(BaseModel):
     model: Optional[ModelMetadata] = None
     timestamp: int
     enabled_feature_flags: Optional[list[str]] = None
+    region: Optional[str] = None
 
 
 class CompletionResponse(BaseModel):
@@ -157,6 +158,6 @@ class StreamHandler(Protocol):
     async def __call__(
         self,
         stream: AsyncIterator[CodeSuggestionsChunk],
-        engine: StreamModelEngine,
+        metadata: ResponseMetadataBase,
     ) -> Union[StreamSuggestionsResponse, EventSourceResponse]:
         pass

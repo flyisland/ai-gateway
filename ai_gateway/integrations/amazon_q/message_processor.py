@@ -40,7 +40,7 @@ class ProcessedMessage:
     """
 
     content: str
-    conversation_id: str
+    conversation_id: Optional[str]
     history: List[HistoryItem]
 
 
@@ -58,7 +58,7 @@ class MessageProcessor:
     def process_messages(
         self,
         messages: List[BaseMessage],
-        conversation_id: str,
+        conversation_id: Optional[str],
     ) -> ProcessedMessage:
         """
         Process a list of messages and prepare them for sending to Amazon Q.
@@ -171,7 +171,7 @@ class MessageProcessor:
         return history
 
     def _create_processed_message(
-        self, content: str, conversation_id: str, history: List[HistoryItem]
+        self, content: str, conversation_id: Optional[str], history: List[HistoryItem]
     ) -> ProcessedMessage:
         """
         Create a final ProcessedMessage instance with all components.

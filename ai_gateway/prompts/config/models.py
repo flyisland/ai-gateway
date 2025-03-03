@@ -10,6 +10,7 @@ __all__ = [
     "ChatLiteLLMParams",
     "ChatAmazonQParams",
     "ChatAnthropicParams",
+    "ChatAmazonQParams",
 ]
 
 
