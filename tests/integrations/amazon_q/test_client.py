@@ -29,92 +29,6 @@ class AccessDeniedException(ClientError):
         )
 
 
-# Fixtures
-@pytest.fixture
-def mock_glgo_authority() -> Mock:
-    """
-    Creates a mock GlgoAuthority with a mocked token method.
-
-    Returns:
-        Mock: Mocked GlgoAuthority instance
-    """
-    return Mock(spec=GlgoAuthority)
-
-
-@pytest.fixture
-def mock_current_user() -> Mock:
-    """
-    Creates a mock user with test credentials and claims.
-
-    Returns:
-        Mock: Mocked StarletteUser instance
-    """
-    user = Mock(spec=StarletteUser)
-    user.global_user_id = "test_user_id"
-    user.cloud_connector_token = "test_token"
-    user.claims = Mock()
-    user.claims.subject = "test_subject"
-    return user
-
-
-@pytest.fixture
-def mock_credentials() -> Dict[str, str]:
-    """
-    Provides mock AWS credentials.
-
-    Returns:
-        Dict[str, str]: Dictionary containing mock AWS credentials
-    """
-    return {
-        "AccessKeyId": "test_access_key",
-        "SecretAccessKey": "test_secret_key",
-        "SessionToken": "test_session_token",
-    }
-
-
-@pytest.fixture
-def client_factory(mock_glgo_authority: Mock) -> AmazonQClientFactory:
-    """
-    Creates an AmazonQClientFactory instance with mocked dependencies.
-
-    Args:
-        mock_glgo_authority: Mocked GlgoAuthority instance
-
-    Returns:
-        AmazonQClientFactory: Configured client factory for testing
-    """
-    with patch("boto3.client") as mock_boto3_client:
-        mock_boto3_client.return_value = Mock()
-        factory = AmazonQClientFactory(
-            glgo_authority=mock_glgo_authority,
-            endpoint_url="https://test-endpoint",
-            region="us-west-2",
-        )
-        factory.sts_client = mock_boto3_client.return_value
-        return factory
-
-
-@pytest.fixture
-def amazon_q_client(mock_credentials: Dict[str, str]) -> AmazonQClient:
-    """
-    Creates an AmazonQClient instance with mocked credentials.
-
-    Args:
-        mock_credentials: Dictionary of mock AWS credentials
-
-    Returns:
-        AmazonQClient: Configured client for testing
-    """
-    with patch("q_developer_boto3.boto3.client") as mock_q_boto3_client:
-        client = AmazonQClient(
-            url="https://test-endpoint",
-            region="us-west-2",
-            credentials=mock_credentials,
-        )
-        client.client = mock_q_boto3_client.return_value
-        return client
-
-
 class TestAmazonQClientFactory:
     @pytest.fixture
     def mock_glgo_authority(self):
@@ -418,7 +332,7 @@ class TestAmazonQClient:
         ],
     )
     def test_send_event(
-        self, amazon_q_client, event_id, payload, client_error, expected_exception
+        self, q_client, event_id, payload, client_error, expected_exception
     ):
         """Tests event sending with various scenarios."""
         # Setup mock request
@@ -427,23 +341,21 @@ class TestAmazonQClient:
         mock_request.event_id = event_id
         mock_request.code = "test_code"
 
-        amazon_q_client._retry_send_event = Mock(return_value={"Success": True})
+        q_client._retry_send_event = Mock(return_value={"Success": True})
 
         if client_error:
             # Configure mock to raise exception on first call
-            amazon_q_client._send_event = Mock(
-                side_effect=[client_error, {"Success": True}]
-            )
+            q_client._send_event = Mock(side_effect=[client_error, {"Success": True}])
         else:
             # Configure mock to return successfully
-            amazon_q_client._send_event = Mock(return_value={"Success": True})
+            q_client._send_event = Mock(return_value={"Success": True})
 
         if expected_exception:
             with pytest.raises(expected_exception):
-                amazon_q_client.send_event(mock_request)
+                q_client.send_event(mock_request)
         else:
             # Should not raise any exception
-            amazon_q_client.send_event(mock_request)
+            q_client.send_event(mock_request)
 
             if (
                 client_error
@@ -451,14 +363,14 @@ class TestAmazonQClient:
                 and client_error.response["Error"]["Code"] == "AccessDeniedException"
             ):
                 # Verify _send_event was called first and raised the exception
-                amazon_q_client._send_event.assert_called_with(event_id, payload)
+                q_client._send_event.assert_called_with(event_id, payload)
                 # Verify retry was called with correct parameters
-                amazon_q_client._retry_send_event.assert_called_once_with(
+                q_client._retry_send_event.assert_called_once_with(
                     client_error, mock_request.code, payload, event_id
                 )
             else:
                 # Verify normal _send_event was called
-                amazon_q_client._send_event.assert_called_once_with(event_id, payload)
+                q_client._send_event.assert_called_once_with(event_id, payload)
 
     def test_generate_code_recommendations(
         self, q_client, mock_q_client, mock_event_request
