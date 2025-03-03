@@ -4,3 +4,4 @@ params:
   max_tokens: 4_096
   max_retries: 1
   model_class_provider: litellm
+  custom_llm_provider: vertex_ai
