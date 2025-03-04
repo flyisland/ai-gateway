@@ -165,32 +165,6 @@ params:
     - Bar
 """,
     )
-    fs.create_file(
-        prompts_definitions_dir / "chat" / "react" / "amazon_q.yml",
-        contents="""
----
-name: Amazon Q React prompt
-model:
-  name: amazon_q
-  params:
-    model_class_provider: amazon_q
-    temperature: 0.1
-    top_p: 0.8
-    top_k: 40
-    max_tokens: 256
-    max_retries: 6
-unit_primitives:
-  - agent_quick_actions
-prompt_template:
-  system: Template1
-  user: Template2
-params:
-  timeout: 60
-  stop:
-    - Foo
-    - Bar
-""",
-    )
     yield fs
 
 
@@ -278,28 +252,6 @@ def prompts_registered():
                         ),
                     ),
                     unit_primitives=["duo_chat"],
-                    prompt_template={"system": "Template1", "user": "Template2"},
-                    params={"timeout": 60, "stop": ["Foo", "Bar"]},
-                ),
-            },
-        ),
-        "chat/react": PromptRegistered(
-            klass=Prompt,
-            versions={
-                "amazon_q": PromptConfig(
-                    name="Amazon Q React prompt",
-                    model=ModelConfig(
-                        name="amazon_q",
-                        params=ChatAmazonQParams(
-                            model_class_provider=ModelClassProvider.AMAZON_Q,
-                            temperature=0.1,
-                            top_p=0.8,
-                            top_k=40,
-                            max_tokens=256,
-                            max_retries=6,
-                        ),
-                    ),
-                    unit_primitives=["agent_quick_actions"],
                     prompt_template={"system": "Template1", "user": "Template2"},
                     params={"timeout": 60, "stop": ["Foo", "Bar"]},
                 ),
@@ -615,16 +567,6 @@ class TestLocalPromptRegistry:
                 ChatLiteLLM,
                 {"stop": ["</new_code>"], "vertex_location": "us-east5"},
                 {"code_suggestions/generations": "base"},
-            ),
-            (
-                "code_suggestions/generations",
-                "Amazon Q Code Generations Agent",
-                Prompt,
-                "amazon_q",
-                "1.0.0",
-                ChatAmazonQ,
-                {"stop": ["</new_code>"]},
-                {},
             ),
         ],
     )

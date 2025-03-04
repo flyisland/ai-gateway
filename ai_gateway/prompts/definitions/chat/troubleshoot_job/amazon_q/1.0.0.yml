@@ -11,5 +11,3 @@ prompt_template:
     {% include 'chat/troubleshoot_job/system.jinja' %}
   user: |
     {% include 'chat/troubleshoot_job/user.jinja' %}
-params:
-  timeout: 60

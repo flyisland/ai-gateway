@@ -133,7 +133,7 @@ class TestReActAgentStream:
                         name="amazon_q",
                         provider="amazon_q",
                         role_arn="role-arn",
-                        conversation_id="conversation-123",
+                        conversation_id="conversation-id",
                     ),
                 ),
                 "thought\nFinal Answer: answer\n",

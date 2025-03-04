@@ -144,7 +144,7 @@ class ChatAmazonQ(BaseChatModel):
         messages: List[BaseMessage],
         user: StarletteUser,
         role_arn: str,
-        conversation_id: str,
+        conversation_id: Optional[str],
         **kwargs: Any,
     ):
         """
@@ -164,7 +164,7 @@ class ChatAmazonQ(BaseChatModel):
         return self._send_chat_message(q_client, processed_message)
 
     def _process_messages(
-        self, messages: List[BaseMessage], conversation_id: str
+        self, messages: List[BaseMessage], conversation_id: Optional[str]
     ) -> ProcessedMessage:
         """
         Process the input messages for the current user.
