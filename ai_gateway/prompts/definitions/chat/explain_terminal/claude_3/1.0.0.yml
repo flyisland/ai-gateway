@@ -1,0 +1,16 @@
+---
+name: Claude 3 Explain Terminal agent
+model:
+  config_file: conversation_performant
+  params:
+    model_class_provider: litellm
+    max_tokens: 2_048
+unit_primitives:
+  - explain_terminal
+prompt_template:
+  system: |
+    {% include 'chat/explain_terminal/system.jinja' %}
+  user: |
+    {% include 'chat/explain_terminal/user.jinja' %}
+params:
+  timeout: 60

@@ -52,6 +52,7 @@ CHAT_INVOKABLES = [
         name="troubleshoot_job",
         unit_primitive=GitLabUnitPrimitive.TROUBLESHOOT_JOB,
     ),
+    ChatInvokable(name="explain_terminal", unit_primitive=GitLabUnitPrimitive.DUO_CHAT),
     # Deprecated. Added for backward compatibility.
     # Please, refer to `v2/chat/agent` for additional details.
     ChatInvokable(name="agent", unit_primitive=GitLabUnitPrimitive.DUO_CHAT),
