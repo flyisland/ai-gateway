@@ -22,7 +22,7 @@ prompt_template:
 
     What is OK:
     - Assume positive intent and begin with positivity and grace. Example: Always start a conversation or response by assuming the other person has good intentions. If someone sends a brief message, assume they're busy rather than being rude. Avoid starting a conversation with accusations or assumptions about someone's motives.
-    - Be kind and respectful, as if you're talking to a person face-to-face. Example: Use polite language and avoid harsh, aggressive tones, insults, sarcasm, or belittling language even in written communication. "Thanks for your contribution! Here are some suggestions..." vs "This is wrong"
+    - Be kind and respectful, as if you're talking to a person face-to-face. Example: Use polite language and avoid harsh, aggressive tones, insults, mockery, sarcasm, or belittling language even in written communication. "Thanks for your contribution! Here are some suggestions..." vs "This is wrong"
     - Express thoughts responsibly and inclusively, considering different perspectives. Example: When sharing an opinion, acknowledge that others may have different views based on their backgrounds and experiences. Consider different cultural perspectives when making statements. Avoid making blanket statements or generalizations that dismiss the experiences of others.
     - Own your words and apologize if you unintentionally hurt the company or an individual. Example: If you realize something you said was offensive or hurtful, take responsibility and genuinely apologize. "I apologize if my previous comment came across as harsh". Don't make excuses or blame others when you've made a mistake or hurt someone.
     - Be a role model of GitLab's values. Example: Demonstrate collaboration, results, efficiency, diversity, iteration, and transparency in your communication.
@@ -30,6 +30,7 @@ prompt_template:
     - Adhere to the anti-harassment policy and code of conduct. Example: Treat everyone with respect and professionalism, regardless of their role or background.
     - Focus on what you can directly influence. Example: Discuss ways to improve KPIs and grow revenue instead of speculating about factors outside your control.
     - Use inclusive and gender-neutral language. Example: "Team members" instead of "guys"
+    - It is ok to be informal.
 
     What is not OK:
     - Avoid using all caps outside of the accepted acronyms accepted in code reviews (LGTM, WIP, and similar) - it might feel like shouting. Example: Write "important update" instead of "IMPORTANT UPDATE".
@@ -38,12 +39,16 @@ prompt_template:
     - Don't use exclusionary language. Example: Don't refer to non-US team members as "international"
 
   user: |
-    Your task is to rate the given comment on a temperature score where:
-    - 1 (low temperature) is good and adheres to the guidelines
-    - 2 (high temperature) is problematic and violates the guidelines
+    Your task is to rate the given comment on two scales:
+    1. **Professionalism Rating**: Rate the comment from 1 to 10 where 10 is the most professional.
+    2. **Temperature Rating**: Based on the professinalism rating, set the temperature to:
+      - 2 if the professionalim rating is less than 7
+      - 1 if the professionalim rating is 7 or higher
 
-    If you rate a comment as high temperature (2), you must provide a bullet-point list explaining the specific problems with the comment.
-    Limit the list to maximum three items.
+    If you rate a comment with a temperature of 2, you must provide a bullet-point list explaining the specific problems with the comment.
+    If you rate a comment with a temperature of 1, you must provide a bullet-point list explaining your reasoning.
+    Each explanation should be as short as possible, concise, and clear. Example: "Use all caps".
+    Limit the list to a maximum of three items.
 
     Here is the comment you need to rate:
 
@@ -59,6 +64,10 @@ prompt_template:
     After your analysis, do not wrap your response in markdown.
     For response, use this JSON schema:
 
-      TemperatureRatingResponse = {"rating": int, "issues": list[str]}
+    TemperatureRatingResponse = {
+        "rating": int, 
+        "professionalism_rating": int, 
+        "issues": list[str]
+    }
 
     Return: TemperatureRatingResponse
