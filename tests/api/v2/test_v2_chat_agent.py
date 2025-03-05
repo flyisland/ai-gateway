@@ -9,11 +9,7 @@ from pydantic import AnyUrl
 from starlette.testclient import TestClient
 
 from ai_gateway.api.v2 import api_router
-from ai_gateway.api.v2.chat.typing import (
-    AgentRequest,
-    AgentRequestOptions,
-    ReActAgentScratchpad,
-)
+from ai_gateway.api.v2.chat.typing import AgentRequest
 from ai_gateway.chat.agents import (
     AdditionalContext,
     AgentBaseEvent,
@@ -145,20 +141,21 @@ class TestReActAgentStream:
                                 selected_code=True,
                             ),
                         ),
-                    ],
-                    options=AgentRequestOptions(
-                        agent_scratchpad=ReActAgentScratchpad(
-                            agent_type="react",
-                            steps=[
-                                ReActAgentScratchpad.AgentStep(
-                                    thought="thought",
-                                    tool="tool",
-                                    tool_input="tool_input",
+                        Message(
+                            role=Role.ASSISTANT,
+                            content=None,
+                            agent_scratchpad=[
+                                AgentStep(
+                                    action=AgentToolAction(
+                                        thought="thought",
+                                        tool="tool",
+                                        tool_input="tool_input",
+                                    ),
                                     observation="observation",
                                 )
                             ],
                         ),
-                    ),
+                    ],
                     model_metadata=ModelMetadata(
                         name="mistral",
                         provider="litellm",
@@ -180,13 +177,12 @@ class TestReActAgentStream:
                                 type="merge_request", title="Fixing database"
                             ),
                         ),
-                    ],
-                    options=AgentRequestOptions(
-                        agent_scratchpad=ReActAgentScratchpad(
-                            agent_type="react",
-                            steps=[],
+                        Message(
+                            role=Role.ASSISTANT,
+                            content=None,
+                            agent_scratchpad=[],
                         ),
-                    ),
+                    ],
                 ),
                 "thought\nFinal Answer: answer\n",
                 [AgentFinalAnswer(text=c) for c in "answer"],
@@ -222,7 +218,6 @@ class TestReActAgentStream:
     @pytest.mark.parametrize(
         (
             "messages",
-            "agent_options",
             "actions",
             "model_metadata",
             "expected_actions",
@@ -246,20 +241,21 @@ class TestReActAgentStream:
                             selected_code=True,
                         ),
                     ),
-                ],
-                AgentRequestOptions(
-                    agent_scratchpad=ReActAgentScratchpad(
-                        agent_type="react",
-                        steps=[
-                            ReActAgentScratchpad.AgentStep(
-                                thought="thought",
-                                tool="tool",
-                                tool_input="tool_input",
+                    Message(
+                        role=Role.ASSISTANT,
+                        content=None,
+                        agent_scratchpad=[
+                            AgentStep(
+                                action=AgentToolAction(
+                                    thought="thought",
+                                    tool="tool",
+                                    tool_input="tool_input",
+                                ),
                                 observation="observation",
                             )
                         ],
                     ),
-                ),
+                ],
                 [
                     AgentToolAction(
                         thought="thought",
@@ -281,7 +277,7 @@ class TestReActAgentStream:
                     )
                 ],
                 ["Mystery Resource 1", "Mystery Resource 2"],
-            )
+            ),
         ],
     )
     async def test_legacy_success(
@@ -290,7 +286,6 @@ class TestReActAgentStream:
         mocked_stream: Mock,
         mock_track_internal_event,
         messages: list[Message],
-        agent_options: AgentRequestOptions,
         actions: list[TypeAgentEvent],
         expected_actions: list[TypeAgentEvent],
         model_metadata: ModelMetadata,
@@ -316,7 +311,6 @@ class TestReActAgentStream:
                 },
                 json={
                     "messages": [m.model_dump(mode="json") for m in messages],
-                    "options": agent_options.model_dump(mode="json"),
                     "model_metadata": model_metadata.model_dump(mode="json"),
                     "unavailable_resources": unavailable_resources,
                 },
@@ -327,21 +321,18 @@ class TestReActAgentStream:
             for chunk in response.text.strip().split("\n")
         ]
 
-        agent_scratchpad = [
-            AgentStep(
-                action=AgentToolAction(
-                    thought=step.thought,
-                    tool=step.tool,
-                    tool_input=step.tool_input,
-                ),
-                observation=step.observation,
-            )
-            for step in agent_options.agent_scratchpad.steps
-        ]
-
         agent_inputs = ReActAgentInputs(
             messages=messages,
-            agent_scratchpad=agent_scratchpad,
+            agent_scratchpad=[
+                AgentStep(
+                    action=AgentToolAction(
+                        thought="thought",
+                        tool="tool",
+                        tool_input="tool_input",
+                    ),
+                    observation="observation",
+                )
+            ],
             unavailable_resources=unavailable_resources,
             current_date=expected_date_string,
         )
@@ -417,13 +408,8 @@ class TestReActAgentStream:
                                 )
                             ],
                         ),
-                    ],
-                    options=AgentRequestOptions(
-                        agent_scratchpad=ReActAgentScratchpad(
-                            agent_type="react",
-                            steps=[],
-                        ),
-                    ),
+                        Message(role=Role.ASSISTANT, content=None, agent_scratchpad=[]),
+                    ]
                 ),
                 200,
                 "",
@@ -561,16 +547,19 @@ class TestChatAgent:
     @pytest.mark.parametrize(
         (
             "messages",
-            "agent_options",
             "model_response",
             "expected_actions",
         ),
         [
             (
-                [Message(role=Role.USER, content="Basic request")],
-                AgentRequestOptions(
-                    agent_scratchpad=ReActAgentScratchpad(agent_type="react", steps=[]),
-                ),
+                [
+                    Message(role=Role.USER, content="Basic request"),
+                    Message(
+                        role=Role.ASSISTANT,
+                        content=None,
+                        agent_scratchpad=[],
+                    ),
+                ],
                 "thought\nFinal Answer: answer\n",
                 [
                     AgentFinalAnswer(
@@ -589,11 +578,13 @@ class TestChatAgent:
                             data="int main() {}",
                             selected_code=True,
                         ),
-                    )
+                    ),
+                    Message(
+                        role=Role.ASSISTANT,
+                        content=None,
+                        agent_scratchpad=[],
+                    ),
                 ],
-                AgentRequestOptions(
-                    agent_scratchpad=ReActAgentScratchpad(agent_type="react", steps=[]),
-                ),
                 "thought\nFinal Answer: answer\n",
                 [
                     AgentFinalAnswer(
@@ -611,7 +602,6 @@ class TestChatAgent:
         mocked_tools: Mock,
         mock_track_internal_event,
         messages: list[Message],
-        agent_options: AgentRequestOptions,
         expected_actions: list[TypeAgentEvent],
     ):
         response = mock_client.post(
@@ -622,7 +612,6 @@ class TestChatAgent:
             },
             json={
                 "messages": [m.model_dump(mode="json") for m in messages],
-                "options": agent_options.model_dump(mode="json"),
             },
         )
 

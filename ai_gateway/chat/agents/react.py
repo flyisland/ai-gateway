@@ -172,6 +172,8 @@ class ReActPromptTemplate(Runnable[ReActAgentInputs, PromptValue]):
                     )
                 )
             elif m.role is Role.ASSISTANT:
+                if m.content is None:
+                    continue
                 messages.append(
                     AIMessage(
                         jinja2_formatter(

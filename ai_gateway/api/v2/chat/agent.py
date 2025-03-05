@@ -33,6 +33,7 @@ __all__ = [
     "router",
 ]
 
+from ai_gateway.models import Role
 from ai_gateway.structured_logging import get_request_logger
 
 request_log = get_request_logger("chat")
@@ -113,6 +114,8 @@ async def chat(
         async for event in stream_events:
             yield f"{event.dump_as_response()}\n"
 
+    last_message = agent_request.messages[-1]
+
     if agent_request.options:
         scratchpad = [
             AgentStep(
@@ -124,6 +127,19 @@ async def chat(
                 observation=step.observation,
             )
             for step in agent_request.options.agent_scratchpad.steps
+        ]
+    elif last_message.role == Role.ASSISTANT and last_message.content is None:
+        scratchpad = [
+            AgentStep(
+                action=AgentToolAction(
+                    type=step.action.type,
+                    thought=step.action.thought.replace("\\_", "_"),
+                    tool=step.action.tool.replace("\\_", "_"),
+                    tool_input=step.action.tool_input,
+                ),
+                observation=step.observation,
+            )
+            for step in last_message.agent_scratchpad or []
         ]
     else:
         scratchpad = []
