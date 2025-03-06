@@ -353,12 +353,11 @@ async def fix_truncation(
             code_before_trim, lang_id
         )
         parser_after_trim = await CodeParser.from_language_id(code_after_trim, lang_id)
+
+        if len(parser_after_trim.errors()) <= len(parser_before_trim.errors()):
+            return trimmed_completion
     except ValueError as e:
         log.warning(f"Failed to parse code: {e}")
-        return completion
-
-    if len(parser_after_trim.errors()) <= len(parser_before_trim.errors()):
-        return trimmed_completion
 
     return completion
 
