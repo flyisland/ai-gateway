@@ -322,7 +322,7 @@ async def fix_truncation(
     # 1. uses exactly max output tokens,
     # 2. is unmodified by previous post processors, and
     # 3. does not end with space or newline characters.
-    def _is_likely_truncated():
+    def _is_likely_truncated() -> bool:
         return (
             max_output_tokens_used
             and completion == raw_completion
@@ -342,7 +342,7 @@ async def fix_truncation(
 
     # Return the unmodified completion if trimming it would remove all code
     # content (e.g. when the completion is only one line without spaces).
-    if trimmed_completion.strip() == "":
+    if not trimmed_completion.strip():
         return completion
 
     code_before_trim = f"{prefix}{completion}{suffix}"
