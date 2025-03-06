@@ -1,12 +1,9 @@
-import json
-
 import boto3
 from botocore.exceptions import ClientError
 from fastapi import HTTPException, status
 from q_developer_boto3 import boto3 as q_boto3
 
 from ai_gateway.api.auth_utils import StarletteUser
-from ai_gateway.api.json_utils import safe_process_json
 from ai_gateway.auth.glgo import GlgoAuthority
 from ai_gateway.integrations.amazon_q.errors import (
     AccessDeniedExceptionReason,
@@ -22,26 +19,6 @@ __all__ = [
     "AmazonQClientFactory",
     "AmazonQClient",
 ]
-
-
-QUICK_ACTION_EVENT_ID = "Quick Action"
-EXCLUDE_EVENT_ATTRIBUTES = [
-    "homepage",
-    "email",
-    "url",
-    "ssh_url",
-    "http_url",
-    "web_url",
-    "avatar_url",
-    "git_ssh_url",
-    "git_http_url",
-    "avatar_url",
-]
-
-SYSTEM_HOOK_EVENT_MAP = {
-    "merge_request": "Merge Request Hook",
-    "pipeline": "Pipeline Hook",
-}
 
 
 class AmazonQClientFactory:
@@ -164,18 +141,6 @@ class AmazonQClient:
     def send_event(self, event_request):
         event_id = event_request.event_id
         payload = event_request.payload.model_dump_json(exclude_none=True)
-
-        if not event_id:
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail="Event ID cannot be resolved",
-            )
-
-        if not payload:
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail="Unknown payload",
-            )
         print("DEBUG [AmazonQClient]: send_event payload", payload)
         print("DEBUG [AmazonQClient]: event_id", event_id)
         try:
@@ -238,37 +203,3 @@ class AmazonQClient:
                     status_code=status.HTTP_403_FORBIDDEN,
                     detail=str(error),
                 )
-
-    def _resolve_event_id(self, event_request):
-        payload = event_request.payload
-
-        if payload.__class__.__name__ == "EventHookPayload":
-            # Use class name comparison to avoid circular import for dependency injection
-            return SYSTEM_HOOK_EVENT_MAP.get(payload.data.get("object_kind"), None)
-        elif payload.__class__.__name__ in [
-            "EventMergeRequestPayload",
-            "EventIssuePayload",
-        ]:
-            return QUICK_ACTION_EVENT_ID
-
-        request_log.warn("Unknown event payload, ignore")
-        return None
-
-    def _get_payload(self, event_request):
-        payload = event_request.payload
-
-        if payload.__class__.__name__ == "EventHookPayload":
-            updated_payload = safe_process_json(
-                payload.model_dump(exclude_none=True),
-                EXCLUDE_EVENT_ATTRIBUTES,
-                ignore_null=True,
-            )
-            return json.dumps(updated_payload)
-        elif payload.__class__.__name__ in [
-            "EventMergeRequestPayload",
-            "EventIssuePayload",
-        ]:
-            return payload.model_dump_json(exclude_none=True)
-
-        request_log.warn("Unknown event payload, ignore")
-        return None
