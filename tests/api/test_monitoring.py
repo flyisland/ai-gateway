@@ -169,14 +169,6 @@ def test_ready_cloud_connector_failure(
     mock_llm_text: Mock,
     mock_config: Config,
 ):
-    # Ensure custom_models.enabled is False so it doesn't bypass the check
-    if not hasattr(mock_config, "custom_models"):
-        mock_config.custom_models = Mock()
-        mock_config.custom_models.enabled = False
-    else:
-        mock_config.custom_models.enabled = False
-
-    # Ensure cloud_connector_ready from the CC lib is false
     with patch("ai_gateway.api.monitoring.cloud_connector_ready", return_value=False):
         response = client.get("/monitoring/ready")
 

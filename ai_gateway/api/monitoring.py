@@ -1,7 +1,7 @@
 import functools
 from typing import Annotated, Any, Awaitable, Callable
 
-from dependency_injector.providers import Factory
+from dependency_injector.providers import Configuration, Factory
 from fastapi import APIRouter, Depends, Request
 from fastapi_health import health
 from gitlab_cloud_connector import cloud_connector_ready
@@ -10,6 +10,7 @@ from ai_gateway.async_dependency_resolver import (
     get_code_suggestions_completions_litellm_factory_provider,
     get_code_suggestions_completions_vertex_legacy_provider,
     get_code_suggestions_generations_anthropic_chat_factory_provider,
+    get_config,
 )
 from ai_gateway.code_suggestions import (
     CodeCompletions,
@@ -18,6 +19,7 @@ from ai_gateway.code_suggestions import (
 )
 from ai_gateway.code_suggestions.processing import MetadataPromptBuilder, Prompt
 from ai_gateway.code_suggestions.processing.typing import MetadataCodeContent
+from ai_gateway.config import Config
 from ai_gateway.models import (
     KindAnthropicModel,
     KindLiteLlmModel,
@@ -140,9 +142,11 @@ async def validate_fireworks_available(
     return True
 
 
-async def validate_cloud_connector_ready(request: Request = None) -> bool:
-    config = request.app.extra["extra"]["config"]
-    if config.custom_models.enabled:
+async def validate_cloud_connector_ready(
+    config: Annotated[Configuration[Config], Depends(get_config)],
+    request: Request = None,
+) -> bool:
+    if config.custom_models.enabled():
         return True  # always pass for Self-Hosted-Models
 
     provider = request.app.state.cloud_connector_auth_provider
