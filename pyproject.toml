@@ -58,6 +58,9 @@ priority = "supplemental"
 [tool.poetry.group.test]
 optional = true
 
+[tool.poetry.group.dev.dependencies]
+locust = "^2.24.0"  # Use the latest version
+
 [tool.poetry.group.test.dependencies]
 pytest = "^8.2.0"
 responses = "^0.25.0"
