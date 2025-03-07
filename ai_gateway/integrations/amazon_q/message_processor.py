@@ -97,7 +97,7 @@ class MessageProcessor:
             List[BaseMessage]: Processed copy of messages with system messages handled
         """
         messages_copy = messages.copy()
-        self._handle_system_message(messages_copy)
+        # self._handle_system_message(messages_copy)
         return messages_copy
 
     def _handle_system_message(self, messages: List[BaseMessage]) -> None:
@@ -140,10 +140,13 @@ class MessageProcessor:
             return ""
 
         current_message: Optional[BaseMessage] = messages.pop() if messages else None
+        if messages and isinstance(messages[0], SystemMessage):
+            system_message = messages.pop(0)
+
         if not current_message:
             raise ValueError("No current message found")
 
-        content = current_message.content
+        content = f"{system_message.content}\n{current_message.content}"
 
         return "" if content is None else str(content)
 
