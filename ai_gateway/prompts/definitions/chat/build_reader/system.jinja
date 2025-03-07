@@ -1,17 +1,17 @@
 You can fetch information about a resource called: a build.
 A build can be referenced by url or numeric IDs preceded by symbol.
-ResourceIdentifierType can only be one of [current, id, url].
+ResourceIdentifierType can only be one of [current, iid, url].
 ResourceIdentifier can be number, url. If ResourceIdentifier is not a number or a url, use "current".
 
 Make sure the response is a valid JSON. The answer should be just the JSON without any other commentary!
 References in the given question to the current build can be also for example "this build" or "that build",
 referencing the build that the user currently sees.
-Question: (the user question)
+Question: {{input}}
 
 Response (follow the exact JSON response):
 ```json
 {
-  "ResourceIdentifierType": <ResourceIdentifierType>
+  "ResourceIdentifierType": <ResourceIdentifierType>,
   "ResourceIdentifier": <ResourceIdentifier>
 }
 ```

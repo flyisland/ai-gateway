@@ -13,7 +13,9 @@ class AmazonQModelMetadata(BaseModel):
     provider: Literal["amazon_q"]
     name: Literal["amazon_q"]
     role_arn: Annotated[str, StringConstraints(max_length=255)]
-    conversation_id: Annotated[str, StringConstraints(max_length=255)]
+    conversation_id: Optional[Annotated[str, StringConstraints(max_length=255)]] = (
+        "conversation_id"
+    )
 
     def to_params(self, user: Optional[StarletteUser] = None) -> Dict[str, Any]:
         return {

@@ -7,12 +7,6 @@ from fastapi import HTTPException
 from pydantic import BaseModel
 
 from ai_gateway.api.auth_utils import StarletteUser
-from ai_gateway.api.v1.amazon_q.typing import (
-    EventHookPayload,
-    EventIssuePayload,
-    EventMergeRequestPayload,
-    EventRequest,
-)
 from ai_gateway.auth.glgo import GlgoAuthority
 from ai_gateway.integrations.amazon_q.client import AmazonQClient, AmazonQClientFactory
 from ai_gateway.integrations.amazon_q.errors import AWSException
@@ -27,184 +21,6 @@ class AccessDeniedException(ClientError):
             },
             operation_name="SendEvent",
         )
-
-
-# Fixtures
-@pytest.fixture
-def mock_glgo_authority() -> Mock:
-    """
-    Creates a mock GlgoAuthority with a mocked token method.
-
-    Returns:
-        Mock: Mocked GlgoAuthority instance
-    """
-    return Mock(spec=GlgoAuthority)
-
-
-@pytest.fixture
-def mock_current_user() -> Mock:
-    """
-    Creates a mock user with test credentials and claims.
-
-    Returns:
-        Mock: Mocked StarletteUser instance
-    """
-    user = Mock(spec=StarletteUser)
-    user.global_user_id = "test_user_id"
-    user.cloud_connector_token = "test_token"
-    user.claims = Mock()
-    user.claims.subject = "test_subject"
-    return user
-
-
-@pytest.fixture
-def mock_credentials() -> Dict[str, str]:
-    """
-    Provides mock AWS credentials.
-
-    Returns:
-        Dict[str, str]: Dictionary containing mock AWS credentials
-    """
-    return {
-        "AccessKeyId": "test_access_key",
-        "SecretAccessKey": "test_secret_key",
-        "SessionToken": "test_session_token",
-    }
-
-
-@pytest.fixture
-def client_factory(mock_glgo_authority: Mock) -> AmazonQClientFactory:
-    """
-    Creates an AmazonQClientFactory instance with mocked dependencies.
-
-    Args:
-        mock_glgo_authority: Mocked GlgoAuthority instance
-
-    Returns:
-        AmazonQClientFactory: Configured client factory for testing
-    """
-    with patch("boto3.client") as mock_boto3_client:
-        mock_boto3_client.return_value = Mock()
-        factory = AmazonQClientFactory(
-            glgo_authority=mock_glgo_authority,
-            endpoint_url="https://test-endpoint",
-            region="us-west-2",
-        )
-        factory.sts_client = mock_boto3_client.return_value
-        return factory
-
-
-@pytest.fixture
-def amazon_q_client(mock_credentials: Dict[str, str]) -> AmazonQClient:
-    """
-    Creates an AmazonQClient instance with mocked credentials.
-
-    Args:
-        mock_credentials: Dictionary of mock AWS credentials
-
-    Returns:
-        AmazonQClient: Configured client for testing
-    """
-    with patch("q_developer_boto3.boto3.client") as mock_q_boto3_client:
-        client = AmazonQClient(
-            url="https://test-endpoint",
-            region="us-west-2",
-            credentials=mock_credentials,
-        )
-        client.client = mock_q_boto3_client.return_value
-        return client
-
-
-@pytest.fixture
-def event_merge_request_payload():
-    """Fixture for EventMergeRequestPayload"""
-    return EventMergeRequestPayload(
-        source="merge_request",
-        merge_request_id="1",
-        merge_request_iid="1",
-        command="dev",
-        role_arn="arn:aws:iam::123456789012:role/test-role",
-        project_path="a/b/c",
-        project_id="123",
-        note_id="1",
-        discussion_id="1",
-        source_branch="dev",
-        target_branch="main",
-        last_commit_id="123",
-    )
-
-
-@pytest.fixture
-def event_issue_payload():
-    """Fixture for EventIssuePayload"""
-    return EventIssuePayload(
-        source="issue",
-        issue_id="1",
-        issue_iid="1",
-        command="dev",
-        role_arn="arn:aws:iam::123456789012:role/test-role",
-        project_path="a/b/c",
-        project_id="123",
-        note_id="1",
-        discussion_id="1",
-    )
-
-
-@pytest.fixture
-def event_hook_payload():
-    """Fixture for EventHookPayload"""
-    return EventHookPayload(
-        source="system_hook",
-        data={
-            "object_kind": "merge_request",
-            "project_id": 1,
-            "ref": "refs/heads/main",
-            "checkout_sha": "abc123",
-            "user_id": 1,
-            "user_name": "Test User",
-            "repository": {
-                "name": "test-repo",
-                "url": "git@gitlab.com:group/project.git",
-                "description": "test repository",
-                "homepage": "https://gitlab.com/group/project",
-            },
-            "project": {
-                "id": 20,
-                "name": "Project1",
-                "description": None,
-            },
-        },
-    )
-
-
-@pytest.fixture
-def event_request_merge(event_merge_request_payload):
-    """Fixture for EventRequest with merge request payload"""
-    return EventRequest(
-        role_arn="arn:aws:iam::123456789012:role/test-role",
-        code="test-code",
-        payload=event_merge_request_payload,
-    )
-
-
-@pytest.fixture
-def event_request_issue(event_issue_payload):
-    """Fixture for EventRequest with issue payload"""
-    return EventRequest(
-        role_arn="arn:aws:iam::123456789012:role/test-role",
-        code="test-code",
-        payload=event_issue_payload,
-    )
-
-
-@pytest.fixture
-def event_request_hook(event_hook_payload):
-    """Fixture for EventRequest with system hook payload"""
-    return EventRequest(
-        role_arn="arn:aws:iam::123456789012:role/test-role",
-        code="test-code",
-        payload=event_hook_payload,
-    )
 
 
 class TestAmazonQClientFactory:
@@ -488,10 +304,6 @@ class TestAmazonQClient:
         [
             # Happy path - successful event sending
             ("Quick Action", '{"test": "data"}', None, None),
-            # Test missing event ID
-            (None, '{"test": "data"}', None, HTTPException),
-            # Test missing payload
-            ("Quick Action", None, None, HTTPException),
             # Test AccessDeniedException with retry
             (
                 "Quick Action",
@@ -514,7 +326,7 @@ class TestAmazonQClient:
         ],
     )
     def test_send_event(
-        self, amazon_q_client, event_id, payload, client_error, expected_exception
+        self, q_client, event_id, payload, client_error, expected_exception
     ):
         """Tests event sending with various scenarios."""
         # Setup mock request
@@ -523,23 +335,21 @@ class TestAmazonQClient:
         mock_request.event_id = event_id
         mock_request.code = "test_code"
 
-        amazon_q_client._retry_send_event = Mock(return_value={"Success": True})
+        q_client._retry_send_event = Mock(return_value={"Success": True})
 
         if client_error:
             # Configure mock to raise exception on first call
-            amazon_q_client._send_event = Mock(
-                side_effect=[client_error, {"Success": True}]
-            )
+            q_client._send_event = Mock(side_effect=[client_error, {"Success": True}])
         else:
             # Configure mock to return successfully
-            amazon_q_client._send_event = Mock(return_value={"Success": True})
+            q_client._send_event = Mock(return_value={"Success": True})
 
         if expected_exception:
             with pytest.raises(expected_exception):
-                amazon_q_client.send_event(mock_request)
+                q_client.send_event(mock_request)
         else:
             # Should not raise any exception
-            amazon_q_client.send_event(mock_request)
+            q_client.send_event(mock_request)
 
             if (
                 client_error
@@ -547,14 +357,14 @@ class TestAmazonQClient:
                 and client_error.response["Error"]["Code"] == "AccessDeniedException"
             ):
                 # Verify _send_event was called first and raised the exception
-                amazon_q_client._send_event.assert_called_with(event_id, payload)
+                q_client._send_event.assert_called_with(event_id, payload)
                 # Verify retry was called with correct parameters
-                amazon_q_client._retry_send_event.assert_called_once_with(
+                q_client._retry_send_event.assert_called_once_with(
                     client_error, mock_request.code, payload, event_id
                 )
             else:
                 # Verify normal _send_event was called
-                amazon_q_client._send_event.assert_called_once_with(event_id, payload)
+                q_client._send_event.assert_called_once_with(event_id, payload)
 
     def test_generate_code_recommendations(
         self, q_client, mock_q_client, mock_event_request

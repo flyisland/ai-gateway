@@ -141,21 +141,8 @@ class AmazonQClient:
     def send_event(self, event_request):
         event_id = event_request.event_id
         payload = event_request.payload.model_dump_json(exclude_none=True)
-
-        if not event_id:
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail="Event ID cannot be resolved",
-            )
-
-        if not payload:
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail="Unknown payload",
-            )
         print("DEBUG [AmazonQClient]: send_event payload", payload)
         print("DEBUG [AmazonQClient]: event_id", event_id)
-
         try:
             self._send_event(event_id, payload)
         except ClientError as ex:
@@ -196,7 +183,6 @@ class AmazonQClient:
         )
 
     def _send_message(self, payload):
-        print("DEBUG [AmazonQClient]: _send_message payload", payload)
         return self.client.send_message(
             message=payload["message"], conversationId=payload["conversation_id"]
         )
