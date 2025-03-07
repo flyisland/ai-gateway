@@ -147,7 +147,16 @@ async def validate_cloud_connector_ready(
     request: Request = None,
 ) -> bool:
     if config.custom_models.enabled():
-        return True  # always pass for Self-Hosted-Models
+        """
+        Always pass for Self-Hosted-Models. This is temporary.
+        With the current CC <-> AI GW interface, we can't easily skip CDot sync just for SHM only.
+        At the same time, we can't require SHM to always connect to CustomersDot -
+        as CustomersDot connection/sync is not needed for AI GW to work in SHM context.
+        So we shouldn't fail the probe for customer setups that can't or don't want to reach CustomersDot.
+        As soon as https://gitlab.com/gitlab-org/gitlab/-/issues/517088 is complete, we should stop passing CustomersDot
+        as a provider for SHM setups. With that, we can drop the check for SHM in this file.
+        """
+        return True
 
     provider = request.app.state.cloud_connector_auth_provider
     if not provider:
