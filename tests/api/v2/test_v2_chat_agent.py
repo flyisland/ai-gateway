@@ -302,6 +302,7 @@ class TestReActAgentStream:
         mocked_stream.side_effect = _agent_stream
 
         mock_now = datetime(2024, 12, 25)
+        expected_date_string = "Wednesday, December 25, 2024"
 
         with patch("ai_gateway.api.v2.chat.agent.datetime") as mock_datetime:
             mock_datetime.now.return_value = mock_now
@@ -342,7 +343,7 @@ class TestReActAgentStream:
             agent_scratchpad=agent_scratchpad,
             model_metadata=model_metadata,
             unavailable_resources=unavailable_resources,
-            current_date=mock_now.strftime("%A, %B %d, %Y"),
+            current_date=expected_date_string,
         )
 
         assert response.status_code == 200
