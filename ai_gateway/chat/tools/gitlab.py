@@ -24,29 +24,21 @@ class IssueReader(BaseRemoteTool):
 
     description: str = dedent(
         """\
-        This tool retrieves the content of a specific issue
-        ONLY if the user question fulfills the strict usage conditions below.
-
-        **Strict Usage Conditions:**
-        * **Condition 1: Issue ID Provided:** This tool MUST be used ONLY when the user provides a valid issue ID.
-        * **Condition 2: Issue URL Context:** This tool MUST be used ONLY when the user is actively viewing a specific
-          issue URL or a specific URL is provided by the user.
-
-        **Do NOT** attempt to search for or identify issues based on descriptions, keywords, or user questions.
-
-        **Action Input:**
-        * The original question asked by the user.
-
-        **Important:**  Reject any input that does not strictly adhere to the usage conditions above.
-        Return a message stating you are unable to search for issues without a valid identifier."""
+        Retrieves content of a specific issue. Use ONLY when:
+        1. User provides a valid issue ID
+        2. User is viewing a specific issue URL or provides a specific URL
+        
+        DO NOT use to search for issues by description or keywords.
+        
+        Action Input: Original user question
+        
+        Reject inputs without valid identifiers."""
     )
 
     example: str = dedent(
         """\
         Question: Please identify the author of #123 issue
-        Thought: You have access to the same resources as user who asks a question.
-          Question is about the content of an issue, so you need to use "issue_reader" tool to retrieve and read issue.
-          Based on this information you can present final answer about issue.
+        Thought: Need to use "issue_reader" to retrieve issue content.
         Action: issue_reader
         Action Input: Please identify the author of #123 issue"""
     )
@@ -60,15 +52,14 @@ class GitlabDocumentation(BaseRemoteTool):
 
     description: str = dedent(
         """\
-        This tool is beneficial when you need to answer questions concerning GitLab and its features.
-        Questions can be about GitLab's projects, groups, issues, merge requests,
-        epics, work items, milestones, labels, CI/CD pipelines, git repositories, and more."""
+        Answers questions about GitLab features including projects, groups, issues, 
+        merge requests, epics, work items, milestones, labels, CI/CD pipelines, and git repositories."""
     )
 
     example: str = dedent(
         """\
         Question: How do I set up a new project?
-        Thought: Question is about inner working of GitLab. "gitlab_documentation" tool is the right one for the job.
+        Thought: Question about GitLab functionality. Use "gitlab_documentation".
         Action: gitlab_documentation
         Action Input: How do I set up a new project?"""
     )
@@ -82,18 +73,14 @@ class SelfHostedGitlabDocumentation(BaseRemoteTool):
 
     description: str = dedent(
         """\
-        This tool is beneficial when you need to answer questions concerning GitLab and its features.
-        Questions can be about GitLab's projects, groups, issues, merge requests,
-        epics, work items, milestones, labels, CI/CD pipelines, git repositories, and more."""
+        Answers questions about GitLab features including projects, groups, issues, 
+        merge requests, epics, work items, milestones, labels, CI/CD pipelines, and git repositories."""
     )
 
     example: str = dedent(
         """
         Question: How do I set up a new project?
-        Thought: Question is about inner working of GitLab. "gitlab_documentation" tool is the right one for the job. I
-          should keep the action input concise to it's intention and do not add punctuation, for example when question
-          is 'How do I set up a project?' then Action Input is 'set up project' nad when question is 'Can you please
-          help me open a merge request?' then Action Input is 'create merge request'.
+        Thought: Question about GitLab functionality. Keep action input concise without punctuation.
         Action: gitlab_documentation
         Action Input: set up project
         """
@@ -108,29 +95,21 @@ class EpicReader(BaseRemoteTool):
 
     description: str = dedent(
         """\
-        This tool retrieves the content of a specific epic or work item.
-        ONLY if the user question fulfills the strict usage conditions below.
-
-        **Strict Usage Conditions:**
-        * **Condition 1: epic ID Provided:** This tool MUST be used ONLY when the user provides a valid epic or work item ID.
-        * **Condition 2: epic URL Context:** This tool MUST be used ONLY when the user is actively viewing
-          a specific epic or work item URL or a specific URL is provided by the user.
-
-        **Do NOT** attempt to search for or identify epics or work items based on descriptions, keywords, or user questions.
-
-        **Action Input:**
-        * The original question asked by the user.
-
-        **Important:**  Reject any input that does not strictly adhere to the usage conditions above.
-        Return a message stating you are unable to search for epics or work items without a valid identifier."""
+        Retrieves content of a specific epic or work item. Use ONLY when:
+        1. User provides a valid epic/work item ID
+        2. User is viewing a specific epic/work item URL or provides a specific URL
+        
+        DO NOT use to search for epics/work items by description or keywords.
+        
+        Action Input: Original user question
+        
+        Reject inputs without valid identifiers."""
     )
 
     example: str = dedent(
         """\
         Question: Please identify the author of &123 epic.
-        Thought: You have access to the same resources as user who asks a question.
-            The question is about an epic, so you need to use "epic_reader" tool.
-            Based on this information you can present final answer.
+        Thought: Need to use "epic_reader" to retrieve epic content.
         Action: epic_reader
         Action Input: Please identify the author of &123 epic."""
     )
@@ -144,30 +123,21 @@ class CommitReader(BaseRemoteTool):
 
     description: str = dedent(
         """\
-        This tool retrieves the content of a specific commit
-        ONLY if the user question fulfills the strict usage conditions below.
-
-        **Strict Usage Conditions:**
-        * **Condition 1: Commit ID Provided:** This tool MUST be used ONLY when the user provides a valid commit ID.
-        * **Condition 2: Commit URL Context:** This tool MUST be used ONLY when the user is actively viewing
-          a specific commit URL or a specific URL is provided by the user.
-
-        **Do NOT** attempt to search for or identify commits based on descriptions, keywords, or user questions.
-
-        **Action Input:**
-        * The original question asked by the user.
-
-        **Important:**  Reject any input that does not strictly adhere to the usage conditions above.
-        Return a message stating you are unable to search for commits without a valid identifier."""
+        Retrieves content of a specific commit. Use ONLY when:
+        1. User provides a valid commit ID
+        2. User is viewing a specific commit URL or provides a specific URL
+        
+        DO NOT use to search for commits by description or keywords.
+        
+        Action Input: Original user question
+        
+        Reject inputs without valid identifiers."""
     )
 
     example: str = dedent(
         """\
         Question: Please identify the author of #123 commit
-        Thought: You have access to the same resources as user who asks a question.
-            Question is about the content of a commit, so you need to use "commit_reader" tool to retrieve
-            and read commit.
-            Based on this information you can present final answer about commit.
+        Thought: Need to use "commit_reader" to retrieve commit content.
         Action: commit_reader
         Action Input: Please identify the author of #123 commit"""
     )
@@ -181,29 +151,21 @@ class BuildReader(BaseRemoteTool):
 
     description: str = dedent(
         """\
-        This tool retrieves the content of a specific build
-        ONLY if the user question fulfills the strict usage conditions below.
-
-        **Strict Usage Conditions:**
-        * **Condition 1: build ID Provided:** This tool MUST be used ONLY when the user provides a valid build ID.
-        * **Condition 2: build URL Context:** This tool MUST be used ONLY when the user is actively viewing
-          a specific build URL or a specific URL is provided by the user.
-
-        **Do NOT** attempt to search for or identify builds based on descriptions, keywords, or user questions.
-
-        **Action Input:**
-        * The original question asked by the user.
-
-        **Important:**  Reject any input that does not strictly adhere to the usage conditions above.
-        Return a message stating you are unable to search for builds without a valid identifier."""
+        Retrieves content of a specific build. Use ONLY when:
+        1. User provides a valid build ID
+        2. User is viewing a specific build URL or provides a specific URL
+        
+        DO NOT use to search for builds by description or keywords.
+        
+        Action Input: Original user question
+        
+        Reject inputs without valid identifiers."""
     )
 
     example: str = dedent(
         """\
         Question: Please identify the author of &123 build.
-        Thought: You have access to the same resources as user who asks a question.
-            The question is about a build, so you need to use "build_reader" tool.
-            Based on this information you can present final answer.
+        Thought: Need to use "build_reader" to retrieve build content.
         Action: build_reader
         Action Input: Please identify the author of &123 build."""
     )
@@ -217,30 +179,21 @@ class MergeRequestReader(BaseRemoteTool):
 
     description: str = dedent(
         """\
-        This tool retrieves the content of a specific merge request
-        ONLY if the user question fulfills the strict usage conditions below.
-
-        **Strict Usage Conditions:**
-        * **Condition 1: Merge request ID Provided:** This tool MUST be used ONLY when the user provides a valid merge request ID.
-        * **Condition 2: Merge request URL Context:** This tool MUST be used ONLY when the user is actively viewing
-          a specific merge request URL or a specific URL is provided by the user.
-
-        **Do NOT** attempt to search for or identify merge requests based on descriptions, keywords, or user questions.
-
-        **Action Input:**
-        * The original question asked by the user.
-
-        **Important:**  Reject any input that does not strictly adhere to the usage conditions above.
-        Return a message stating you are unable to search for merge requests without a valid identifier."""
+        Retrieves content of a specific merge request. Use ONLY when:
+        1. User provides a valid merge request ID
+        2. User is viewing a specific merge request URL or provides a specific URL
+        
+        DO NOT use to search for merge requests by description or keywords.
+        
+        Action Input: Original user question
+        
+        Reject inputs without valid identifiers."""
     )
 
     example: str = dedent(
         """\
         Question: Please identify the author of #123 merge request
-         Thought: You have access to the same resources as user who asks a question.
-             Question is about the content of a merge request, so you need to use "merge_request_reader" tool to retrieve
-             and read merge request.
-             Based on this information you can present final answer about merge request.
-         Action: merge_request_reader
-         Action Input: Please identify the author of #123 merge request"""
+        Thought: Need to use "merge_request_reader" to retrieve merge request content.
+        Action: merge_request_reader
+        Action Input: Please identify the author of #123 merge request"""
     )
