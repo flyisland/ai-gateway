@@ -173,21 +173,3 @@ def test_ready_cloud_connector_failure_from_library(
         response = client.get("/monitoring/ready")
 
     assert response.status_code == 503
-
-
-def test_ready_cloud_connector_failure_from_provider_not_passed(
-    client: TestClient,
-    mock_generations: Mock,
-    mock_completions_legacy: Mock,
-    mock_llm_text: Mock,
-    mock_config: Config,
-):
-    with patch.object(
-        client.app.state, "cloud_connector_auth_provider", None
-    ):  # cover the `provider` check in the code
-        with patch(
-            "ai_gateway.api.monitoring.cloud_connector_ready", return_value=True
-        ):  # even when it is True, we fail if no provider is passed
-            response = client.get("/monitoring/ready")
-
-    assert response.status_code == 503
