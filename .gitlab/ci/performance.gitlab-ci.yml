@@ -8,6 +8,7 @@ dotenv-vars:
     - cat variables.env
   artifacts:
     paths:
+      - performance_tests
       - variables.env
     expire_in: 1 hour
     reports:
