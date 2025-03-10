@@ -246,7 +246,7 @@ To add a new test, create a new `.js` file under [performance_test/k6-test](../p
 
 Update the comment sections with the respective values/code.
 
-```js
+```javascript
 // Import necessary modules
 import { textSummary } from 'https://jslib.k6.io/k6-summary/0.0.1/index.js';
 export const TTFB_THRESHOLD= /* TTFB THRESHOLD VALUE EXPECTED */
