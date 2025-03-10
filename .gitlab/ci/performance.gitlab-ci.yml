@@ -19,7 +19,7 @@ tests:performance:
     - job: dotenv-vars
       artifacts: true
   trigger:
-    project: gitlab-org/quality/component-performance-testing-aigw-poc
+    project: gitlab-org/quality/component-performance-testing
     branch: main
     strategy: depend
     forward:
