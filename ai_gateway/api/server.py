@@ -69,6 +69,20 @@ async def lifespan(app: FastAPI):
 
 
 def create_fast_api_server(config: Config):
+    """
+    Do not fetch JWKS from CustomersDot for Self-Hosted-Models setup.
+    CustomersDot sync is not needed for AI GW to work in SHM context.
+    For SHM, we only need keys from local GitLab instance and local AI GW for direct access.
+
+    Implementing it via `AIGW_CUSTOM_MODELS__ENABLED`(`config.custom.models.enabled`) is a short-term solution.
+    The next iteration will be supplying and loading providers-as-configuration.
+    Refer to https://gitlab.com/gitlab-org/gitlab/-/issues/517088 for more.
+    With that, we can avoid the direct check for SHM there.
+    """
+    oidc_providers = {"Gitlab": config.gitlab_url}
+    if not config.custom_models.enabled:
+        oidc_providers["CustomersDot"] = config.customer_portal_url
+
     auth_provider = CompositeProvider(
         [
             LocalAuthProvider(
@@ -78,10 +92,7 @@ def create_fast_api_server(config: Config):
             ),
             GitLabOidcProvider(
                 structlog,
-                oidc_providers={
-                    "Gitlab": config.gitlab_url,
-                    "CustomersDot": config.customer_portal_url,
-                },
+                oidc_providers=oidc_providers,
             ),
         ],
         structlog,
