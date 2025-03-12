@@ -24,8 +24,8 @@ from langchain_core.messages import AIMessage, BaseMessage, HumanMessage, System
 class HistoryItem(TypedDict, total=False):
     """Type definition for history items"""
 
-    userInputMessage: str
-    assistantResponseMessage: str
+    userInputMessage: dict
+    assistantResponseMessage: dict
 
 
 @dataclass
@@ -167,9 +167,9 @@ class MessageProcessor:
 
         for message in messages:
             if isinstance(message, HumanMessage):
-                history.append({"userInputMessage": str(message.content)})
+                history.append({"userInputMessage": {"content":str(message.content)}})
             elif isinstance(message, AIMessage):
-                history.append({"assistantResponseMessage": str(message.content)})
+                history.append({"assistantResponseMessage": {"content":str(message.content)}})
 
         return history
 

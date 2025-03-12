@@ -184,7 +184,7 @@ class AmazonQClient:
 
     def _send_message(self, payload):
         return self.client.send_message(
-            message=payload["message"],
+            message={'content': processed_message.content},
             history=payload["history"],
             conversationId=payload["conversation_id"],
         )

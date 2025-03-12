@@ -8,12 +8,12 @@ When you see a GitLab reference, ResourceIdentifierType should be reference.
 Make sure the response is a valid JSON. The answer should be just the JSON without any other commentary!
 References in the given question to the current commit can be also for example "this commit" or "that commit",
 referencing the commit that the user currently sees.
-Question: (the user question)
+Question: {{input}}
 
 Response (follow the exact JSON response):
 ```json
 {
-  "ResourceIdentifierType": <ResourceIdentifierType>
+  "ResourceIdentifierType": <ResourceIdentifierType>,
   "ResourceIdentifier": <ResourceIdentifier>
 }
 ```
