@@ -42,8 +42,8 @@ class DuoChatToolsRegistry(BaseToolsRegistry):
         _tools = []
 
         for tool in self.tools:
-            if not user.can(tool.unit_primitive):
-                continue
+            # if not user.can(tool.unit_primitive):
+            #     continue
 
             if not tool.is_compatible(gl_version):
                 continue

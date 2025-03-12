@@ -2,6 +2,10 @@ from dependency_injector import containers, providers
 
 from ai_gateway.chat.executor import GLAgentRemoteExecutor
 from ai_gateway.chat.toolset import DuoChatToolsRegistry
+from ai_gateway.integrations.amazon_q.chat import ChatAmazonQ
+from ai_gateway.integrations.amazon_q.client import AmazonQClientFactory
+from ai_gateway.integrations.amazon_q.message_processor import MessageProcessor
+from ai_gateway.integrations.amazon_q.response_handlers import ResponseHandler
 
 __all__ = [
     "ContainerChat",
@@ -18,6 +22,27 @@ class ContainerChat(containers.DeclarativeContainer):
     # However, we can still override its internal sub-factories to achieve the same goal.
     _anthropic_claude_llm_factory = providers.Factory(models.anthropic_claude)
     _anthropic_claude_chat_factory = providers.Factory(models.anthropic_claude_chat)
+
+    # Core dependencies
+    message_processor = providers.Singleton(MessageProcessor)
+    response_handler = providers.Singleton(ResponseHandler)
+
+    # Client factory
+    amazon_q_client_factory = providers.Singleton(
+        AmazonQClientFactory, config=config.amazon_q
+    )
+
+    # Chat factory with validated config
+    amazon_q_factory = providers.Factory(
+        ChatAmazonQ,
+        amazon_q_client_factory=amazon_q_client_factory,
+        message_processor=message_processor,
+        response_handler=response_handler,
+        metadata=providers.Dict(user=providers.Callable(lambda: None)),
+        model="amazon_q",
+        temperature=0.7,
+        max_retries=3,
+    )
 
     # We need to resolve the model based on model name provided in request payload
     # Hence, `models._anthropic_claude` and `models._anthropic_claude_chat_factory` are only partially applied here.

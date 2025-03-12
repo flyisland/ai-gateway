@@ -41,6 +41,7 @@ class AmazonQClientFactory:
             url=self.endpoint_url,
             region=self.region,
             credentials=credentials,
+            # credentials={}
         )
 
     def _get_glgo_token(
@@ -140,13 +141,22 @@ class AmazonQClient:
     def send_event(self, event_request):
         event_id = event_request.event_id
         payload = event_request.payload.model_dump_json(exclude_none=True)
-
+        print("DEBUG [AmazonQClient]: send_event payload", payload)
+        print("DEBUG [AmazonQClient]: event_id", event_id)
         try:
             self._send_event(event_id, payload)
         except ClientError as ex:
             if ex.__class__.__name__ == "AccessDeniedException":
                 return self._retry_send_event(ex, event_request.code, payload, event_id)
 
+            raise ex
+
+    @raise_aws_errors
+    def send_chat_message(self, payload):
+
+        try:
+            return self._send_message(payload)
+        except ClientError as ex:
             raise ex
 
     @raise_aws_errors
@@ -170,6 +180,13 @@ class AmazonQClient:
             eventId=event_id,
             eventVersion="1.0",
             event=payload,
+        )
+
+    def _send_message(self, payload):
+        return self.client.send_message(
+            message=payload["message"],
+            history=payload["history"],
+            conversationId=payload["conversation_id"],
         )
 
     def _retry_send_event(self, error, code, payload, event_id):

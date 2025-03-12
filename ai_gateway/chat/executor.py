@@ -40,6 +40,7 @@ class GLAgentRemoteExecutor(Generic[TypeAgentInputs, TypeAgentEvent]):
         self.tools_registry = tools_registry
         self.internal_event_client = internal_event_client
         self._tools: list[BaseTool] | None = None
+        self._user: StarletteUser | None = None
 
     @property
     def tools(self) -> list[BaseTool]:
@@ -86,7 +87,7 @@ class GLAgentRemoteExecutor(Generic[TypeAgentInputs, TypeAgentEvent]):
             tools_by_name.keys()
         )
 
-        log.info("Processed inputs", source=__name__, inputs=inputs)
+        # log.info("Processed inputs", source=__name__, inputs=inputs)
 
         async for event in self.agent.astream(inputs):
             if isinstance(event, AgentToolAction):
