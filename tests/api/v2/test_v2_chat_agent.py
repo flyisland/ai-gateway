@@ -1,7 +1,7 @@
 import json
 from datetime import datetime
 from typing import AsyncIterator
-from unittest.mock import ANY, Mock, PropertyMock, call, patch
+from unittest.mock import Mock, PropertyMock, call, patch
 
 import pytest
 from gitlab_cloud_connector import CloudConnectorUser, UserClaims
@@ -121,7 +121,6 @@ class TestReActAgentStream:
                         name="amazon_q",
                         provider="amazon_q",
                         role_arn="role-arn",
-                        conversation_id="conversation-id",
                     ),
                 ),
                 "thought\nFinal Answer: answer\n",
@@ -352,7 +351,7 @@ class TestReActAgentStream:
         mocked_stream.assert_called_once_with(inputs=agent_inputs)
 
         mock_track_internal_event.assert_called_once_with(
-            "request_amazon_q_integration",
+            "request_duo_chat",
             category="ai_gateway.api.v2.chat.agent",
         )
 
@@ -362,18 +361,12 @@ class TestReActAgentStream:
         [
             (
                 CloudConnectorUser(
-                    authenticated=True,
-                    claims=UserClaims(scopes=["duo_chat", "amazon_q_integration"]),
+                    authenticated=True, claims=UserClaims(scopes=["duo_chat"])
                 ),
                 AgentRequest(messages=[Message(role=Role.USER, content="Hi")]),
                 200,
                 "",
-                [
-                    call(
-                        "request_amazon_q_integration",
-                        category="ai_gateway.api.v2.chat.agent",
-                    )
-                ],
+                [call("request_duo_chat", category="ai_gateway.api.v2.chat.agent")],
             ),
             (
                 CloudConnectorUser(
@@ -387,13 +380,7 @@ class TestReActAgentStream:
             (
                 CloudConnectorUser(
                     authenticated=True,
-                    claims=UserClaims(
-                        scopes=[
-                            "duo_chat",
-                            "include_file_context",
-                            "amazon_q_integration",
-                        ]
-                    ),
+                    claims=UserClaims(scopes=["duo_chat", "include_file_context"]),
                 ),
                 AgentRequest(
                     messages=[
@@ -415,8 +402,7 @@ class TestReActAgentStream:
             ),
             (
                 CloudConnectorUser(
-                    authenticated=True,
-                    claims=UserClaims(scopes=["duo_chat", "amazon_q_integration"]),
+                    authenticated=True, claims=UserClaims(scopes=["duo_chat"])
                 ),
                 AgentRequest(
                     messages=[
@@ -429,17 +415,11 @@ class TestReActAgentStream:
                 ),
                 200,
                 "",
-                [
-                    call(
-                        "request_amazon_q_integration",
-                        category="ai_gateway.api.v2.chat.agent",
-                    )
-                ],
+                [call("request_duo_chat", category="ai_gateway.api.v2.chat.agent")],
             ),
             (
                 CloudConnectorUser(
-                    authenticated=True,
-                    claims=UserClaims(scopes=["duo_chat", "amazon_q_integration"]),
+                    authenticated=True, claims=UserClaims(scopes=["duo_chat"])
                 ),
                 AgentRequest(
                     messages=[
@@ -452,12 +432,7 @@ class TestReActAgentStream:
                 ),
                 200,
                 "",
-                [
-                    call(
-                        "request_amazon_q_integration",
-                        category="ai_gateway.api.v2.chat.agent",
-                    )
-                ],
+                [call("request_duo_chat", category="ai_gateway.api.v2.chat.agent")],
             ),
             (
                 CloudConnectorUser(
@@ -507,8 +482,7 @@ class TestReActAgentStream:
             ),
             (
                 CloudConnectorUser(
-                    authenticated=True,
-                    claims=UserClaims(scopes=["duo_chat", "amazon_q_integration"]),
+                    authenticated=True, claims=UserClaims(scopes=["duo_chat"])
                 ),
                 AgentRequest(
                     messages=[
@@ -632,6 +606,6 @@ class TestChatAgent:
         assert actual_actions == expected_actions
 
         mock_track_internal_event.assert_called_once_with(
-            "request_amazon_q_integration",
+            "request_duo_chat",
             category="ai_gateway.api.v2.chat.agent",
         )
