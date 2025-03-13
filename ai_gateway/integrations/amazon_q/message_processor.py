@@ -167,9 +167,11 @@ class MessageProcessor:
 
         for message in messages:
             if isinstance(message, HumanMessage):
-                history.append({"userInputMessage": {"content":str(message.content)}})
+                history.append({"userInputMessage": {"content": str(message.content)}})
             elif isinstance(message, AIMessage):
-                history.append({"assistantResponseMessage": {"content":str(message.content)}})
+                history.append(
+                    {"assistantResponseMessage": {"content": str(message.content)}}
+                )
 
         return history
 

@@ -1,10 +1,8 @@
-from typing import List, Sequence
-from unittest.mock import Mock
+from typing import List
 
 import pytest
-from langchain_core.messages import AIMessage, BaseMessage, HumanMessage, SystemMessage
+from langchain_core.messages import AIMessage, BaseMessage, HumanMessage
 
-from ai_gateway.api.auth_utils import StarletteUser
 from ai_gateway.integrations.amazon_q.message_processor import (
     HistoryItem,
     MessageProcessor,
@@ -81,10 +79,10 @@ def test_create_history_alternating_messages(
     result = message_processor.process_messages(messages, "test-user-123")
 
     expected_history: List[HistoryItem] = [
-        {"userInputMessage": "Message 1"},
-        {"assistantResponseMessage": "Response 1"},
-        {"userInputMessage": "Message 2"},
-        {"assistantResponseMessage": "Response 2"},
+        {"userInputMessage": {"content": "Message 1"}},
+        {"assistantResponseMessage": {"content": "Response 1"}},
+        {"userInputMessage": {"content": "Message 2"}},
+        {"assistantResponseMessage": {"content": "Response 2"}},
     ]
 
     assert result.content == "Current message"
