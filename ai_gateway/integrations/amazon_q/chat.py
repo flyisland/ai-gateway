@@ -144,7 +144,7 @@ class ChatAmazonQ(BaseChatModel):
         messages: List[BaseMessage],
         user: StarletteUser,
         role_arn: str,
-        conversation_id: Optional[str],
+        conversation_id: Optional[str] = "conversation_id",
         **kwargs: Any,
     ):
         """

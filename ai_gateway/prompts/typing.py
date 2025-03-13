@@ -73,7 +73,9 @@ class ModelMetadata(BaseModelMetadata):
         return params
 
 
+# TODO: Fix me!!
 TypeModelMetadata = ModelMetadata | AmazonQModelMetadata
+# TypeModelMetadata = AmazonQModelMetadata
 
 
 class TypeModelFactory(Protocol):
