@@ -31,6 +31,9 @@ class AmazonQModelMetadata(BaseModelMetadata):
     provider: Literal["amazon_q"]
     name: Literal["amazon_q"]
     role_arn: Annotated[str, StringConstraints(max_length=255)]
+    conversation_id: Optional[Annotated[str, StringConstraints(max_length=255)]] = (
+        "conversation_id"
+    )
 
     def to_params(self) -> Dict[str, Any]:
         return {"role_arn": self.role_arn, "user": self._user}
@@ -39,11 +42,11 @@ class AmazonQModelMetadata(BaseModelMetadata):
 class ModelMetadata(BaseModelMetadata):
     name: Annotated[str, StringConstraints(max_length=255)]
     provider: Annotated[str, StringConstraints(max_length=255)]
-    endpoint: Annotated[AnyUrl, UrlConstraints(max_length=255)]
-    api_key: Optional[Annotated[str, StringConstraints(max_length=1000)]] = None
-    identifier: Optional[Annotated[str, StringConstraints(max_length=1000)]] = None
+    endpoint: Optional[Annotated[AnyUrl, UrlConstraints(max_length=255)]] = None
+    api_key: Optional[Annotated[str, StringConstraints(max_length=255)]] = None
+    identifier: Optional[Annotated[str, StringConstraints(max_length=255)]] = None
 
-    def to_params(self) -> Dict[str, Any]:
+    def to_params(self, user: Optional[StarletteUser] = None) -> Dict[str, Any]:
         params: Dict[str, str] = {}
 
         if self.endpoint:
@@ -70,7 +73,7 @@ class ModelMetadata(BaseModelMetadata):
         return params
 
 
-TypeModelMetadata = ModelMetadata | AmazonQModelMetadata
+TypeModelMetadata = AmazonQModelMetadata | ModelMetadata
 
 
 class TypeModelFactory(Protocol):

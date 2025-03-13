@@ -20,7 +20,7 @@ from ai_gateway.chat.agents.typing import (
     TypeAgentEvent,
 )
 from ai_gateway.chat.tools.base import BaseTool
-from ai_gateway.feature_flags import FeatureFlag, is_feature_enabled
+from ai_gateway.feature_flags.context import FeatureFlag, is_feature_enabled
 from ai_gateway.models.base_chat import Role
 from ai_gateway.prompts import Prompt, jinja2_formatter
 from ai_gateway.prompts.config import ModelClassProvider, ModelConfig
@@ -166,6 +166,12 @@ class ReActPromptTemplate(Runnable[ReActAgentInputs, PromptValue]):
 
         for m in input.messages:
             if m.role is Role.USER:
+                print(
+                    "HumanMessage",
+                    HumanMessage(
+                        jinja2_formatter(self.prompt_template["user"], message=m)
+                    ),
+                )
                 messages.append(
                     HumanMessage(
                         jinja2_formatter(self.prompt_template["user"], message=m)

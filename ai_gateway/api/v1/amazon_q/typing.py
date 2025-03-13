@@ -1,4 +1,4 @@
-from typing import Annotated, Any, Literal, Optional, Union
+from typing import Annotated, Any, List, Literal, Optional, Union
 
 from pydantic import BaseModel, Field, StringConstraints
 
@@ -69,3 +69,32 @@ class EventRequest(BaseModel):
     payload: Union[EventMergeRequestPayload, EventIssuePayload, EventHookPayload] = (
         Field(discriminator="source")
     )
+    payload: Union[EventMergeRequestPayload, EventIssuePayload, EventHookPayload] = (
+        Field(discriminator="source")
+    )
+
+
+class ProgrammingLanguage(BaseModel):
+    languageName: str
+
+
+class FileContext(BaseModel):
+    leftFileContent: Optional[str]
+    rightFileContent: Optional[str]
+    filename: str
+    programmingLanguage: ProgrammingLanguage
+
+
+class CodeSuggestionRequest(BaseModel):
+    fileContext: FileContext
+    maxResults: int
+
+
+class CodeRecommendation(BaseModel):
+    content: str
+    mostRelevantMissingImports: List[str] = Field(default_factory=list)
+    references: List[str] = Field(default_factory=list)
+
+
+class CodeSuggestionResponse(BaseModel):
+    CodeRecommendations: List[CodeRecommendation]

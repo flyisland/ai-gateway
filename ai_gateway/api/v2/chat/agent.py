@@ -105,6 +105,11 @@ async def chat(
         InternalEventsClient, Depends(get_internal_event_client)
     ],
 ):
+    request_log.info(
+        "DEBUG!!! Request to V2 Chat Agent",
+        source=__name__,
+        agent_request=agent_request,
+    )
     agent = get_agent(current_user, agent_request, prompt_registry)
 
     authorize_additional_context(current_user, agent_request, internal_event_client)
@@ -141,7 +146,7 @@ async def chat(
         current_user, gl_version, agent_request.model_metadata
     )
 
-    request_log.info("Request to V2 Chat Agent", source=__name__, inputs=inputs)
+    request_log.info("Input request to V2 Chat Agent", source=__name__, inputs=inputs)
 
     stream_events = gl_agent_remote_executor.stream(inputs=inputs)
 

@@ -9,7 +9,6 @@ from langchain_core.language_models.chat_models import SimpleChatModel
 from langchain_core.messages import BaseMessage
 from pydantic import AnyUrl
 
-from ai_gateway.api.auth_utils import StarletteUser
 from ai_gateway.api.v1 import api_router
 from ai_gateway.prompts import Prompt
 from ai_gateway.prompts.typing import (
@@ -160,6 +159,7 @@ class TestPrompt:
                     name="amazon_q",
                     provider="amazon_q",
                     role_arn="role-arn",
+                    conversation_id="conversation_id",
                 ),
                 (
                     "test",
@@ -168,6 +168,7 @@ class TestPrompt:
                         name="amazon_q",
                         provider="amazon_q",
                         role_arn="role-arn",
+                        conversation_id="conversation_id",
                     ),
                 ),
                 200,
