@@ -177,7 +177,7 @@ class ReActPromptTemplate(Runnable[ReActAgentInputs, PromptValue]):
                         jinja2_formatter(self.prompt_template["user"], message=m)
                     )
                 )
-            elif m.role is Role.ASSISTANT and input.agent_scratchpad:
+            elif m.role is Role.ASSISTANT:
                 messages.append(
                     AIMessage(
                         jinja2_formatter(
