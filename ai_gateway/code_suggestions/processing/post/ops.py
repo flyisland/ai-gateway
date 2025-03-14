@@ -432,7 +432,7 @@ def strip_asterisks(completion: str) -> str:
     return completion
 
 
-# This function removes auxiliary words from completions
+# This function removes irrelevant keywords from completions
 # https://gitlab.com/gitlab-org/gitlab/-/issues/517027
 def clean_irrelevant_keywords(completions: str) -> str:
     pattern = "|".join(map(re.escape, _IRRELEVANT_KEYWORDS))
