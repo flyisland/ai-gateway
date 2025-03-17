@@ -1,5 +1,5 @@
 dotenv-vars:
-  stage: test
+  stage: build
   script:
     - echo "JOB_WITH_ARTIFACTS=$CI_JOB_NAME" >> variables.env
     - echo "JOB_WITH_ARTIFACTS_ID=$CI_JOB_ID" >> variables.env
@@ -15,7 +15,7 @@ dotenv-vars:
       dotenv: variables.env
 
 tests:performance:
-  stage: test
+  stage: build
   needs:
     - job: dotenv-vars
       artifacts: true
