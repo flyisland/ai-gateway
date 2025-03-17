@@ -113,4 +113,5 @@ tag-self-hosted:
       git tag "self-hosted-${GITLAB_VERSION}" ${CI_COMMIT_SHA}
       git push origin "self-hosted-${GITLAB_VERSION}"
   rules:
-    - if: $GITLAB_VERSION
+    - if: $GITLAB_VERSION && $GITLAB_VERSION =~ /^v\d+\.\d+\.\d+(-ee)?$/
+      # Only run when GITLAB_VERSION is a valid version tag (from GitLab release)
