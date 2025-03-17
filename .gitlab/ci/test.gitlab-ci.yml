@@ -42,8 +42,6 @@ tests:integration:
 
 test:enforce_prompt_versioning:
   stage: test
-  needs:
-    - build-docker-model-gateway
   variables:
     PROMPT_DEFINTIONS_DIR: "ai_gateway/prompts/definitions"
   script:
@@ -56,7 +54,7 @@ test:enforce_prompt_versioning:
           continue
         fi
         
-        if [[ ! $file =~ -alpha\.yml$ && ! $file =~ -beta\.yml$ && ! $file =~ -rc\.yml$ && ! $file =~ -dev\.yml$]]; then
+        if [[ ! $file =~ -alpha\.yml$ && ! $file =~ -beta\.yml$ && ! $file =~ -rc\.yml$ && ! $file =~ -dev\.yml$ ]]; then
           echo "Error: Changes to stable prompt file $file are not allowed."
           exit 1
         fi
