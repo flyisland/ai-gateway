@@ -39,3 +39,32 @@ tests:integration:
     CI_DEBUG_SERVICES: true
   script:
     - make test-integration
+
+test:enforce_prompt_versioning:
+  stage: test
+  needs:
+    - build-docker-model-gateway
+  variables:
+    PROMPT_DEFINTIONS_DIR: "ai_gateway/prompts/definitions"
+  script:
+    - |
+      changed_files=$(git diff --name-only $CI_COMMIT_BEFORE_SHA $CI_COMMIT_SHA -- '${PROMPT_DEFINTIONS_DIR}*.yml')
+      for file in $changed_files; do
+        # Skip files that are newly created
+        if ! git ls-tree -r $CI_COMMIT_BEFORE_SHA | grep -q "$(basename $file)"; then
+          echo "Skipping newly created file: $file"
+          continue
+        fi
+        
+        if [[ ! $file =~ -alpha\.yml$ && ! $file =~ -beta\.yml$ && ! $file =~ -rc\.yml$ && ! $file =~ -dev\.yml$]]; then
+          echo "Error: Changes to stable prompt file $file are not allowed."
+          exit 1
+        fi
+      done
+    - echo "All changes are in allowed files."
+  rules:
+    - if: $CI_PIPELINE_SOURCE == "merge_request_event"
+    - if: $CI_PIPELINE_SOURCE == "schedule"
+    - if: $CI_PIPELINE_SOURCE == "push"
+      changes:
+        - "${PROMPT_DEFINTIONS_DIR}*.yml"
