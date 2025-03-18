@@ -62,7 +62,7 @@ async def test_middleware_non_http_request(internal_event_middleware):
     send = AsyncMock()
 
     with request_cycle_context({}), patch(
-        "ai_gateway.api.middleware.current_event_context"
+        "ai_gateway.api.middleware.middleware.current_event_context"
     ) as mock_event_context:
         await internal_event_middleware(scope, receive, send)
         mock_event_context.set.assert_not_called()
@@ -81,7 +81,7 @@ async def test_middleware_disabled(mock_app):
     send = AsyncMock()
 
     with request_cycle_context({}), patch(
-        "ai_gateway.api.middleware.current_event_context"
+        "ai_gateway.api.middleware.middleware.current_event_context"
     ) as mock_event_context:
         await internal_event_middleware(scope, receive, send)
         mock_event_context.set.assert_not_called()
@@ -103,7 +103,7 @@ async def test_middleware_skip_path(internal_event_middleware):
     send = AsyncMock()
 
     with request_cycle_context({}), patch(
-        "ai_gateway.api.middleware.current_event_context"
+        "ai_gateway.api.middleware.middleware.current_event_context"
     ) as mock_event_context:
         await internal_event_middleware(scope, receive, send)
         mock_event_context.set.assert_not_called()
@@ -139,9 +139,9 @@ async def test_middleware_set_context(internal_event_middleware):
     send = AsyncMock()
 
     with request_cycle_context({}), patch(
-        "ai_gateway.api.middleware.current_event_context"
+        "ai_gateway.api.middleware.middleware.current_event_context"
     ) as mock_event_context, patch(
-        "ai_gateway.api.middleware.tracked_internal_events"
+        "ai_gateway.api.middleware.middleware.tracked_internal_events"
     ) as mock_tracked_internal_events:
         await internal_event_middleware(scope, receive, send)
 
@@ -229,7 +229,7 @@ async def test_middleware_set_context_feature_enabled_by_namespace_ids(
     send = AsyncMock()
 
     with request_cycle_context({}), patch(
-        "ai_gateway.api.middleware.current_event_context"
+        "ai_gateway.api.middleware.middleware.current_event_context"
     ) as mock_event_context:
         await internal_event_middleware(scope, receive, send)
 
@@ -269,7 +269,7 @@ async def test_middleware_missing_headers(internal_event_middleware):
     send = AsyncMock()
 
     with request_cycle_context({}), patch(
-        "ai_gateway.api.middleware.current_event_context"
+        "ai_gateway.api.middleware.middleware.current_event_context"
     ) as mock_event_context:
         await internal_event_middleware(scope, receive, send)
 
@@ -308,7 +308,9 @@ async def test_middleware_distributed_trace(distributed_trace_middleware):
     receive = AsyncMock()
     send = AsyncMock()
 
-    with patch("ai_gateway.api.middleware.tracing_context") as mock_tracing_context:
+    with patch(
+        "ai_gateway.api.middleware.middleware.tracing_context"
+    ) as mock_tracing_context:
         await distributed_trace_middleware(scope, receive, send)
 
         mock_tracing_context.assert_called_once_with(parent=current_run_id)
@@ -352,7 +354,7 @@ async def test_middleware_feature_flag(
     send = AsyncMock()
 
     with patch(
-        "ai_gateway.api.middleware.current_feature_flag_context"
+        "ai_gateway.api.middleware.feature_flag_middleware.current_feature_flag_context"
     ) as mock_feature_flag_context, request_cycle_context({}):
         await feature_flag_middleware(scope, receive, send)
 
