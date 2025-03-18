@@ -662,16 +662,23 @@ async def _execute_code_completion(
     **kwargs: dict,
 ) -> any:
     with TelemetryInstrumentator().watch(payload.telemetry):
-        output = await code_completions.execute(
-            prefix=payload.current_file.content_above_cursor,
-            suffix=payload.current_file.content_below_cursor,
-            file_name=payload.current_file.file_name,
-            editor_lang=payload.current_file.language_identifier,
-            stream=payload.stream,
-            snowplow_event_context=snowplow_event_context,
-            **kwargs,
-        )
+        try:
+            output = await code_completions.execute(
+                prefix=payload.current_file.content_above_cursor,
+                suffix=payload.current_file.content_below_cursor,
+                file_name=payload.current_file.file_name,
+                editor_lang=payload.current_file.language_identifier,
+                stream=payload.stream,
+                snowplow_event_context=snowplow_event_context,
+                **kwargs,
+            )
 
-    if isinstance(code_completions, CodeCompletions):
-        return [output]
-    return output
+            if isinstance(code_completions, CodeCompletions):
+                return [output]
+            return output
+        except Exception as ex:
+            if hasattr(ex, "status_code") and ex.status_code == 429:
+                raise HTTPException(
+                    status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+                    detail="Too many requests",
+                )

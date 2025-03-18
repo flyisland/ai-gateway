@@ -6,7 +6,7 @@ from unittest.mock import ANY, Mock, patch
 
 import pytest
 from dependency_injector import containers
-from fastapi import status
+from fastapi import HTTPException, status
 from fastapi.testclient import TestClient
 from gitlab_cloud_connector import CloudConnectorUser, UserClaims
 from snowplow_tracker import Snowplow
@@ -1305,6 +1305,37 @@ class TestCodeCompletions:
         ]
 
         assert (body["detail"]) == expected_error_message
+
+    def test_completions_with_client_429_error(
+        self,
+        mock_client: Mock,
+        mock_litellm_acompletion: Mock,
+    ):
+        mock_litellm_acompletion.side_effect = HTTPException(
+            status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+            detail="Too many requests",
+        )
+
+        params = {
+            "prompt_version": 2,
+            "project_path": "gitlab-org/gitlab",
+            "project_id": 278964,
+            "current_file": {
+                "file_name": "main.py",
+                "content_above_cursor": "foo",
+                "content_below_cursor": "\n",
+            },
+            "model_provider": "vertex-ai",
+            "model_name": "codestral-2501",
+        }
+
+        response = self._send_code_completions_request(mock_client, params)
+
+        mock_litellm_acompletion.assert_called_once()
+
+        assert response.status_code == 429
+        result = response.json()
+        assert result["detail"] == "Too many requests"
 
     def test_disable_code_gecko_default(
         self,
