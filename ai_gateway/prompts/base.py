@@ -1,3 +1,4 @@
+import json
 from abc import ABC, abstractmethod
 from typing import Any, AsyncIterator, Mapping, Optional, Tuple, TypeVar, cast
 
@@ -8,6 +9,7 @@ from langchain_core.prompt_values import PromptValue
 from langchain_core.prompts import ChatPromptTemplate
 from langchain_core.prompts.string import DEFAULT_FORMATTER_MAPPING
 from langchain_core.runnables import Runnable, RunnableBinding, RunnableConfig
+from pydantic import BaseModel
 
 from ai_gateway.api.auth_utils import StarletteUser
 from ai_gateway.feature_flags.context import FeatureFlag, is_feature_enabled
@@ -20,6 +22,13 @@ __all__ = [
     "Prompt",
     "BasePromptRegistry",
     "jinja2_formatter",
+    "Input",
+    "Output",
+    "ServerSentEvent",
+    "ServerSentEventStart",
+    "ServerSentEventChunk",
+    "ServerSentEventEnd",
+    "ServerSentEventError",
 ]
 
 Input = TypeVar("Input")
@@ -36,6 +45,30 @@ def jinja2_formatter(template: str, /, **kwargs: Any) -> str:
 
 # Override LangChain's jinja2 formatter so we can specify a loader with access to all our templates
 DEFAULT_FORMATTER_MAPPING["jinja2"] = jinja2_formatter
+
+
+class ServerSentEvent(BaseModel):
+    event: str
+    data: dict = {}
+
+    def dump_as_response(self) -> str:
+        return f"event: {self.event}\ndata: {json.dumps(self.data)}\n"
+
+
+class ServerSentEventStart(ServerSentEvent):
+    event: str = "start"
+
+
+class ServerSentEventChunk(ServerSentEvent):
+    event: str = "chunk"
+
+
+class ServerSentEventEnd(ServerSentEvent):
+    event: str = "end"
+
+
+class ServerSentEventError(ServerSentEvent):
+    event: str = "error"
 
 
 class Prompt(RunnableBinding[Input, Output]):

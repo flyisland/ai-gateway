@@ -10,7 +10,7 @@ from starlette.responses import StreamingResponse
 from ai_gateway.api.auth_utils import StarletteUser, get_current_user
 from ai_gateway.api.feature_category import feature_category
 from ai_gateway.async_dependency_resolver import get_prompt_registry
-from ai_gateway.prompts import BasePromptRegistry, Prompt
+from ai_gateway.prompts import BasePromptRegistry, Prompt, ServerSentEvent
 from ai_gateway.prompts.typing import TypeModelMetadata
 
 
@@ -71,7 +71,7 @@ async def invoke(
         )
 
     # We don't use `isinstance` because we don't want to match subclasses
-    if not type(prompt) is Prompt:  # pylint: disable=unidiomatic-typecheck
+    if not isinstance(prompt, Prompt):  # pylint: disable=unidiomatic-typecheck
         raise HTTPException(
             status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
             detail=f"Prompt '{prompt_id}' is not supported",
@@ -83,7 +83,10 @@ async def invoke(
 
             async def _handle_stream():
                 async for chunk in response:
-                    yield chunk.content
+                    if isinstance(chunk, ServerSentEvent):
+                        yield f"{chunk.dump_as_response()}\n"
+                    else:
+                        yield chunk.content
 
             return StreamingResponse(_handle_stream(), media_type="text/event-stream")
 
