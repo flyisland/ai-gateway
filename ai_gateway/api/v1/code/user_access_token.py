@@ -1,4 +1,4 @@
-from typing import Optional, Annotated
+from typing import Annotated, Optional
 
 import structlog
 from fastapi import APIRouter, Depends, Header, HTTPException, Request, status

@@ -1,5 +1,5 @@
 from time import time
-from typing import Optional, Annotated, AsyncIterator
+from typing import Annotated, AsyncIterator, Optional
 
 from dependency_injector.providers import Factory
 from dependency_injector.wiring import Provide, inject
