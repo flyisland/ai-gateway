@@ -3,8 +3,7 @@ from starlette_context import context as starlette_context
 
 from ai_gateway.feature_flags import current_feature_flag_context
 
-X_GITLAB_ENABLED_FEATURE_FLAGS = "x-gitlab-enabled-feature-flags"
-X_GITLAB_REALM_HEADER = "X-Gitlab-Realm"
+from .headers import X_GITLAB_ENABLED_FEATURE_FLAGS, X_GITLAB_REALM_HEADER
 
 
 class FeatureFlagMiddleware:
