@@ -1,6 +1,7 @@
 from dependency_injector import containers, providers
 
-from ai_gateway.chat import agents as chat
+from ai_gateway.chat import agents as react_chat
+from ai_gateway.chat import generation as chat
 from ai_gateway.prompts.config import ModelClassProvider
 from ai_gateway.prompts.registry import LocalPromptRegistry
 
@@ -17,8 +18,9 @@ class ContainerPrompts(containers.DeclarativeContainer):
     prompt_registry = providers.Singleton(
         LocalPromptRegistry.from_local_yaml,
         class_overrides={
-            "chat/react": chat.ReActAgent,
-            "chat/react/vertex": chat.ReActAgent,
+            "chat/react": react_chat.ReActAgent,
+            "chat/react/vertex": react_chat.ReActAgent,
+            "chat/generation": chat.Generation,
         },
         model_factories={
             ModelClassProvider.ANTHROPIC: providers.Factory(
