@@ -24,8 +24,8 @@ from ai_gateway.code_suggestions.processing.typing import (
 from ai_gateway.config import Config
 from ai_gateway.container import ContainerApplication
 from ai_gateway.experimentation.base import ExperimentTelemetry
-from ai_gateway.models.base import ModelMetadata, TokensConsumptionMetadata
 from ai_gateway.internal_events.client import InternalEventsClient
+from ai_gateway.models.base import ModelMetadata, TokensConsumptionMetadata
 from ai_gateway.models.base_text import (
     TextGenModelBase,
     TextGenModelChunk,
@@ -40,7 +40,7 @@ from ai_gateway.safety_attributes import SafetyAttributes
 pytest_plugins = ("pytest_asyncio",)
 
 
-@pytest.fixture
+@pytest.fixture(scope="module")
 def assets_dir() -> Path:
     return Path(__file__).parent / "tests" / "_assets"
 
@@ -121,7 +121,7 @@ def config_values():
 
 @pytest.fixture
 def mock_config(config_values: dict[str, Any]):
-    yield Config(_env_file=None, _env_prefix='AIGW_TEST', **config_values)
+    yield Config(_env_file=None, _env_prefix="AIGW_TEST", **config_values)
 
 
 @pytest.fixture
@@ -380,7 +380,7 @@ def mock_litellm_acompletion():
                 AsyncMock(
                     message=AsyncMock(content="Test response"),
                     text="Test text completion response",
-                    logprobs= AsyncMock(token_logprobs=[999]),
+                    logprobs=AsyncMock(token_logprobs=[999]),
                 ),
             ],
             usage=AsyncMock(completion_tokens=999),
