@@ -1,4 +1,10 @@
-from .feature_flag_middleware import FeatureFlagMiddleware
+from .base import (
+    AccessLogMiddleware,
+    DistributedTraceMiddleware,
+    InternalEventMiddleware,
+    MiddlewareAuthentication,
+)
+from .feature_flag import FeatureFlagMiddleware
 from .headers import (
     X_GITLAB_CLIENT_NAME,
     X_GITLAB_CLIENT_TYPE,
@@ -15,12 +21,6 @@ from .headers import (
     X_GITLAB_SAAS_DUO_PRO_NAMESPACE_IDS_HEADER,
     X_GITLAB_TEAM_MEMBER_HEADER,
     X_GITLAB_VERSION_HEADER,
-)
-from .middleware import (
-    AccessLogMiddleware,
-    DistributedTraceMiddleware,
-    InternalEventMiddleware,
-    MiddlewareAuthentication,
 )
 
 __all__ = [

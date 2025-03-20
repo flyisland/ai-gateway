@@ -236,7 +236,7 @@ def test_middleware_internal_event(fastapi_server_app: FastAPI, test_path, expec
     client = TestClient(server)
 
     with patch(
-        "ai_gateway.api.middleware.middleware.current_event_context"
+        "ai_gateway.api.middleware.base.current_event_context"
     ) as mock_event_context:
         client.post(test_path)
         if expected:
@@ -258,7 +258,7 @@ def test_middleware_distributed_trace(fastapi_server_app: FastAPI, test_path, ex
     client = TestClient(server)
 
     with patch(
-        "ai_gateway.api.middleware.middleware.tracing_context"
+        "ai_gateway.api.middleware.base.tracing_context"
     ) as mock_tracing_context:
         client.post(
             test_path,
@@ -281,7 +281,7 @@ def test_middleware_feature_flag(fastapi_server_app: FastAPI):
     client = TestClient(server)
 
     with patch(
-        "ai_gateway.api.middleware.feature_flag_middleware.current_feature_flag_context"
+        "ai_gateway.api.middleware.feature_flag.current_feature_flag_context"
     ) as mock_feature_flag_context:
         client.post(
             "/v1/chat/agent",
