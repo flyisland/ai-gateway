@@ -5,7 +5,6 @@ from dependency_injector import containers
 from fastapi.testclient import TestClient
 from gitlab_cloud_connector import CloudConnectorUser, UserClaims
 
-from ai_gateway.api.v3 import api_router
 from ai_gateway.feature_flags.context import current_feature_flag_context
 from ai_gateway.models.base import KindModelProvider
 from ai_gateway.tracking import SnowplowEventContext
@@ -25,24 +24,7 @@ def route():
     return "/code/completions"
 
 
-@pytest.fixture(scope="class")
-def fast_api_router():
-    return api_router
-
-
-@pytest.fixture
-def auth_user():
-    return CloudConnectorUser(
-        authenticated=True,
-        claims=UserClaims(
-            scopes=["complete_code", "generate_code", "amazon_q_integration"],
-            subject="1234",
-            gitlab_realm="self-managed",
-        ),
-    )
-
-
-@pytest.fixture
+@pytest.fixture(scope="module")
 def config_values(assets_dir):
     return {
         "custom_models": {
@@ -66,6 +48,18 @@ def config_values(assets_dir):
             },
         },
     }
+
+
+@pytest.fixture(scope="class")
+def auth_user():
+    return CloudConnectorUser(
+        authenticated=True,
+        claims=UserClaims(
+            scopes=["complete_code", "generate_code", "amazon_q_integration"],
+            subject="1234",
+            gitlab_realm="self-managed",
+        ),
+    )
 
 
 class TestEditorContentCompletion:
@@ -123,6 +117,9 @@ class TestEditorContentCompletion:
         expected_response: dict,
         route: str,
     ):
+        import time
+
+        now = time.time()
         payload = {
             "file_name": "main.py",
             "content_above_cursor": "# Create a fast binary search\n",
@@ -130,6 +127,9 @@ class TestEditorContentCompletion:
             "language_identifier": "python",
             "choices_count": 3,
         }
+
+        print("Ellapsed time  1: ", (now - time.time()))
+        now = time.time()
 
         prompt_component = {
             "type": "code_editor_completion",
@@ -141,6 +141,9 @@ class TestEditorContentCompletion:
         }
 
         current_feature_flag_context.set({"flag_a", "flag_b"})
+
+        print("Ellapsed time  2: ", (now - time.time()))
+        now = time.time()
 
         response = mock_client.post(
             route,
@@ -154,6 +157,9 @@ class TestEditorContentCompletion:
             json=data,
         )
 
+        print("Ellapsed time  3: ", (now - time.time()))
+        now = time.time()
+
         assert response.status_code == 200
 
         body = response.json()
@@ -164,9 +170,15 @@ class TestEditorContentCompletion:
 
         assert body["metadata"]["timestamp"] > 0
 
+        print("Ellapsed time  4: ", (now - time.time()))
+        now = time.time()
+
         assert set(body["metadata"]["enabled_feature_flags"]) == set(
             expected_response["metadata"]["enabled_feature_flags"]
         )
+
+        print("Ellapsed time  5: ", (now - time.time()))
+        now = time.time()
 
         expected_snowplow_event = SnowplowEventContext(
             prefix_length=30,
@@ -181,6 +193,9 @@ class TestEditorContentCompletion:
             suggestion_source="network",
             region="us-central1",
         )
+
+        print("Ellapsed time  6: ", (now - time.time()))
+        now = time.time()
         mock_completions_legacy.assert_called_with(
             prefix=payload["content_above_cursor"],
             suffix=payload["content_below_cursor"],
@@ -191,6 +206,8 @@ class TestEditorContentCompletion:
             candidate_count=3,
             snowplow_event_context=expected_snowplow_event,
         )
+        print("Ellapsed time  7: ", (now - time.time()))
+        now = time.time()
 
     @pytest.mark.parametrize(
         ("model_provider", "expected_code", "expected_response", "expected_model"),
@@ -902,7 +919,7 @@ class TestEditorContentGenerationStream:
 
 
 class TestUnauthorizedScopes:
-    @pytest.fixture
+    @pytest.fixture(scope="class")
     def auth_user(self):
         return CloudConnectorUser(
             authenticated=True,
@@ -1040,7 +1057,7 @@ class TestIncomingRequest:
 
 
 class TestUnauthorizedIssuer:
-    @pytest.fixture
+    @pytest.fixture(scope="class")
     def auth_user(self):
         return CloudConnectorUser(
             authenticated=True,

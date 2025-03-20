@@ -40,7 +40,7 @@ from ai_gateway.safety_attributes import SafetyAttributes
 pytest_plugins = ("pytest_asyncio",)
 
 
-@pytest.fixture
+@pytest.fixture(scope="module")
 def assets_dir() -> Path:
     return Path(__file__).parent / "_assets"
 
