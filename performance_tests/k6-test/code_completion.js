@@ -1,7 +1,7 @@
 import http from 'k6/http';
 import { check, sleep } from 'k6';
 import { textSummary } from 'https://jslib.k6.io/k6-summary/0.0.1/index.js';
-export const TTFB_THRESHOLD= 25;
+export const TTFB_THRESHOLD= 20;
 export const RPS_THRESHOLD= 2;
 export const TEST_NAME='v2_code_completions'
 
