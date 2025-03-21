@@ -1,8 +1,6 @@
 # Example usage:
 test:langsmith_evaluation:
-  extends:
-    - .poetry
-    - .langsmith_evaluation
+  extends: [.poetry, .langsmith_evaluation]
   variables:
     PROMPT_ID: "documentation_search"
     PROMPT_VERSION: "1.0.0"
