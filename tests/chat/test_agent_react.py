@@ -452,9 +452,9 @@ class TestReActAgent:
         should_add_anthropic_cache: bool,
     ):
         if feature_flag_enabled:
-            current_feature_flag_context.set(["enable_anthropic_prompt_caching"])
+            current_feature_flag_context.set({"enable_anthropic_prompt_caching"})
         else:
-            current_feature_flag_context.set([])
+            current_feature_flag_context.set(set[str]())
 
         prompt_value = prompt.prompt_tpl.invoke(inputs)
 
