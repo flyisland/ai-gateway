@@ -1,22 +1,8 @@
-.langsmith_evaluation:
-  stage: evaluate
-  needs:
-    - build:ingest-image
-  services:
-   - name: ${TARGET_IMAGE}
-     alias: ai-gateway
-  script:
-    - |
-      if [ -z "$PROMPT_ID" ] || [ -z "$PROMPT_VERSION" ] || [ -z "$DATASET_NAME" ]; then
-        echo "Error: Required variables not set. Please define PROMPT_ID, PROMPT_VERSION, and DATASET_NAME."
-        exit 1
-      fi
-      echo "Running evaluation with PROMPT_ID=${PROMPT_ID}, PROMPT_VERSION=${PROMPT_VERSION}, DATASET_NAME=${DATASET_NAME}"
-      poetry run python eval ${PROMPT_ID} ${PROMPT_VERSION} ${DATASET_NAME}
-
 # Example usage:
 test:langsmith_evaluation:
-  extends: .langsmith_evaluation
+  extends:
+    - .poetry
+    - .langsmith_evaluation
   variables:
     PROMPT_ID: "documentation_search"
     PROMPT_VERSION: "1.0.0"
