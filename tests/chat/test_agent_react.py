@@ -458,7 +458,7 @@ class TestReActAgent:
 
         prompt_value = prompt.prompt_tpl.invoke(inputs)
 
-        for msg in prompt_value.messages:
+        for msg in prompt_value.to_messages():
             if isinstance(msg, SystemMessage):
                 if should_add_anthropic_cache:
                     content_dict = msg.content[0]
