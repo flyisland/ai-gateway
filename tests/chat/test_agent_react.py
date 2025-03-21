@@ -26,6 +26,7 @@ from ai_gateway.models.base_chat import Role
 from ai_gateway.prompts.config.models import (
     ChatAnthropicParams,
     ChatLiteLLMParams,
+    ModelClassProvider,
     TypeModelParams,
 )
 
@@ -377,7 +378,7 @@ class TestReActAgent:
                     agent_scratchpad=[],
                     tools=[IssueReader()],
                 ),
-                ChatAnthropicParams(model_class_provider="anthropic"),
+                ChatAnthropicParams(model_class_provider=ModelClassProvider.ANTHROPIC),
                 True,
             ),
             (
@@ -392,7 +393,7 @@ class TestReActAgent:
                     agent_scratchpad=[],
                     tools=[IssueReader()],
                 ),
-                ChatAnthropicParams(model_class_provider="anthropic"),
+                ChatAnthropicParams(model_class_provider=ModelClassProvider.ANTHROPIC),
                 False,
             ),
             (
@@ -407,22 +408,7 @@ class TestReActAgent:
                     agent_scratchpad=[],
                     tools=[IssueReader()],
                 ),
-                ChatLiteLLMParams(model_class_provider="litellm"),
-                False,
-            ),
-            (
-                True,
-                ReActAgentInputs(
-                    messages=[
-                        Message(
-                            role=Role.USER,
-                            content="What's the title of this issue?",
-                        ),
-                    ],
-                    agent_scratchpad=[],
-                    tools=[IssueReader()],
-                ),
-                ChatLiteLLMParams(model_class_provider="litellm"),
+                ChatLiteLLMParams(model_class_provider=ModelClassProvider.LITE_LLM),
                 False,
             ),
             (
@@ -437,7 +423,22 @@ class TestReActAgent:
                     agent_scratchpad=[],
                     tools=[IssueReader()],
                 ),
-                ChatLiteLLMParams(model_class_provider="litellm"),
+                ChatLiteLLMParams(model_class_provider=ModelClassProvider.LITE_LLM),
+                False,
+            ),
+            (
+                True,
+                ReActAgentInputs(
+                    messages=[
+                        Message(
+                            role=Role.USER,
+                            content="What's the title of this issue?",
+                        ),
+                    ],
+                    agent_scratchpad=[],
+                    tools=[IssueReader()],
+                ),
+                ChatLiteLLMParams(model_class_provider=ModelClassProvider.LITE_LLM),
                 False,
             ),
         ],
