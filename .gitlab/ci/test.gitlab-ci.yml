@@ -42,7 +42,8 @@ tests:integration:
 
 .langsmith_evaluation:
   stage: test
-  needs: []
+  needs:
+    - build-docker-model-gateway
   services:
    - name: ${TARGET_IMAGE}
      alias: ai-gateway
