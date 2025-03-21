@@ -461,9 +461,14 @@ class TestReActAgent:
         for msg in prompt_value.to_messages():
             if isinstance(msg, SystemMessage):
                 if should_add_anthropic_cache:
-                    content_dict = msg.content[0]
-                    assert content_dict["type"] == "text"
-                    assert content_dict["cache_control"] == {"type": "ephemeral"}
+                    if isinstance(msg.content[0], dict):
+                        content_dict = msg.content[0]
+                        assert content_dict["type"] == "text"
+                        assert content_dict["cache_control"] == {"type": "ephemeral"}
+                    else:
+                        raise TypeError(
+                            f"Expected msg.content[0] to be a dict, but got {type(msg.content[0])}"
+                        )
                 else:
                     assert isinstance(msg.content, str)
 
