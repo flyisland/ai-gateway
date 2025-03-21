@@ -55,25 +55,6 @@ def prompt_template():
     }
 
 
-@pytest.fixture
-def tool_action(model_response: str):
-    yield AgentToolAction(
-        thought="I'm thinking...",
-        tool="ci_issue_reader",
-        tool_input="random input",
-        log=model_response,
-    )
-
-
-@pytest.fixture
-def final_answer(model_response: str):
-    yield AgentFinalAnswer(
-        thought="I'm thinking...",
-        text="Paris",
-        log=model_response,
-    )
-
-
 @pytest.fixture(autouse=True)
 def stub_feature_flags():
     current_feature_flag_context.set(["expanded_ai_logging"])
