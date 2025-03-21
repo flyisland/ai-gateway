@@ -23,6 +23,7 @@ from ai_gateway.code_suggestions import (
 )
 from ai_gateway.models import KindVertexTextModel, Message
 from ai_gateway.models.base import KindModelProvider
+from ai_gateway.prompts.typing import ModelMetadata as PromptModelMetadata
 
 __all__ = [
     "CodeEditorComponents",
@@ -121,6 +122,7 @@ class CompletionRequest(BaseModel):
     prompt_components: Annotated[
         List[PromptComponent], Field(min_length=1, max_length=100)
     ]
+    model_params: Optional[PromptModelMetadata] = None
 
 
 class ModelMetadata(BaseModel):
