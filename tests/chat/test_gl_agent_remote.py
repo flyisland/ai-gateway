@@ -334,7 +334,7 @@ class TestGLAgentRemoteExecutorToolAction:
         expected_available_tools,
         expected_internal_events,
     ):
-        executor = GLAgentRemoteExecutor(
+        executor: GLAgentRemoteExecutor = GLAgentRemoteExecutor(
             agent=agent,
             tools_registry=tools_registry,
             internal_event_client=internal_event_client,
@@ -399,7 +399,7 @@ class TestGLAgentRemoteExecutorToolValidation:
         user: StarletteUser,
         expected_event,
     ):
-        executor = GLAgentRemoteExecutor(
+        executor: GLAgentRemoteExecutor = GLAgentRemoteExecutor(
             agent=agent,
             tools_registry=tools_registry,
             internal_event_client=internal_event_client,
