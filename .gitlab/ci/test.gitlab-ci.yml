@@ -59,7 +59,13 @@ tests:integration:
 test:langsmith_evaluation:
   extends: .langsmith_evaluation
   variables:
+    EVAL_TYPE: "documentation_search"
+    MODEL_VERSION: "1.0.0"
+    DATASET_NAME: "duo_chat.cot_qa_docs.1"
   rules:
+    - if: $CI_PIPELINE_SOURCE == "merge_request_event"
+      when: manual
+      allow_failure: true 
     - if: $CI_PIPELINE_SOURCE == "web"
       when: manual
       allow_failure: true 
