@@ -100,7 +100,7 @@ class TestGLAgentRemoteExecutor:
         inputs: ReActAgentInputs,
         user: StarletteUser,
     ):
-        executor = GLAgentRemoteExecutor(
+        executor: GLAgentRemoteExecutor = GLAgentRemoteExecutor(
             agent=agent,
             tools_registry=tools_registry,
             internal_event_client=internal_event_client,
