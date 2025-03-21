@@ -677,14 +677,14 @@ class TestEditorContentGeneration:
             suffix="\n",
         )
 
-    class TestModelParamsSelection:
+    class TestModelMetadataSelection:
         @dataclass
         class Case:
-            model_params: Optional[dict]
+            model_metadata: Optional[dict]
             expected_arguments: tuple[str, str, Optional[ModelMetadata]]
 
         CASE_WITH_MODEL_PARAMS = Case(
-            model_params={
+            model_metadata={
                 "api_key": "token",
                 "endpoint": "http://localhost:4000",
                 "identifier": "provider/some-model",
@@ -705,14 +705,14 @@ class TestEditorContentGeneration:
         )
 
         CASE_WITHOUT_MODEL_PARAMS = Case(
-            model_params=None,
+            model_metadata=None,
             expected_arguments=("code_suggestions/generations", "2.0.1", None),
         )
 
         @pytest.mark.parametrize(
             "test_case", [CASE_WITH_MODEL_PARAMS, CASE_WITHOUT_MODEL_PARAMS]
         )
-        def test_model_params_selection(
+        def test_model_metadata_selection(
             self,
             mock_client: TestClient,
             mock_generations: Mock,
@@ -744,7 +744,7 @@ class TestEditorContentGeneration:
                         },
                     }
                 ],
-                "model_params": test_case.model_params,
+                "model_metadata": test_case.model_metadata,
             }
 
             with patch("ai_gateway.prompts.registry.LocalPromptRegistry.get") as mock:
