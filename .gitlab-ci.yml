@@ -11,6 +11,7 @@ image: python:3.11.11
 stages:
   - build
   - test
+  - evaluate
   - deploy-review
   - validate
   - release
@@ -47,6 +48,7 @@ include:
   - local: .gitlab/ci/performance.gitlab-ci.yml
   - local: .gitlab/ci/release.gitlab-ci.yml
   - local: .gitlab/ci/ingest.gitlab-ci.yml
+  - local: .gitlab/ci/evaluate.gitlab-ci.yml
   - template: Jobs/Container-Scanning.latest.gitlab-ci.yml
   - template: Jobs/Dependency-Scanning.latest.gitlab-ci.yml
   - template: Jobs/SAST.latest.gitlab-ci.yml
