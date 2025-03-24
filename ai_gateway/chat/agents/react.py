@@ -100,7 +100,6 @@ class ReActPlainTextParser(BaseCumulativeTransformOutputParser):
     def _parse(self, text: str) -> TypeAgentEvent:
         wrapped_text = f"<message>Thought: {text}</message>"
 
-        event: Optional[TypeAgentEvent] = None
         if final_answer := self._parse_final_answer(wrapped_text):
             event = final_answer
         elif agent_action := self._parse_agent_action(wrapped_text):
