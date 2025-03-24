@@ -1,3 +1,5 @@
+from collections.abc import Sequence
+
 from ai_gateway.api.auth_utils import StarletteUser
 from ai_gateway.chat.base import BaseToolsRegistry
 from ai_gateway.chat.tools import BaseTool
@@ -20,7 +22,7 @@ class DuoChatToolsRegistry(BaseToolsRegistry):
         self.self_hosted_documentation_enabled = self_hosted_documentation_enabled
 
     @property
-    def tools(self) -> list[BaseTool]:
+    def tools(self) -> Sequence[BaseTool]:
         # We can also read the list of tools and associated unit primitives from the file
         # similar to what we implemented for the Prompt Registry
         tools = [
