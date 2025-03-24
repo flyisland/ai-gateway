@@ -177,7 +177,11 @@ def check_suggestions_model_access(
         "prompt": "",
     }
 
-    model_endpoint_message = model_endpoint if provider != "bedrock" else "Set to None as Bedrock models don't require a model endpoint to be set"
+    model_endpoint_message = (
+        model_endpoint
+        if provider != "bedrock"
+        else "Set to None as Bedrock models don't require a model endpoint to be set"
+    )
 
     error_message = f"""
                 >> Failed to access the {model_family} model."
@@ -185,7 +189,7 @@ def check_suggestions_model_access(
                 >> - The model is not running. Verify if your model is running
                 >> - Model, model endpoint or the api key are invalid. Double check the parameters passed:
                 >>    - model_family: {model_family}
-                >>    - model_endpoint: {model_endpoint_message} 
+                >>    - model_endpoint: {model_endpoint_message}
                 >>    - api_key: {api_key}
                 >>    - model_identifier: {model_identifier}
                 >> - The model is not reachable by AI Gateway. This can happen if the network is not configured correctly.
