@@ -39,3 +39,11 @@ tests:integration:
     CI_DEBUG_SERVICES: true
   script:
     - make test-integration
+
+tests:evaluation-runner:
+  stage: test
+  needs: []
+  trigger:
+    project: gitlab-org/modelops/ai-model-validation-and-research/ai-evaluation/evaluation-runner
+  variables:
+    AI_GATEWAY_CHECKOUT_REF: $CI_COMMIT_REF_NAME
