@@ -4,6 +4,8 @@ import { textSummary } from 'https://jslib.k6.io/k6-summary/0.0.1/index.js';
 export const TTFB_THRESHOLD= 25;
 export const RPS_THRESHOLD= 2;
 export const TEST_NAME='v2_code_completions'
+export const MR_IID = __ENV.PARENT_PIPELINE_MR_IID || 'unknown';
+export const JOB_ID = __ENV.JOB_WITH_ARTIFACTS_ID || 'unknown';
 
 export const options = {
   vus: 2, // Number of virtual users
@@ -43,7 +45,34 @@ export default function () {
 
 export function handleSummary(data) {
   const SUMMARY_OUTPUT_PATH = `results/${TEST_NAME}.json`;
-  console.log(data.metrics.http_reqs)
+  console.log(data.metrics.http_reqs)  
+  
+  // Create structured log entries
+  const structuredLogs = {
+    test_execution: {
+      timestamp: new Date().toISOString(),
+      level: "info",
+      service: "k6-performance-test",
+      test_name: TEST_NAME,
+      gitlab_mr_iid: MR_IID,
+      gitlab_job_id: JOB_ID,
+      message: "Performance test execution completed",
+      metrics: {
+        http_requests_rate: data.metrics.http_reqs.values["rate"],
+        ttfb_avg_ms: data.metrics.http_req_waiting.values["avg"],
+        ttfb_p90_ms: data.metrics.http_req_waiting.values["p(90)"],
+        http_req_duration_avg_ms: data.metrics.http_req_duration.values["avg"],
+        http_req_duration_p90_ms: data.metrics.http_req_duration.values["p(90)"],
+        http_req_failed_rate: data.metrics.http_req_failed.values["rate"]
+      },
+      status: data.metrics.http_req_waiting.values["p(90)"] < TTFB_THRESHOLD && 
+              data.metrics.http_reqs.values["rate"] > RPS_THRESHOLD ? "passed" : "failed"
+    }
+  };
+
+  // Log to console in structured format
+  console.log(JSON.stringify(structuredLogs.test_execution));
+
 
   // Create an object for the return value
   const summaryOutput = {
@@ -55,7 +84,9 @@ export function handleSummary(data) {
               `Duration: ${options.duration}\n`+
               `TTFB p90: ${data.metrics.http_req_waiting.values["p(90)"]}ms\n`+
               `TTFB Avg: ${data.metrics.http_req_waiting.values["avg"]}ms\n`+
-              `http_requests: ${data.metrics.http_reqs.values["rate"]}\n,`
+              `http_requests: ${data.metrics.http_reqs.values["rate"]}\n`+
+              `MR IID: ${MR_IID}\n`+
+              `Job ID: ${JOB_ID}\n,`
   };
 
   // Add the JSON output using the variable path
@@ -65,7 +96,9 @@ export function handleSummary(data) {
       ttfb_threshold: TTFB_THRESHOLD,
       rps_threshold: RPS_THRESHOLD,
       vus: options.vus,
-      duration: options.duration
+      duration: options.duration,
+      gitlab_mr_iid: MR_IID,
+      gitlab_job_id: JOB_ID
     }
   }, null, 2);
 
