@@ -16,7 +16,7 @@ __all__ = [
 ]
 
 
-class IssueReader(BaseRemoteTool):
+class IssueReader(BaseRemoteTool, frozen=True):
     name: str = "issue_reader"
     resource: str = "issues"
     unit_primitive: GitLabUnitPrimitive = GitLabUnitPrimitive.ASK_ISSUE
@@ -52,7 +52,7 @@ class IssueReader(BaseRemoteTool):
     )
 
 
-class GitlabDocumentation(BaseRemoteTool):
+class GitlabDocumentation(BaseRemoteTool, frozen=True):
     name: str = "gitlab_documentation"
     resource: str = "documentation answers"
     unit_primitive: GitLabUnitPrimitive = GitLabUnitPrimitive.DOCUMENTATION_SEARCH
@@ -74,7 +74,7 @@ class GitlabDocumentation(BaseRemoteTool):
     )
 
 
-class SelfHostedGitlabDocumentation(BaseRemoteTool):
+class SelfHostedGitlabDocumentation(BaseRemoteTool, frozen=True):
     name: str = "gitlab_documentation"
     resource: str = "documentation answers"
     unit_primitive: GitLabUnitPrimitive = GitLabUnitPrimitive.DOCUMENTATION_SEARCH
@@ -100,7 +100,7 @@ class SelfHostedGitlabDocumentation(BaseRemoteTool):
     )
 
 
-class EpicReader(BaseRemoteTool):
+class EpicReader(BaseRemoteTool, frozen=True):
     name: str = "epic_reader"
     resource: str = "epics"
     unit_primitive: GitLabUnitPrimitive = GitLabUnitPrimitive.ASK_EPIC
@@ -136,7 +136,7 @@ class EpicReader(BaseRemoteTool):
     )
 
 
-class CommitReader(BaseRemoteTool):
+class CommitReader(BaseRemoteTool, frozen=True):
     name: str = "commit_reader"
     resource: str = "commits"
     unit_primitive: GitLabUnitPrimitive = GitLabUnitPrimitive.ASK_COMMIT
@@ -173,7 +173,7 @@ class CommitReader(BaseRemoteTool):
     )
 
 
-class BuildReader(BaseRemoteTool):
+class BuildReader(BaseRemoteTool, frozen=True):
     name: str = "build_reader"
     resource: str = "builds"
     unit_primitive: GitLabUnitPrimitive = GitLabUnitPrimitive.ASK_BUILD
@@ -209,7 +209,7 @@ class BuildReader(BaseRemoteTool):
     )
 
 
-class MergeRequestReader(BaseRemoteTool):
+class MergeRequestReader(BaseRemoteTool, frozen=True):
     name: str = "merge_request_reader"
     resource: str = "merge_requests"
     unit_primitive: GitLabUnitPrimitive = GitLabUnitPrimitive.ASK_MERGE_REQUEST

@@ -32,7 +32,7 @@ class BaseTool(ABC, BaseModel, frozen=True):
             return False
 
 
-class BaseRemoteTool(BaseTool):
+class BaseRemoteTool(BaseTool, frozen=True):
     def _run(self, *args: Any, **kwargs: Any) -> Any:
         # By default, we run tools on the Ruby app side
         raise NotImplementedError(
