@@ -21,7 +21,7 @@ __all__ = [
     "TestUnauthorizedIssuer",
 ]
 
-from ai_gateway.prompts.typing import ModelMetadata
+from ai_gateway.model_metadata import ModelMetadata
 
 
 @pytest.fixture
