@@ -97,7 +97,7 @@ class ReActPlainTextParser(BaseCumulativeTransformOutputParser):
 
         return name.replace("\\_", "_")
 
-    def _parse(self, text: str) -> TypeAgentEvent:
+    def _parse(self, text: str) -> TypeAgentEvent:  # type: ignore
         wrapped_text = f"<message>Thought: {text}</message>"
 
         if final_answer := self._parse_final_answer(wrapped_text):
