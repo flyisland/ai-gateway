@@ -14,10 +14,10 @@ dotenv-vars:
     expire_in: 1 hour
     reports:
       dotenv: variables.env
-  rules:
-    - if: $CI_PIPELINE_SOURCE == "merge_request_event"
-      when: always
-    - when: never
+  # rules:
+  #   - if: $CI_PIPELINE_SOURCE == "merge_request_event"
+  #     when: always
+  #   - when: never
 
 tests:performance:
   stage: test
