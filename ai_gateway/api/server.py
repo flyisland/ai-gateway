@@ -153,8 +153,8 @@ async def custom_http_exception_handler(request: Request, exc: StarletteHTTPExce
 
 async def model_api_exception_handler(request: Request, exc: ModelAPIError):
     wrapped_exception = StarletteHTTPException(
-        status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-        detail="Inference failed",
+        status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+        detail="Too many requests. Please try again later.",
     )
     return await http_exception_handler(request, wrapped_exception)
 
