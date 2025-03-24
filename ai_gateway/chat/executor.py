@@ -1,4 +1,4 @@
-from typing import AsyncIterator, Generic, Optional
+from typing import AsyncIterator, Generic, Optional, Union
 
 import starlette_context
 from gitlab_cloud_connector import GitLabUnitPrimitive
@@ -77,7 +77,9 @@ class GLAgentRemoteExecutor(Generic[TypeAgentInputs, TypeAgentEvent]):
             else:
                 self._tools = self.tools_registry.get_on_behalf(user, gl_version)
 
-    async def stream(self, *, inputs: TypeAgentInputs) -> AsyncIterator[TypeAgentEvent]:
+    async def stream(
+        self, *, inputs: TypeAgentInputs
+    ) -> AsyncIterator[Union[TypeAgentEvent, AgentError]]:
         inputs.tools = self.tools
 
         tools_by_name = self.tools_by_name
