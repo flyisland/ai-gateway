@@ -327,7 +327,7 @@ On every merge to the `main` branch, a GitLab Pages job automatically deploys th
 
 ### Prompt directory structure
 
-The prompt directory structure is deployed to [prompt_directory_structure.json](https://gitlab-org.gitlab.io/modelops/applied-ml/code-suggestions/ai-assist/prompt_directory_structure.json).
+The prompt directory structure is deployed to [`/prompt_directory_structure`](https://gitlab-org.gitlab.io/modelops/applied-ml/code-suggestions/ai-assist/prompt_directory_structure.json).
 
 This endpoint exposes the available prompt versions for various AI features and model families supported by the AI Gateway. Introduced in [!2139](https://gitlab.com/gitlab-org/modelops/applied-ml/code-suggestions/ai-assist/-/merge_requests/2139).
 
