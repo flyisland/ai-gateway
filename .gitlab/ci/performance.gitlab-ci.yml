@@ -37,7 +37,7 @@ tests:performance:
     PROJECT_ID: $CI_PROJECT_ID
     COMPONENT_MR_CI_COMMIT_SHA: $CI_COMMIT_SHORT_SHA
     PARENT_PIPELINE_MR_IID: $CI_MERGE_REQUEST_IID
-  rules:
-    - if: $CI_PIPELINE_SOURCE == "merge_request_event"
-      when: always
-    - when: never
+  # rules:
+  #   - if: $CI_PIPELINE_SOURCE == "merge_request_event"
+  #     when: always
+  #   - when: never
