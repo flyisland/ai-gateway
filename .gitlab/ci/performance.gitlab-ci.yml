@@ -5,6 +5,7 @@ dotenv-vars:
     - echo "JOB_WITH_ARTIFACTS_ID=$CI_JOB_ID" >> variables.env
     - echo $JOB_WITH_ARTIFACTS
     - echo $JOB_WITH_ARTIFACTS_ID
+    - echo $CI_PIPELINE_SOURCE
     - cat variables.env
   artifacts:
     paths:
@@ -13,10 +14,10 @@ dotenv-vars:
     expire_in: 1 hour
     reports:
       dotenv: variables.env
-  rules:
-    - if: $CI_PIPELINE_SOURCE == "merge_request_event"
-      when: always
-    - when: never
+  # rules:
+  #   - if: $CI_PIPELINE_SOURCE == "merge_request_event"
+  #     when: always
+  #   - when: never
 
 tests:performance:
   stage: test
@@ -36,7 +37,7 @@ tests:performance:
     PROJECT_ID: $CI_PROJECT_ID
     COMPONENT_MR_CI_COMMIT_SHA: $CI_COMMIT_SHORT_SHA
     PARENT_PIPELINE_MR_IID: $CI_MERGE_REQUEST_IID
-  rules:
-    - if: $CI_PIPELINE_SOURCE == "merge_request_event"
-      when: always
-    - when: never
+  # rules:
+  #   - if: $CI_PIPELINE_SOURCE == "merge_request_event"
+  #     when: always
+  #   - when: never
