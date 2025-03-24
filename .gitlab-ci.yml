@@ -11,6 +11,7 @@ image: python:3.11.11
 stages:
   - build
   - test
+  - evaluate
   - deploy-review
   - validate
   - release
@@ -44,6 +45,7 @@ include:
   - local: .gitlab/ci/build.gitlab-ci.yml
   - local: .gitlab/ci/lint.gitlab-ci.yml
   - local: .gitlab/ci/test.gitlab-ci.yml
+  - local: .gitlab/ci/evaluate.gitlab-ci.yml
   - local: .gitlab/ci/performance.gitlab-ci.yml
   - local: .gitlab/ci/release.gitlab-ci.yml
   - local: .gitlab/ci/ingest.gitlab-ci.yml
@@ -94,6 +96,23 @@ cache:
     - poetry self add poetry-plugin-export
     - poetry export -f requirements.txt --output requirements.txt --without-hashes
     - poetry config --list
+
+.langsmith_evaluation:
+  stage: evaluate
+  needs:
+    - build:ingest-image
+    - poetry
+  services:
+   - name: ${TARGET_IMAGE}
+     alias: ai-gateway
+  script:
+    - |
+      if [ -z "$PROMPT_ID" ] || [ -z "$PROMPT_VERSION" ] || [ -z "$DATASET_NAME" ]; then
+        echo "Error: Required variables not set. Please define PROMPT_ID, PROMPT_VERSION, and DATASET_NAME."
+        exit 1
+      fi
+      echo "Running evaluation with PROMPT_ID=${PROMPT_ID}, PROMPT_VERSION=${PROMPT_VERSION}, DATASET_NAME=${DATASET_NAME}"
+      poetry run python eval ${PROMPT_ID} ${PROMPT_VERSION} ${DATASET_NAME}
 
 .docker:
   image: docker:${DOCKER_VERSION}

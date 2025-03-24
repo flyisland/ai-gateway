@@ -1,0 +1,17 @@
+# Example usage:
+test:langsmith_evaluation:
+  extends: [.poetry, .langsmith_evaluation]
+  variables:
+    PROMPT_ID: "documentation_search"
+    PROMPT_VERSION: "1.0.0"
+    DATASET_NAME: "duo_chat.cot_qa_docs.1"
+  rules:
+    - if: $CI_PIPELINE_SOURCE == "merge_request_event"
+      when: manual
+      allow_failure: true 
+    - if: $CI_PIPELINE_SOURCE == "web"
+      when: manual
+      allow_failure: true 
+    - if: $CI_PIPELINE_SOURCE == "schedule"
+      when: manual
+      allow_failure: true

@@ -39,3 +39,37 @@ tests:integration:
     CI_DEBUG_SERVICES: true
   script:
     - make test-integration
+
+.langsmith_evaluation:
+  stage: test
+  needs:
+    - build-docker-model-gateway
+  services:
+   - name: ${TARGET_IMAGE}
+     alias: ai-gateway
+  script:
+    - |
+      if [ -z "$UNIT_PRIMITIVE" ] || [ -z "$MODEL_VERSION" ] || [ -z "$DATASET_NAME" ]; then
+        echo "Error: Required variables not set. Please define UNIT_PRIMITIVE, MODEL_VERSION, and DATASET_NAME."
+        exit 1
+      fi
+      echo "Running evaluation with UNIT_PRIMITIVE=${UNIT_PRIMITIVE}, MODEL_VERSION=${MODEL_VERSION}, DATASET_NAME=${DATASET_NAME}"
+      poetry run python eval ${UNIT_PRIMITIVE} ${MODEL_VERSION} ${DATASET_NAME}
+
+# Example usage:
+test:langsmith_evaluation:
+  extends: .langsmith_evaluation
+  variables:
+    EVAL_TYPE: "documentation_search"
+    MODEL_VERSION: "1.0.0"
+    DATASET_NAME: "duo_chat.cot_qa_docs.1"
+  rules:
+    - if: $CI_PIPELINE_SOURCE == "merge_request_event"
+      when: manual
+      allow_failure: true 
+    - if: $CI_PIPELINE_SOURCE == "web"
+      when: manual
+      allow_failure: true 
+    - if: $CI_PIPELINE_SOURCE == "schedule"
+      when: manual
+      allow_failure: true
