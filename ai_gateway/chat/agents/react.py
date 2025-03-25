@@ -12,6 +12,7 @@ from pydantic import BaseModel
 
 from ai_gateway.chat.agents.typing import (
     AgentError,
+    AgentEventType,
     AgentFinalAnswer,
     AgentStep,
     AgentToolAction,
@@ -97,7 +98,7 @@ class ReActPlainTextParser(BaseCumulativeTransformOutputParser):
 
         return name.replace("\\_", "_")
 
-    def _parse(self, text: str) -> TypeAgentEvent:  # type: ignore
+    def _parse(self, text: str) -> AgentEventType:
         wrapped_text = f"<message>Thought: {text}</message>"
 
         if final_answer := self._parse_final_answer(wrapped_text):

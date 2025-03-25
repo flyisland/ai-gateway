@@ -1,5 +1,5 @@
 import json
-from typing import Literal, Optional, Self, TypeVar
+from typing import Literal, Optional, Self, TypeVar, Union
 
 import fastapi
 from fastapi import status
@@ -53,9 +53,8 @@ class AgentError(AgentBaseEvent):
     retryable: bool
 
 
-TypeAgentEvent = TypeVar(
-    "TypeAgentEvent", AgentToolAction, AgentFinalAnswer, AgentUnknownAction
-)
+AgentEventType = Union[AgentToolAction, AgentFinalAnswer, AgentUnknownAction]
+TypeAgentEvent = TypeVar("TypeAgentEvent", bound=AgentEventType)
 
 TypeAgentInputs = TypeVar("TypeAgentInputs")
 
