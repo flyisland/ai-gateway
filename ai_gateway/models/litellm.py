@@ -102,7 +102,7 @@ MODEL_STOP_TOKENS = {
         "<|fim_middle|>",
         "<|file_separator|>",
     ],
-    KindLiteLlmModel.CODESTRAL_2501: ["\n\n", "\n+++++", "[PREFIX]","</s>[SUFFIX]","[MIDDLE]"],
+    KindLiteLlmModel.CODESTRAL_2501: ["\n\n", "\n+++++", "[PREFIX]", "</s>[SUFFIX]", "[MIDDLE]"],
     KindLiteLlmModel.QWEN_2_5: [
         "<|fim_prefix|>",
         "<|fim_suffix|>",

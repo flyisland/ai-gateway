@@ -6,7 +6,6 @@ from typing import Any, Callable, NewType, Optional
 from ai_gateway.code_suggestions.processing.ops import strip_whitespaces
 from ai_gateway.code_suggestions.processing.post.base import PostProcessorBase
 from ai_gateway.code_suggestions.processing.post.ops import (
-    SCORE_THRESHOLD_DISABLED,
     clean_irrelevant_keywords,
     clean_model_reflection,
     filter_score,

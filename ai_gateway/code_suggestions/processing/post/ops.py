@@ -25,8 +25,6 @@ __all__ = [
 
 log = structlog.stdlib.get_logger("codesuggestions")
 
-SCORE_THRESHOLD_DISABLED = -9999.0
-
 _COMMENT_IDENTIFIERS = ["/*", "//", "#"]
 _SPECIAL_CHARS = "()[];.,$%&^*@#!{}/"
 _RE_MARKDOWN_CODE_BLOCK_BEGIN = re.compile(r"^`{3}\S*\n", flags=re.MULTILINE)

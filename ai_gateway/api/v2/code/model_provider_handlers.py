@@ -54,7 +54,7 @@ class FireworksHandler(BaseModelProviderHandler):
         if not self.payload.model_provider:
             self.payload.model_provider = KindModelProvider.FIREWORKS
 
-        if not self.payload.model_name or not self.payload.model_name in [KindLiteLlmModel.QWEN_2_5, KindLiteLlmModel.CODESTRAL_2501]:
+        if not self.payload.model_name or self.payload.model_name not in [KindLiteLlmModel.QWEN_2_5, KindLiteLlmModel.CODESTRAL_2501]:
             self.payload.model_name = default_model
 
 
