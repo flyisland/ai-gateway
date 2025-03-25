@@ -162,14 +162,9 @@ def increment_lang_counter(
     lang_id: Optional[LanguageId] = None,
     editor_lang_id: Optional[str] = None,
 ):
-    labels = {"lang": None, "editor_lang": None}
-
-    if lang_id:
-        labels["lang"] = lang_id.name.lower()
-
-    if editor_lang_id:
-        labels["editor_lang"] = editor_lang_id
-
-    labels["extension"] = Path(filename).suffix[1:]
-
+    labels = {
+        "lang": lang_id,
+        "editor_lang": editor_lang_id,
+        "extension": Path(filename).suffix[1:],
+    }
     LANGUAGE_COUNTER.labels(**labels).inc()
