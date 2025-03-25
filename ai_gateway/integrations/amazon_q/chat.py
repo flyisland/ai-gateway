@@ -10,13 +10,25 @@ from langchain_core.messages import (
     SystemMessage,
 )
 from langchain_core.outputs import ChatGeneration, ChatGenerationChunk, ChatResult
+from pydantic import BaseModel
 
 from ai_gateway.api.auth_utils import StarletteUser
 from ai_gateway.integrations.amazon_q.client import AmazonQClientFactory
 
-__all__ = [
-    "ChatAmazonQ",
-]
+
+class Repository(BaseModel):
+    shape: Optional[str] = ""
+
+
+class CodeReference(BaseModel):
+    repository: Optional[Repository | str] = ""
+    licenseName: Optional[Repository | str] = ""
+    url: Optional[Repository | str] = ""
+    recommendationContentSpan: Optional[Repository | str] = ""
+
+
+class CodeReferenceEvent(BaseModel):
+    references: List[CodeReference] = []
 
 
 class ChatAmazonQ(BaseChatModel):
@@ -66,83 +78,50 @@ class ChatAmazonQ(BaseChatModel):
         self, event: Dict
     ) -> Iterator[ChatGenerationChunk]:
         """
-        Processes a code reference event and extracts code reference information.
+        Process code reference events and format them into a readable string.
+        Uses Pydantic models for data validation and parsing.
 
         Args:
-            event (dict): The code reference event to process
+            event (Dict): The event containing code references
 
         Returns:
-            Iterator[ChatGenerationChunk]: A response containing the code reference information
-
-        Example:
-            Input event:
-            {
-                "codeReferenceEvent": {
-                    "references": [
-                        {
-                            "repository": {"shape": "example-repo"},
-                            "licenseName": {"shape": "MIT"},
-                            "url": {"shape": "https://github.com/example/repo"},
-                            "recommendationContentSpan": {"shape": "lines 10-20"}
-                        },
-                        {
-                            "repository": {"shape": "another-repo"},
-                            "licenseName": {"shape": "Apache-2.0"},
-                            "url": {"shape": "https://github.com/another/repo"},
-                            "recommendationContentSpan": {"shape": "lines 5-15"}
-                        }
-                    ]
-                }
-            }
-
-        Output:
-            ChatGenerationChunk with content:
-            "example-repo [MIT]: https://github.com/example/repo (lines 10-20)
-            another-repo [Apache-2.0]: https://github.com/another/repo (lines 5-15)"
+            Iterator[ChatGenerationChunk]: Formatted code reference information
         """
-        references = event.get("codeReferenceEvent")
-        if not references:
-            yield ChatGenerationChunk(message=AIMessageChunk(content=""))
-            return
+        try:
+            # Parse the event using Pydantic model
+            reference_event = CodeReferenceEvent(
+                references=event.get("codeReferenceEvent", {}).get("references", [])
+            )
 
-        if not isinstance(references, dict):
-            yield ChatGenerationChunk(message=AIMessageChunk(content=""))
-            return
+            formatted_references = []
+            for reference in reference_event.references:
+                parts = []
 
-        content = references.get("references", "")
-        if not content:
-            yield ChatGenerationChunk(message=AIMessageChunk(content=""))
-            return
-
-        formatted_references = []
-        for item in content:
-            if isinstance(item, dict):
-                # Extract values, handling nested dictionary structure
+                # Extract values, handling both string and Repository types
                 repository = (
-                    item.get("repository", {}).get("shape")
-                    if isinstance(item.get("repository"), dict)
-                    else item.get("repository", "")
+                    reference.repository.shape
+                    if isinstance(reference.repository, Repository)
+                    else reference.repository
                 )
                 license_name = (
-                    item.get("licenseName", {}).get("shape")
-                    if isinstance(item.get("licenseName"), dict)
-                    else item.get("licenseName", "")
+                    reference.licenseName.shape
+                    if isinstance(reference.licenseName, Repository)
+                    else reference.licenseName
                 )
                 url = (
-                    item.get("url", {}).get("shape")
-                    if isinstance(item.get("url"), dict)
-                    else item.get("url", "")
+                    reference.url.shape
+                    if isinstance(reference.url, Repository)
+                    else reference.url
                 )
                 span = (
-                    item.get("recommendationContentSpan", {}).get("shape")
-                    if isinstance(item.get("recommendationContentSpan"), dict)
-                    else item.get("recommendationContentSpan", "")
+                    reference.recommendationContentSpan.shape
+                    if isinstance(reference.recommendationContentSpan, Repository)
+                    else reference.recommendationContentSpan
                 )
 
-                # Build the reference string part by part
-                parts = []
+                # Build the formatted reference string
                 if repository:
-                    parts.append(repository)
+                    parts.append(str(repository))
                 if license_name:
                     parts.append(f"[{license_name}]")
                 if url:
@@ -150,15 +129,20 @@ class ChatAmazonQ(BaseChatModel):
                 if span:
                     parts.append(f"({span})")
 
-                # Join the parts with spaces, only if they exist
-                formatted_ref = " ".join(parts)
-                if formatted_ref:
-                    formatted_references.append(formatted_ref)
-            else:
-                formatted_references.append(str(item))
+                if parts:
+                    formatted_references.append(" ".join(parts))
 
-        reference_content = "\n".join(formatted_references)
-        yield ChatGenerationChunk(message=AIMessageChunk(content=reference_content))
+            if formatted_references:
+                reference_content = "\n".join(formatted_references)
+                yield ChatGenerationChunk(
+                    message=AIMessageChunk(content=reference_content)
+                )
+            else:
+                yield ChatGenerationChunk(message=AIMessageChunk(content=""))
+
+        except Exception:
+            # If there's any error in parsing/validation, return empty content
+            yield ChatGenerationChunk(message=AIMessageChunk(content=""))
 
     def _perform_api_request(
         self,
