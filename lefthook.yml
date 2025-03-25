@@ -3,9 +3,6 @@ pre-commit:
   skip:
     - ref: main
   commands:
-    lint-code:
-      glob: "*.py"
-      run: make lint-code
     lint-doc:
       glob: "*.md"
       run: make lint-doc
