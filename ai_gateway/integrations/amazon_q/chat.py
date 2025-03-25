@@ -56,10 +56,100 @@ class ChatAmazonQ(BaseChatModel):
                         yield ChatGenerationChunk(
                             message=AIMessageChunk(content=content)
                         )
+                    elif key == "codeReferenceEvent":
+                        yield from self._process_code_reference_event(event)
 
         finally:
             stream.close()
 
+    def _process_code_reference_event(self, event: Dict) -> Iterator[ChatGenerationChunk]:
+        """
+        Processes a code reference event and extracts code reference information.
+        
+        Args:
+            event (dict): The code reference event to process
+            
+        Returns:
+            Iterator[ChatGenerationChunk]: A response containing the code reference information
+        
+        Example:
+            Input event:
+            {
+                "codeReferenceEvent": {
+                    "references": [
+                        {
+                            "repository": {"shape": "example-repo"},
+                            "licenseName": {"shape": "MIT"},
+                            "url": {"shape": "https://github.com/example/repo"},
+                            "recommendationContentSpan": {"shape": "lines 10-20"}
+                        },
+                        {
+                            "repository": {"shape": "another-repo"},
+                            "licenseName": {"shape": "Apache-2.0"},
+                            "url": {"shape": "https://github.com/another/repo"},
+                            "recommendationContentSpan": {"shape": "lines 5-15"}
+                        }
+                    ]
+                }
+            }
+        
+        Output:
+            ChatGenerationChunk with content:
+            "example-repo [MIT]: https://github.com/example/repo (lines 10-20)
+            another-repo [Apache-2.0]: https://github.com/another/repo (lines 5-15)"
+        """
+        references = event.get("codeReferenceEvent")
+        if not references:
+            yield ChatGenerationChunk(
+                message=AIMessageChunk(content="")
+            )
+            return
+    
+        if not isinstance(references, dict):
+            yield ChatGenerationChunk(
+                message=AIMessageChunk(content="")
+            )
+            return
+    
+        content = references.get("references", "")
+        if not content:
+            yield ChatGenerationChunk(
+                message=AIMessageChunk(content="")
+            )
+            return
+    
+        formatted_references = []
+        for item in content:
+            if isinstance(item, dict):
+                # Extract values, handling nested dictionary structure
+                repository = item.get('repository', {}).get('shape') if isinstance(item.get('repository'), dict) else item.get('repository', '')
+                license_name = item.get('licenseName', {}).get('shape') if isinstance(item.get('licenseName'), dict) else item.get('licenseName', '')
+                url = item.get('url', {}).get('shape') if isinstance(item.get('url'), dict) else item.get('url', '')
+                span = item.get('recommendationContentSpan', {}).get('shape') if isinstance(item.get('recommendationContentSpan'), dict) else item.get('recommendationContentSpan', '')
+    
+                # Build the reference string part by part
+                parts = []
+                if repository:
+                    parts.append(repository)
+                if license_name:
+                    parts.append(f"[{license_name}]")
+                if url:
+                    parts.append(f": {url}")
+                if span:
+                    parts.append(f"({span})")
+    
+                # Join the parts with spaces, only if they exist
+                formatted_ref = " ".join(parts)
+                if formatted_ref:
+                    formatted_references.append(formatted_ref)
+            else:
+                formatted_references.append(str(item))
+    
+        reference_content = "\n".join(formatted_references)
+        yield ChatGenerationChunk(
+            message=AIMessageChunk(content=reference_content)
+        )
+    
     def _perform_api_request(
         self,
         message: dict[str, str],
