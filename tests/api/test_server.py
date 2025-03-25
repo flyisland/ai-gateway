@@ -343,10 +343,10 @@ def test_model_exception_handler(app):
 def test_model_exception_handler_with_429_error(app):
     @app.get("/test")
     def test_route():
-        class TooManyRequestsError(ModelAPICallError):
+        class TestTooManyRequestsError(ModelAPICallError):
             code = 429
 
-        error = TooManyRequestsError("Too many requests")
+        error = TestTooManyRequestsError("Too many requests")
         raise error
 
     setup_custom_exception_handlers(app)
