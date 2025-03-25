@@ -158,11 +158,10 @@ class ContainerCodeCompletions(containers.DeclarativeContainer):
         ),
     )
 
-    fireworks_qwen_factory = providers.Factory(
+    fireworks_factory = providers.Factory(
         CodeCompletions,
         model=providers.Factory(
             litellm,
-            name=KindLiteLlmModel.QWEN_2_5,
             provider=KindModelProvider.FIREWORKS,
         ),
         tokenization_strategy=providers.Factory(
@@ -175,7 +174,7 @@ class ContainerCodeCompletions(containers.DeclarativeContainer):
                 PostProcessorOperation.FILTER_SCORE,
                 PostProcessorOperation.FIX_TRUNCATION,
             ],
-            score_threshold=config.fireworks_qwen_score_threshold,
+            score_threshold=config.fireworks_score_threshold,
         ).provider,
     )
 

@@ -440,9 +440,9 @@ def clean_irrelevant_keywords(completions: str) -> str:
 
 
 # Very simple filtering based on score
-def filter_score(completion: str, score: float, threshold: float) -> str:
+def filter_score(completion: str, score: float, threshold: float = None) -> str:
     if (
-        threshold != SCORE_THRESHOLD_DISABLED
+        threshold
         and isinstance(score, (int, float))
         and score < threshold
     ):
