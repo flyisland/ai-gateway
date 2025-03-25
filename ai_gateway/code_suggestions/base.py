@@ -121,7 +121,7 @@ SAAS_PROMPT_MODEL_MAP = {
 
 
 class CodeSuggestionsOutput(NamedTuple):
-    class Metadata(NamedTuple):
+    class Metadata(NamedTuple):  # type: ignore
         experiments: list[ExperimentTelemetry]
         tokens_consumption_metadata: Optional[TokensConsumptionMetadata] = None
 
