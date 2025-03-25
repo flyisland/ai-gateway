@@ -233,6 +233,106 @@ class TestChatAmazonQ:
         chunks = chat_amazon_q._process_code_reference_event(event)
         self.assert_chunk_content(chunks, "")
 
+    def test_process_missing_repository(self, chat_amazon_q):
+        """Test processing reference with missing repository field"""
+        event = {
+            "codeReferenceEvent": {
+                "references": [
+                    {
+                        "licenseName": {"shape": "MIT"},
+                        "url": {"shape": "https://github.com/aws/aws-sdk"},
+                    }
+                ]
+            }
+        }
+        chunks = chat_amazon_q._process_code_reference_event(event)
+        self.assert_chunk_content(chunks, "")
+
+    def test_process_empty_repository(self, chat_amazon_q):
+        """Test processing reference with empty repository value"""
+        event = {
+            "codeReferenceEvent": {
+                "references": [
+                    {
+                        "repository": {"shape": ""},
+                        "licenseName": {"shape": "MIT"},
+                    }
+                ]
+            }
+        }
+        chunks = chat_amazon_q._process_code_reference_event(event)
+        self.assert_chunk_content(chunks, "")
+
+    def test_process_invalid_reference_type(self, chat_amazon_q):
+        """Test processing reference with invalid type"""
+        event = {
+            "codeReferenceEvent": {
+                "references": "not_a_list"
+            }
+        }
+        chunks = chat_amazon_q._process_code_reference_event(event)
+        self.assert_chunk_content(chunks, "")
+
+    def test_process_none_reference(self, chat_amazon_q):
+        """Test processing None reference"""
+        event = {
+            "codeReferenceEvent": {
+                "references": [None]
+            }
+        }
+        chunks = chat_amazon_q._process_code_reference_event(event)
+        self.assert_chunk_content(chunks, "")
+
+    def test_process_missing_references_key(self, chat_amazon_q):
+        """Test processing event with missing references key"""
+        event = {
+            "codeReferenceEvent": {}
+        }
+        chunks = chat_amazon_q._process_code_reference_event(event)
+        self.assert_chunk_content(chunks, "")
+
+    def test_process_none_event(self, chat_amazon_q):
+        """Test processing None event"""
+        chunks = chat_amazon_q._process_code_reference_event(None)
+        self.assert_chunk_content(chunks, "")
+
+    def test_process_mixed_reference_formats(self, chat_amazon_q):
+        """Test processing mixed formats within the same references list"""
+        event = {
+            "codeReferenceEvent": {
+                "references": [
+                    {
+                        "repository": {"shape": "aws-sdk"},
+                        "licenseName": {"shape": "MIT"}
+                    },
+                    {
+                        "repository": "boto3",
+                        "licenseName": "Apache-2.0"
+                    },
+                    None,
+                    {}
+                ]
+            }
+        }
+        expected = "aws-sdk [MIT]\nboto3 [Apache-2.0]"
+        chunks = chat_amazon_q._process_code_reference_event(event)
+        self.assert_chunk_content(chunks, expected)
+
+    def test_process_invalid_shape_format(self, chat_amazon_q):
+        """Test processing invalid shape format"""
+        event = {
+            "codeReferenceEvent": {
+                "references": [
+                    {
+                        "repository": {"invalid": "aws-sdk"},
+                        "licenseName": {"shape": "MIT"}
+                    }
+                ]
+            }
+        }
+        chunks = chat_amazon_q._process_code_reference_event(event)
+        self.assert_chunk_content(chunks, "")
+
     def test_generate_response(
         self,
         chat_amazon_q,
