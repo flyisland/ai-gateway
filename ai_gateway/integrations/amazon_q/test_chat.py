@@ -265,29 +265,19 @@ class TestChatAmazonQ:
 
     def test_process_invalid_reference_type(self, chat_amazon_q):
         """Test processing reference with invalid type"""
-        event = {
-            "codeReferenceEvent": {
-                "references": "not_a_list"
-            }
-        }
+        event = {"codeReferenceEvent": {"references": "not_a_list"}}
         chunks = chat_amazon_q._process_code_reference_event(event)
         self.assert_chunk_content(chunks, "")
 
     def test_process_none_reference(self, chat_amazon_q):
         """Test processing None reference"""
-        event = {
-            "codeReferenceEvent": {
-                "references": [None]
-            }
-        }
+        event = {"codeReferenceEvent": {"references": [None]}}
         chunks = chat_amazon_q._process_code_reference_event(event)
         self.assert_chunk_content(chunks, "")
 
     def test_process_missing_references_key(self, chat_amazon_q):
         """Test processing event with missing references key"""
-        event = {
-            "codeReferenceEvent": {}
-        }
+        event = {"codeReferenceEvent": {}}
         chunks = chat_amazon_q._process_code_reference_event(event)
         self.assert_chunk_content(chunks, "")
 
@@ -303,14 +293,11 @@ class TestChatAmazonQ:
                 "references": [
                     {
                         "repository": {"shape": "aws-sdk"},
-                        "licenseName": {"shape": "MIT"}
+                        "licenseName": {"shape": "MIT"},
                     },
-                    {
-                        "repository": "boto3",
-                        "licenseName": "Apache-2.0"
-                    },
+                    {"repository": "boto3", "licenseName": "Apache-2.0"},
                     None,
-                    {}
+                    {},
                 ]
             }
         }
@@ -325,7 +312,7 @@ class TestChatAmazonQ:
                 "references": [
                     {
                         "repository": {"invalid": "aws-sdk"},
-                        "licenseName": {"shape": "MIT"}
+                        "licenseName": {"shape": "MIT"},
                     }
                 ]
             }
