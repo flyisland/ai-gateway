@@ -5,7 +5,7 @@ export const TTFB_THRESHOLD= 25;
 export const RPS_THRESHOLD= 2;
 export const TEST_NAME='v2_code_completions'
 export const MR_IID = __ENV.PARENT_PIPELINE_MR_IID || 'unknown';
-export const JOB_ID = __ENV.JOB_WITH_ARTIFACTS_ID || 'unknown';
+export const COMMIT_SHA = __ENV.COMPONENT_MR_CI_COMMIT_SHA || 'unknown';
 
 export const options = {
   vus: 2, // Number of virtual users
@@ -55,7 +55,7 @@ export function handleSummary(data) {
       service: "k6-performance-test",
       test_name: TEST_NAME,
       gitlab_mr_iid: MR_IID,
-      gitlab_job_id: JOB_ID,
+      gitlab_commit_sha: COMMIT_SHA,
       message: "Performance test execution completed",
       metrics: {
         http_requests_rate: data.metrics.http_reqs.values["rate"],
@@ -86,7 +86,7 @@ export function handleSummary(data) {
               `TTFB Avg: ${data.metrics.http_req_waiting.values["avg"]}ms\n`+
               `http_requests: ${data.metrics.http_reqs.values["rate"]}\n`+
               `MR IID: ${MR_IID}\n`+
-              `Job ID: ${JOB_ID}\n,`
+              `Commit SHA: ${COMMIT_SHA}\n,`
   };
 
   // Add the JSON output using the variable path
@@ -98,7 +98,7 @@ export function handleSummary(data) {
       vus: options.vus,
       duration: options.duration,
       gitlab_mr_iid: MR_IID,
-      gitlab_job_id: JOB_ID
+      gitlab_commit_sha: COMMIT_SHA
     }
   }, null, 2);
 
