@@ -29,6 +29,7 @@ from ai_gateway.config import (
 )
 from ai_gateway.container import ContainerApplication
 from ai_gateway.models import ModelAPIError
+from ai_gateway.models.base import ModelAPICallError
 from ai_gateway.structured_logging import setup_logging
 
 _ROUTES_V1 = [
@@ -342,8 +343,10 @@ def test_model_exception_handler(app):
 def test_model_exception_handler_with_429_error(app):
     @app.get("/test")
     def test_route():
-        error = ModelAPIError("Too many requests", 429)
-        error.status_code = 429
+        class TooManyRequestsError(ModelAPICallError):
+            code = 429
+
+        error = TooManyRequestsError("Too many requests")
         raise error
 
     setup_custom_exception_handlers(app)
