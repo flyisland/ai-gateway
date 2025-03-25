@@ -157,7 +157,6 @@ def resolve_lang_name(file_name: str) -> Optional[str]:
     return lang_name
 
 
-# TODO: https://gitlab.com/gitlab-org/modelops/applied-ml/code-suggestions/ai-assist/-/issues/292
 def increment_lang_counter(
     filename: str,
     lang_id: Optional[LanguageId] = None,
