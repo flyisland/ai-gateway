@@ -102,9 +102,6 @@ MODEL_STOP_TOKENS = {
         "<|fim_middle|>",
         "<|file_separator|>",
     ],
-    # Ref: https://docs.litellm.ai/docs/providers/vertex#mistral-api
-    # This model is served by Vertex AI but accessed through LiteLLM abstraction
-    KindVertexTextModel.CODESTRAL_2501: ["\n\n", "\n+++++"],
     KindLiteLlmModel.CODESTRAL_2501: ["\n\n", "\n+++++", "[PREFIX]","</s>[SUFFIX]","[MIDDLE]"],
     KindLiteLlmModel.QWEN_2_5: [
         "<|fim_prefix|>",
@@ -120,23 +117,27 @@ MODEL_STOP_TOKENS = {
 }
 
 MODEL_SPECIFICATIONS = {
-    KindVertexTextModel.CODESTRAL_2501: {
-        "timeout": 60,
-        "completion_type": ModelCompletionType.TEXT,
+    KindModelProvider.VERTEX_AI: {
+      KindVertexTextModel.CODESTRAL_2501: {
+          "timeout": 60,
+          "completion_type": ModelCompletionType.TEXT,
+      },
     },
-    KindLiteLlmModel.CODESTRAL_2501: {
-        "timeout": 60,
-        "completion_type": ModelCompletionType.FIM,
-        # this model is suffix-first, then prefix
-        "fim_format": "</s>[SUFFIX]{suffix}[PREFIX]{prefix}[MIDDLE]",
-        "session_header": True,
-    },
-    KindLiteLlmModel.QWEN_2_5: {
-        "timeout": 60,
-        "completion_type": ModelCompletionType.FIM,
-        "fim_format": "<|fim_prefix|>{prefix}<|fim_suffix|>{suffix}<|fim_middle|>",
-        "session_header": True,
-    },
+    KindModelProvider.FIREWORKS: {
+      KindLiteLlmModel.CODESTRAL_2501: {
+          "timeout": 60,
+          "completion_type": ModelCompletionType.FIM,
+          # this model is suffix-first, then prefix
+          "fim_format": "</s>[SUFFIX]{suffix}[PREFIX]{prefix}[MIDDLE]",
+          "session_header": True,
+      },
+      KindLiteLlmModel.QWEN_2_5: {
+          "timeout": 60,
+          "completion_type": ModelCompletionType.FIM,
+          "fim_format": "<|fim_prefix|>{prefix}<|fim_suffix|>{suffix}<|fim_middle|>",
+          "session_header": True,
+      },
+    }
 }
 
 
@@ -269,7 +270,7 @@ class LiteLlmChatModel(ChatModelBase):
         if provider == KindModelProvider.FIREWORKS:
             api_key = provider_keys.get("fireworks_api_key")
 
-            endpoint, identifier = _get_fireworks_config(provider_endpoints)
+            endpoint, identifier = _get_fireworks_config(provider_endpoints, name)
             identifier = f"fireworks_ai/{identifier}"
 
         try:
@@ -323,7 +324,7 @@ class LiteLlmTextGenModel(TextGenModelBase):
 
     @property
     def specifications(self):
-        return MODEL_SPECIFICATIONS.get(self.model_name, {})
+        return MODEL_SPECIFICATIONS.get(self.provider, {}).get(self.model_name, {})
 
     async def generate(
         self,
@@ -402,8 +403,8 @@ class LiteLlmTextGenModel(TextGenModelBase):
         content = prefix
 
         if self._completion_type() == ModelCompletionType.FIM:
-            fim_format = MODEL_SPECIFICATIONS.get(self.model_name).get("fim_format")
-            content = fim_format.format(prefix=prefix, suffix=suffix)
+            fim_format = self.specifications.get("fim_format")
+            content = fim_format.format(prefix=prefix, suffix=suffix or '')
 
         completion_args = {
             "messages": [{"content": content, "role": Role.USER}],
@@ -553,8 +554,13 @@ def _get_fireworks_config(provider_endpoints: dict, model_name: str) -> tuple[st
     if not region_config:
         raise ValueError("Fireworks regional endpoints configuration is missing.")
 
-    endpoint = region_config.get(model_name).get("endpoint")
-    identifier = region_config.get(model_name).get("identifier")
+    model_config = region_config.get(model_name)
+
+    if not model_config:
+        raise ValueError(f"Fireworks model configuration is missing for model {model_name}.")
+
+    endpoint = model_config.get("endpoint")
+    identifier = model_config.get("identifier")
 
     if not endpoint or not identifier:
         raise ValueError("Fireworks endpoint or identifier missing in region config.")

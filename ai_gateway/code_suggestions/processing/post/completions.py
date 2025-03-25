@@ -139,7 +139,8 @@ class PostProcessor(PostProcessorBase):
         func = self.ops[actual_processor_key]
 
         if actual_processor_key == PostProcessorOperation.FILTER_SCORE:
-            threshold = self.score_threshold.get(kwargs.get("model_name"))
+            model_name = kwargs.get("model_name", "").partition('/')[-1]
+            threshold = self.score_threshold.get(model_name)
             score = kwargs.get("score")
             func = partial(func, score=score, threshold=threshold)
 

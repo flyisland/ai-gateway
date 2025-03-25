@@ -182,7 +182,7 @@ def test_config_google_cloud_profiler(
         (
             {
                 "AIGW_FEATURE_FLAGS__EXCL_POST_PROCESS": '["func1", "func2"]',
-                "AIGW_FEATURE_FLAGS__FIREWORKS_SCORE_THRESHOLD": {"model": "-1.0"},
+                "AIGW_FEATURE_FLAGS__FIREWORKS_SCORE_THRESHOLD": '{"model": "-1.0"}',
             },
             ConfigFeatureFlags(
                 excl_post_process=["func1", "func2"],
