@@ -129,7 +129,7 @@ class CodeSuggestionsOutput(NamedTuple):
     score: float
     model: ModelMetadata
     lang_id: Optional[LanguageId] = None
-    metadata: Optional[Metadata] = None
+    metadata: Optional["CodeSuggestionsOutput.Metadata"] = None  # type: ignore
 
     @property
     def lang(self) -> str:
