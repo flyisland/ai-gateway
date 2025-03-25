@@ -1,4 +1,4 @@
-from typing import AsyncIterator, Generic, Optional, Union
+from typing import AsyncIterator, Generic, Optional, Union, cast
 
 import starlette_context
 from gitlab_cloud_connector import GitLabUnitPrimitive
@@ -11,6 +11,7 @@ from ai_gateway.chat.agents import (
     TypeAgentEvent,
     TypeAgentInputs,
 )
+from ai_gateway.chat.agents.react import ReActAgentInputs
 from ai_gateway.chat.base import BaseToolsRegistry
 from ai_gateway.chat.tools import BaseTool
 from ai_gateway.internal_events import InternalEventsClient
@@ -80,7 +81,7 @@ class GLAgentRemoteExecutor(Generic[TypeAgentInputs, TypeAgentEvent]):
     async def stream(
         self, *, inputs: TypeAgentInputs
     ) -> AsyncIterator[Union[TypeAgentEvent, AgentError]]:
-        inputs.tools = self.tools
+        inputs.tools = self.tools  # type: ignore
 
         tools_by_name = self.tools_by_name
 
@@ -90,7 +91,7 @@ class GLAgentRemoteExecutor(Generic[TypeAgentInputs, TypeAgentEvent]):
 
         log.info("Processed inputs", source=__name__, inputs=inputs)
 
-        async for event in self.agent.astream(inputs):
+        async for event in self.agent.astream(cast(ReActAgentInputs, inputs)):
             if isinstance(event, AgentToolAction):
                 if event.tool in tools_by_name:
                     tool = tools_by_name[event.tool]
@@ -98,7 +99,7 @@ class GLAgentRemoteExecutor(Generic[TypeAgentInputs, TypeAgentEvent]):
                         f"request_{tool.unit_primitive}",
                         category=__name__,
                     )
-                    yield event
+                    yield cast(TypeAgentEvent, event)
                 else:
                     yield AgentError(message="tool not available", retryable=False)
             else:
