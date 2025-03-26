@@ -25,7 +25,7 @@ tests:performance:
       artifacts: true
   trigger:
     project: gitlab-org/quality/component-performance-testing
-    branch: main
+    branch: vp-handle-summary-template-method
     strategy: depend
     forward:
       pipeline_variables: true
