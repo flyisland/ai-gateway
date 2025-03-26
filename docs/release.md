@@ -10,8 +10,7 @@ It's NOT necessary for GitLab-managed AI Gateway as currently Runway deploys the
 
 ## Overview
 
-We follow the [Semantic Versioning guideline](https://semver.org/),
-which is rendered in [Conventional Commits](https://www.conventionalcommits.org/en) as an actual practice. To harness the practice, we use [semantic-release](https://github.com/semantic-release/semantic-release).
+We follow the [Semantic Versioning guideline](https://semver.org/). To harness the practice, we use [semantic-release](https://github.com/semantic-release/semantic-release).
 
 In CI pipelines in AI Gateway:
 
