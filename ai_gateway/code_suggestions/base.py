@@ -121,7 +121,7 @@ SAAS_PROMPT_MODEL_MAP = {
 
 
 class CodeSuggestionsOutput(NamedTuple):
-    class Metadata(NamedTuple):  # type: ignore
+    class Metadata(NamedTuple):  # type: ignore[misc]
         experiments: list[ExperimentTelemetry]
         tokens_consumption_metadata: Optional[TokensConsumptionMetadata] = None
 
@@ -129,7 +129,7 @@ class CodeSuggestionsOutput(NamedTuple):
     score: float
     model: ModelMetadata
     lang_id: Optional[LanguageId] = None
-    metadata: Optional["CodeSuggestionsOutput.Metadata"] = None  # type: ignore
+    metadata: Optional["CodeSuggestionsOutput.Metadata"] = None  # type: ignore[name-defined]
 
     @property
     def lang(self) -> str:
@@ -162,9 +162,14 @@ def increment_lang_counter(
     lang_id: Optional[LanguageId] = None,
     editor_lang_id: Optional[str] = None,
 ):
-    labels = {
-        "lang": lang_id,
-        "editor_lang": editor_lang_id,
-        "extension": Path(filename).suffix[1:],
-    }
+    labels: dict[str, Optional[str]] = {"lang": None, "editor_lang": None}
+
+    if lang_id:
+        labels["lang"] = lang_id.name.lower()
+
+    if editor_lang_id:
+        labels["editor_lang"] = editor_lang_id
+
+    labels["extension"] = Path(filename).suffix[1:]
+
     LANGUAGE_COUNTER.labels(**labels).inc()
