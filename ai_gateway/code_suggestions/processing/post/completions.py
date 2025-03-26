@@ -65,7 +65,7 @@ class PostProcessor(PostProcessorBase):
         ] = None,
         exclude: Optional[list] = None,
         extras: Optional[list] = None,
-        score_threshold: Optional[dict[str, float]] = {},
+        score_threshold: Optional[dict[str, float]] = None,
     ):
         self.code_context = code_context
         self.lang_id = lang_id
@@ -73,7 +73,7 @@ class PostProcessor(PostProcessorBase):
         self.overrides = overrides if overrides else {}
         self.exclude = set(exclude) if exclude else []
         self.extras = extras if extras else []
-        self.score_threshold = score_threshold
+        self.score_threshold = score_threshold or {}
 
     @property
     def ops(self) -> dict[PostProcessorOperation, Callable[..., str]]:
