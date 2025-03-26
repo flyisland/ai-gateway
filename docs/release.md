@@ -11,13 +11,11 @@ It's NOT necessary for GitLab-managed AI Gateway as currently Runway deploys the
 ## Overview
 
 We follow the [Semantic Versioning guideline](https://semver.org/),
-which is rendered in [Conventional Commits](https://www.conventionalcommits.org/en) as an actual practice.
-To harness the practice, we use [semantic-release](https://github.com/semantic-release/semantic-release).
+which is rendered in [Conventional Commits](https://www.conventionalcommits.org/en) as an actual practice. To harness the practice, we use [semantic-release](https://github.com/semantic-release/semantic-release).
 
 In CI pipelines in AI Gateway:
 
 - On merge requests:
-  - `lint:commit` job runs to validate the commits in the feature branch if they are following Conventional Commits.
   - `publish-dryrun` job runs to make sure the commits are releasable via semantic-release.
 - On `main` branch:
   - `publish` job can run manually to cut a new release and Git tag. This requires Maintainer+ access in AI Gateway project.
