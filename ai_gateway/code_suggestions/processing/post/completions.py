@@ -78,9 +78,7 @@ class PostProcessor(PostProcessorBase):
     @property
     def ops(self) -> dict[PostProcessorOperation, Callable[..., str]]:
         return {
-            PostProcessorOperation.FILTER_SCORE: partial(
-                filter_score
-            ),
+            PostProcessorOperation.FILTER_SCORE: partial(filter_score),
             PostProcessorOperation.REMOVE_COMMENTS: partial(
                 remove_comment_only_completion, lang_id=self.lang_id
             ),
@@ -138,7 +136,7 @@ class PostProcessor(PostProcessorBase):
         func = self.ops[actual_processor_key]
 
         if actual_processor_key == PostProcessorOperation.FILTER_SCORE:
-            model_name = kwargs.get("model_name", "").partition('/')[-1]
+            model_name = kwargs.get("model_name", "").partition("/")[-1]
             threshold = self.score_threshold.get(model_name)
             score = kwargs.get("score")
             func = partial(func, score=score, threshold=threshold)

@@ -393,7 +393,9 @@ def test_config_vertex_text_model(values: dict, expected: ConfigVertexTextModel)
                 "RUNWAY_REGION": "test-case1",  # ignored
             },
             ConfigModelEndpoints(
-                fireworks_regional_endpoints={"location": {"model": {"endpoint": "endpoint"}}},
+                fireworks_regional_endpoints={
+                    "location": {"model": {"endpoint": "endpoint"}}
+                },
                 fireworks_current_region_endpoint={"model": {"endpoint": "endpoint"}},
             ),
         ),
@@ -404,7 +406,9 @@ def test_config_vertex_text_model(values: dict, expected: ConfigVertexTextModel)
                 "RUNWAY_REGION": "test-case1",  # ignored
             },
             ConfigModelEndpoints(
-                fireworks_regional_endpoints={"us": {"model": {"endpoint": "endpoint"}}},
+                fireworks_regional_endpoints={
+                    "us": {"model": {"endpoint": "endpoint"}}
+                },
                 fireworks_current_region_endpoint={"model": {"endpoint": "endpoint"}},
             ),
         ),

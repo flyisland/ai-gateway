@@ -1206,11 +1206,14 @@ class TestCodeCompletions:
             top_p=0.95,
             stream=False,
             timeout=60,
-            stop=["\n\n", "\n+++++", "[PREFIX]","</s>[SUFFIX]","[MIDDLE]"],
+            stop=["\n\n", "\n+++++", "[PREFIX]", "</s>[SUFFIX]", "[MIDDLE]"],
         )
 
         mock_post_processor.assert_called_with(
-            "Test text completion response", score=10**5, max_output_tokens_used=False, model_name="vertex_ai/codestral-2501",
+            "Test text completion response",
+            score=10**5,
+            max_output_tokens_used=False,
+            model_name="vertex_ai/codestral-2501",
         )
 
         result = response.json()
@@ -1342,11 +1345,14 @@ class TestCodeCompletions:
             top_p=0.95,
             stream=False,
             timeout=60,
-            stop=["\n\n", "\n+++++", "[PREFIX]","</s>[SUFFIX]","[MIDDLE]"],
+            stop=["\n\n", "\n+++++", "[PREFIX]", "</s>[SUFFIX]", "[MIDDLE]"],
         )
 
         mock_post_processor.assert_called_with(
-            "Test text completion response", score=10**5, max_output_tokens_used=False, model_name="vertex_ai/codestral-2501"
+            "Test text completion response",
+            score=10**5,
+            max_output_tokens_used=False,
+            model_name="vertex_ai/codestral-2501",
         )
 
         result = response.json()
@@ -1408,7 +1414,10 @@ class TestCodeCompletions:
         )
 
         mock_post_processor.assert_called_with(
-            "Test response", score=999, max_output_tokens_used=False, model_name="text-completion-fireworks_ai/qwen2p5-coder-7b",
+            "Test response",
+            score=999,
+            max_output_tokens_used=False,
+            model_name="text-completion-fireworks_ai/qwen2p5-coder-7b",
         )
 
         result = response.json()

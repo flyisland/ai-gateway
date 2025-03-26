@@ -424,8 +424,7 @@ class TestLiteLlmTextGenModel:
                 "codestral-2501": {
                     "endpoint": "https://fireworks.codestral.endpoint",
                     "identifier": "provider/some-codestral-model#deployment_id",
-                }
-
+                },
             }
         }
 
@@ -656,7 +655,9 @@ class TestLiteLlmTextGenModel:
                     name=model_name,
                     provider_keys={"fireworks_api_key": "stubbed-api-key"},
                     provider_endpoints={
-                        "fireworks_current_region_endpoint": {model_name: {"invalid": "config"}}
+                        "fireworks_current_region_endpoint": {
+                            model_name: {"invalid": "config"}
+                        }
                     },
                 )
             assert (
@@ -809,9 +810,7 @@ class TestLiteLlmTextGenModel:
                 True,
                 {
                     "model": "provider/some-codestral-model#deployment_id",
-                    "stop": [
-                        "\n\n", "\n+++++", "[PREFIX]","</s>[SUFFIX]","[MIDDLE]"
-                    ],
+                    "stop": ["\n\n", "\n+++++", "[PREFIX]", "</s>[SUFFIX]", "[MIDDLE]"],
                     "api_key": "fireworks-api-key",
                     "messages": [
                         {
@@ -1078,7 +1077,7 @@ class TestLiteLlmTextGenModel:
             top_p=0.95,
             stream=False,
             timeout=60.0,
-            stop=["\n\n", "\n+++++", "[PREFIX]","</s>[SUFFIX]","[MIDDLE]"],
+            stop=["\n\n", "\n+++++", "[PREFIX]", "</s>[SUFFIX]", "[MIDDLE]"],
         )
 
         assert isinstance(output, TextGenModelOutput)
