@@ -498,9 +498,16 @@ def _build_code_completions(
         )
 
         return code_completions, kwargs
-    elif payload.model_provider == KindModelProvider.FIREWORKS or (
-        not _allow_vertex_codestral(region)
-        and is_feature_enabled(FeatureFlag.DISABLE_CODE_GECKO_DEFAULT)
+    elif payload.model_provider == KindModelProvider.AMAZON_Q:
+        unit_primitive = GitLabUnitPrimitive.AMAZON_Q_INTEGRATION
+        tracking_event = f"request_{unit_primitive}_complete_code"
+        code_completions = completions_amazon_q_factory(
+            model__current_user=current_user,
+            model__role_arn=payload.role_arn,
+        )
+    elif (
+        payload.model_provider == KindModelProvider.FIREWORKS
+        or not _allow_vertex_codestral(region)
     ):
         FireworksHandler(payload, request, kwargs).update_completion_params()
         code_completions = _resolve_code_completions_litellm(
@@ -512,24 +519,7 @@ def _build_code_completions(
         )
 
         return code_completions, kwargs
-    elif payload.model_provider == KindModelProvider.AMAZON_Q:
-        unit_primitive = GitLabUnitPrimitive.AMAZON_Q_INTEGRATION
-        tracking_event = f"request_{unit_primitive}_complete_code"
-        code_completions = completions_amazon_q_factory(
-            model__current_user=current_user,
-            model__role_arn=payload.role_arn,
-        )
-    elif (
-        (
-            (
-                payload.model_provider == KindModelProvider.VERTEX_AI
-                and payload.model_name == KindVertexTextModel.CODESTRAL_2501
-            )
-            or is_feature_enabled(FeatureFlag.DISABLE_CODE_GECKO_DEFAULT)
-        )
-        # Codestral is currently not supported in asia-* locations
-        and _allow_vertex_codestral(region)
-    ):
+    else:
         code_completions = _resolve_code_completions_vertex_codestral(
             payload=payload,
             completions_litellm_vertex_codestral_factory=completions_litellm_vertex_codestral_factory,
@@ -548,9 +538,6 @@ def _build_code_completions(
         )
         if payload.context:
             kwargs.update({"code_context": [ctx.content for ctx in payload.context]})
-    else:
-        code_completions = completions_legacy_factory()
-        LegacyHandler(payload, request, kwargs).update_completion_params()
 
     # Providers that are handled via the prompt registry perform their own UP check and event tracking. If we reach
     # this point is because we're using some other legacy provider, and we need to perform these steps now
