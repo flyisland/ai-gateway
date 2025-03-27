@@ -15,6 +15,9 @@ from pydantic import BaseModel
 from ai_gateway.api.auth_utils import StarletteUser
 from ai_gateway.integrations.amazon_q.client import AmazonQClientFactory
 
+__all__ = [
+    "ChatAmazonQ",
+]
 
 class ReferenceSpan(BaseModel):
     shape: str
