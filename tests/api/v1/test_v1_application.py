@@ -1,5 +1,5 @@
 from datetime import datetime, timedelta
-from unittest.mock import MagicMock, patch
+from unittest.mock import MagicMock, call, patch
 
 import botocore
 import pytest
@@ -363,8 +363,9 @@ class TestApplication:
             redirectUrl="https://example.com",
         )
 
-        mock_create_o_auth_app_connection.assert_called_once_with(**params)
-        mock_update_o_auth_app_connection.assert_called_once_with(**params)
+        mock_create_o_auth_app_connection.assert_has_calls(
+            [call(**params), call(**params)]
+        )
 
     def test_successful_delete_oauth_application_with_conflict(
         self,
