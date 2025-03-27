@@ -339,14 +339,14 @@ class TestApplication:
         mock_create_o_auth_app_connection = MagicMock(
             side_effect=[create_conflict_exception_error(), None]
         )
-        mock_update_o_auth_app_connection = MagicMock()
+        mock_delete_o_auth_app_connection = MagicMock()
 
         mock_q_client_response = MagicMock()
         mock_q_client_response.create_o_auth_app_connection = (
             mock_create_o_auth_app_connection
         )
-        mock_q_client_response.update_o_auth_app_connection = (
-            mock_update_o_auth_app_connection
+        mock_q_client_response.delete_o_auth_app_connection = (
+            mock_delete_o_auth_app_connection
         )
 
         mock_q_boto3.client.return_value = mock_q_client_response
@@ -366,6 +366,8 @@ class TestApplication:
         mock_create_o_auth_app_connection.assert_has_calls(
             [call(**params), call(**params)]
         )
+
+        mock_delete_o_auth_app_connection.assert_called_once()
 
     def test_successful_delete_oauth_application_with_conflict(
         self,

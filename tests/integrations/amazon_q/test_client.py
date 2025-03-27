@@ -277,7 +277,7 @@ class TestAmazonQClient:
         q_client.create_or_update_auth_application(mock_application_request)
         mock_q_client.create_o_auth_app_connection.assert_called_once_with(**params)
 
-        assert not mock_q_client.update_o_auth_app_connection.called
+        assert not mock_q_client.delete_o_auth_app_connection.called
 
     def test_update_auth_application_on_conflict(
         self, q_client, mock_q_client, mock_application_request, params
@@ -311,7 +311,7 @@ class TestAmazonQClient:
             q_client.create_or_update_auth_application(mock_application_request)
 
         mock_q_client.create_o_auth_app_connection.assert_called_once()
-        assert not mock_q_client.update_o_auth_app_connection.called
+        assert not mock_q_client.delete_o_auth_app_connection.called
 
     @pytest.mark.parametrize(
         "event_id,payload,client_error,expected_exception",
