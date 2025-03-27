@@ -19,6 +19,7 @@ __all__ = [
     "ChatAmazonQ",
 ]
 
+
 class ReferenceSpan(BaseModel):
     shape: str
 
