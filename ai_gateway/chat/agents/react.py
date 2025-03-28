@@ -57,10 +57,8 @@ class ReActPlainTextParser(BaseCumulativeTransformOutputParser):
 
     def _parse_final_answer(self, message: str) -> Optional[AgentFinalAnswer]:
         if match_answer := self.re_final_answer.search(message):
-            match_thought = self.re_thought.search(message)
 
             return AgentFinalAnswer(
-                thought=match_thought.group(1) if match_thought else "",
                 text=match_answer.group(1),
             )
 
