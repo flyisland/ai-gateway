@@ -17,7 +17,6 @@ from ai_gateway.api.snowplow_context import get_snowplow_code_suggestion_context
 from ai_gateway.api.v2.code.model_provider_handlers import (
     AnthropicHandler,
     FireworksHandler,
-    LegacyHandler,
     LiteLlmHandler,
 )
 from ai_gateway.api.v2.code.typing import (
@@ -55,17 +54,12 @@ from ai_gateway.code_suggestions.base import CodeSuggestionsOutput
 from ai_gateway.code_suggestions.processing.base import ModelEngineOutput
 from ai_gateway.code_suggestions.processing.ops import lang_from_filename
 from ai_gateway.config import Config
-from ai_gateway.feature_flags.context import (
-    FeatureFlag,
-    current_feature_flag_context,
-    is_feature_enabled,
-)
+from ai_gateway.feature_flags.context import current_feature_flag_context
 from ai_gateway.instrumentators.base import TelemetryInstrumentator
 from ai_gateway.internal_events import InternalEventsClient
 from ai_gateway.model_metadata import ModelMetadata
 from ai_gateway.models import KindAnthropicModel, KindModelProvider
 from ai_gateway.models.base import TokensConsumptionMetadata
-from ai_gateway.models.vertex_text import KindVertexTextModel
 from ai_gateway.prompts import BasePromptRegistry
 from ai_gateway.structured_logging import get_request_logger
 from ai_gateway.tracking import SnowplowEvent, SnowplowEventContext

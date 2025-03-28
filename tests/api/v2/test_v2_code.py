@@ -865,7 +865,7 @@ class TestCodeCompletions:
         self,
         mock_client: TestClient,
         mock_container: containers.Container,
-        mock_completions_legacy: Mock,
+        mock_completions: Mock,
         auth_user: CloudConnectorUser,
         telemetry: List[Dict[str, Union[str, int, None]]],
         current_file: Dict[str, str],
@@ -1180,7 +1180,6 @@ class TestCodeCompletions:
             },
         }
         response = self._send_code_completions_request(mock_client, params)
-
 
         mock_litellm_acompletion.assert_called_with(
             model="vertex_ai/codestral-2501",
