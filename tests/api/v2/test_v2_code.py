@@ -1179,11 +1179,8 @@ class TestCodeCompletions:
                 "content_below_cursor": "\n",
             },
         }
-        current_feature_flag_context.set({FeatureFlag.DISABLE_CODE_GECKO_DEFAULT})
-
         response = self._send_code_completions_request(mock_client, params)
 
-        current_feature_flag_context.set(set[str]())
 
         mock_litellm_acompletion.assert_called_with(
             model="vertex_ai/codestral-2501",
@@ -1228,9 +1225,7 @@ class TestCodeCompletions:
                 "content_below_cursor": "\n",
             },
         }
-        current_feature_flag_context.set({FeatureFlag.DISABLE_CODE_GECKO_DEFAULT})
         response = self._send_code_completions_request(mock_client, params)
-        current_feature_flag_context.set(set[str]())
 
         mock_litellm_acompletion.assert_called_with(
             messages=[
