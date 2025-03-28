@@ -1,6 +1,9 @@
 import json
 
-from ai_gateway.model_metadata import ModelMetadata, current_model_metadata_context
+from ai_gateway.model_metadata import (
+    create_model_metadata,
+    current_model_metadata_context,
+)
 
 
 class ModelConfigMiddleware:
@@ -17,7 +20,12 @@ class ModelConfigMiddleware:
             message = await receive()
 
             body: bytes = message.get("body", b"")
-            body: str = body.decode()
+
+            if b"model_metadata" not in body:
+                return message
+
+            body: str = body.decode("utf-8")
+
             try:
                 data = json.loads(body)
             except json.JSONDecodeError:
@@ -25,7 +33,7 @@ class ModelConfigMiddleware:
 
             if "model_metadata" in data:
                 current_model_metadata_context.set(
-                    ModelMetadata(**data["model_metadata"])
+                    create_model_metadata(data["model_metadata"])
                 )
             return message
 

@@ -8,7 +8,13 @@ from ai_gateway.model_metadata import current_model_metadata_context
 
 
 @pytest.fixture
-def middleware_test_client(custom_models_enabled):
+def model_metadata_context():
+    current_model_metadata_context.set(None)
+    yield current_model_metadata_context
+
+
+@pytest.fixture
+def middleware_test_client(custom_models_enabled, model_metadata_context):
     app = FastAPI(
         middleware=[
             Middleware(
@@ -22,7 +28,7 @@ def middleware_test_client(custom_models_enabled):
         request: Request,
     ):
         await request.body()
-        return current_model_metadata_context.get()
+        return model_metadata_context.get()
 
     return TestClient(app)
 
@@ -40,6 +46,21 @@ async def test_parses_model_params_into_context_var(middleware_test_client):
         "endpoint": "http://test_model.com/",
         "api_key": "test_api_key",
         "identifier": "test_model_identifier",
+    }
+
+    response = middleware_test_client.post(
+        "/test", json={"model_metadata": model_params}
+    )
+
+    assert response.json() == model_params
+
+
+@pytest.mark.asyncio
+async def test_amazon_q_params_to_context_var(middleware_test_client):
+    model_params = {
+        "provider": "amazon_q",
+        "name": "amazon_q",
+        "role_arn": "arn:aws:iam::123456789012:role/example-role",
     }
 
     response = middleware_test_client.post(
