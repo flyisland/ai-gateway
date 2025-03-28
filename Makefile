@@ -157,3 +157,8 @@ markdownlint:
 ingest:
 	@echo "Running data ingestion and refreshing for search APIs..."
 	@$(ROOT_DIR)/scripts/ingest/gitlab-docs/run.sh
+
+.PHONY: install-eval-deps
+install-eval-deps:
+	@echo "Installing eval dependencies..."
+	@poetry install --with eval
