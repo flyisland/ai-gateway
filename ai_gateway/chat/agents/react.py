@@ -1,5 +1,5 @@
 import re
-from typing import Any, AsyncIterator, Optional
+from typing import Any, AsyncIterator, Optional, Union
 
 import starlette_context
 from langchain_core.exceptions import OutputParserException
@@ -142,7 +142,7 @@ class ReActPromptTemplate(Runnable[ReActAgentInputs, PromptValue]):
         config: Optional[RunnableConfig] = None,
         **kwargs: Any,
     ) -> PromptValue:
-        messages = []
+        messages: list[Union[SystemMessage, HumanMessage, AIMessage]] = []
 
         if "system" in self.prompt_template:
             content = jinja2_formatter(
