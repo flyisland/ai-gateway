@@ -101,6 +101,8 @@ class ReActPlainTextParser(BaseCumulativeTransformOutputParser):
     def _parse(self, text: str) -> AgentEventType:
         wrapped_text = f"<message>Thought: {text}</message>"
 
+        event: AgentEventType  # Explicit declaration avoids mypy confusion
+
         if final_answer := self._parse_final_answer(wrapped_text):
             event = final_answer
         elif agent_action := self._parse_agent_action(wrapped_text):
@@ -112,7 +114,7 @@ class ReActPlainTextParser(BaseCumulativeTransformOutputParser):
 
     def parse_result(
         self, result: list[Generation], *, partial: bool = False
-    ) -> Optional[TypeAgentEvent]:
+    ) -> Optional[AgentEventType]:
         event = None
         text = result[0].text.strip()
 
@@ -125,7 +127,7 @@ class ReActPlainTextParser(BaseCumulativeTransformOutputParser):
 
         return event
 
-    def parse(self, text: str) -> Optional[TypeAgentEvent]:
+    def parse(self, text: str) -> Optional[AgentEventType]:
         return self.parse_result([Generation(text=text)])
 
 
