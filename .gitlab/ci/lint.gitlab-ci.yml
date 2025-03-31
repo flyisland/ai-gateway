@@ -34,7 +34,6 @@ lint:commit:
     - npm install --save-dev @commitlint/config-conventional @commitlint/cli
   script:
     - npx commitlint --from="$CI_MERGE_REQUEST_DIFF_BASE_SHA" --help-url
-      'https://www.conventionalcommits.org/en'
     - echo "Verifying Merge request title formatting"
     - echo "$CI_MERGE_REQUEST_TITLE" | npx commitlint
   rules:
