@@ -260,6 +260,6 @@ class ReActAgent(Prompt[ReActAgentInputs, Union[TypeAgentEvent, AgentError]]):
             starlette_context.context[_REACT_AGENT_TOOL_ACTION_CONTEXT_KEY] = (
                 agent_tool_action.tool
             )
-            yield agent_tool_action
+            yield cast(TypeAgentEvent, agent_tool_action)
         elif isinstance(events[-1], AgentUnknownAction):
-            yield events[-1]
+            yield cast(TypeAgentEvent, events[-1])
