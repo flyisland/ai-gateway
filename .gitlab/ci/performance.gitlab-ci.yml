@@ -40,7 +40,7 @@ tests:performance:
     PROJECT_ID: $CI_PROJECT_ID
     COMPONENT_MR_CI_COMMIT_SHA: $CI_COMMIT_SHORT_SHA
   rules:
-    - if: $CI_PROJECT_NAMESPACE == "gitlab-org/security"
+    - if: $CI_PROJECT_NAMESPACE =~ /^gitlab-org\/security.*/
       when: never
     - if: $CI_PIPELINE_SOURCE == "merge_request_event"
       variables:
