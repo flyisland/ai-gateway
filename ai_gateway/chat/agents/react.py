@@ -201,13 +201,13 @@ class ReActPromptTemplate(Runnable[ReActAgentInputs, PromptValue]):
         return ChatPromptValue(messages=messages)
 
 
-class ReActAgent(Prompt[ReActAgentInputs, TypeAgentEvent]):
+class ReActAgent(Prompt[ReActAgentInputs, Union[TypeAgentEvent, AgentError]]):
     RETRYABLE_ERRORS: list[str] = ["overloaded_error"]
 
     @staticmethod
     def _build_chain(
-        chain: Runnable[ReActAgentInputs, TypeAgentEvent],
-    ) -> Runnable[ReActAgentInputs, TypeAgentEvent]:
+        chain: Runnable[ReActAgentInputs, Union[TypeAgentEvent, AgentError]],
+    ) -> Runnable[ReActAgentInputs, Union[TypeAgentEvent, AgentError]]:
         return chain | ReActPlainTextParser()
 
     @classmethod
@@ -221,7 +221,7 @@ class ReActAgent(Prompt[ReActAgentInputs, TypeAgentEvent]):
         input: ReActAgentInputs,
         config: Optional[RunnableConfig] = None,
         **kwargs: Optional[Any],
-    ) -> AsyncIterator[TypeAgentEvent]:
+    ) -> AsyncIterator[Union[TypeAgentEvent, AgentError]]:
         events = []
         astream = super().astream(input, config, **kwargs)
         len_final_answer = 0
