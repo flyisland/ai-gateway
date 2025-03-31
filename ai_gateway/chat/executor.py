@@ -81,7 +81,7 @@ class GLAgentRemoteExecutor(Generic[TypeAgentInputs, TypeAgentEvent]):
     async def stream(
         self, *, inputs: TypeAgentInputs
     ) -> AsyncIterator[Union[TypeAgentEvent, AgentError]]:
-        inputs.tools = self.tools  # type: ignore
+        inputs.tools = self.tools  # type: ignore[attr-defined]
 
         tools_by_name = self.tools_by_name
 
