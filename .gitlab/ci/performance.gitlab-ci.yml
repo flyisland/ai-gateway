@@ -5,7 +5,6 @@ dotenv-vars:
     - echo "JOB_WITH_ARTIFACTS_ID=$CI_JOB_ID" >> variables.env
     - echo $JOB_WITH_ARTIFACTS
     - echo $JOB_WITH_ARTIFACTS_ID
-    - echo $SECURITY_PROJECT
     - cat variables.env
   artifacts:
     paths:
@@ -15,7 +14,7 @@ dotenv-vars:
     reports:
       dotenv: variables.env
   rules:
-    - if: $CI_PROJECT_PATH =~ /^gitlab-org\/security\/.*/ || $SECURITY_PROJECT == "true"
+    - if: $CI_PROJECT_NAMESPACE == "gitlab-org/security"
       when: never
     - if: $CI_PIPELINE_SOURCE == "merge_request_event"
       when: always
@@ -41,7 +40,7 @@ tests:performance:
     PROJECT_ID: $CI_PROJECT_ID
     COMPONENT_MR_CI_COMMIT_SHA: $CI_COMMIT_SHORT_SHA
   rules:
-    - if: $CI_PROJECT_PATH =~ /^gitlab-org\/security\/.*/ || $SECURITY_PROJECT == "true"
+    - if: $CI_PROJECT_NAMESPACE == "gitlab-org/security"
       when: never
     - if: $CI_PIPELINE_SOURCE == "merge_request_event"
       variables:
