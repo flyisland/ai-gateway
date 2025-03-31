@@ -256,7 +256,7 @@ class ReActAgent(Prompt[ReActAgentInputs, Union[TypeAgentEvent, AgentError]]):
         if agent_final_answer_found:
             pass  # no-op
         elif agent_tool_action_found:
-            agent_tool_action: AgentToolAction = events[-1]
+            agent_tool_action: AgentToolAction = events[-1]  # type: ignore[assignment]
             starlette_context.context[_REACT_AGENT_TOOL_ACTION_CONTEXT_KEY] = (
                 agent_tool_action.tool
             )
