@@ -154,15 +154,16 @@ class ReActPromptTemplate(Runnable[ReActAgentInputs, PromptValue]):
                 and self.model_config.params.model_class_provider
                 == ModelClassProvider.ANTHROPIC
             ):
-                content = [
+                content_block: list[Union[str, dict]] = [
                     {
                         "text": content,
                         "type": "text",
                         "cache_control": {"type": "ephemeral"},
                     }
                 ]
-
-            messages.append(SystemMessage(content=content))
+                messages.append(SystemMessage(content=content_block))
+            else:
+                messages.append(SystemMessage(content=content))
 
         for m in input.messages:
             if m.role is Role.USER:
