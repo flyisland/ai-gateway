@@ -14,7 +14,7 @@ dotenv-vars:
     reports:
       dotenv: variables.env
   rules:
-    - if: $CI_PROJECT_NAMESPACE =~ "^gitlab-org\/security.*"
+    - if: $CI_PROJECT_NAMESPACE =~ /^gitlab-org\/security.*/
       when: never
     - if: $CI_PIPELINE_SOURCE == "merge_request_event"
       when: always
