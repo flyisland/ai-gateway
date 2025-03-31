@@ -255,8 +255,10 @@ class ReActAgent(Prompt[ReActAgentInputs, TypeAgentEvent]):
         if agent_final_answer_found:
             pass  # no-op
         elif agent_tool_action_found:
-            event = events[-1]
-            starlette_context.context[_REACT_AGENT_TOOL_ACTION_CONTEXT_KEY] = event.tool
-            yield event
+            agent_tool_action: AgentToolAction = events[-1]
+            starlette_context.context[_REACT_AGENT_TOOL_ACTION_CONTEXT_KEY] = (
+                agent_tool_action.tool
+            )
+            yield agent_tool_action
         elif isinstance(events[-1], AgentUnknownAction):
             yield events[-1]
