@@ -1,5 +1,5 @@
 import re
-from typing import Any, AsyncIterator, Optional, Union
+from typing import Any, AsyncIterator, Optional, Union, cast
 
 import starlette_context
 from langchain_core.exceptions import OutputParserException
@@ -238,9 +238,10 @@ class ReActAgent(Prompt[ReActAgentInputs, TypeAgentEvent]):
                 elif isinstance(event, AgentFinalAnswer):
                     agent_final_answer_found = True
                     if len(event.text) > 0:
-                        yield AgentFinalAnswer(
+                        response = AgentFinalAnswer(
                             text=event.text[len_final_answer:],
                         )
+                        yield cast(TypeAgentEvent, response)
 
                         len_final_answer = len(event.text)
 
