@@ -40,6 +40,7 @@ from ai_gateway.container import ContainerApplication
 from ai_gateway.feature_flags import FeatureFlag, is_feature_enabled
 from ai_gateway.instrumentators.threads import monitor_threads
 from ai_gateway.models import ModelAPIError
+from ai_gateway.models.anthropic import AnthropicAPIStatusError
 from ai_gateway.models.base import ModelAPICallError
 from ai_gateway.profiling import setup_profiling
 from ai_gateway.structured_logging import setup_app_logging
@@ -163,12 +164,29 @@ async def model_api_exception_handler(request: Request, exc: ModelAPIError):
             status_code=status.HTTP_429_TOO_MANY_REQUESTS,
             detail="Too many requests. Please try again later.",
         )
-    else:
-        # Default to 503 for all other error types
-        wrapped_exception = StarletteHTTPException(
-            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-            detail="Inference failed",
-        )
+
+        # When a 429 error is returned from Anthropic API
+        # the response includes a retry-after header
+        # which we propogate to the client
+        # https://docs.anthropic.com/en/api/rate-limits#response-headers
+        retry_after = None
+        if isinstance(exc, AnthropicAPIStatusError) and exc.errors:
+            original_error = exc.errors[0]
+            if hasattr(original_error, "response"):
+                retry_after = original_error.response.headers.get("retry-after")
+
+        response = await http_exception_handler(request, wrapped_exception)
+
+        if retry_after:
+            response.headers["Retry-After"] = retry_after
+
+        return response
+
+    # Default to 503 for all other error types
+    wrapped_exception = StarletteHTTPException(
+        status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+        detail="Inference failed",
+    )
     return await http_exception_handler(request, wrapped_exception)
 
 

@@ -7,6 +7,7 @@ from unittest.mock import MagicMock, patch
 
 import litellm
 import pytest
+from anthropic import APIStatusError
 from fastapi import FastAPI
 from fastapi.exceptions import RequestValidationError
 from fastapi.routing import APIRoute
@@ -29,6 +30,7 @@ from ai_gateway.config import (
 )
 from ai_gateway.container import ContainerApplication
 from ai_gateway.models import ModelAPIError
+from ai_gateway.models.anthropic import AnthropicAPIStatusError
 from ai_gateway.models.base import ModelAPICallError
 from ai_gateway.structured_logging import setup_logging
 
@@ -356,6 +358,30 @@ def test_model_exception_handler_with_429_error(app):
 
     assert response.status_code == 429
     assert response.json() == {"detail": "Too many requests. Please try again later."}
+
+
+def test_model_exception_handler_propagates_retry_after_header(app):
+    @app.get("/test")
+    def test_route():
+        mock_response = MagicMock()
+        mock_response.status_code = 429
+        mock_response.headers = {"retry-after": "30"}
+
+        api_status_error = APIStatusError(
+            "Too many requests", response=mock_response, body=None
+        )
+
+        anthropic_error = AnthropicAPIStatusError.from_exception(api_status_error)
+
+        raise anthropic_error
+
+    setup_custom_exception_handlers(app)
+
+    client = TestClient(app)
+    response = client.get("/test")
+
+    assert "Retry-After" in response.headers
+    assert response.headers["Retry-After"] == "30"
 
 
 @pytest.mark.parametrize(
