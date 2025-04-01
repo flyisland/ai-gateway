@@ -17,7 +17,6 @@ MYPY_LINT_TODO_DIR ?= --exclude "ai_gateway/models/*" \
 	--exclude "ai_gateway/api/middleware/model_config.py" \
 	--exclude "ai_gateway/api/middleware/base.py" \
 	--exclude "ai_gateway/api/snowplow_context.py" \
-	--exclude "ai_gateway/api/monitoring.py" \
 	--exclude "ai_gateway/api/v3/code/completions.py" \
 	--exclude "ai_gateway/api/v2/code/completions.py" \
 	--exclude "ai_gateway/api/v2/chat/agent.py" \
