@@ -144,7 +144,7 @@ async def validate_fireworks_available(
 
 async def validate_cloud_connector_ready(
     config: Annotated[Configuration[Config], Depends(get_config)],
-    request: Request = None,  # type: ignore
+    request: Request,
 ) -> bool:
     """
     Always pass for Self-Hosted-Models. This is temporary.
