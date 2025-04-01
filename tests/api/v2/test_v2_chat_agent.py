@@ -9,7 +9,11 @@ from pydantic import AnyUrl
 from starlette.testclient import TestClient
 
 from ai_gateway.api.v2 import api_router
-from ai_gateway.api.v2.chat.typing import AgentRequest
+from ai_gateway.api.v2.chat.typing import (
+    AgentRequest,
+    AgentRequestOptions,
+    ReActAgentScratchpad,
+)
 from ai_gateway.chat.agents import (
     AdditionalContext,
     AgentBaseEvent,
@@ -119,6 +123,49 @@ class TestReActAgentStream:
                         provider="amazon_q",
                         role_arn="role-arn",
                     ),
+                ),
+                "thought\nFinal Answer: answer\n",
+                [AgentFinalAnswer(text=c) for c in "answer"],
+            ),
+            (
+                AgentRequest(
+                    messages=[
+                        Message(
+                            role=Role.USER,
+                            content="chat history",
+                        ),
+                        Message(role=Role.ASSISTANT, content="chat history"),
+                        Message(
+                            role=Role.USER,
+                            content="What's the title of this issue?",
+                            context=Context(type="issue", content="issue content"),
+                            current_file=CurrentFile(
+                                file_path="main.py",
+                                data="def main()",
+                                selected_code=True,
+                            ),
+                        ),
+                    ],
+                    options=AgentRequestOptions(
+                        agent_scratchpad=ReActAgentScratchpad(
+                            agent_type="react",
+                            steps=[
+                                ReActAgentScratchpad.AgentStep(
+                                    thought="thought",
+                                    tool="tool",
+                                    tool_input="tool_input",
+                                    observation="observation",
+                                )
+                            ],
+                        ),
+                    ),
+                    model_metadata=ModelMetadata(
+                        name="mistral",
+                        provider="litellm",
+                        endpoint=AnyUrl("http://localhost:4000"),
+                        api_key="token",
+                    ),
+                    unavailable_resources=["Mystery Resource 1", "Mystery Resource 2"],
                 ),
                 "thought\nFinal Answer: answer\n",
                 [AgentFinalAnswer(text=c) for c in "answer"],
