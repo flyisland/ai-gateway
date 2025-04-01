@@ -53,7 +53,9 @@ class AgentError(AgentBaseEvent):
     retryable: bool
 
 
-AgentEventType = Union[AgentToolAction, AgentFinalAnswer, AgentUnknownAction]
+AgentEventType = Union[
+    AgentToolAction, AgentFinalAnswer, AgentUnknownAction, AgentError
+]
 TypeAgentEvent = TypeVar("TypeAgentEvent", bound=AgentEventType)
 
 TypeAgentInputs = TypeVar("TypeAgentInputs")
