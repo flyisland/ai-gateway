@@ -140,7 +140,7 @@ class ReActPromptTemplate(Runnable[ReActAgentInputs, PromptValue]):
         config: Optional[RunnableConfig] = None,
         **kwargs: Any,
     ) -> PromptValue:
-        messages: list[Union[SystemMessage, HumanMessage, AIMessage]] = []
+        messages: list[BaseMessage] = []
 
         if "system" in self.prompt_template:
             content = jinja2_formatter(
