@@ -1,4 +1,4 @@
-from typing import AsyncIterator, Generic, Optional, Union, cast
+from typing import AsyncIterator, Generic, Optional, cast
 
 import starlette_context
 from gitlab_cloud_connector import GitLabUnitPrimitive
@@ -99,6 +99,9 @@ class GLAgentRemoteExecutor(Generic[TypeAgentInputs, TypeAgentEvent]):
                     )
                     yield cast(TypeAgentEvent, event)
                 else:
-                    yield AgentError(message="tool not available", retryable=False)
+                    yield cast(
+                        TypeAgentEvent,
+                        AgentError(message="tool not available", retryable=False),
+                    )
             else:
                 yield event

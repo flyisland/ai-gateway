@@ -3,7 +3,7 @@ from typing import Any, AsyncIterator, Optional, Union, cast
 
 import starlette_context
 from langchain_core.exceptions import OutputParserException
-from langchain_core.messages import AIMessage, HumanMessage, SystemMessage
+from langchain_core.messages import AIMessage, BaseMessage, HumanMessage, SystemMessage
 from langchain_core.output_parsers import BaseCumulativeTransformOutputParser
 from langchain_core.outputs import Generation
 from langchain_core.prompt_values import ChatPromptValue, PromptValue
@@ -250,7 +250,9 @@ class ReActAgent(Prompt[ReActAgentInputs, TypeAgentEvent]):
             error_message = str(e)
             retryable = any(err in error_message for err in self.RETRYABLE_ERRORS)
 
-            yield AgentError(message=error_message, retryable=retryable)
+            yield cast(
+                TypeAgentEvent, AgentError(message=error_message, retryable=retryable)
+            )
             raise
 
         if agent_final_answer_found:
