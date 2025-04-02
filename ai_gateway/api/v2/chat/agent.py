@@ -21,6 +21,7 @@ from ai_gateway.async_dependency_resolver import (
 from ai_gateway.chat.agents import (
     AgentStep,
     AgentToolAction,
+    Message,
     ReActAgent,
     ReActAgentInputs,
     TypeAgentEvent,
@@ -91,7 +92,9 @@ def get_agent(
     return prompt
 
 
-def _build_scratchpad_from_request(agent_request, last_message):
+def _build_scratchpad_from_request(
+    agent_request: AgentRequest, last_message: Message
+) -> list[AgentStep]:
     if agent_request.options:
         return [
             AgentStep(
