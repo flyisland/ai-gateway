@@ -1,4 +1,9 @@
-def extract_retry_after_header(exc):
+from typing import Optional
+
+from ai_gateway.models.base import ModelAPICallError
+
+
+def extract_retry_after_header(exc: ModelAPICallError) -> Optional[str]:
     retry_after = None
     if hasattr(exc, "errors") and exc.errors:
         original_error = exc.errors[0]
