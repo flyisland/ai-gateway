@@ -1,6 +1,8 @@
 from enum import StrEnum
 from typing import Optional
 
+import structlog
+
 from ai_gateway.api.auth_utils import StarletteUser
 from ai_gateway.integrations.amazon_q.client import AmazonQClientFactory
 from ai_gateway.models.base import ModelMetadata
@@ -11,6 +13,8 @@ __all__ = [
     "AmazonQModel",
     "KindAmazonQModel",
 ]
+
+log = structlog.stdlib.get_logger("amazon_q")
 
 
 class KindAmazonQModel(StrEnum):
@@ -64,9 +68,10 @@ class AmazonQModel(TextGenModelBase):
             },
             "maxResults": 1,
         }
-
+        log.debug(f"Amazon Q request: {str(request_payload)}")
         response = q_client.generate_code_recommendations(request_payload)
 
+        log.debug(f"Amazon Q response: {str(response)}")
         recommendations = response.get("CodeRecommendations", [])
         recommendation = recommendations[0] if recommendations else {}
 

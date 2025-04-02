@@ -58,6 +58,10 @@ class AWSException(Exception):
             return HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST, detail=self.exception_str
             )
+        if self.error_code == "UnknownOperationException":
+            return HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND, detail=self.exception_str
+            )
 
         # For any other AWS errors, return a 500 Internal Server Error
         return HTTPException(
