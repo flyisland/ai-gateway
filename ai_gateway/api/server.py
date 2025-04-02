@@ -169,7 +169,7 @@ async def model_api_exception_handler(request: Request, exc: ModelAPIError):
         # the response includes a retry-after header
         # which we propogate to the client
         # https://docs.anthropic.com/en/api/rate-limits#response-headers
-        retry_after = await extract_retry_after_header(exc)
+        retry_after = extract_retry_after_header(exc)
 
         response = await http_exception_handler(request, wrapped_exception)
 

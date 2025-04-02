@@ -1,4 +1,4 @@
-async def extract_retry_after_header(exc):
+def extract_retry_after_header(exc):
     retry_after = None
     if hasattr(exc, "errors") and exc.errors:
         original_error = exc.errors[0]
