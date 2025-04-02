@@ -31,6 +31,7 @@ from ai_gateway.api.middleware import (
     ModelConfigMiddleware,
 )
 from ai_gateway.api.monitoring import router as http_monitoring_router
+from ai_gateway.api.server_utils import extract_retry_after_header
 from ai_gateway.api.v1 import api_router as http_api_router_v1
 from ai_gateway.api.v2 import api_router as http_api_router_v2
 from ai_gateway.api.v3 import api_router as http_api_router_v3
@@ -40,7 +41,6 @@ from ai_gateway.container import ContainerApplication
 from ai_gateway.feature_flags import FeatureFlag, is_feature_enabled
 from ai_gateway.instrumentators.threads import monitor_threads
 from ai_gateway.models import ModelAPIError
-from ai_gateway.models.anthropic import AnthropicAPIStatusError
 from ai_gateway.models.base import ModelAPICallError
 from ai_gateway.profiling import setup_profiling
 from ai_gateway.structured_logging import setup_app_logging
@@ -165,15 +165,11 @@ async def model_api_exception_handler(request: Request, exc: ModelAPIError):
             detail="Too many requests. Please try again later.",
         )
 
-        # When a 429 error is returned from Anthropic API
+        # When a 429 error is returned from some API, like Anthropic
         # the response includes a retry-after header
         # which we propogate to the client
         # https://docs.anthropic.com/en/api/rate-limits#response-headers
-        retry_after = None
-        if isinstance(exc, AnthropicAPIStatusError) and exc.errors:
-            original_error = exc.errors[0]
-            if hasattr(original_error, "response"):
-                retry_after = original_error.response.headers.get("retry-after")
+        retry_after = await extract_retry_after_header(exc)
 
         response = await http_exception_handler(request, wrapped_exception)
 
