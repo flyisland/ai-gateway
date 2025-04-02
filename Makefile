@@ -30,7 +30,6 @@ MYPY_LINT_TODO_DIR ?= --exclude "ai_gateway/models/*" \
 	--exclude "ai_gateway/code_suggestions/processing/completions.py" \
 	--exclude "ai_gateway/code_suggestions/processing/ops.py" \
 	--exclude "ai_gateway/code_suggestions/processing/post/completions.py" \
-	--exclude "ai_gateway/code_suggestions/processing/pre/base.py" \
 	--exclude "tests/code_suggestions/test_completions.py" \
 	--exclude "tests/code_suggestions/test_container.py" \
 	--exclude "tests/code_suggestions/test_engine.py" \
