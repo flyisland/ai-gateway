@@ -1,7 +1,5 @@
 from unittest.mock import MagicMock
 
-import pytest
-
 from ai_gateway.api.server_utils import extract_retry_after_header
 from ai_gateway.models.base import ModelAPICallError
 
