@@ -69,3 +69,7 @@ class EventRequest(BaseModel):
     payload: Union[EventMergeRequestPayload, EventIssuePayload, EventHookPayload] = (
         Field(discriminator="source")
     )
+
+
+class HealthRequest(BaseModel):
+    role_arn: Annotated[str, StringConstraints(max_length=2048)]
