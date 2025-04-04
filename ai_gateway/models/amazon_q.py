@@ -1,12 +1,16 @@
 from enum import StrEnum
-from typing import Optional
+from typing import AsyncIterator, Optional
 
 import structlog
 
 from ai_gateway.api.auth_utils import StarletteUser
 from ai_gateway.integrations.amazon_q.client import AmazonQClientFactory
 from ai_gateway.models.base import ModelMetadata
-from ai_gateway.models.base_text import TextGenModelBase, TextGenModelOutput
+from ai_gateway.models.base_text import (
+    TextGenModelBase,
+    TextGenModelChunk,
+    TextGenModelOutput,
+)
 from ai_gateway.safety_attributes import SafetyAttributes
 
 __all__ = [
@@ -50,6 +54,7 @@ class AmazonQModel(TextGenModelBase):
         suffix: Optional[str],
         filename: str,
         language: str,
+        stream: bool,
         **kwargs,
     ) -> TextGenModelOutput:
         q_client = self._client_factory.get_client(
@@ -74,9 +79,17 @@ class AmazonQModel(TextGenModelBase):
         log.debug(f"Amazon Q response: {str(response)}")
         recommendations = response.get("CodeRecommendations", [])
         recommendation = recommendations[0] if recommendations else {}
+        content = recommendation.get("content", "")
+
+        if stream:
+
+            async def _handle_stream() -> AsyncIterator[TextGenModelChunk]:
+                yield TextGenModelChunk(text=content)
+
+            return _handle_stream()
 
         return TextGenModelOutput(
-            text=recommendation.get("content", ""),
+            text=content,
             # Give a high value, the model doesn't return scores.
             score=10**5,
             safety_attributes=SafetyAttributes(),
