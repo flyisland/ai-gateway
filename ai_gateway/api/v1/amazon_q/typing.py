@@ -73,3 +73,4 @@ class EventRequest(BaseModel):
 
 class HealthRequest(BaseModel):
     role_arn: Annotated[str, StringConstraints(max_length=2048)]
+    code: Annotated[str, StringConstraints(max_length=255)]

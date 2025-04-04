@@ -168,8 +168,18 @@ class AmazonQClient:
         )
 
     @raise_aws_errors
-    def verify_oauth_connection(self, payload):
-        self.client.verify_o_auth_app_connection()
+    def verify_oauth_connection(self, health_request):
+        try:
+            return self._verify_oauth_connection()
+        except ClientError as ex:
+            if ex.__class__.__name__ == "AccessDeniedException":
+                return self._retry_verify_oauth_connection(ex, health_request.code)
+
+            raise ex
+
+    @raise_aws_errors
+    def _verify_oauth_connection(self):
+        return self.client.verify_o_auth_app_connection()
 
     @raise_aws_errors
     def _create_o_auth_app_connection(self, **params):
@@ -180,6 +190,8 @@ class AmazonQClient:
         self.client.delete_o_auth_app_connection()
 
     def _send_event(self, event_id: str, payload: dict):
+        request_log.info("Sending Event", event_id=event_id)
+        request_log.debug("Event Payload", payload=payload)
         self.client.send_event(
             providerId="GITLAB",
             eventId=event_id,
@@ -191,6 +203,11 @@ class AmazonQClient:
         self._is_retry(error, code)
 
         return self._send_event(event_id, payload)
+
+    def _retry_verify_oauth_connection(self, error, code):
+        self._is_retry(error, code)
+
+        return self._verify_oauth_connection()
 
     def _is_retry(self, error, code):
         match str(error.response.get("reason")):

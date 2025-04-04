@@ -104,7 +104,7 @@ async def oauth_delete_application(
 @feature_category(GitLabFeatureCategory.DUO_CHAT)
 async def validate_auth_app(
     request: Request,
-    event_request: HealthRequest,
+    health_request: HealthRequest,
     current_user: Annotated[StarletteUser, Depends(get_current_user)],
     internal_event_client: Annotated[
         InternalEventsClient, Depends(get_internal_event_client)
@@ -128,11 +128,11 @@ async def validate_auth_app(
         # Get Q client without role_arn as this is just a validation
         q_client = amazon_q_client_factory.get_client(
             current_user=current_user,
-            role_arn=event_request.role_arn,
+            role_arn=health_request.role_arn,
         )
 
         # Verify OAuth connection
-        response_data = q_client.verify_oauth_connection({})
+        response_data = q_client.verify_oauth_connection(health_request)
     except AWSException as e:
         raise e.to_http_exception()
 
@@ -144,5 +144,5 @@ async def validate_auth_app(
 
     return JSONResponse(
         status_code=status.HTTP_200_OK,
-        content=response_data["response"],
+        content={"detail": response_data["response"]},
     )
