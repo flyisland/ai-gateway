@@ -1,9 +1,9 @@
 from .base import (
     AccessLogMiddleware,
     DistributedTraceMiddleware,
-    InternalEventMiddleware,
     MiddlewareAuthentication,
 )
+from .internal_events import InternalEventMiddleware
 from .feature_flag import FeatureFlagMiddleware
 from .headers import (
     X_GITLAB_CLIENT_NAME,
