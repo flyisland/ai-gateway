@@ -3,7 +3,6 @@ from .base import (
     DistributedTraceMiddleware,
     MiddlewareAuthentication,
 )
-from .internal_event import InternalEventMiddleware
 from .feature_flag import FeatureFlagMiddleware
 from .headers import (
     X_GITLAB_CLIENT_NAME,
@@ -22,6 +21,7 @@ from .headers import (
     X_GITLAB_TEAM_MEMBER_HEADER,
     X_GITLAB_VERSION_HEADER,
 )
+from .internal_event import InternalEventMiddleware
 from .model_config import ModelConfigMiddleware
 
 __all__ = [
