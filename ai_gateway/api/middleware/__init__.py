@@ -3,7 +3,7 @@ from .base import (
     DistributedTraceMiddleware,
     MiddlewareAuthentication,
 )
-from .internal_events import InternalEventMiddleware
+from .internal_event import InternalEventMiddleware
 from .feature_flag import FeatureFlagMiddleware
 from .headers import (
     X_GITLAB_CLIENT_NAME,

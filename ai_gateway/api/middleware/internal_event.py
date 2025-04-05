@@ -26,6 +26,7 @@ from ai_gateway.internal_events import (
     current_event_context,
     tracked_internal_events,
 )
+from gitlab_cloud_connector import X_GITLAB_DUO_SEAT_COUNT_HEADER
 
 
 class InternalEventMiddleware:
@@ -81,6 +82,7 @@ class InternalEventMiddleware:
             client_name=request.headers.get(X_GITLAB_CLIENT_NAME),
             client_version=request.headers.get(X_GITLAB_CLIENT_VERSION),
             interface=request.headers.get(X_GITLAB_INTERFACE),
+            duo_seat_count=request.headers.get(X_GITLAB_DUO_SEAT_COUNT_HEADER),
             feature_enabled_by_namespace_ids=feature_enabled_by_namespace_ids,
             feature_enablement_type=request.headers.get(
                 X_GITLAB_FEATURE_ENABLEMENT_TYPE_HEADER
