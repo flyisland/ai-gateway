@@ -46,8 +46,6 @@ class AWSException(Exception):
         return self.error_code == "ResourceNotFoundException"
 
     def to_http_exception(self):
-        print("Handling exception: error code", self.error_code)
-        print("Handling exception: error message", self.error_message)
         if self.error_code == "ResourceNotFoundException":
             return HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND, detail=self.exception_str
@@ -60,7 +58,7 @@ class AWSException(Exception):
             return HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST, detail=self.exception_str
             )
-        if self.error_code == "ThrottlingException":
+        if str(self.error_code) in ("ThrottlingException", "429"):
             return HTTPException(
                 status_code=status.HTTP_429_TOO_MANY_REQUESTS, detail=self.exception_str
             )
