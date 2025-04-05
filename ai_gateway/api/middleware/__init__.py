@@ -22,6 +22,7 @@ from .headers import (
     X_GITLAB_TEAM_MEMBER_HEADER,
     X_GITLAB_VERSION_HEADER,
 )
+from .internal_event import InternalEventMiddleware
 from .model_config import ModelConfigMiddleware
 
 __all__ = [
