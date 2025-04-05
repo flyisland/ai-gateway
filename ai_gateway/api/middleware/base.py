@@ -22,7 +22,7 @@ from starlette.authentication import (
     AuthenticationError,
     HTTPConnection,
 )
-from starlette.datastructures import CommaSeparatedStrings, MutableHeaders
+from starlette.datastructures import MutableHeaders
 from starlette.middleware import Middleware
 from starlette.middleware.authentication import (
     AuthenticationBackend,
@@ -35,29 +35,18 @@ from uvicorn.protocols.utils import get_path_with_query_string
 
 from ai_gateway.api.auth_utils import StarletteUser
 from ai_gateway.api.timing import timing
-from ai_gateway.internal_events import (
-    EventContext,
-    current_event_context,
-    tracked_internal_events,
-)
 from ai_gateway.tracking.errors import log_exception
-from ai_gateway.api.middleware.internal_event import InternalEventMiddleware
 
 from .headers import (
-    X_GITLAB_CLIENT_NAME,
-    X_GITLAB_CLIENT_TYPE,
-    X_GITLAB_CLIENT_VERSION,
     X_GITLAB_FEATURE_ENABLED_BY_NAMESPACE_IDS_HEADER,
     X_GITLAB_FEATURE_ENABLEMENT_TYPE_HEADER,
     X_GITLAB_GLOBAL_USER_ID_HEADER,
     X_GITLAB_HOST_NAME_HEADER,
     X_GITLAB_INSTANCE_ID_HEADER,
-    X_GITLAB_INTERFACE,
     X_GITLAB_LANGUAGE_SERVER_VERSION,
     X_GITLAB_MODEL_GATEWAY_REQUEST_SENT_AT,
     X_GITLAB_REALM_HEADER,
     X_GITLAB_SAAS_DUO_PRO_NAMESPACE_IDS_HEADER,
-    X_GITLAB_TEAM_MEMBER_HEADER,
     X_GITLAB_VERSION_HEADER,
 )
 

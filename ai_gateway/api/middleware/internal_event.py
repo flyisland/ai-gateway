@@ -1,5 +1,6 @@
-from typing import Optional
+from datetime import datetime
 
+from asgi_correlation_id.context import correlation_id
 from starlette.datastructures import CommaSeparatedStrings
 from starlette.middleware.base import Request
 from starlette_context import context as starlette_context
@@ -45,8 +46,6 @@ class InternalEventMiddleware:
             await self.app(scope, receive, send)
             return
 
-        # Fetching a list of namespaces that allow the user to use the tracked feature.
-        # This is relevant for requests coming from gitlab.com, and unrelated to self-managed or dedicated instances.
         feature_enabled_by_namespace_ids = list(
             CommaSeparatedStrings(
                 request.headers.get(
@@ -54,7 +53,7 @@ class InternalEventMiddleware:
                 )
             )
         )
-        # Supporting the legacy header https://gitlab.com/gitlab-org/modelops/applied-ml/code-suggestions/ai-assist/-/issues/561.
+
         if not feature_enabled_by_namespace_ids:
             feature_enabled_by_namespace_ids = list(
                 CommaSeparatedStrings(
@@ -96,4 +95,4 @@ class InternalEventMiddleware:
 
         starlette_context["tracked_internal_events"] = list(
             tracked_internal_events.get()
-        ) 
+        )

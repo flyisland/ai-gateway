@@ -265,4 +265,4 @@ async def test_middleware_missing_headers(internal_event_middleware):
         )
         mock_event_context.set.assert_called_once_with(expected_context)
 
-    internal_event_middleware.app.assert_called_once_with(scope, receive, send) 
+    internal_event_middleware.app.assert_called_once_with(scope, receive, send)
