@@ -34,7 +34,6 @@ from starlette_context import context as starlette_context
 from uvicorn.protocols.utils import get_path_with_query_string
 
 from ai_gateway.api.auth_utils import StarletteUser
-from ai_gateway.api.middleware.internal_event import InternalEventMiddleware
 from ai_gateway.api.timing import timing
 from ai_gateway.internal_events import (
     EventContext,
