@@ -28,9 +28,7 @@ from starlette.middleware.authentication import (
     AuthenticationMiddleware,
 )
 from starlette.middleware.base import Request
-
-# from langsmith.run_helpers import tracing_context
-from starlette.responses import JSONResponse  # Add this import
+from starlette.responses import JSONResponse
 from starlette_context import context as starlette_context
 from uvicorn.protocols.utils import get_path_with_query_string
 

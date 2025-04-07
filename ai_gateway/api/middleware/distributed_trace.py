@@ -1,9 +1,6 @@
 from langsmith.run_helpers import tracing_context
 from starlette.middleware.base import Request
 
-# from starlette_context import context as starlette_context
-from .base import _PathResolver
-
 
 class DistributedTraceMiddleware:
     """Middleware for distributed tracing."""
@@ -11,7 +8,6 @@ class DistributedTraceMiddleware:
     def __init__(self, app, skip_endpoints, environment):
         self.app = app
         self.environment = environment
-        self.path_resolver = _PathResolver.from_optional_list(skip_endpoints)
 
     async def __call__(self, scope, receive, send):
         if scope["type"] != "http":
