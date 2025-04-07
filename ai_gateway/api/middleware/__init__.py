@@ -1,9 +1,4 @@
-from .base import (
-    AccessLogMiddleware,
-    InternalEventMiddleware,
-    MiddlewareAuthentication,
-    _PathResolver,
-)
+from .base import AccessLogMiddleware, InternalEventMiddleware, MiddlewareAuthentication
 from .distributed_trace import DistributedTraceMiddleware
 from .feature_flag import FeatureFlagMiddleware
 from .headers import (
@@ -31,7 +26,6 @@ __all__ = [
     "MiddlewareAuthentication",
     "FeatureFlagMiddleware",
     "DistributedTraceMiddleware",
-    "_PathResolver",
     "ModelConfigMiddleware",
     "X_GITLAB_REALM_HEADER",
     "X_GITLAB_INSTANCE_ID_HEADER",
