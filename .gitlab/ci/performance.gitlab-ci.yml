@@ -31,8 +31,8 @@ tests:performance:
     - job: dotenv-vars
       artifacts: true
   trigger:
-    project: gitlab-org/quality/component-performance-testing
-    branch: testbranch
+    project: dev-ex-mirror/component-performance-testing-mirror
+    branch: main
     strategy: depend
     forward:
       pipeline_variables: true
