@@ -1,7 +1,7 @@
 from langsmith.run_helpers import tracing_context
 from starlette.middleware.base import Request
-from starlette_context import context as starlette_context
 
+# from starlette_context import context as starlette_context
 from .base import _PathResolver
 
 

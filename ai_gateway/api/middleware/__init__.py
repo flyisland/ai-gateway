@@ -29,6 +29,7 @@ __all__ = [
     "AccessLogMiddleware",
     "InternalEventMiddleware",
     "MiddlewareAuthentication",
+    "FeatureFlagMiddleware",
     "DistributedTraceMiddleware",
     "_PathResolver",
     "ModelConfigMiddleware",
