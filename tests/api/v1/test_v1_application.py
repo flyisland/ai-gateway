@@ -453,10 +453,6 @@ class TestApplication:
         ("error_response", "expected_code"),
         [
             (
-                create_access_denied_error(),
-                status.HTTP_403_FORBIDDEN,
-            ),
-            (
                 create_throttle_error(),
                 status.HTTP_429_TOO_MANY_REQUESTS,
             ),

@@ -136,12 +136,6 @@ async def validate_auth_app(
     except AWSException as e:
         raise e.to_http_exception()
 
-    except Exception:
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Internal Server Error",
-        )
-
     return JSONResponse(
         status_code=status.HTTP_200_OK,
         content={"detail": response_data["response"]},

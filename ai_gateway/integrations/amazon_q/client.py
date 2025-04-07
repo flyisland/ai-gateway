@@ -180,15 +180,15 @@ class AmazonQClient:
     def _verify_oauth_connection(self):
         return self.client.verify_o_auth_app_connection()
 
+    @raise_aws_errors
     def _create_o_auth_app_connection(self, **params):
         self.client.create_o_auth_app_connection(**params)
 
+    @raise_aws_errors
     def _delete_o_auth_app_connection(self):
         self.client.delete_o_auth_app_connection()
 
     def _send_event(self, event_id: str, payload: dict):
-        request_log.info("Sending Event", event_id=event_id)
-        request_log.debug("Event Payload", payload=payload)
         self.client.send_event(
             providerId="GITLAB",
             eventId=event_id,
