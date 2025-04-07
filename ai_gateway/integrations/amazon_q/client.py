@@ -172,20 +172,17 @@ class AmazonQClient:
         try:
             return self._verify_oauth_connection()
         except ClientError as ex:
-            if ex.__class__.__name__ == "AccessDeniedException":
+            if ex.response["Error"]["Code"] == "AccessDeniedException":
                 return self._retry_verify_oauth_connection(ex, health_request.code)
 
             raise ex
 
-    @raise_aws_errors
     def _verify_oauth_connection(self):
         return self.client.verify_o_auth_app_connection()
 
-    @raise_aws_errors
     def _create_o_auth_app_connection(self, **params):
         self.client.create_o_auth_app_connection(**params)
 
-    @raise_aws_errors
     def _delete_o_auth_app_connection(self):
         self.client.delete_o_auth_app_connection()
 
