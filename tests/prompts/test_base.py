@@ -26,11 +26,27 @@ from ai_gateway.prompts.typing import Model
 
 
 class TestPrompt:
+    @pytest.mark.parametrize(
+        ("model_params", "expected_model_engine"),
+        [
+            ({"model_class_provider": "litellm"}, "litellm"),
+            (
+                {"model_class_provider": "litellm", "custom_llm_provider": "my_engine"},
+                "my_engine",
+            ),
+        ],
+    )
     def test_initialize(
-        self, prompt: Prompt, unit_primitives: list[GitLabUnitPrimitive]
+        self,
+        prompt: Prompt,
+        unit_primitives: list[GitLabUnitPrimitive],
+        model_params: dict,
+        expected_model_engine: str,
     ):
         assert prompt.name == "test_prompt"
         assert prompt.unit_primitives == unit_primitives
+        assert prompt.model_provider == model_params["model_class_provider"]
+        assert prompt.model_engine == expected_model_engine
         assert isinstance(prompt.bound, Runnable)
 
     def test_build_prompt_template(self, prompt_template, model_config):

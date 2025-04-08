@@ -55,6 +55,8 @@ class PromptLoggingHandler(BaseCallbackHandler):
 
 class Prompt(RunnableBinding[Input, Output]):
     name: str
+    model_engine: str
+    model_provider: str
     model: Model
     unit_primitives: list[GitLabUnitPrimitive]
     prompt_tpl: Runnable[Input, PromptValue]
@@ -67,7 +69,7 @@ class Prompt(RunnableBinding[Input, Output]):
         disable_streaming: bool = False,
     ):
         model_override = None
-
+        model_provider = config.model.params.model_class_provider
         model_kwargs = self._build_model_kwargs(config.params, model_metadata)
         model = self._build_model(
             model_factory, config.model, disable_streaming, model_override
@@ -82,6 +84,8 @@ class Prompt(RunnableBinding[Input, Output]):
 
         super().__init__(
             name=config.name,
+            model_engine=config.model.params.custom_llm_provider or model_provider,
+            model_provider=model_provider,
             model=model,
             unit_primitives=config.unit_primitives,
             bound=chain,
