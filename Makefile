@@ -13,15 +13,21 @@ LINT_WORKING_DIR ?= ${AI_GATEWAY_DIR} \
 	${TESTS_DIR} \
 	${INTEGRATION_TESTS_DIR}
 
-MYPY_LINT_TODO_DIR ?= --exclude "ai_gateway/models/*" \
-	--exclude "ai_gateway/api/snowplow_context.py" \
+MYPY_LINT_TODO_DIR ?= --exclude "ai_gateway/models/agent_model.py" \
+	--exclude "ai_gateway/models/amazon_q.py" \
+	--exclude "ai_gateway/models/anthropic.py" \
+	--exclude "ai_gateway/models/base.py" \
+	--exclude "ai_gateway/models/litellm.py" \
+	--exclude "ai_gateway/models/mock.py" \
+	--exclude "ai_gateway/models/v2/anthropic_claude.py" \
+	--exclude "ai_gateway/models/v2/container.py" \
+	--exclude "ai_gateway/models/vertex_text.py" \
 	--exclude "ai_gateway/api/v3/code/completions.py" \
 	--exclude "ai_gateway/api/v2/code/completions.py" \
 	--exclude "ai_gateway/api/v2/chat/agent.py" \
 	--exclude "ai_gateway/api/v1/x_ray/libraries.py" \
 	--exclude "ai_gateway/api/v1/prompts/invoke.py" \
 	--exclude "ai_gateway/api/v1/chat/agent.py" \
-	--exclude "ai_gateway/api/server.py" \
 	--exclude "ai_gateway/code_suggestions/completions.py" \
 	--exclude "ai_gateway/code_suggestions/container.py" \
 	--exclude "ai_gateway/code_suggestions/generations.py" \
@@ -31,7 +37,7 @@ MYPY_LINT_TODO_DIR ?= --exclude "ai_gateway/models/*" \
 	--exclude "tests/code_suggestions/test_completions.py" \
 	--exclude "tests/code_suggestions/test_container.py" \
 	--exclude "tests/code_suggestions/test_engine.py" \
-	--exclude "tests/code_suggestions/test_generation.py"
+	--exclude "tests/code_suggestions/generations/test_generations_base.py"
 
 COMPOSE_FILES := -f docker-compose.dev.yaml
 ifneq (,$(wildcard docker-compose.override.yaml))

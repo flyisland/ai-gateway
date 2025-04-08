@@ -1,8 +1,15 @@
-from typing import Optional
+import os
+from typing import Optional, Type
+from unittest import mock
 from unittest.mock import Mock, call
 
 import pytest
+from anthropic import APITimeoutError, AsyncAnthropic
 from gitlab_cloud_connector import GitLabUnitPrimitive, WrongUnitPrimitives
+from langchain_community.chat_models import ChatLiteLLM
+from langchain_core.prompts import ChatPromptTemplate
+from langchain_core.runnables import Runnable
+from litellm.exceptions import Timeout
 from pydantic import AnyUrl
 
 from ai_gateway.api.auth_utils import StarletteUser
@@ -12,7 +19,138 @@ from ai_gateway.model_metadata import (
     TypeModelMetadata,
     current_model_metadata_context,
 )
+from ai_gateway.models.v2.anthropic_claude import ChatAnthropic
 from ai_gateway.prompts import BasePromptRegistry, Prompt
+from ai_gateway.prompts.config.base import PromptParams
+from ai_gateway.prompts.typing import Model
+
+
+class TestPrompt:
+    def test_initialize(
+        self, prompt: Prompt, unit_primitives: list[GitLabUnitPrimitive]
+    ):
+        assert prompt.name == "test_prompt"
+        assert prompt.unit_primitives == unit_primitives
+        assert isinstance(prompt.bound, Runnable)
+
+    def test_build_prompt_template(self, prompt_template, model_config):
+        prompt_template = Prompt._build_prompt_template(prompt_template, model_config)
+
+        assert prompt_template == ChatPromptTemplate.from_messages(
+            [("system", "Hi, I'm {{name}}"), ("user", "{{content}}")],
+            template_format="jinja2",
+        )
+
+    def test_instrumentator(self, model_engine: str, model_name: str, prompt: Prompt):
+        assert prompt.instrumentator.labels == {
+            "model_engine": model_engine,
+            "model_name": model_name,
+        }
+
+    @pytest.mark.asyncio
+    @mock.patch("ai_gateway.prompts.base.get_request_logger")
+    @mock.patch(
+        "ai_gateway.instrumentators.model_requests.ModelRequestInstrumentator.watch"
+    )
+    async def test_ainvoke(
+        self,
+        mock_watch: mock.Mock,
+        mock_get_logger: mock.Mock,
+        prompt: Prompt,
+        model_response: str,
+    ):
+        mock_logger = mock.MagicMock()
+        mock_get_logger.return_value = mock_logger
+
+        response = await prompt.ainvoke({"name": "Duo", "content": "What's up?"})
+
+        assert response.content == model_response
+
+        mock_logger.info.assert_called_with(
+            "Performing LLM request",
+            prompt="System: Hi, I'm Duo\nHuman: What's up?",
+        )
+
+        mock_watch.assert_called_with(stream=False)
+
+    @pytest.mark.asyncio
+    @mock.patch("ai_gateway.prompts.base.get_request_logger")
+    @mock.patch(
+        "ai_gateway.instrumentators.model_requests.ModelRequestInstrumentator.watch"
+    )
+    async def test_astream(
+        self,
+        mock_watch: mock.Mock,
+        mock_get_logger: mock.Mock,
+        prompt: Prompt,
+        model_response: str,
+    ):
+        mock_watcher = mock.AsyncMock()
+        mock_watch.return_value.__enter__.return_value = mock_watcher
+        response = ""
+
+        mock_logger = mock.MagicMock()
+        mock_get_logger.return_value = mock_logger
+
+        async for c in prompt.astream({"name": "Duo", "content": "What's up?"}):
+            response += c.content
+
+            mock_watcher.afinish.assert_not_awaited()  # Make sure we don't finish prematurely
+
+        mock_logger.info.assert_called_with(
+            "Performing LLM request",
+            prompt="System: Hi, I'm Duo\nHuman: What's up?",
+        )
+
+        assert response == model_response
+
+        mock_watch.assert_called_with(stream=True)
+
+        mock_watcher.afinish.assert_awaited_once()
+
+
+@pytest.mark.skipif(
+    # pylint: disable=direct-environment-variable-reference
+    os.getenv("REAL_AI_REQUEST") is None,
+    # pylint: enable=direct-environment-variable-reference
+    reason="3rd party requests not enabled",
+)
+class TestPromptTimeout:
+    @pytest.fixture
+    def prompt_params(self):
+        return PromptParams(timeout=0.1)
+
+    @pytest.mark.asyncio
+    @pytest.mark.parametrize(
+        ("model", "expected_exception"),
+        [
+            (
+                ChatAnthropic(
+                    async_client=AsyncAnthropic(), model="claude-3-sonnet-20240229"  # type: ignore[call-arg]
+                ),
+                APITimeoutError,
+            ),
+            (
+                ChatLiteLLM(
+                    model="claude-3-sonnet@20240229", custom_llm_provider="vertex_ai"  # type: ignore[call-arg]
+                ),
+                Timeout,
+            ),
+            (
+                ChatLiteLLM(
+                    model="claude-3-5-sonnet-v2@20241022", custom_llm_provider="vertex_ai"  # type: ignore[call-arg]
+                ),
+                Timeout,
+            ),
+        ],
+    )
+    async def test_timeout(
+        self, prompt: Prompt, model: Model, expected_exception: Type
+    ):
+        with pytest.raises(expected_exception):
+            await prompt.ainvoke(
+                {"name": "Duo", "content": "Print pi with 400 decimals"}
+            )
 
 
 @pytest.fixture

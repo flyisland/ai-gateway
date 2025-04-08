@@ -1,10 +1,11 @@
 import asyncio
 import os
 from contextlib import asynccontextmanager
+from typing import Awaitable, Callable, cast
 
 import litellm
 import structlog
-from fastapi import APIRouter, FastAPI
+from fastapi import APIRouter, FastAPI, Request, Response
 from fastapi.exception_handlers import http_exception_handler
 from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
@@ -17,10 +18,9 @@ from prometheus_fastapi_instrumentator import Instrumentator, metrics
 from starlette import status
 from starlette.exceptions import HTTPException as StarletteHTTPException
 from starlette.middleware import Middleware
-from starlette.requests import Request
 from starlette.responses import JSONResponse
 from starlette_context import context
-from starlette_context.middleware import RawContextMiddleware
+from starlette_context.middleware import ContextMiddleware, RawContextMiddleware
 
 from ai_gateway.api.middleware import (
     AccessLogMiddleware,
@@ -29,6 +29,9 @@ from ai_gateway.api.middleware import (
     InternalEventMiddleware,
     MiddlewareAuthentication,
     ModelConfigMiddleware,
+)
+from ai_gateway.api.middleware.self_hosted_logging import (
+    EnabledInstanceVerboseAiLogsHeaderPlugin,
 )
 from ai_gateway.api.monitoring import router as http_monitoring_router
 from ai_gateway.api.server_utils import extract_retry_after_header
@@ -50,6 +53,8 @@ __all__ = [
 ]
 
 _SKIP_ENDPOINTS = ["/monitoring/healthz", "/monitoring/ready", "/metrics"]
+
+ExceptionHandler = Callable[[Request, Exception], Awaitable[Response]]
 
 
 @asynccontextmanager
@@ -136,6 +141,10 @@ def create_fast_api_server(config: Config):
                 ModelConfigMiddleware,
                 custom_models_enabled=config.custom_models.enabled,
             ),
+            Middleware(
+                ContextMiddleware,
+                plugins=(EnabledInstanceVerboseAiLogsHeaderPlugin(),),
+            ),
         ],
         extra={"config": config},
     )
@@ -153,12 +162,14 @@ def create_fast_api_server(config: Config):
     return fastapi_app
 
 
-async def custom_http_exception_handler(request: Request, exc: StarletteHTTPException):
+async def custom_http_exception_handler(
+    request: Request, exc: StarletteHTTPException
+) -> Response:
     context["http_exception_details"] = str(exc)
     return await http_exception_handler(request, exc)
 
 
-async def model_api_exception_handler(request: Request, exc: ModelAPIError):
+async def model_api_exception_handler(request: Request, exc: ModelAPIError) -> Response:
     if isinstance(exc, ModelAPICallError) and exc.code == 429:
         wrapped_exception = StarletteHTTPException(
             status_code=status.HTTP_429_TOO_MANY_REQUESTS,
@@ -186,7 +197,9 @@ async def model_api_exception_handler(request: Request, exc: ModelAPIError):
     return await http_exception_handler(request, wrapped_exception)
 
 
-async def validation_exception_handler(request: Request, exc: RequestValidationError):
+async def validation_exception_handler(
+    request: Request, exc: RequestValidationError
+) -> JSONResponse:
     if is_feature_enabled(FeatureFlag.EXPANDED_AI_LOGGING):
         context["exception_message"] = str(exc)
         return JSONResponse(
@@ -201,9 +214,15 @@ async def validation_exception_handler(request: Request, exc: RequestValidationE
 
 
 def setup_custom_exception_handlers(app: FastAPI):
-    app.add_exception_handler(StarletteHTTPException, custom_http_exception_handler)
-    app.add_exception_handler(ModelAPIError, model_api_exception_handler)
-    app.add_exception_handler(RequestValidationError, validation_exception_handler)
+    app.add_exception_handler(
+        StarletteHTTPException, cast(ExceptionHandler, custom_http_exception_handler)
+    )
+    app.add_exception_handler(
+        ModelAPIError, cast(ExceptionHandler, model_api_exception_handler)
+    )
+    app.add_exception_handler(
+        RequestValidationError, cast(ExceptionHandler, validation_exception_handler)
+    )
 
 
 def setup_litellm(config: Config):
