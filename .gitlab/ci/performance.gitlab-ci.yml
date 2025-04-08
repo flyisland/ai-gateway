@@ -25,6 +25,38 @@ dotenv-vars:
       when: always
     - when: never
 
+# tests:performance:
+#   extends: .run_tests
+#   stage: test
+#   needs:
+#     - job: dotenv-vars
+#       artifacts: true
+#   # trigger:
+#   #   project: gitlab-org/quality/component-performance-testing
+#   #   branch: vp-testing-templates
+#   #   strategy: depend
+#   #   forward:
+#   #     pipeline_variables: true
+#   #     yaml_variables: true
+#   variables:
+#     JOB_WITH_ARTIFACTS: $JOB_WITH_ARTIFACTS
+#     JOB_WITH_ARTIFACTS_ID: $JOB_WITH_ARTIFACTS_ID
+#     PROJECT_ID: $CI_PROJECT_ID
+#     PARENT_PIPELINE_COMMIT_BRANCH: $CI_COMMIT_BRANCH
+#     PARENT_PIPELINE_SOURCE: $CI_PIPELINE_SOURCE
+#     COMPONENT_MR_CI_COMMIT_SHA: $CI_COMMIT_SHORT_SHA
+#   rules:
+#     - if: $CI_PROJECT_NAMESPACE =~ /^gitlab-org\/security.*/
+#       when: never
+#     - if: $CI_PIPELINE_SOURCE == "merge_request_event"
+#       variables:
+#         PARENT_PIPELINE_MR_IID: $CI_MERGE_REQUEST_IID
+#       when: always
+#     - if: $CI_COMMIT_BRANCH == "main"
+#       variables:
+#         PARENT_PIPELINE_MR_IID: "main"
+#       when: always
+#     - when: never
 tests:performance:
   extends: .run_tests
   stage: test
