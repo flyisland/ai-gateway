@@ -7,6 +7,7 @@ import pytest
 from anthropic import APITimeoutError, AsyncAnthropic
 from gitlab_cloud_connector import GitLabUnitPrimitive, WrongUnitPrimitives
 from langchain_community.chat_models import ChatLiteLLM
+from langchain_core.messages.ai import UsageMetadata
 from langchain_core.prompts import ChatPromptTemplate
 from langchain_core.runnables import Runnable
 from litellm.exceptions import Timeout
@@ -123,6 +124,57 @@ class TestPrompt:
         mock_watch.assert_called_with(stream=True)
 
         mock_watcher.afinish.assert_awaited_once()
+
+    @pytest.mark.asyncio
+    @pytest.mark.parametrize(
+        ("usage_metadata"),
+        [UsageMetadata(input_tokens=1, output_tokens=2, total_tokens=3)],
+    )
+    async def test_ainvoke_handle_usage_metadata(
+        self,
+        internal_event_client: mock.Mock,
+        prompt: Prompt,
+        usage_metadata: UsageMetadata,
+    ):
+        prompt.internal_event_client = internal_event_client
+        await prompt.ainvoke({"name": "Duo", "content": "What's up?"})
+
+        _assert_usage_metadata_handling(internal_event_client, prompt, usage_metadata)
+
+    @pytest.mark.asyncio
+    @pytest.mark.parametrize(
+        ("usage_metadata"),
+        [UsageMetadata(input_tokens=1, output_tokens=2, total_tokens=3)],
+    )
+    async def test_astream_handle_usage_metadata(
+        self,
+        internal_event_client: mock.Mock,
+        prompt: Prompt,
+        usage_metadata: UsageMetadata,
+    ):
+        prompt.internal_event_client = internal_event_client
+
+        # Consume stream
+        async for _ in prompt.astream({"name": "Duo", "content": "What's up?"}):
+            pass
+
+        _assert_usage_metadata_handling(internal_event_client, prompt, usage_metadata)
+
+
+def _assert_usage_metadata_handling(
+    internal_event_client: mock.Mock, prompt: Prompt, usage_metadata: UsageMetadata
+):
+    for unit_primitive in prompt.unit_primitives:
+        internal_event_client.track_event.assert_any_call(
+            f"token_usage_{unit_primitive}",
+            category="ai_gateway.prompts.base",
+            input_tokens=usage_metadata["input_tokens"],
+            output_tokens=usage_metadata["output_tokens"],
+            total_tokens=usage_metadata["total_tokens"],
+            model_engine=prompt.model_engine,
+            model_name=prompt.model_name,
+            model_provider=prompt.model_provider,
+        )
 
 
 @pytest.mark.skipif(
@@ -265,6 +317,7 @@ class TestBaseRegistry:
     ):
         if success:
             assert registry.get_on_behalf(user, "test", None, model_metadata) == prompt
+            assert prompt.internal_event_client == internal_event_client
 
             if model_metadata:
                 assert model_metadata._user == user
