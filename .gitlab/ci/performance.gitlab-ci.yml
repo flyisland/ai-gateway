@@ -16,7 +16,7 @@ dotenv-vars:
   rules:
     - if: $CI_PROJECT_NAMESPACE =~ /^gitlab-org\/security.*/
       when: never
-    - if: $CI_PIPELINE_SOURCE == "merge_request_event"
+    - if: '$CI_PIPELINE_SOURCE == "merge_request_event" && $CI_PROJECT_NAMESPACE == /^gitlab(-org)?($|\/)/'
       when: always
     - if: $CI_COMMIT_BRANCH == "main"
       when: always
@@ -44,7 +44,7 @@ tests:performance:
   rules:
     - if: $CI_PROJECT_NAMESPACE =~ /^gitlab-org\/security.*/
       when: never
-    - if: $CI_PIPELINE_SOURCE == "merge_request_event"
+    - if: '$CI_PIPELINE_SOURCE == "merge_request_event" && $CI_PROJECT_NAMESPACE == /^gitlab(-org)?($|\/)/'
       variables:
         PARENT_PIPELINE_MR_IID: $CI_MERGE_REQUEST_IID
       when: always
