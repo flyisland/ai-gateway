@@ -13,18 +13,21 @@ LINT_WORKING_DIR ?= ${AI_GATEWAY_DIR} \
 	${TESTS_DIR} \
 	${INTEGRATION_TESTS_DIR}
 
-MYPY_LINT_TODO_DIR ?= --exclude "ai_gateway/api/*" \
-	--exclude "ai_gateway/chat/*" \
-	--exclude "ai_gateway/models/*" \
+MYPY_LINT_TODO_DIR ?= --exclude "ai_gateway/models/*" \
+	--exclude "ai_gateway/api/snowplow_context.py" \
+	--exclude "ai_gateway/api/v3/code/completions.py" \
+	--exclude "ai_gateway/api/v2/code/completions.py" \
+	--exclude "ai_gateway/api/v2/chat/agent.py" \
+	--exclude "ai_gateway/api/v1/x_ray/libraries.py" \
+	--exclude "ai_gateway/api/v1/prompts/invoke.py" \
+	--exclude "ai_gateway/api/v1/chat/agent.py" \
+	--exclude "ai_gateway/api/server.py" \
 	--exclude "ai_gateway/code_suggestions/completions.py" \
 	--exclude "ai_gateway/code_suggestions/container.py" \
-	--exclude "ai_gateway/code_suggestions/experimental.py" \
 	--exclude "ai_gateway/code_suggestions/generations.py" \
-	--exclude "ai_gateway/code_suggestions/processing/base.py" \
 	--exclude "ai_gateway/code_suggestions/processing/completions.py" \
 	--exclude "ai_gateway/code_suggestions/processing/ops.py" \
 	--exclude "ai_gateway/code_suggestions/processing/post/completions.py" \
-	--exclude "ai_gateway/code_suggestions/processing/pre/base.py" \
 	--exclude "tests/code_suggestions/test_completions.py" \
 	--exclude "tests/code_suggestions/test_container.py" \
 	--exclude "tests/code_suggestions/test_engine.py" \

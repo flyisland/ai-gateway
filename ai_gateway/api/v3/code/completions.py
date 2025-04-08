@@ -268,7 +268,7 @@ async def code_generation(
         ContainerApplication.code_suggestions.generations.amazon_q_factory.provider
     ],
     code_context: Optional[list[CodeContextPayload]] = None,
-    model_metadata: TypeModelMetadata = None,
+    model_metadata: Optional[TypeModelMetadata] = None,
 ):
     model_provider = payload.model_provider or (
         model_metadata and model_metadata.provider
@@ -329,6 +329,7 @@ async def code_generation(
         prompt_enhancer=payload.prompt_enhancer,
         suffix=payload.content_below_cursor,
     )
+
     if isinstance(suggestion, AsyncIterator):
         stream_metadata = _get_stream_metadata(engine, snowplow_event_context)
         return await stream_handler(suggestion, stream_metadata)

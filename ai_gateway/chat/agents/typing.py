@@ -1,11 +1,12 @@
 import json
-from typing import Literal, Optional, Self, TypeVar
+from typing import Literal, Optional, Self, TypeVar, Union
 
 import fastapi
 from fastapi import status
 from pydantic import BaseModel, model_validator
 
 from ai_gateway.chat.context.current_page import CurrentPageContext
+from ai_gateway.chat.tools.base import BaseTool
 from ai_gateway.models.base_chat import Role
 
 __all__ = [
@@ -14,12 +15,14 @@ __all__ = [
     "AgentUnknownAction",
     "AgentError",
     "AgentBaseEvent",
+    "AgentBaseInputs",
     "TypeAgentEvent",
     "AgentStep",
     "TypeAgentInputs",
     "CurrentFile",
     "AdditionalContext",
     "Message",
+    "ReActAgentInputs",
 ]
 
 
@@ -53,11 +56,10 @@ class AgentError(AgentBaseEvent):
     retryable: bool
 
 
-TypeAgentEvent = TypeVar(
-    "TypeAgentEvent", AgentToolAction, AgentFinalAnswer, AgentUnknownAction
-)
-
-TypeAgentInputs = TypeVar("TypeAgentInputs")
+AgentEventType = Union[
+    AgentToolAction, AgentFinalAnswer, AgentUnknownAction, AgentError
+]
+TypeAgentEvent = TypeVar("TypeAgentEvent", bound=AgentEventType)
 
 
 class AgentStep(BaseModel):
@@ -89,7 +91,7 @@ class AdditionalContext(BaseModel):
 
 class Message(BaseModel):
     role: Role
-    content: str
+    content: Optional[str] = None
     context: Optional[CurrentPageContext] = None
     current_file: Optional[CurrentFile] = None
     additional_context: Optional[list[AdditionalContext]] = None
@@ -103,3 +105,17 @@ class Message(BaseModel):
                 detail="agent_scratchpad can only be present when role is ASSISTANT",
             )
         return self
+
+
+class AgentBaseInputs(BaseModel):
+    tools: Optional[list[BaseTool]] = None
+
+
+class ReActAgentInputs(AgentBaseInputs):
+    messages: list[Message]
+    agent_scratchpad: Optional[list[AgentStep]] = None
+    unavailable_resources: Optional[list[str]] = None
+    current_date: Optional[str] = None
+
+
+TypeAgentInputs = TypeVar("TypeAgentInputs", bound=AgentBaseInputs)
