@@ -419,8 +419,9 @@ class TestApplication:
         mock_glgo,
         credentials,
     ):
+        verify_app_response = {"test1": "PASSED", "test2": "PASSED"}
         mock_verify_o_auth_app_connection = MagicMock(
-            return_value={"response": {"test1": "PASSED", "test2": "PASSED"}}
+            return_value={"response": verify_app_response}
         )
         mock_q_client_response = MagicMock()
         mock_q_client_response.verify_o_auth_app_connection = (
@@ -445,6 +446,7 @@ class TestApplication:
         )
 
         assert response.status_code == status.HTTP_200_OK
+        assert response.json() == verify_app_response
         mock_q_boto3.client.assert_called_once_with("q", **credentials)
 
         mock_verify_o_auth_app_connection.assert_called_once_with()
