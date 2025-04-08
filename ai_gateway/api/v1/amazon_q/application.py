@@ -138,5 +138,5 @@ async def validate_auth_app(
 
     return JSONResponse(
         status_code=status.HTTP_200_OK,
-        content={"detail": response_data["response"]},
+        content=response_data["response"],
     )
