@@ -5,6 +5,7 @@ dotenv-vars:
     - echo "JOB_WITH_ARTIFACTS_ID=$CI_JOB_ID" >> variables.env
     - echo $JOB_WITH_ARTIFACTS
     - echo $JOB_WITH_ARTIFACTS_ID
+    - echo $CI_PROJECT_NAMESPACE
     - cat variables.env
   artifacts:
     paths:
