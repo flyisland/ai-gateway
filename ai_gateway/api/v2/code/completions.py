@@ -56,7 +56,6 @@ from ai_gateway.code_suggestions.processing.ops import lang_from_filename
 from ai_gateway.config import Config
 from ai_gateway.feature_flags.context import current_feature_flag_context
 from ai_gateway.instrumentators.base import TelemetryInstrumentator
-from ai_gateway.integrations.amazon_q.errors import AWSException
 from ai_gateway.internal_events import InternalEventsClient
 from ai_gateway.model_metadata import ModelMetadata
 from ai_gateway.models import KindAnthropicModel, KindModelProvider
@@ -177,36 +176,32 @@ async def completions(
         stream=payload.stream,
     )
 
-    try:
-        suggestions = await _execute_code_completion(
-            payload=payload,
-            code_completions=code_completions,
-            snowplow_event_context=snowplow_event_context,
-            **kwargs,
-        )
-        if isinstance(suggestions[0], AsyncIterator):
-            return await _handle_stream(suggestions[0])
-        choices, tokens_consumption_metadata = _completion_suggestion_choices(
-            suggestions
-        )
-        return SuggestionsResponse(
-            id="id",
-            created=int(time()),
-            model=SuggestionsResponse.Model(
-                engine=suggestions[0].model.engine,
-                name=suggestions[0].model.name,
-                lang=suggestions[0].lang,
-                tokens_consumption_metadata=tokens_consumption_metadata,
-                region=region,
-            ),
-            experiments=suggestions[0].metadata.experiments,
-            metadata=SuggestionsResponse.MetadataBase(
-                enabled_feature_flags=current_feature_flag_context.get(),
-            ),
-            choices=choices,
-        )
-    except AWSException as e:
-        raise e.to_http_exception()
+    suggestions = await _execute_code_completion(
+        payload=payload,
+        code_completions=code_completions,
+        snowplow_event_context=snowplow_event_context,
+        **kwargs,
+    )
+
+    if isinstance(suggestions[0], AsyncIterator):
+        return await _handle_stream(suggestions[0])
+    choices, tokens_consumption_metadata = _completion_suggestion_choices(suggestions)
+    return SuggestionsResponse(
+        id="id",
+        created=int(time()),
+        model=SuggestionsResponse.Model(
+            engine=suggestions[0].model.engine,
+            name=suggestions[0].model.name,
+            lang=suggestions[0].lang,
+            tokens_consumption_metadata=tokens_consumption_metadata,
+            region=region,
+        ),
+        experiments=suggestions[0].metadata.experiments,
+        metadata=SuggestionsResponse.MetadataBase(
+            enabled_feature_flags=current_feature_flag_context.get(),
+        ),
+        choices=choices,
+    )
 
 
 @router.post("/code/generations")

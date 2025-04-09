@@ -40,7 +40,6 @@ from ai_gateway.code_suggestions.base import SAAS_PROMPT_MODEL_MAP
 from ai_gateway.config import Config
 from ai_gateway.container import ContainerApplication
 from ai_gateway.feature_flags.context import current_feature_flag_context
-from ai_gateway.integrations.amazon_q.errors import AWSException
 from ai_gateway.model_metadata import TypeModelMetadata
 from ai_gateway.models import KindModelProvider
 from ai_gateway.prompts import BasePromptRegistry
@@ -197,20 +196,16 @@ async def code_completion(
     if payload.choices_count > 0:
         kwargs.update({"candidate_count": payload.choices_count})
 
-    try:
-        suggestions = await engine.execute(
-            prefix=payload.content_above_cursor,
-            suffix=payload.content_below_cursor,
-            file_name=payload.file_name,
-            editor_lang=payload.language_identifier,
-            stream=payload.stream,
-            code_context=code_context,
-            snowplow_event_context=snowplow_event_context,
-            **kwargs,
-        )
-    except AWSException as e:
-        raise e.to_http_exception()
-
+    suggestions = await engine.execute(
+        prefix=payload.content_above_cursor,
+        suffix=payload.content_below_cursor,
+        file_name=payload.file_name,
+        editor_lang=payload.language_identifier,
+        stream=payload.stream,
+        code_context=code_context,
+        snowplow_event_context=snowplow_event_context,
+        **kwargs,
+    )
     if not isinstance(suggestions, list):
         suggestions = [suggestions]
 
@@ -324,19 +319,16 @@ async def code_generation(
         if payload.prompt:
             engine.with_prompt_prepared(payload.prompt)
 
-    try:
-        suggestion = await engine.execute(
-            prefix=payload.content_above_cursor,
-            file_name=payload.file_name,
-            editor_lang=payload.language_identifier,
-            model_provider=model_provider,
-            stream=payload.stream,
-            snowplow_event_context=snowplow_event_context,
-            prompt_enhancer=payload.prompt_enhancer,
-            suffix=payload.content_below_cursor,
-        )
-    except AWSException as e:
-        raise e.to_http_exception()
+    suggestion = await engine.execute(
+        prefix=payload.content_above_cursor,
+        file_name=payload.file_name,
+        editor_lang=payload.language_identifier,
+        model_provider=model_provider,
+        stream=payload.stream,
+        snowplow_event_context=snowplow_event_context,
+        prompt_enhancer=payload.prompt_enhancer,
+        suffix=payload.content_below_cursor,
+    )
 
     if isinstance(suggestion, AsyncIterator):
         stream_metadata = _get_stream_metadata(engine, snowplow_event_context)

@@ -5,6 +5,7 @@ import structlog
 
 from ai_gateway.api.auth_utils import StarletteUser
 from ai_gateway.integrations.amazon_q.client import AmazonQClientFactory
+from ai_gateway.integrations.amazon_q.errors import AWSException
 from ai_gateway.models.base import ModelMetadata
 from ai_gateway.models.base_text import (
     TextGenModelBase,
@@ -57,10 +58,6 @@ class AmazonQModel(TextGenModelBase):
         stream: bool,
         **kwargs,
     ) -> TextGenModelOutput:
-        q_client = self._client_factory.get_client(
-            current_user=self._current_user,
-            role_arn=self._role_arn,
-        )
 
         request_payload = {
             "fileContext": {
@@ -73,10 +70,15 @@ class AmazonQModel(TextGenModelBase):
             },
             "maxResults": 1,
         }
-        log.debug(f"Amazon Q request: {str(request_payload)}")
-        response = q_client.generate_code_recommendations(request_payload)
+        try:
+            q_client = self._client_factory.get_client(
+                current_user=self._current_user,
+                role_arn=self._role_arn,
+            )
+            response = q_client.generate_code_recommendations(request_payload)
+        except AWSException as e:
+            raise e.to_http_exception()
 
-        log.debug(f"Amazon Q response: {str(response)}")
         recommendations = response.get("CodeRecommendations", [])
         recommendation = recommendations[0] if recommendations else {}
         content = recommendation.get("content", "")
