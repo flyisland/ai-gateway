@@ -322,6 +322,6 @@ We have added a rule as a part of [this MR](https://gitlab.com/gitlab-org/modelo
 
 ### Any other access related issues
 
-The intention is to run `tests:performance` job only on MRs and in `main` branch. But for some reason you see this happening in other scenarios, create a MR and update the rules in the [performance.GitLab-ci.yml](../.gitlab/ci/performance.gitlab-ci.yml) file and get it merged, following the required reviews, into the main branch.
+The intention is to run `tests:performance` job only on MRs and in `main` branch. But for some reason you see this happening in other scenarios, create a MR and update the rules in the [ci file](../.gitlab/ci/performance.gitlab-ci.yml) and get it merged, following the required reviews, into the main branch.
 
 If the `tests:performance` job fails due to any code related issue, please post a message in [#g_performance_enablement](https://gitlab.enterprise.slack.com/archives/C081476PPAM) channel.
