@@ -64,4 +64,13 @@ async def libraries(
         prefix=package_file_prompt.prompt,
         _suffix="",
     )
-    return XRayResponse(response=completion.text)
+
+    if hasattr(completion, "text"):
+        response = completion.text
+    else:
+        chunks = []
+        async for chunk in completion:
+            chunks.append(chunk.text)
+        response = "".join(chunks)
+
+    return XRayResponse(response=response)
