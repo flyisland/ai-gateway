@@ -10,9 +10,7 @@ class DistributedTraceMiddleware:
     def __init__(self, app, skip_endpoints, environment):
         self.app = app
         self.environment = environment
-        self.path_resolver = _PathResolver.from_optional_list(
-            skip_endpoints
-        ) 
+        self.path_resolver = _PathResolver.from_optional_list(skip_endpoints)
 
     async def __call__(self, scope, receive, send):
         if scope["type"] != "http":
@@ -26,9 +24,12 @@ class DistributedTraceMiddleware:
             return
 
         if self.environment == "development" and "langsmith-trace" in request.headers:
-            # Set the distributed tracing LangSmith header to the tracing context, which is sent from Langsmith::RunHelpers of GitLab-Rails/Sidekiq.
-            # See https://docs.gitlab.com/ee/development/ai_features/duo_chat.html#tracing-with-langsmith
-            # and https://docs.smith.langchain.com/how_to_guides/tracing/distributed_tracing
+            # In development, if the 'langsmith-trace' header is provided,
+            # set it as the parent for the distributed tracing context.
+            # This header is sent from LangSmith::RunHelpers in GitLab-Rails/Sidekiq.
+            # For more details, see:
+            #   https://docs.gitlab.com/ee/development/ai_features/duo_chat.html#tracing-with-langsmith
+            #   https://docs.smith.langchain.com/how_to_guides/tracing/distributed_tracing
             with tracing_context(parent=request.headers["langsmith-trace"]):
                 await self.app(scope, receive, send)
         else:
