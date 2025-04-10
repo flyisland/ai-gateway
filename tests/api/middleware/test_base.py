@@ -293,7 +293,7 @@ async def test_middleware_distributed_trace(distributed_trace_middleware):
     send = AsyncMock()
 
     with patch(
-        "ai_gateway.api.middleware.base.tracing_context"
+        "ai_gateway.api.middleware.distributed_trace.tracing_context"
     ) as mock_tracing_context:
         await distributed_trace_middleware(scope, receive, send)
 
