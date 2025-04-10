@@ -302,53 +302,35 @@ export function handleSummary(data) {
 }
 ```
 
-# Troubleshooting tests:performance Job Failures
+## Troubleshooting tests:performance Job Failures
 
 The `tests:performance` job is designed to run only in Merge Request pipelines and the main branch pipeline of the canonical [ai-assist](https://gitlab.com/gitlab-org/modelops/applied-ml/code-suggestions/ai-assist) project.
 
-## Common Permission Issues
+### Common Permission Issues
 
 If the `tests:performance` job fails due to permission issues, it may be caused by one of the following scenarios:
 
-### Bot-Created MRs
+#### Bot-Created MRs
 
 If a bot created the MR, verify whether the bot is managed by GitLab:
-1. If you're unsure, ask in the `#it-help` channel whether the bot is managed by GitLab
-2. If confirmed, post a message in the `#performance-enablement` channel requesting someone to add the bot to the [Component Performance Testing](https://gitlab.com/gitlab-org/quality/component-performance-testing-aigw-poc) project
 
-### Community Contributions from Forked Repositories
+ 1. If you're unsure, ask in the `#it-help` channel whether the bot is managed by GitLab
+ 1. If confirmed, post a message in the `#performance-enablement` channel requesting someone to add the bot to the [Component Performance Testing](https://gitlab.com/gitlab-org/quality/component-performance-testing-aigw-poc) project
+
+#### Community Contributions from Forked Repositories
 
 We've implemented a rule in [MR #2299](https://gitlab.com/gitlab-org/modelops/applied-ml/code-suggestions/ai-assist/-/merge_requests/2299) that prevents the `tests:performance` job from running in MRs from forked repositories. This should no longer be an issue.
 
-### Other Access-Related Issues
+#### Other Access-Related Issues
 
 The `tests:performance` job is intended to run only on MRs and in the `main` branch. If you observe it running in other scenarios:
-1. Create an MR to update the rules in the [CI configuration file](../.gitlab/ci/performance.gitlab-ci.yml)
-2. Ensure your changes receive the required reviews
-3. Merge the approved changes into the main branch
 
-## Code-Related Failures
+ 1. Create an MR to update the rules in the [CI configuration file](../.gitlab/ci/performance.gitlab-ci.yml)
+ 1. Ensure your changes receive the required reviews
+ 1. Merge the approved changes into the main branch
+
+### Code-Related Failures
 
 If the `tests:performance` job fails due to code-related issues rather than permissions, please post a message in the [#g_performance_enablement](https://gitlab.enterprise.slack.com/archives/C081476PPAM) channel for assistance.
 
 The `tests:performance` job is supposed to only run in the Merge Requests pipelines and main branch pipeline of canonical [ai-assist](https://gitlab.com/gitlab-org/modelops/applied-ml/code-suggestions/ai-assist) project.
-
-If the `tests:performance` job fails due to permission issue, it can be because of the following
-
-- Bot created MR
-- MR created from the fork by community contribution
-- Any other access related failures
-
-#### Bot created MR
-
-Make sure if the bot is managed by GitLab. If you aren't sure, ask in `#it-help` if the bot is being managed by GitLab? If so, post a message in #performance-enablement channel and ask someone to add the bot the [Component Performance Testing](https://gitlab.com/gitlab-org/quality/component-performance-testing-aigw-poc) project.
-
-### MR created from the fork by community contribution
-
-We have added a rule as a part of [this MR](https://gitlab.com/gitlab-org/modelops/applied-ml/code-suggestions/ai-assist/-/merge_requests/2299)]to not run the `tests:performance` job in MR from forks so this shouldn't be an issue anymore.
-
-### Any other access related issues
-
-The intention is to run `tests:performance` job only on MRs and in `main` branch. But for some reason you see this happening in other scenarios, create a MR and update the rules in the [ci file](../.gitlab/ci/performance.gitlab-ci.yml) and get it merged, following the required reviews, into the main branch.
-
-If the `tests:performance` job fails due to any code related issue, please post a message in [#g_performance_enablement](https://gitlab.enterprise.slack.com/archives/C081476PPAM) channel.
