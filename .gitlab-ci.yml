@@ -51,7 +51,7 @@ include:
   - template: Jobs/Dependency-Scanning.latest.gitlab-ci.yml
   - template: Jobs/SAST.latest.gitlab-ci.yml
   - template: Jobs/Secret-Detection.latest.gitlab-ci.yml
-  - component: $CI_SERVER_FQDN/dev-ex-mirror/component-performance-testing-mirror/performance-test@1.0.1
+
   # Includes a base template for running kaniko easily
   # see https://gitlab.com/gitlab-com/gl-infra/common-ci-tasks/-/blob/main/kaniko.md
   - project: "gitlab-com/gl-infra/common-ci-tasks"
