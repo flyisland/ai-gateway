@@ -65,12 +65,16 @@ async def libraries(
         _suffix="",
     )
 
+    # Check if completion is a direct response object with a text attribute
     if hasattr(completion, "text"):
         response = completion.text
     else:
+        # For streaming completions, we need to collect chunks
         chunks = []
         async for chunk in completion:
+            # Accumulate text from each chunk in the stream
             chunks.append(chunk.text)
+        # Combine all collected chunks into a single response string
         response = "".join(chunks)
 
     return XRayResponse(response=response)
