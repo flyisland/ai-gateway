@@ -36,7 +36,7 @@ tests:performance:
   allow_failure: true
   trigger:
     project: gitlab-org/quality/component-performance-testing
-    branch: vp/component-name-var
+    branch: main
     strategy: depend
     forward:
       pipeline_variables: true
