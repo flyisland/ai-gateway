@@ -4,7 +4,6 @@ dotenv-vars:
   needs:
     - job: build-docker-model-gateway
   script:
-    - exit 1
     - echo "JOB_WITH_ARTIFACTS=$CI_JOB_NAME" >> variables.env
     - echo "JOB_WITH_ARTIFACTS_ID=$CI_JOB_ID" >> variables.env
     - echo $JOB_WITH_ARTIFACTS
