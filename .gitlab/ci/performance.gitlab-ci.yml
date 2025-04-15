@@ -64,7 +64,7 @@ tests:performance:
       artifacts: true
   trigger:
     project: gitlab-org/quality/component-performance-testing
-    branch: vp/component-name-var
+    branch: main
     strategy: depend
     forward:
       pipeline_variables: true
@@ -76,7 +76,6 @@ tests:performance:
     PARENT_PIPELINE_COMMIT_BRANCH: $CI_COMMIT_BRANCH
     PARENT_PIPELINE_SOURCE: $CI_PIPELINE_SOURCE
     COMPONENT_MR_CI_COMMIT_SHA: $CI_COMMIT_SHORT_SHA
-    # COMPONENT_SERVICE_NAME: "ai-gateway-influx"
   rules:
     - if: $CI_PROJECT_NAMESPACE =~ /^gitlab-org\/security.*/
       when: never
