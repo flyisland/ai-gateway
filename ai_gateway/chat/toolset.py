@@ -11,7 +11,7 @@ from ai_gateway.chat.tools.gitlab import (
     SelfHostedGitlabDocumentation,
 )
 
-__all__ = ["DuoChatToolsRegistry", "AmazonQChatToolsRegistry"]
+__all__ = ["DuoChatToolsRegistry"]
 
 
 class DuoChatToolsRegistry(BaseToolsRegistry):
@@ -55,18 +55,3 @@ class DuoChatToolsRegistry(BaseToolsRegistry):
     def get_all(self) -> list[BaseTool]:
         return self.tools
 
-
-class AmazonQChatToolsRegistry(DuoChatToolsRegistry):
-    @property
-    def tools(self) -> list[BaseTool]:
-        # We can also read the list of tools and associated unit primitives from the file
-        # similar to what we implemented for the Prompt Registry
-        tools: list[BaseTool] = [
-            BuildReader(),
-            EpicReader(),
-            IssueReader(),
-            MergeRequestReader(),
-            CommitReader(),
-        ]
-
-        return tools
