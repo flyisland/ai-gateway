@@ -2,7 +2,7 @@ dotenv-vars:
   stage: test
   needs:
     - job: build-docker-model-gateway
-  allow_failure: true
+  allow_failure: false
   script:
     - echo "JOB_WITH_ARTIFACTS=$CI_JOB_NAME" >> variables.env
     - echo "JOB_WITH_ARTIFACTS_ID=$CI_JOB_ID" >> variables.env
@@ -32,7 +32,7 @@ tests:performance:
   needs:
     - job: dotenv-vars
       artifacts: true
-  allow_failure: true
+  allow_failure: false
   trigger:
     project: gitlab-org/quality/component-performance-testing
     branch: vp/component-name-var
