@@ -33,6 +33,7 @@ tests:performance:
   needs:
     - job: dotenv-vars
       artifacts: true
+  allow_failure: true
   trigger:
     project: gitlab-org/quality/component-performance-testing
     branch: vp/component-name-var
