@@ -1,7 +1,7 @@
 import json
 from abc import ABC, abstractmethod
 from enum import StrEnum
-from typing import Any, NamedTuple, Optional
+from typing import Any, NamedTuple, Optional, Union
 
 import httpx
 import structlog
@@ -69,7 +69,7 @@ class ModelAPIError(Exception):
 
 
 class ModelAPICallError(ModelAPIError):
-    code: int
+    code: Union[int, None] = None
 
     def __init__(self, message: str, errors: tuple = (), details: tuple = ()):
         super().__init__(f"{self.code} {message}", errors=errors, details=details)
