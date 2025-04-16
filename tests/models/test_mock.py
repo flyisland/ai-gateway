@@ -1,4 +1,7 @@
+import inspect
 import json
+from types import MappingProxyType
+from typing import List
 
 import pytest
 
@@ -29,7 +32,10 @@ class TestLLM:
         assert isinstance(response, TextGenModelOutput)
 
         expected_substrings = [prefix, suffix] if suffix else [prefix]
-        expected_substrings += [json.dumps(kwargs)]
+        generate_params = inspect.signature(model.generate).parameters
+        expected_substrings = _build_expected_substrings_from_kwargs(
+            generate_params, expected_substrings, kwargs
+        )
 
         assert all(substring in response.text for substring in expected_substrings)
         assert response.text.startswith("echo:")
@@ -45,7 +51,10 @@ class TestLLM:
 
         actual_text = "".join([chunk.text async for chunk in response])
         expected_substrings = [prefix, suffix] if suffix else [prefix]
-        expected_substrings += [json.dumps(kwargs)]
+        generate_params = inspect.signature(model.generate).parameters
+        expected_substrings = _build_expected_substrings_from_kwargs(
+            generate_params, expected_substrings, kwargs
+        )
 
         assert all(substring in actual_text for substring in expected_substrings)
 
@@ -77,7 +86,11 @@ class TestChatModel:
         assert isinstance(response, TextGenModelOutput)
 
         raw_messages = [message.model_dump(mode="json") for message in messages]
-        expected_substrings = [json.dumps(s) for s in (raw_messages, kwargs)]
+        expected_substrings = [json.dumps(raw_messages)]
+        generate_params = inspect.signature(model.generate).parameters
+        expected_substrings = _build_expected_substrings_from_kwargs(
+            generate_params, expected_substrings, kwargs
+        )
 
         assert response.score == 0
         assert response.safety_attributes == SafetyAttributes()
@@ -94,7 +107,29 @@ class TestChatModel:
         actual_text = "".join([chunk.text async for chunk in response])
 
         raw_messages = [message.model_dump(mode="json") for message in messages]
-        expected_substrings = [json.dumps(s) for s in (raw_messages, kwargs)]
+        expected_substrings = [json.dumps(raw_messages)]
+        generate_params = inspect.signature(model.generate).parameters
+        expected_substrings = _build_expected_substrings_from_kwargs(
+            generate_params, expected_substrings, kwargs
+        )
 
         assert actual_text.startswith("echo:")
         assert all(substring in actual_text for substring in expected_substrings)
+
+
+def _build_expected_substrings_from_kwargs(
+    generate_params: MappingProxyType[str, inspect.Parameter],
+    expected_substrings: List[str],
+    kwargs: dict,
+) -> List[str]:
+    """
+    Builds expected substrings from messages and kwargs for a model function.
+    """
+    remaining_kwargs = {}
+    for key, value in kwargs.items():
+        if key in generate_params:
+            expected_substrings.append(json.dumps(value))
+        else:
+            remaining_kwargs[key] = value
+    expected_substrings.append(json.dumps(remaining_kwargs))
+    return expected_substrings
