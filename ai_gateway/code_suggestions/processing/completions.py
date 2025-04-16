@@ -16,16 +16,10 @@ from ai_gateway.code_suggestions.processing.typing import (
     MetadataExtraInfo,
     MetadataPromptBuilder,
     Prompt,
-    TokenStrategyBase,
 )
 from ai_gateway.code_suggestions.prompts.parsers import CodeParser
-from ai_gateway.experimentation import ExperimentRegistry, ExperimentTelemetry
 from ai_gateway.instrumentators import TextGenModelInstrumentator
-from ai_gateway.models import (
-    PalmCodeGenBaseModel,
-    VertexAPIConnectionError,
-    VertexAPIStatusError,
-)
+from ai_gateway.models import VertexAPIConnectionError, VertexAPIStatusError
 from ai_gateway.models.base import TokensConsumptionMetadata
 
 log = structlog.stdlib.get_logger("codesuggestions")
@@ -101,15 +95,10 @@ class _PromptBuilder(PromptBuilderBase):
         suffix: CodeContent,
         file_name: str,
         lang_id: Optional[LanguageId] = None,
-        experiments: Optional[list[ExperimentTelemetry]] = None,
     ):
-        if experiments is None:
-            experiments = []
-
         super().__init__(prefix, suffix, lang_id)
 
         self.file_name = file_name
-        self._metadata["experiments"] = experiments
 
     def add_extra_info(
         self, extra_info: _CodeInfo, max_total_length_tokens: int, extra_info_name: str
@@ -155,19 +144,36 @@ class _PromptBuilder(PromptBuilderBase):
 
     def build(self) -> Prompt:
         new_prefix = self._prepend_comments()
+        components = {}
+
+        for key in ("prefix", "suffix"):
+            value = self._metadata.get(key)
+            if isinstance(value, MetadataCodeContent):
+                components[key] = value
+
+        imports_val = self._metadata.get("imports")
+        imports = imports_val if isinstance(imports_val, MetadataExtraInfo) else None
+        function_signatures_val = self._metadata.get("function_signatures")
+        function_signatures = (
+            function_signatures_val
+            if isinstance(function_signatures_val, MetadataExtraInfo)
+            else None
+        )
+        code_context_val = self._metadata.get("code_context")
+        code_context = (
+            code_context_val
+            if isinstance(code_context_val, MetadataExtraInfo)
+            else None
+        )
 
         return Prompt(
             prefix=new_prefix,
             suffix=self._suffix,
             metadata=MetadataPromptBuilder(
-                components={
-                    "prefix": self._metadata["prefix"],
-                    "suffix": self._metadata["suffix"],
-                },
-                imports=self._metadata.get("imports", None),
-                function_signatures=self._metadata.get("function_signatures", None),
-                experiments=self._metadata["experiments"],
-                code_context=self._metadata.get("code_context", None),
+                components=components,
+                imports=imports,
+                function_signatures=function_signatures,
+                code_context=code_context,
             ),
         )
 
@@ -177,25 +183,15 @@ class ModelEngineCompletions(ModelEngineBase):
     MAX_TOKENS_SUFFIX_PERCENT = 0.07  # about 126 tokens for code-gecko, if "imports" takes up all the available space
     MAX_TOKENS_CONTEXT_PERCENT = 0.5  # about 1024 tokens for code-gecko
 
-    def __init__(
-        self,
-        model: PalmCodeGenBaseModel,
-        tokenization_strategy: TokenStrategyBase,
-        experiment_registry: ExperimentRegistry,
-    ):
-        super().__init__(model, tokenization_strategy)
-        self.experiment_registry = experiment_registry
-
     async def _generate(
         self,
         prefix: str,
         suffix: str,
         file_name: str,
-        lang_id: LanguageId,
+        lang_id: Optional[LanguageId] = None,
         editor_lang: Optional[str] = None,
-        stream: bool = False,
         **kwargs: Any,
-    ) -> ModelEngineOutput:
+    ) -> list[ModelEngineOutput]:
         prompt = await self._build_prompt(
             prefix, file_name, suffix, lang_id, kwargs.get("code_context")
         )
@@ -218,15 +214,16 @@ class ModelEngineCompletions(ModelEngineBase):
         ) as watch_container:
             try:
                 # count symbols of the final prompt
-                await self._count_symbols(prompt.prefix, lang_id, watch_container)
-
-                # log experiments included in this request
-                self._count_experiments(prompt.metadata.experiments, watch_container)
+                await self._count_symbols(
+                    prompt.get_normalized_prefix(), watch_container, lang_id
+                )
 
                 watch_container.register_lang(lang_id, editor_lang)
 
                 if responses := await self.model.generate(
-                    prompt.prefix, prompt.suffix, **kwargs
+                    prompt.get_normalized_prefix(),
+                    prompt.suffix if prompt.suffix else "",
+                    **kwargs,
                 ):
                     if not isinstance(responses, list):
                         responses = [responses]
@@ -239,7 +236,10 @@ class ModelEngineCompletions(ModelEngineBase):
                             res.safety_attributes
                         )
 
-                        if res.score > MINIMUM_CONFIDENCE_SCORE:
+                        if (
+                            res.score is not None
+                            and res.score > MINIMUM_CONFIDENCE_SCORE
+                        ):
                             completion = res.text
                         else:
                             watch_container.register_is_discarded()
@@ -288,7 +288,7 @@ class ModelEngineCompletions(ModelEngineBase):
                         outputs.append(
                             ModelEngineOutput(
                                 text=completion,
-                                score=res.score,
+                                score=res.score if res.score is not None else 0.0,
                                 model=self.model.metadata,
                                 lang_id=lang_id,
                                 metadata=prompt.metadata,
@@ -328,20 +328,9 @@ class ModelEngineCompletions(ModelEngineBase):
             - prompt_len_func_signatures
         )
 
-        experiments = []
-        if exp := self.experiment_registry.get_experiment("exp_truncate_suffix"):
-            experiment_output = exp.run(
-                logger=log, prefix=prefix, suffix=suffix, lang_id=lang_id
-            )
-            experiments.append(experiment_output.telemetry)
-            truncated_suffix = experiment_output.output
-            body = self._get_body(prefix, truncated_suffix, prompt_len_body)
-        else:
-            body = self._get_body(prefix, suffix, prompt_len_body)
+        body = self._get_body(prefix, suffix, prompt_len_body)
 
-        prompt_builder = _PromptBuilder(
-            body.prefix, body.suffix, file_name, lang_id, experiments
-        )
+        prompt_builder = _PromptBuilder(body.prefix, body.suffix, file_name, lang_id)
         # NOTE that the last thing we add here will appear first in the prefix
         prompt_builder.add_extra_info(
             func_signatures,
@@ -405,7 +394,10 @@ class ModelEngineCompletions(ModelEngineBase):
         return extracted
 
     def _to_code_info(
-        self, contents: list[str], lang_id: LanguageId, as_comments: bool = True
+        self,
+        contents: list[str],
+        lang_id: Optional[LanguageId] = None,
+        as_comments: bool = True,
     ) -> _CodeInfo:
         """
         Convert a list of code snippets into `_CodeInfo`, which includes metadata like text length and token length.
@@ -413,7 +405,7 @@ class ModelEngineCompletions(ModelEngineBase):
         if len(contents) == 0:
             return _CodeInfo(content=[])
 
-        if as_comments:
+        if as_comments and lang_id is not None and lang_id in COMMENT_GENERATOR:
             comment_converter = COMMENT_GENERATOR[lang_id]
             contents = [comment_converter(content) for content in contents]
 
@@ -451,21 +443,13 @@ class ModelEngineCompletions(ModelEngineBase):
     async def _count_symbols(
         self,
         prompt: str,
-        lang_id: LanguageId,
         watch_container: TextGenModelInstrumentator.WatchContainer,
+        lang_id: Optional[LanguageId] = None,
     ) -> None:
         try:
             parser = await CodeParser.from_language_id(prompt, lang_id)
             symbol_map = parser.count_symbols()
-            self.increment_code_symbol_counter(lang_id, symbol_map)
+            self.increment_code_symbol_counter(symbol_map, lang_id)
             self.log_symbol_map(watch_container, symbol_map)
         except ValueError as e:
             log.warning(f"Failed to parse code: {e}")
-
-    def _count_experiments(
-        self,
-        experiments: list[ExperimentTelemetry],
-        watch_container: TextGenModelInstrumentator.WatchContainer,
-    ) -> None:
-        watch_container.register_experiments(experiments)
-        self.increment_experiment_counter(experiments)

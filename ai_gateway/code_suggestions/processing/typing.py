@@ -2,8 +2,6 @@ from abc import ABC, abstractmethod
 from enum import IntEnum
 from typing import Mapping, NamedTuple, Optional
 
-from ai_gateway.experimentation.base import ExperimentTelemetry
-
 __all__ = [
     "LanguageId",
     "MetadataCodeContent",
@@ -46,7 +44,6 @@ class MetadataPromptBuilder(NamedTuple):
     components: Mapping[str, MetadataCodeContent]
     imports: Optional[MetadataExtraInfo] = None
     function_signatures: Optional[MetadataExtraInfo] = None
-    experiments: Optional[list[ExperimentTelemetry]] = []
     code_context: Optional[MetadataExtraInfo] = None
 
 
@@ -59,6 +56,11 @@ class Prompt(NamedTuple):
     prefix: str | list
     metadata: MetadataPromptBuilder
     suffix: Optional[str] = None
+
+    def get_normalized_prefix(self) -> str:
+        if isinstance(self.prefix, list):
+            return "".join(map(str, self.prefix))
+        return self.prefix
 
 
 class TokenStrategyBase(ABC):

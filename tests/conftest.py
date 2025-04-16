@@ -8,7 +8,9 @@ from fastapi import FastAPI
 from fastapi.testclient import TestClient
 from gitlab_cloud_connector import CloudConnectorUser, GitLabUnitPrimitive, UserClaims
 from langchain.chat_models.fake import FakeListChatModel
-from langchain_core.outputs import ChatGenerationChunk
+from langchain_core.messages import BaseMessage
+from langchain_core.messages.ai import AIMessage, UsageMetadata
+from langchain_core.outputs import ChatGenerationChunk, ChatResult
 from starlette.middleware import Middleware
 from starlette_context.middleware import RawContextMiddleware
 
@@ -23,7 +25,6 @@ from ai_gateway.code_suggestions.processing.typing import (
 )
 from ai_gateway.config import Config
 from ai_gateway.container import ContainerApplication
-from ai_gateway.experimentation.base import ExperimentTelemetry
 from ai_gateway.internal_events.client import InternalEventsClient
 from ai_gateway.model_metadata import TypeModelMetadata, current_model_metadata_context
 from ai_gateway.models.base import ModelMetadata, TokensConsumptionMetadata
@@ -37,6 +38,12 @@ from ai_gateway.prompts.config.base import ModelConfig, PromptConfig, PromptPara
 from ai_gateway.prompts.config.models import ChatLiteLLMParams, TypeModelParams
 from ai_gateway.prompts.typing import Model, TypeModelFactory
 from ai_gateway.safety_attributes import SafetyAttributes
+from duo_workflow_service.entities.state import (
+    MessageTypeEnum,
+    Plan,
+    WorkflowState,
+    WorkflowStatusEnum,
+)
 
 pytest_plugins = ("pytest_asyncio",)
 
@@ -271,9 +278,6 @@ def mock_completions_legacy_output(mock_completions_legacy_output_texts: str):
                         "prefix": MetadataCodeContent(length=10, length_tokens=2),
                         "suffix": MetadataCodeContent(length=10, length_tokens=2),
                     },
-                    experiments=[
-                        ExperimentTelemetry(name="truncate_suffix", variant=1)
-                    ],
                 ),
                 tokens_consumption_metadata=TokensConsumptionMetadata(
                     input_tokens=1, output_tokens=2
@@ -312,7 +316,7 @@ def mock_suggestions_output(
             name=mock_suggestions_model, engine=mock_suggestions_engine
         ),
         lang_id=LanguageId.PYTHON,
-        metadata=CodeSuggestionsOutput.Metadata(experiments=[]),  # type: ignore[attr-defined]
+        metadata=CodeSuggestionsOutput.Metadata(),  # type: ignore[attr-defined]
     )
 
 
@@ -435,10 +439,16 @@ def model_error():
     return None
 
 
+@pytest.fixture
+def usage_metadata():
+    return None
+
+
 class FakeModel(FakeListChatModel):
     model_engine: str
     model_name: str
     model_error: Optional[Exception] = None
+    usage_metadata: Optional[UsageMetadata] = None
 
     @property
     def _llm_type(self) -> str:
@@ -448,21 +458,45 @@ class FakeModel(FakeListChatModel):
     def _identifying_params(self) -> dict[str, Any]:
         return {**super()._identifying_params, **{"model": self.model_name}}
 
+    def _generate(self, *args, **kwargs) -> ChatResult:
+        result = super()._generate(*args, **kwargs)
+
+        self._set_usage_metadata(result.generations[0].message)
+
+        return result
+
     async def _astream(
         self,
         *args,
         **kwargs,
     ) -> AsyncIterator[ChatGenerationChunk]:
+        usage_metadata_sent = False
         async for c in super()._astream(*args, **kwargs):
+            # Send usage metadata only once
+            if not usage_metadata_sent:
+                self._set_usage_metadata(c.message)
+                usage_metadata_sent = True
+
             yield c
 
         if self.model_error:
             raise self.model_error  # pylint: disable=raising-bad-type
 
+    def _set_usage_metadata(self, message: BaseMessage):
+        if not self.usage_metadata or not isinstance(message, AIMessage):
+            return
+
+        message.usage_metadata = self.usage_metadata
+        message.response_metadata = {"model_name": self.model_name}
+
 
 @pytest.fixture
 def model(
-    model_response: str, model_engine: str, model_name: str, model_error: Exception
+    model_response: str,
+    model_engine: str,
+    model_name: str,
+    model_error: Exception,
+    usage_metadata: Optional[UsageMetadata],
 ):
     # our default Assistant prompt template already contains "Thought: "
     text = model_response.removeprefix("Thought: ") if model_response else ""
@@ -472,6 +506,7 @@ def model(
         model_name=model_name,
         responses=[text],
         model_error=model_error,
+        usage_metadata=usage_metadata,
     )
 
 
@@ -562,4 +597,25 @@ def user(user_is_debug: bool, scopes: list[str]):
         CloudConnectorUser(
             authenticated=True, is_debug=user_is_debug, claims=UserClaims(scopes=scopes)
         )
+    )
+
+
+@pytest.fixture(scope="function")
+def workflow_state():
+    return WorkflowState(
+        plan=Plan(steps=[]),
+        status=WorkflowStatusEnum.NOT_STARTED,
+        conversation_history={},
+        handover=[],
+        last_human_input=None,
+        ui_chat_log=[
+            {
+                "message_type": MessageTypeEnum.AGENT,
+                "content": "This is a test message",
+                "timestamp": "2025-01-08T12:00:00Z",
+                "status": None,
+                "correlation_id": None,
+                "tool_info": None,
+            }
+        ],
     )

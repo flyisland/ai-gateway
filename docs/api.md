@@ -39,7 +39,7 @@ POST /v4/code/suggestions
 Format details:
 
 - A streaming response consists of one or more SSE messages.
-- An indvidual, **complete SSE message** consists of the keys `event` and `data` (outputted in this order), and is delimited by double newlines.
+- An individual, **complete SSE message** consists of the keys `event` and `data` (outputted in this order), and is delimited by double newlines.
 - The streaming response always begins with event `stream_start` and ends with `stream_end`.
 - The value of `data` is either `null` or a JSON string.
 - Metadata is only provided in the starting message.
@@ -324,7 +324,7 @@ This will compile and execute the program, printing "Hello World" to the console
 
 - `200: OK` if the service returns some completions.
 - `401: Unauthorized` if the service fails to authenticate using the access token.
-- `422: Unprocessable Entity` if the required attributes are missing or the number of `prompt_component` objects is not adequet.
+- `422: Unprocessable Entity` if the required attributes are missing or the number of `prompt_component` objects is not adequate.
 
 ### V2
 
@@ -367,9 +367,6 @@ third-party model provider.
 | `telemetry.model_engine`            | string | no       | The model engine used for completions (max_len: **50**).                                                         | `vertex-ai`               |
 | `telemetry.model_name`              | string | no       | The model name used for completions (max_len: **50**).                                                           | `code-gecko`              |
 | `telemetry.lang`                    | string | no       | The language used for completions (max_len: **50**).                                                             | `python`                  |
-| `telemetry.experiments`             | array  | no       | The list of experiments run from previous request.                                                               |                           |
-| `telemetry.experiments.name`        | string | yes      | The experiment name.                                                                                             | `exp_truncate_suffix`     |
-| `telemetry.experiments.variant`     | int    | yes      | The experiment variant.                                                                                          | `0`                       |
 | `telemetry.requests`                | int    | yes      | The number of previously requested completions.                                                                  | `1`                       |
 | `telemetry.accepts`                 | int    | yes      | The number of previously accepted completions.                                                                   | `1`                       |
 | `telemetry.errors`                  | int    | yes      | The number of previously failed completions.                                                                     | `0`                       |
@@ -395,12 +392,6 @@ curl --request POST \
         "model_engine": "vertex-ai",
         "model_name": "code-gecko",
         "lang": "python",
-        "experiments": [
-          {
-            "name": "exp_truncate_suffix",
-            "variant": 0
-          }
-        ],
         "requests": 1,
         "accepts": 1,
         "errors": 0
@@ -419,12 +410,7 @@ Example response:
     "name": "code-gecko",
     "lang": "python"
   },
-  "experiments": [
-    {
-      "name": "exp_truncate_suffix",
-      "variant": 0
-    }
-  ]
+  "experiments": [],
   "object": "text_completion",
   "created": 1682031100,
   "choices": [
@@ -467,9 +453,6 @@ This accepts a pre-built `prompt` and forwards it directly to third-party provid
 | `telemetry.model_engine`            | string | no       | The model engine used for completions (max_len: **50**)                        | `vertex-ai`                          |
 | `telemetry.model_name`              | string | no       | The model name used for completions (max_len: **50**)                          | `code-gecko`                         |
 | `telemetry.lang`                    | string | no       | The language used for completions (max_len: **50**)                            | `python`                             |
-| `telemetry.experiments`             | array  | no       | The list of experiments run from previous request                              |                                      |
-| `telemetry.experiments.name`        | string | yes      | The experiment name                                                            | `exp_truncate_suffix`                |
-| `telemetry.experiments.variant`     | int    | yes      | The experiment variant                                                         | `0`                                  |
 | `telemetry.requests`                | int    | yes      | The number of previously requested completions                                 | `1`                                  |
 | `telemetry.accepts`                 | int    | yes      | The number of previously accepted completions                                  | `1`                                  |
 | `telemetry.errors`                  | int    | yes      | The number of previously failed completions                                    | `0`                                  |
@@ -497,12 +480,7 @@ curl --request POST \
         "model_engine": "anthropic",
         "model_name": "claude-2.1",
         "lang": "python",
-        "experiments": [
-          {
-            "name": "exp_truncate_suffix",
-            "variant": 0
-          }
-        ],
+        "experiments": [],
         "requests": 1,
         "accepts": 1,
         "errors": 0
@@ -544,12 +522,7 @@ Example response:
     "name": "claude-2.1",
     "lang": "python"
   },
-  "experiments": [
-    {
-      "name": "exp_truncate_suffix",
-      "variant": 0
-    }
-  ]
+  "experiments": [],
   "object": "text_completion",
   "created": 1682031100,
   "choices": [
@@ -587,9 +560,6 @@ This accepts a pre-built `prompt` and forwards it directly to a third-party prov
 | `telemetry.model_engine`            | string | no       | The model engine used for completions (max_len: **50**)                        | `vertex-ai`                          |
 | `telemetry.model_name`              | string | no       | The model name used for completions (max_len: **50**)                          | `code-gecko`                         |
 | `telemetry.lang`                    | string | no       | The language used for completions (max_len: **50**)                            | `python`                             |
-| `telemetry.experiments`             | array  | no       | The list of experiments run from previous request                              |                                      |
-| `telemetry.experiments.name`        | string | yes      | The experiment name                                                            | `exp_truncate_suffix`                |
-| `telemetry.experiments.variant`     | int    | yes      | The experiment variant                                                         | `0`                                  |
 | `telemetry.requests`                | int    | yes      | The number of previously requested completions                                 | `1`                                  |
 | `telemetry.accepts`                 | int    | yes      | The number of previously accepted completions                                  | `1`                                  |
 | `telemetry.errors`                  | int    | yes      | The number of previously failed completions                                    | `0`                                  |
@@ -646,12 +616,7 @@ Example response:
     "name": "claude-2.1",
     "lang": "python"
   },
-  "experiments": [
-    {
-      "name": "exp_truncate_suffix",
-      "variant": 0
-    }
-  ]
+  "experiments": [],
   "object": "text_completion",
   "created": 1682031100,
   "choices": [
@@ -702,9 +667,6 @@ third-party model provider.
 | `telemetry.model_engine`            | string | no       | The model engine used for completions (max_len: **50**).                                                                                                                               | `vertex-ai`               |
 | `telemetry.model_name`              | string | no       | The model name used for completions (max_len: **50**).                                                                                                                                 | `code-gecko`              |
 | `telemetry.lang`                    | string | no       | The language used for completions (max_len: **50**).                                                                                                                                   | `python`                  |
-| `telemetry.experiments`             | array  | no       | The list of experiments run from previous request.                                                                                                                                     |                           |
-| `telemetry.experiments.name`        | string | yes      | The experiment name.                                                                                                                                                                   | `exp_truncate_suffix`     |
-| `telemetry.experiments.variant`     | int    | yes      | The experiment variant.                                                                                                                                                                | `0`                       |
 | `telemetry.requests`                | int    | yes      | The number of previously requested completions.                                                                                                                                        | `1`                       |
 | `telemetry.accepts`                 | int    | yes      | The number of previously accepted completions.                                                                                                                                         | `1`                       |
 | `telemetry.errors`                  | int    | yes      | The number of previously failed completions.                                                                                                                                           | `0`                       |
@@ -729,12 +691,6 @@ curl --request POST \
         "model_engine": "vertex-ai",
         "model_name": "code-bison@002",
         "lang": "python",
-        "experiments": [
-          {
-            "name": "exp_truncate_suffix",
-            "variant": 0
-          }
-        ],
         "requests": 1,
         "accepts": 1,
         "errors": 0
@@ -753,12 +709,7 @@ Example response:
     "name": "code-bison@002",
     "lang": "python"
   },
-  "experiments": [
-    {
-      "name": "exp_truncate_suffix",
-      "variant": 0
-    }
-  ]
+  "experiments": [],
   "object": "text_completion",
   "created": 1682031100,
   "choices": [
@@ -795,9 +746,6 @@ This accepts a pre-built `prompt` and forwards it directly to the third-party pr
 | `telemetry.model_engine`            | string | no       | The model engine used for completions (max_len: **50**)                                                                                                                                | `vertex-ai`                          |
 | `telemetry.model_name`              | string | no       | The model name used for completions (max_len: **50**)                                                                                                                                  | `code-gecko`                         |
 | `telemetry.lang`                    | string | no       | The language used for completions (max_len: **50**)                                                                                                                                    | `python`                             |
-| `telemetry.experiments`             | array  | no       | The list of experiments run from previous request                                                                                                                                      |                                      |
-| `telemetry.experiments.name`        | string | yes      | The experiment name                                                                                                                                                                    | `exp_truncate_suffix`                |
-| `telemetry.experiments.variant`     | int    | yes      | The experiment variant                                                                                                                                                                 | `0`                                  |
 | `telemetry.requests`                | int    | yes      | The number of previously requested completions                                                                                                                                         | `1`                                  |
 | `telemetry.accepts`                 | int    | yes      | The number of previously accepted completions                                                                                                                                          | `1`                                  |
 | `telemetry.errors`                  | int    | yes      | The number of previously failed completions                                                                                                                                            | `0`                                  |
@@ -824,12 +772,6 @@ curl --request POST \
         "model_engine": "anthropic",
         "model_name": "claude-2.0",
         "lang": "python",
-        "experiments": [
-          {
-            "name": "exp_truncate_suffix",
-            "variant": 0
-          }
-        ],
         "requests": 1,
         "accepts": 1,
         "errors": 0
@@ -871,12 +813,7 @@ Example response:
     "name": "claude-2.0",
     "lang": "python"
   },
-  "experiments": [
-    {
-      "name": "exp_truncate_suffix",
-      "variant": 0
-    }
-  ],
+  "experiments": [],
   "object": "text_completion",
   "created": 1682031100,
   "choices": [

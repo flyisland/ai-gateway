@@ -1,22 +1,26 @@
 dotenv-vars:
   stage: test
+  needs:
+    - job: build-docker-model-gateway
   script:
     - echo "JOB_WITH_ARTIFACTS=$CI_JOB_NAME" >> variables.env
     - echo "JOB_WITH_ARTIFACTS_ID=$CI_JOB_ID" >> variables.env
     - echo $JOB_WITH_ARTIFACTS
     - echo $JOB_WITH_ARTIFACTS_ID
+    - echo $CI_PROJECT_NAMESPACE
     - cat variables.env
   artifacts:
     paths:
       - performance_tests
       - variables.env
-    expire_in: 1 hour
+    expire_in: 5d
     reports:
       dotenv: variables.env
+  allow_failure: true
   rules:
     - if: $CI_PROJECT_NAMESPACE =~ /^gitlab-org\/security.*/
       when: never
-    - if: $CI_PIPELINE_SOURCE == "merge_request_event"
+    - if: '$CI_PIPELINE_SOURCE == "merge_request_event" && $CI_PROJECT_NAMESPACE =~ /^gitlab-org?($|\/)/'
       when: always
     - if: $CI_COMMIT_BRANCH == "main"
       when: always
@@ -34,6 +38,7 @@ tests:performance:
     forward:
       pipeline_variables: true
       yaml_variables: true
+  allow_failure: true  
   variables:
     JOB_WITH_ARTIFACTS: $JOB_WITH_ARTIFACTS
     JOB_WITH_ARTIFACTS_ID: $JOB_WITH_ARTIFACTS_ID
@@ -41,10 +46,11 @@ tests:performance:
     PARENT_PIPELINE_COMMIT_BRANCH: $CI_COMMIT_BRANCH
     PARENT_PIPELINE_SOURCE: $CI_PIPELINE_SOURCE
     COMPONENT_MR_CI_COMMIT_SHA: $CI_COMMIT_SHORT_SHA
+    COMPONENT_SERVICE_NAME: "ai-gateway-influx"
   rules:
     - if: $CI_PROJECT_NAMESPACE =~ /^gitlab-org\/security.*/
       when: never
-    - if: $CI_PIPELINE_SOURCE == "merge_request_event"
+    - if: '$CI_PIPELINE_SOURCE == "merge_request_event" && $CI_PROJECT_NAMESPACE =~ /^gitlab-org?($|\/)/'
       variables:
         PARENT_PIPELINE_MR_IID: $CI_MERGE_REQUEST_IID
       when: always
