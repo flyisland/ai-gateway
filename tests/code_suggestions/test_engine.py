@@ -13,7 +13,6 @@ from ai_gateway.code_suggestions.processing import (
     ops,
 )
 from ai_gateway.code_suggestions.processing.pre import TokenizerTokenStrategy
-from ai_gateway.experimentation import ExperimentRegistry
 from ai_gateway.models import (
     ModelAPIError,
     ModelMetadata,
@@ -51,7 +50,8 @@ def _side_effect_few_shot_tpl(
     lang_id = ops.lang_from_filename(filename)
 
     def _fn(prompt: str, _suffix: str):
-        assert lang_id.name.lower() in prompt
+        if lang_id is not None:
+            assert lang_id.name.lower() in prompt
         assert content in prompt
 
         return TextGenModelOutput(
@@ -107,7 +107,8 @@ def _side_effect_lang_prepended(
     lang_id = ops.lang_from_filename(filename)
 
     def _fn(prompt: str, _suffix: str):
-        assert prompt.startswith(f"<{lang_id.name.lower()}>")
+        if lang_id is not None:
+            assert prompt.startswith(f"<{lang_id.name.lower()}>")
         assert prompt.endswith(content)
 
         return TextGenModelOutput(
@@ -596,7 +597,6 @@ async def test_model_engine_palm(
     engine = ModelEngineCompletions(
         model=text_gen_base_model,
         tokenization_strategy=tokenization_strategy,
-        experiment_registry=ExperimentRegistry(),
     )
     engine.instrumentator = MockInstrumentor()
 
@@ -796,7 +796,6 @@ async def test_prompt_building_model_engine_palm(
     engine = ModelEngineCompletions(
         model=text_gen_base_model,
         tokenization_strategy=tokenization_strategy,
-        experiment_registry=ExperimentRegistry(),
     )
     prompt = await engine._build_prompt(
         prefix=prefix,
