@@ -54,4 +54,3 @@ class DuoChatToolsRegistry(BaseToolsRegistry):
 
     def get_all(self) -> list[BaseTool]:
         return self.tools
-
