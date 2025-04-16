@@ -1,7 +1,6 @@
 from .base import (
     AccessLogMiddleware,
     DistributedTraceMiddleware,
-    InternalEventMiddleware,
     MiddlewareAuthentication,
 )
 from .feature_flag import FeatureFlagMiddleware

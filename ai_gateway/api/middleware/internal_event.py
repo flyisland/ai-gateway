@@ -1,4 +1,4 @@
-from typing import Optional
+from datetime import datetime
 
 from gitlab_cloud_connector import X_GITLAB_DUO_SEAT_COUNT_HEADER
 from starlette.datastructures import CommaSeparatedStrings
@@ -23,6 +23,7 @@ from ai_gateway.api.middleware.headers import (
 )
 from ai_gateway.internal_events import (
     EventContext,
+    correlation_id,
     current_event_context,
     tracked_internal_events,
 )
