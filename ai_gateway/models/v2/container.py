@@ -15,7 +15,8 @@ __all__ = [
 
 def _litellm_factory(*args, **kwargs) -> Model:
 
-    if not kwargs.get("disable_streaming", False):
+    config = providers.Configuration(strict=True)
+    if not config.custom_models.disable_streaming:
         # Always include usage metrics when streaming. See https://docs.litellm.ai/docs/completion/usage#streaming-usage
         # Respect other possible values that may have been passed.
         kwargs["model_kwargs"] = kwargs.get("model_kwargs", {})
