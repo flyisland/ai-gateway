@@ -140,7 +140,7 @@ class TextGenModelInstrumentator:
         def dict(self) -> dict:
             return self.__dict__
 
-    def __init__(self, model_engine: str, model_name: str):
+    def __init__(self, model_engine: Optional[str], model_name: str):
         self.labels = {"model_engine": model_engine, "model_name": model_name}
 
     @contextmanager
