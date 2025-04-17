@@ -187,6 +187,10 @@ class ReActPromptTemplate(Runnable[ReActAgentInputs, PromptValue]):
                     )
                 )
             )
+        
+        if "llama3" == self.model_config.name:
+            if isinstance(messages[-1], AIMessage):
+                messages.append(HumanMessage(content="."))
 
         return ChatPromptValue(messages=messages)
 
