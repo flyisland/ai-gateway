@@ -1,4 +1,3 @@
-# implement tests for load_llm_definitions, mocking the file system
 from pathlib import Path
 from textwrap import dedent
 
