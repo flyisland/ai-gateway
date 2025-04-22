@@ -35,7 +35,7 @@ tests:performance:
   allow_failure: true
   trigger:
     project: gitlab-org/quality/component-performance-testing
-    branch: vp-adding-mean-deviation
+    branch: vp-update-handle-summary
     strategy: depend
     forward:
       pipeline_variables: true
