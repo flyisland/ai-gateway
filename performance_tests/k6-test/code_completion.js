@@ -49,11 +49,13 @@ export function handleSummary(data) {
   const summaryOutput = {
     'stdout': textSummary(data, { indent: ' ', enableColors: true }) +
               `\nConstants:\n` +
+              `TEST_NAME: ${TEST_NAME}\n` +
               `TTFB_THRESHOLD: ${TTFB_THRESHOLD}\n` +
               `RPS_THRESHOLD: ${RPS_THRESHOLD}\n` +
               `VUs: ${options.vus}\n` +
               `Duration: ${options.duration}\n`+
               `TTFB p90: ${data.metrics.http_req_waiting.values["p(90)"]}ms\n`+
+              `TTFB p50: ${data.metrics.http_req_waiting.values["med"]}ms\n`
               `TTFB Avg: ${data.metrics.http_req_waiting.values["avg"]}ms\n`+
               `http_requests: ${data.metrics.http_reqs.values["rate"]}\n,`
   };
@@ -62,6 +64,10 @@ export function handleSummary(data) {
   summaryOutput[SUMMARY_OUTPUT_PATH] = JSON.stringify({
     metrics: data.metrics,
     constants: {
+      test_name: TEST_NAME,
+      ttfb_p90: data.metrics.http_req_waiting.values["p(90)"],
+      ttfb_avg: data.metrics.http_req_waiting.values["avg"],
+      ttfb_p50: data.metrics.http_req_waiting.values["med"],
       ttfb_threshold: TTFB_THRESHOLD,
       rps_threshold: RPS_THRESHOLD,
       vus: options.vus,
