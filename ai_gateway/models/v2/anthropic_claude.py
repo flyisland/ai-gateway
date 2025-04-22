@@ -6,6 +6,7 @@ from langchain_core.callbacks import CallbackManagerForLLMRun
 from langchain_core.messages import BaseMessage
 from langchain_core.outputs import ChatResult
 from pydantic import model_validator
+from ai_gateway.config import Config
 
 __all__ = ["ChatAnthropic"]
 
@@ -19,7 +20,7 @@ class ChatAnthropic(_LChatAnthropic):
     async_client: AsyncAnthropic
     """Anthropic async HTTP client"""
 
-    default_request_timeout: float | None = 60.0
+    default_request_timeout: float | None = Config.models.default_timeout
     """Timeout for requests to Anthropic Completion API."""
 
     # sdk default = 2: https://github.com/anthropics/anthropic-sdk-python?tab=readme-ov-file#retries

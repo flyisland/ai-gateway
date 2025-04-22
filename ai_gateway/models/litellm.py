@@ -5,6 +5,7 @@ from litellm import CustomStreamWrapper, ModelResponse, acompletion
 from litellm.exceptions import APIConnectionError, InternalServerError
 from openai import AsyncOpenAI
 
+from ai_gateway.config import Config
 from ai_gateway.models.base import (
     KindModelProvider,
     ModelAPIError,
@@ -91,6 +92,11 @@ class ModelCompletionType(StrEnum):
     FIM = "fim"
 
 
+# Get config for timeout value
+config = Config()
+DEFAULT_TIMEOUT = config.models.default_timeout
+
+
 MODEL_STOP_TOKENS = {
     KindLiteLlmModel.MISTRAL: ["</new_code>"],
     # Ref: https://huggingface.co/google/codegemma_2b-7b
@@ -125,20 +131,20 @@ MODEL_STOP_TOKENS = {
 MODEL_SPECIFICATIONS = {
     KindModelProvider.VERTEX_AI: {
         KindVertexTextModel.CODESTRAL_2501: {
-            "timeout": 60,
+            "timeout": DEFAULT_TIMEOUT,
             "completion_type": ModelCompletionType.TEXT,
         },
     },
     KindModelProvider.FIREWORKS: {
         KindLiteLlmModel.CODESTRAL_2501: {
-            "timeout": 60,
+            "timeout": DEFAULT_TIMEOUT,
             "completion_type": ModelCompletionType.FIM,
             # this model is suffix-first, then prefix
             "fim_format": "</s>[SUFFIX]{suffix}[PREFIX]{prefix}[MIDDLE]",
             "session_header": True,
         },
         KindLiteLlmModel.QWEN_2_5: {
-            "timeout": 60,
+            "timeout": DEFAULT_TIMEOUT,
             "completion_type": ModelCompletionType.FIM,
             "fim_format": "<|fim_prefix|>{prefix}<|fim_suffix|>{suffix}<|fim_middle|>",
             "session_header": True,
@@ -200,7 +206,7 @@ class LiteLlmChatModel(ChatModelBase):
             "temperature": temperature,
             "top_p": top_p,
             "max_tokens": max_output_tokens,
-            "timeout": 30.0,
+            "timeout": DEFAULT_TIMEOUT,
             "stop": self.stop_tokens,
             **self.model_metadata_to_params(),
         }
@@ -418,7 +424,7 @@ class LiteLlmTextGenModel(TextGenModelBase):
             "temperature": temperature,
             "top_p": top_p,
             "stream": stream,
-            "timeout": self.specifications.get("timeout", 30.0),
+            "timeout": self.specifications.get("timeout", DEFAULT_TIMEOUT),
             "stop": self._get_stop_tokens(suffix),
         }
 

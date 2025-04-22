@@ -18,6 +18,7 @@ __all__ = [
     "ConfigCustomModels",
     "ConfigModelKeys",
     "ConfigModelEndpoints",
+    "ConfigModels",
 ]
 
 ENV_PREFIX = "AIGW"
@@ -176,6 +177,10 @@ class ConfigDefaultPrompts(RootModel):
     root: dict[str, str] = {}
 
 
+class ConfigModels(BaseModel):
+    default_timeout: int = 60
+
+
 class Config(BaseSettings):
     model_config = SettingsConfigDict(
         env_nested_delimiter="__",
@@ -249,6 +254,9 @@ class Config(BaseSettings):
     feature_flags: Annotated[
         ConfigFeatureFlags, Field(default_factory=ConfigFeatureFlags)
     ] = ConfigFeatureFlags()
+    models: Annotated[ConfigModels, Field(default_factory=ConfigModels)] = (
+        ConfigModels()
+    )
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)

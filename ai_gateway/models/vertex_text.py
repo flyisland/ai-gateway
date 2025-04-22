@@ -17,6 +17,7 @@ from ai_gateway.models.base import (
 from ai_gateway.models.base_text import TextGenModelBase, TextGenModelOutput
 from ai_gateway.safety_attributes import SafetyAttributes
 from ai_gateway.tracking import SnowplowEventContext
+from ai_gateway.config import Config
 
 __all__ = [
     "PalmCodeBisonModel",
@@ -137,7 +138,7 @@ class PalmCodeGenBaseModel(TextGenModelBase):
         client: PredictionServiceAsyncClient,
         project: str,
         location: str,
-        timeout: int = 30,
+        timeout: int = Config().models.default_timeout,
     ):
         self.client = client
         self.timeout = timeout

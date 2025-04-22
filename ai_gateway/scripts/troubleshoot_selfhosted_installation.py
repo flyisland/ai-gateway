@@ -6,6 +6,7 @@ import os
 
 import boto3
 import requests
+from ai_gateway.config import Config
 
 SUPPORTED_MODEL_FAMILIES = ["mistral", "mixtral", "gpt", "claude_3", "llama3"]
 
@@ -17,7 +18,7 @@ def check_aigw_endpoint(endpoint="localhost:5052"):
 
     try:
         health_response = requests.get(
-            aigw_url, headers={"accept": "application/json"}, timeout=30
+            aigw_url, headers={"accept": "application/json"}, timeout=Config().models.default_timeout
         )
 
         if health_response.status_code == 200:
