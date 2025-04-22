@@ -35,7 +35,7 @@ tests:performance:
   allow_failure: true
   trigger:
     project: gitlab-org/quality/component-performance-testing
-    branch: main
+    branch: vp-fixing-k6-test-path
     strategy: depend
     forward:
       pipeline_variables: true
