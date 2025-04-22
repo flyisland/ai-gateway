@@ -1,5 +1,6 @@
 from datetime import datetime
 
+from asgi_correlation_id.context import correlation_id
 from gitlab_cloud_connector import X_GITLAB_DUO_SEAT_COUNT_HEADER
 from starlette.datastructures import CommaSeparatedStrings
 from starlette.middleware.base import Request
@@ -23,7 +24,6 @@ from ai_gateway.api.middleware.headers import (
 )
 from ai_gateway.internal_events import (
     EventContext,
-    correlation_id,
     current_event_context,
     tracked_internal_events,
 )
