@@ -16,8 +16,8 @@ from pydantic import AnyUrl
 from ai_gateway.api.auth_utils import StarletteUser
 from ai_gateway.model_metadata import (
     AmazonQModelMetadata,
+    BaseModelMetadata,
     ModelMetadata,
-    TypeModelMetadata,
     current_model_metadata_context,
 )
 from ai_gateway.models.v2.anthropic_claude import ChatAnthropic
@@ -309,7 +309,7 @@ class TestBaseRegistry:
         registry: BasePromptRegistry,
         user: StarletteUser,
         prompt: Prompt,
-        model_metadata: Optional[TypeModelMetadata],
+        model_metadata: Optional[BaseModelMetadata],
         unit_primitives: list[GitLabUnitPrimitive],
         scopes: list[str],
         success: bool,
@@ -386,7 +386,7 @@ class TestBaseRegistry:
         user: StarletteUser,
         prompt: Prompt,
         unit_primitives: list[GitLabUnitPrimitive],
-        model_metadata: TypeModelMetadata,
+        model_metadata: BaseModelMetadata,
     ):
         current_model_metadata_context.set(model_metadata)
 

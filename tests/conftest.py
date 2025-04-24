@@ -26,7 +26,7 @@ from ai_gateway.code_suggestions.processing.typing import (
 from ai_gateway.config import Config
 from ai_gateway.container import ContainerApplication
 from ai_gateway.internal_events.client import InternalEventsClient
-from ai_gateway.model_metadata import TypeModelMetadata, current_model_metadata_context
+from ai_gateway.model_metadata import BaseModelMetadata, current_model_metadata_context
 from ai_gateway.models.base import ModelMetadata, TokensConsumptionMetadata
 from ai_gateway.models.base_text import (
     TextGenModelBase,
@@ -571,7 +571,7 @@ def prompt(
     prompt_class: Type[Prompt],
     model_factory: TypeModelFactory,
     prompt_config: PromptConfig,
-    model_metadata: TypeModelMetadata | None,
+    model_metadata: BaseModelMetadata | None,
 ):
     return prompt_class(model_factory, prompt_config, model_metadata)
 

@@ -14,7 +14,7 @@ from langchain_core.runnables import Runnable, RunnableBinding, RunnableConfig
 from ai_gateway.api.auth_utils import StarletteUser
 from ai_gateway.instrumentators.model_requests import ModelRequestInstrumentator
 from ai_gateway.internal_events.client import InternalEventsClient
-from ai_gateway.model_metadata import TypeModelMetadata, current_model_metadata_context
+from ai_gateway.model_metadata import BaseModelMetadata, current_model_metadata_context
 from ai_gateway.prompts.config.base import ModelConfig, PromptConfig, PromptParams
 from ai_gateway.prompts.typing import Model, TypeModelFactory
 from ai_gateway.structured_logging import get_request_logger
@@ -67,7 +67,7 @@ class Prompt(RunnableBinding[Input, Output]):
         self,
         model_factory: TypeModelFactory,
         config: PromptConfig,
-        model_metadata: Optional[TypeModelMetadata] = None,
+        model_metadata: Optional[BaseModelMetadata] = None,
         disable_streaming: bool = False,
     ):
         model_override = None
@@ -97,7 +97,7 @@ class Prompt(RunnableBinding[Input, Output]):
     def _build_model_kwargs(
         self,
         params: PromptParams | None,
-        model_metadata: Optional[TypeModelMetadata] | None,
+        model_metadata: Optional[BaseModelMetadata] | None,
     ) -> Mapping[str, Any]:
         return {
             **(params.model_dump(exclude_none=True) if params else {}),
@@ -236,7 +236,7 @@ class BasePromptRegistry(ABC):
         self,
         prompt_id: str,
         prompt_version: str,
-        model_metadata: Optional[TypeModelMetadata] = None,
+        model_metadata: Optional[BaseModelMetadata] = None,
     ) -> Prompt:
         pass
 
@@ -245,7 +245,7 @@ class BasePromptRegistry(ABC):
         user: StarletteUser,
         prompt_id: str,
         prompt_version: Optional[str] = None,
-        model_metadata: Optional[TypeModelMetadata] = None,
+        model_metadata: Optional[BaseModelMetadata] = None,
         internal_event_category=__name__,
     ) -> Prompt:
         if not model_metadata:

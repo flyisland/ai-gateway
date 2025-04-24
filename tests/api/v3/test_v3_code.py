@@ -24,8 +24,8 @@ __all__ = [
 
 from ai_gateway.model_metadata import (
     AmazonQModelMetadata,
+    BaseModelMetadata,
     ModelMetadata,
-    TypeModelMetadata,
 )
 
 
@@ -1292,7 +1292,7 @@ class TestAmazonQIntegrationV3:
         mock_generations: Mock,
         mock_suggestions_output_text: str,
         role_arn: str,
-        model_metadata: Optional[TypeModelMetadata],
+        model_metadata: Optional[BaseModelMetadata],
         expected_response: dict,
         route: str,
     ):
@@ -1428,7 +1428,7 @@ class TestAmazonQIntegrationV3:
         mock_completions: Mock,
         mock_suggestions_output_text: str,
         role_arn: str,
-        model_metadata: Optional[TypeModelMetadata],
+        model_metadata: Optional[BaseModelMetadata],
         expected_response: dict,
         route: str,
     ):

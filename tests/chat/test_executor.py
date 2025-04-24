@@ -19,8 +19,8 @@ from ai_gateway.chat.agents import (
 from ai_gateway.chat.toolset import DuoChatToolsRegistry
 from ai_gateway.model_metadata import (
     AmazonQModelMetadata,
+    BaseModelMetadata,
     ModelMetadata,
-    TypeModelMetadata,
 )
 from ai_gateway.models.base_chat import Role
 
@@ -329,7 +329,7 @@ class TestGLAgentRemoteExecutorToolAction:
         internal_event_client: Mock,
         inputs: ReActAgentInputs,
         user: StarletteUser,
-        model_metadata: Optional[TypeModelMetadata],
+        model_metadata: Optional[BaseModelMetadata],
         gl_version: str,
         expected_available_tools,
         expected_internal_events,

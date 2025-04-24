@@ -12,8 +12,8 @@ from pydantic import AnyUrl
 from ai_gateway.api.v1 import api_router
 from ai_gateway.model_metadata import (
     AmazonQModelMetadata,
+    BaseModelMetadata,
     ModelMetadata,
-    TypeModelMetadata,
 )
 from ai_gateway.prompts import Prompt
 
@@ -219,7 +219,7 @@ class TestPrompt:
         mock_track_internal_event,
         inputs: dict[str, str],
         prompt_version: Optional[str],
-        model_metadata: Optional[TypeModelMetadata],
+        model_metadata: Optional[BaseModelMetadata],
         expected_get_args: dict,
         expected_status: int,
         expected_response: Any,

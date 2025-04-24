@@ -1,4 +1,3 @@
-from abc import abstractmethod
 from contextvars import ContextVar
 from typing import Annotated, Any, Dict, Literal, Optional
 
@@ -8,13 +7,15 @@ from ai_gateway.api.auth_utils import StarletteUser
 
 
 class BaseModelMetadata(BaseModel):
+    provider: str
+    name: str
+
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self._user = None
 
-    @abstractmethod
     def to_params(self) -> Dict[str, Any]:
-        pass
+        return {}
 
     def add_user(self, user: StarletteUser):
         self._user = user
@@ -32,7 +33,7 @@ class AmazonQModelMetadata(BaseModelMetadata):
 class ModelMetadata(BaseModelMetadata):
     name: Annotated[str, StringConstraints(max_length=255)]
     provider: Annotated[str, StringConstraints(max_length=255)]
-    endpoint: Annotated[AnyUrl, UrlConstraints(max_length=255)]
+    endpoint: Optional[Annotated[AnyUrl, UrlConstraints(max_length=255)]] = None
     api_key: Optional[Annotated[str, StringConstraints(max_length=2000)]] = None
     identifier: Optional[Annotated[str, StringConstraints(max_length=1000)]] = None
 
@@ -63,16 +64,13 @@ class ModelMetadata(BaseModelMetadata):
         return params
 
 
-TypeModelMetadata = AmazonQModelMetadata | ModelMetadata
-
-
-def create_model_metadata(data: Dict[str, Any]) -> TypeModelMetadata:
+def create_model_metadata(data: Dict[str, Any]) -> BaseModelMetadata:
     if data["provider"] == "amazon_q":
         return AmazonQModelMetadata(**data)
 
     return ModelMetadata(**data)
 
 
-current_model_metadata_context: ContextVar[Optional[TypeModelMetadata]] = ContextVar(
+current_model_metadata_context: ContextVar[Optional[BaseModelMetadata]] = ContextVar(
     "current_model_metadata_context", default=None
 )

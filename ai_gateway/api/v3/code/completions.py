@@ -40,7 +40,7 @@ from ai_gateway.code_suggestions.base import SAAS_PROMPT_MODEL_MAP
 from ai_gateway.config import Config
 from ai_gateway.container import ContainerApplication
 from ai_gateway.feature_flags.context import current_feature_flag_context
-from ai_gateway.model_metadata import TypeModelMetadata
+from ai_gateway.model_metadata import BaseModelMetadata
 from ai_gateway.models import KindModelProvider
 from ai_gateway.prompts import BasePromptRegistry
 from ai_gateway.structured_logging import get_request_logger
@@ -166,7 +166,7 @@ async def code_completion(
         ContainerApplication.code_suggestions.completions.amazon_q_factory.provider
     ],
     code_context: Optional[list[CodeContextPayload]] = None,
-    model_metadata: TypeModelMetadata = None,
+    model_metadata: BaseModelMetadata = None,
 ):
     kwargs = {}
 
@@ -268,7 +268,7 @@ async def code_generation(
         ContainerApplication.code_suggestions.generations.amazon_q_factory.provider
     ],
     code_context: Optional[list[CodeContextPayload]] = None,
-    model_metadata: Optional[TypeModelMetadata] = None,
+    model_metadata: Optional[BaseModelMetadata] = None,
 ):
     model_provider = payload.model_provider or (
         model_metadata and model_metadata.provider
