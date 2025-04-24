@@ -6,7 +6,7 @@ import yaml
 from poetry.core.constraints.version import Version, parse_constraint
 
 from ai_gateway.internal_events.client import InternalEventsClient
-from ai_gateway.model_metadata import ModelMetadata, TypeModelMetadata
+from ai_gateway.model_metadata import BaseModelMetadata, ModelMetadata
 from ai_gateway.prompts.base import BasePromptRegistry, Prompt
 from ai_gateway.prompts.config import BaseModelConfig, ModelClassProvider, PromptConfig
 from ai_gateway.prompts.typing import TypeModelFactory
@@ -43,7 +43,7 @@ class LocalPromptRegistry(BasePromptRegistry):
     def _resolve_id(
         self,
         prompt_id: str,
-        model_metadata: Optional[TypeModelMetadata] = None,
+        model_metadata: Optional[BaseModelMetadata] = None,
     ) -> str:
         if model_metadata:
             return f"{prompt_id}/{model_metadata.name}"
@@ -83,7 +83,7 @@ class LocalPromptRegistry(BasePromptRegistry):
         self,
         prompt_id: str,
         prompt_version: str,
-        model_metadata: Optional[TypeModelMetadata] = None,
+        model_metadata: Optional[BaseModelMetadata] = None,
     ) -> Prompt:
         if (
             isinstance(model_metadata, ModelMetadata)

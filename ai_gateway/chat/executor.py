@@ -15,7 +15,7 @@ from ai_gateway.chat.agents.react import ReActAgentInputs
 from ai_gateway.chat.base import BaseToolsRegistry
 from ai_gateway.chat.tools import BaseTool
 from ai_gateway.internal_events import InternalEventsClient
-from ai_gateway.model_metadata import TypeModelMetadata
+from ai_gateway.model_metadata import BaseModelMetadata
 from ai_gateway.prompts.config.models import ModelClassProvider
 
 __all__ = [
@@ -57,7 +57,7 @@ class GLAgentRemoteExecutor(Generic[TypeAgentInputs, TypeAgentEvent]):
         self,
         user: StarletteUser,
         gl_version: str,
-        model_metadata: Optional[TypeModelMetadata] = None,
+        model_metadata: Optional[BaseModelMetadata] = None,
     ):
         # Access the user tools as soon as possible to raise an exception
         # (in case of invalid unit primitives) before starting the data stream.
