@@ -8,13 +8,6 @@ from pylint.lint import PyLinter
 # DO NOT ADD FILES FROM THE ai_gateway MODULE
 EXCLUDED_FILES = {
     "tests/test_structured_logging.py",
-    "tests/searches/test_search_container.py",
-    "tests/code_suggestions/test_instrumentators.py",
-    "tests/code_suggestions/test_engine.py",
-    "tests/code_suggestions/test_processing.py",
-    "tests/code_suggestions/test_logging.py",
-    "tests/code_suggestions/test_authentication.py",
-    "tests/prompts/test_litellm_prompt.py",
 }
 
 
