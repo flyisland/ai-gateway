@@ -107,13 +107,13 @@ class LLM(TextGenModelBase):
             "kwargs": dict(kwargs),
         }
         if temperature is not None:
-            scope["temperature"] = json.dumps(temperature)
+            scope["temperature"] = str(temperature)
         if max_output_tokens is not None:
-            scope["max_output_tokens"] = json.dumps(max_output_tokens)
+            scope["max_output_tokens"] = str(max_output_tokens)
         if top_p is not None:
-            scope["top_p"] = json.dumps(top_p)
+            scope["top_p"] = str(top_p)
         if top_k is not None:
-            scope["top_k"] = json.dumps(top_k)
+            scope["top_k"] = str(top_k)
 
         # echo the current scope's local variables
         # default=vars prevents object is not JSON serializable error
@@ -192,13 +192,13 @@ class ChatModel(ChatModelBase):
             "kwargs": dict(kwargs),
         }
         if temperature is not None:
-            scope["temperature"] = json.dumps(temperature)
+            scope["temperature"] = str(temperature)
         if max_output_tokens is not None:
-            scope["max_output_tokens"] = json.dumps(max_output_tokens)
+            scope["max_output_tokens"] = str(max_output_tokens)
         if top_p is not None:
-            scope["top_p"] = json.dumps(top_p)
+            scope["top_p"] = str(top_p)
         if top_k is not None:
-            scope["top_k"] = json.dumps(top_k)
+            scope["top_k"] = str(top_k)
         suggestion = (
             f"echo: {json.dumps(scope)}"  # echo the current scope's local variables
         )
