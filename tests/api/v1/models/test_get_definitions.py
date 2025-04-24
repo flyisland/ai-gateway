@@ -64,7 +64,7 @@ def mock_model_config():
 
 
 def test_get_models_returns_correct_data(mock_model_config, client):
-    response = client.post("/definitions")
+    response = client.get("/definitions")
 
     assert response.status_code == 200
     data = response.json()

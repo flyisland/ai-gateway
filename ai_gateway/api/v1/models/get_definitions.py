@@ -25,7 +25,7 @@ class _GetModelResponse(BaseModel):
     unit_primitives: list[_GetModelResponseUnitPrimitive]
 
 
-@router.post(
+@router.get(
     "/definitions",
     status_code=status.HTTP_200_OK,
     description="List of available large language models powering GitLab Duo features",
