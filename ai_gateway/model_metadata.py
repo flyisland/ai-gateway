@@ -76,21 +76,19 @@ def parameters_for_gitlab_provider(identifier) -> dict[str, Any]:
     """
     gitlab_model = ModelSelectionConfig().get_gitlab_model(identifier)
 
-    params = {
+    return {
         "provider": gitlab_model.provider,
         "identifier": gitlab_model.provider_identifier,
         "name": gitlab_model.family or "base",
     }
 
-    return params
-
 
 def create_model_metadata(data: Dict[str, Any]) -> TypeModelMetadata:
-    provider = data["provider"]
-    if provider == "amazon_q":
-        return AmazonQModelMetadata(**data)
-    if provider == "gitlab":
-        return ModelMetadata(**parameters_for_gitlab_provider(data["identifier"]))
+    match data["provider"]:
+        case "amazon_q":
+            return AmazonQModelMetadata(**data)
+        case "gitlab":
+            return ModelMetadata(**parameters_for_gitlab_provider(data["identifier"]))
 
     return ModelMetadata(**data)
 
