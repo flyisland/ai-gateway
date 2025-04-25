@@ -1,3 +1,4 @@
+# see docs/model_selection for documentation
 configurable_unit_primitives:
   - unit_primitives:
       - "ask_build"
