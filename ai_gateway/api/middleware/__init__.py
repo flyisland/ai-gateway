@@ -1,9 +1,5 @@
-from .base import (
-    AccessLogMiddleware,
-    DistributedTraceMiddleware,
-    InternalEventMiddleware,
-    MiddlewareAuthentication,
-)
+from .base import AccessLogMiddleware, InternalEventMiddleware, MiddlewareAuthentication
+from .distributed_trace import DistributedTraceMiddleware
 from .feature_flag import FeatureFlagMiddleware
 from .headers import (
     X_GITLAB_CLIENT_NAME,
@@ -26,9 +22,9 @@ from .model_config import ModelConfigMiddleware
 
 __all__ = [
     "AccessLogMiddleware",
-    "FeatureFlagMiddleware",
-    "MiddlewareAuthentication",
     "InternalEventMiddleware",
+    "MiddlewareAuthentication",
+    "FeatureFlagMiddleware",
     "DistributedTraceMiddleware",
     "ModelConfigMiddleware",
     "X_GITLAB_REALM_HEADER",
