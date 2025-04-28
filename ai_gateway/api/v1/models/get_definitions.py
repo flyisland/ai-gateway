@@ -14,7 +14,7 @@ class _GetModelResponseModel(BaseModel):
 
 
 class _GetModelResponseUnitPrimitive(BaseModel):
-    configuration_name: str
+    feature_setting: str
     default_model: str
     selectable_models: list[str]
     beta_models: list[str]
