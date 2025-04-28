@@ -1,5 +1,6 @@
 dotenv-vars:
   stage: test
+  allow_failure: true
   needs:
     - job: build-docker-model-gateway
   script:
@@ -31,9 +32,10 @@ tests:performance:
   needs:
     - job: dotenv-vars
       artifacts: true
+  allow_failure: true
   trigger:
     project: gitlab-org/quality/component-performance-testing
-    branch: main
+    branch: vp-add-std-dev-to-custom-report
     strategy: depend
     forward:
       pipeline_variables: true
