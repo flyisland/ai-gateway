@@ -175,3 +175,13 @@ class TestModelMetadataToParams:
             "api_key": "abcde",
             "custom_llm_provider": "bedrock",
         }
+
+
+def test_create_model_metadata_with_none_data():
+    result = create_model_metadata(None)
+    assert result is None
+
+
+def test_create_model_metadata_without_provider():
+    result = create_model_metadata({"name": "test"})
+    assert result is None

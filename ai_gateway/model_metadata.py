@@ -83,7 +83,10 @@ def parameters_for_gitlab_provider(identifier) -> dict[str, Any]:
     }
 
 
-def create_model_metadata(data: Dict[str, Any]) -> TypeModelMetadata:
+def create_model_metadata(data: Dict[str, Any]) -> Optional[TypeModelMetadata]:
+    if not data or "provider" not in data:
+        return None
+
     match data["provider"]:
         case "amazon_q":
             return AmazonQModelMetadata(**data)
