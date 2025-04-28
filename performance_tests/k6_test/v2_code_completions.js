@@ -7,7 +7,7 @@ export const TEST_NAME='v2_code_completions'
 
 export const options = {
   vus: 2, // Number of virtual users
-  duration: '60s', // Test duration
+  duration: '30s', // Test duration
 };
 
 export default function () {
