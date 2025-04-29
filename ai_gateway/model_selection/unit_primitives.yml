@@ -35,3 +35,10 @@ configurable_unit_primitives:
     selectable_models:
       - "claude_3_7_sonnet-20250219"
       - "claude_3_5_sonnet_20240620"
+  - feature_setting: "duo_chat_write_tests"
+    unit_primitives:
+      - "write_tests"
+    default_model: "claude_sonnet_3_7_20250219"
+    selectable_models:
+      - "claude_3_7_sonnet-20250219"
+      - "claude_3_5_sonnet_20240620"      
