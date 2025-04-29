@@ -27,4 +27,11 @@ configurable_unit_primitives:
     default_model: "claude_sonnet_3_7_20250219"
     selectable_models:
       - "claude_3_7_sonnet_20250219"
+      - "claude_3_5_sonnet-20240620"
+  - feature_setting: "duo_chat_refactor_code"
+    unit_primitives:
+      - "refactor_code"
+    default_model: "claude_sonnet_3_7_20250219"
+    selectable_models:
+      - "claude_3_7_sonnet-20250219"
       - "claude_3_5_sonnet_20240620"
