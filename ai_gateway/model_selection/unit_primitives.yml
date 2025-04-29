@@ -26,5 +26,5 @@ configurable_unit_primitives:
       - "fix_code"
     default_model: "claude_sonnet_3_7_20250219"
     selectable_models:
-      - "claude-3-7-sonnet-20250219"
-      - "claude-3-5-sonnet-20240620"
+      - "claude_3_7_sonnet_20250219"
+      - "claude_3_5_sonnet_20240620"
