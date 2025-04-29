@@ -1,0 +1,24 @@
+# frozen_string_literal: true
+
+CODE_SUGGESTIONS_DANGER_MESSAGE = <<~MSG
+## Code Suggestions
+
+This merge request includes changes to ~"Category:Code Suggestions" files that may affect the
+[Code Suggestions API](https://gitlab.com/gitlab-org/modelops/applied-ml/code-suggestions/ai-assist/-/blob/main/docs/api.md#code-suggestions).
+Please make sure that the Rails E2E tests for Code Suggestions runs successfully against your local AI Gateway.
+
+Refer to the Handbook instructions on [running end-to-end tests against your GDK instance](https://handbook.gitlab.com/handbook/engineering/development/dev/create/code-creation/code-suggestions-guide/testing_guide/#running-end-to-end-tests-locally).
+MSG
+
+# These are paths to files that may cause a change in the Code Suggestions API
+CODE_SUGGESTIONS_API_PATH = %r{^ai_gateway/api/v\d+/code/typing.py}
+CODE_SUGGESTIONS_PROMPT_PATH = %r{^ai_gateway/prompts/definitions/code_suggestions/}
+
+# Check for changes in files that may cause a change in the Code Suggestions API
+def possible_code_suggestions_api_change?(files)
+  files.any? do |file|
+    file.match?(CODE_SUGGESTIONS_API_PATH) || file.match?(CODE_SUGGESTIONS_PROMPT_PATH)
+  end
+end
+
+warn CODE_SUGGESTIONS_DANGER_MESSAGE if possible_code_suggestions_api_change?(helper.all_changed_files)
