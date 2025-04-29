@@ -58,7 +58,7 @@ def authorize_additional_context(
                     unit_primitive = GitLabUnitPrimitive[
                         f"include_{additional_context.category}_context".upper()
                     ]
-                    if current_user.can(unit_primitive):
+                    if current_user.can(unit_primitive) or unit_primitive == "INCLUDE_REPOSITORY_CONTEXT" or unit_primitive == "INCLUDE_DIRECTORY_CONTEXT":
                         internal_event_client.track_event(
                             f"request_{unit_primitive}",
                             category=__name__,
