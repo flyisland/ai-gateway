@@ -18,7 +18,6 @@ from ai_gateway.model_metadata import ModelMetadata
 
 access_logger = structlog.stdlib.get_logger("api.access")
 ENABLE_REQUEST_LOGGING = False
-
 CUSTOM_MODELS_ENABLED = False
 
 
