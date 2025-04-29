@@ -46,7 +46,7 @@ Each Unit Primitive can be configured with:
 Unit primitive groups are defined in `ai_gateway/model_selection/unit_primitives.yml` and the following properties are
 available:
 
-- group_name: An identifier used to refer to this configuration group
+- feature_setting: An identifier used to refer to the feature name
 - unit_primitives: the list of unit primitives that belong to this group, as defined in
   the [cloud_connector](https://gitlab.com/gitlab-org/cloud-connector/gitlab-cloud-connector/-/blob/main/src/python/gitlab_cloud_connector/gitlab_features.py#L19)
 - default_model: the `gitlab_identifier` of the model that is used if the user has not selected a different model
@@ -57,10 +57,10 @@ Example:
 
 ```yaml
 configurable_unit_primitives:
-  - group_name: "completion"
+  - feature_setting: "duo_chat"
     unit_primitives:
-      - "complete_code"
-      - "generate_code"
+      - "ask_build"
+      - "ask_commit"
     default_model: "claude_sonnet_3_7_20250219"
     selectable_models:
       - "claude-3-7-sonnet-20250219"
