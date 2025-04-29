@@ -6,8 +6,21 @@ export const RPS_THRESHOLD= 2;
 export const TEST_NAME='v2_code_completions'
 
 export const options = {
-  vus: 2, // Number of virtual users
-  duration: '60s', // Test duration
+  scenarios: {
+    warmup: {
+      executor: 'constant-vus',
+      vus: 1,
+      duration: '10s',
+      gracefulStop: '0s',
+      tags: { scenario: 'warmup' }, // Tag these requests to filter them out
+    },
+    load_test: {
+      executor: 'constant-vus',
+      vus: 2,
+      duration: '50s',
+      startTime: '10s', // Start after warmup completes
+      tags: { scenario: 'load_test' },
+    },
 };
 
 export default function () {
