@@ -6,7 +6,7 @@ export const RPS_THRESHOLD= 2;
 export const TEST_NAME='v2_code_completions'
 
 export const options = {
-  scenarios: {
+scenarios:  {
     warmup: {
       executor: 'constant-vus',
       vus: 1,
@@ -21,7 +21,8 @@ export const options = {
       startTime: '10s', // Start after warmup completes
       tags: { scenario: 'load_test' },
     },
-};
+  },
+}
 
 export default function () {
   const url = `http://${__ENV.AI_GATEWAY_IP}:5052/v2/code/completions`; // Replace with your API endpoint
