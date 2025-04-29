@@ -271,6 +271,7 @@ export const options = {
       startTime: '10s', // Start after warmup completes
       tags: { scenario: 'load_test' },
     },
+  }
 };
 
 export default function () {
