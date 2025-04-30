@@ -1,7 +1,6 @@
 from time import time
 from typing import Annotated, AsyncIterator, Optional, Tuple
 
-import anthropic
 from dependency_injector.providers import Factory
 from fastapi import APIRouter, Depends, HTTPException, Request, status
 from gitlab_cloud_connector import (
@@ -37,7 +36,6 @@ from ai_gateway.async_dependency_resolver import (
     get_code_suggestions_completions_vertex_legacy_provider,
     get_code_suggestions_generations_agent_factory_provider,
     get_code_suggestions_generations_anthropic_chat_factory_provider,
-    get_code_suggestions_generations_anthropic_factory_provider,
     get_code_suggestions_generations_litellm_factory_provider,
     get_code_suggestions_generations_vertex_provider,
     get_config,
@@ -59,7 +57,7 @@ from ai_gateway.feature_flags.context import current_feature_flag_context
 from ai_gateway.instrumentators.base import TelemetryInstrumentator
 from ai_gateway.internal_events import InternalEventsClient
 from ai_gateway.model_metadata import ModelMetadata, create_model_metadata
-from ai_gateway.models import KindAnthropicModel, KindModelProvider
+from ai_gateway.models import KindModelProvider
 from ai_gateway.models.base import TokensConsumptionMetadata
 from ai_gateway.prompts import BasePromptRegistry
 from ai_gateway.structured_logging import get_request_logger
@@ -217,10 +215,6 @@ async def generations(
         Factory[CodeGenerations],
         Depends(get_code_suggestions_generations_vertex_provider),
     ],
-    generations_anthropic_factory: Annotated[
-        Factory[CodeGenerations],
-        Depends(get_code_suggestions_generations_anthropic_factory_provider),
-    ],
     generations_anthropic_chat_factory: Annotated[
         Factory[CodeGenerations],
         Depends(get_code_suggestions_generations_anthropic_chat_factory_provider),
@@ -281,14 +275,13 @@ async def generations(
         current_user,
         prompt_registry,
         generations_vertex_factory,
-        generations_anthropic_factory,
         generations_anthropic_chat_factory,
         generations_litellm_factory,
         generations_agent_factory,
         internal_event_client,
     )
 
-    if payload.prompt_version in {2, 3}:
+    if payload.prompt_version == 3:
         code_generations.with_prompt_prepared(payload.prompt)
 
     with TelemetryInstrumentator().watch(payload.telemetry):
@@ -324,20 +317,6 @@ async def generations(
             enabled_feature_flags=current_feature_flag_context.get(),
         ),
         choices=_generation_suggestion_choices(suggestion.text),
-    )
-
-
-def _resolve_code_generations_anthropic(
-    payload: SuggestionsRequest,
-    generations_anthropic_factory: Factory[CodeGenerations],
-) -> CodeGenerations:
-    model_name = (
-        payload.model_name if payload.model_name else KindAnthropicModel.CLAUDE_2_1
-    )
-
-    return generations_anthropic_factory(
-        model__name=model_name,
-        model__stop_sequences=["</new_code>", anthropic.HUMAN_PROMPT],
     )
 
 
@@ -380,7 +359,6 @@ def _build_code_generations(
     current_user: StarletteUser,
     prompt_registry: BasePromptRegistry,
     generations_vertex_factory: Factory[CodeGenerations],
-    generations_anthropic_factory: Factory[CodeGenerations],
     generations_anthropic_chat_factory: Factory[CodeGenerations],
     generations_litellm_factory: Factory[CodeGenerations],
     generations_agent_factory: Factory[CodeGenerations],
@@ -401,15 +379,9 @@ def _build_code_generations(
     )
 
     if payload.model_provider == KindModelProvider.ANTHROPIC:
-        if payload.prompt_version == 3:
-            return _resolve_code_generations_anthropic_chat(
-                payload,
-                generations_anthropic_chat_factory,
-            )
-
-        return _resolve_code_generations_anthropic(
+        return _resolve_code_generations_anthropic_chat(
             payload,
-            generations_anthropic_factory,
+            generations_anthropic_chat_factory,
         )
 
     if payload.model_provider == KindModelProvider.LITELLM:
