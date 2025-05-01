@@ -79,7 +79,7 @@ class AdditionalContext(BaseModel):
         "repository",
         "directory",
         "file",
-        "semantic_search_result",
+        "codebase_search_result",
         "snippet",
         "merge_request",
         "issue",
