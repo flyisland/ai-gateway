@@ -58,7 +58,7 @@ from ai_gateway.config import Config
 from ai_gateway.feature_flags.context import current_feature_flag_context
 from ai_gateway.instrumentators.base import TelemetryInstrumentator
 from ai_gateway.internal_events import InternalEventsClient
-from ai_gateway.model_metadata import ModelMetadata
+from ai_gateway.model_metadata import create_model_metadata, ModelMetadata
 from ai_gateway.models import KindAnthropicModel, KindModelProvider
 from ai_gateway.models.base import TokensConsumptionMetadata
 from ai_gateway.prompts import BasePromptRegistry
@@ -431,13 +431,19 @@ def _resolve_code_completions_litellm(
     completions_litellm_factory: Factory[CodeCompletions],
 ) -> CodeCompletions:
     if payload.prompt_version == 2 and not payload.prompt:
-        model_metadata = ModelMetadata(
-            name=payload.model_name,
-            endpoint=payload.model_endpoint,
-            api_key=payload.model_api_key,
-            identifier=payload.model_identifier,
-            provider="text-completion-openai",
-        )
+        if payload.model_provider == "gitlab":
+            model_metadata = create_model_metadata({
+                "provider": "gitlab",
+                "identifier": payload.model_identifier or payload.model_name,
+            })
+        else:
+            model_metadata = ModelMetadata(
+                name=payload.model_name,
+                endpoint=payload.model_endpoint,
+                api_key=payload.model_api_key,
+                identifier=payload.model_identifier,
+                provider=payload.model_provider or "text-completion-openai",
+            )
 
         return _resolve_agent_code_completions(
             model_metadata=model_metadata,
