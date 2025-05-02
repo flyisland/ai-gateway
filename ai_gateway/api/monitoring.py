@@ -62,6 +62,7 @@ def single_validation(
 
     return _decorator
 
+
 # TODO: replace this with the correct vertex model
 # @single_validation(KindModelProvider.VERTEX_AI)
 # async def validate_vertex_available(
