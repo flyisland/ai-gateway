@@ -17,7 +17,7 @@ scenarios:  {
     load_test: {
       executor: 'constant-vus',
       vus: 2,
-      duration: '50s',
+      duration: '40s',
       startTime: '10s', // Start after warmup completes
       tags: { scenario: 'load_test' },
     },
