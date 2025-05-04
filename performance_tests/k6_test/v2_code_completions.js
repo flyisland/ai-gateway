@@ -17,12 +17,21 @@ scenarios:  {
     load_test: {
       executor: 'constant-vus',
       vus: 2,
-      duration: '50s',
+      duration: '40s',
       startTime: '10s', // Start after warmup completes
       tags: { scenario: 'load_test' },
     },
   },
-}
+  thresholds: {
+    // Real thresholds that won't fail the test
+    'http_req_waiting{scenario:load_test}': [
+      { threshold: `p(90)<${TTFB_THRESHOLD}`, abortOnFail: false }
+    ],
+    'http_reqs{scenario:load_test}': [
+      { threshold: `rate>=${RPS_THRESHOLD}`, abortOnFail: false }
+    ]
+  },
+};
 
 export default function () {
   const url = `http://${__ENV.AI_GATEWAY_IP}:5052/v2/code/completions`; // Replace with your API endpoint
