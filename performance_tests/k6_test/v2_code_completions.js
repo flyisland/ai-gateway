@@ -68,33 +68,3 @@ export default function () {
   sleep(1);
 }
 
-export function handleSummary(data) {
-  const SUMMARY_OUTPUT_PATH = `results/${TEST_NAME}.json`;
-  console.log(data.metrics.http_reqs)
-
-  // Create an object for the return value
-  const summaryOutput = {
-    'stdout': textSummary(data, { indent: ' ', enableColors: true }) +
-              `\nConstants:\n` +
-              `TTFB_THRESHOLD: ${TTFB_THRESHOLD}\n` +
-              `RPS_THRESHOLD: ${RPS_THRESHOLD}\n` +
-              `VUs: ${options.vus}\n` +
-              `Duration: ${options.duration}\n`+
-              `TTFB p90: ${data.metrics.http_req_waiting.values["p(90)"]}ms\n`+
-              `TTFB Avg: ${data.metrics.http_req_waiting.values["avg"]}ms\n`+
-              `http_requests: ${data.metrics.http_reqs.values["rate"]}\n,`
-  };
-
-  // Add the JSON output using the variable path
-  summaryOutput[SUMMARY_OUTPUT_PATH] = JSON.stringify({
-    metrics: data.metrics,
-    constants: {
-      ttfb_threshold: TTFB_THRESHOLD,
-      rps_threshold: RPS_THRESHOLD,
-      vus: options.vus,
-      duration: options.duration
-    }
-  }, null, 2);
-
-  return summaryOutput;
-}
