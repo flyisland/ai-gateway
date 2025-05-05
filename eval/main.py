@@ -12,6 +12,8 @@ from ai_gateway.container import ContainerApplication
 from ai_gateway.prompts.base import BasePromptRegistry
 
 EVALUATORS = {
+    # In this iteration, we assume that all evaluators are LLM-based and require an LLM to be configured.
+    # We rely on Claude 3.5 Sonnet (20240620) with the temperature set to 0.
     "correctness": CorrectnessEvaluator,
 }
 
@@ -42,7 +44,7 @@ def eval(
     )
 
 
-def run(
+def _main(
     prompt_id: Annotated[str, typer.Option()],
     prompt_version: Annotated[str, typer.Option()],
     dataset: Annotated[str, typer.Option()],
@@ -56,7 +58,7 @@ def run(
 
 
 def main():
-    typer.run(run)
+    typer.run(_main)
 
 
 if __name__ == "__main__":
