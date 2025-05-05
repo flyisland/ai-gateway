@@ -254,10 +254,12 @@ import { textSummary } from 'https://jslib.k6.io/k6-summary/0.0.1/index.js';
 export const TTFB_THRESHOLD= /* TTFB THRESHOLD VALUE EXPECTED */
 export const RPS_THRESHOLD= /* RPS THRESHOLD VALUE EXPECTED */;
 export const TEST_NAME=/* 'NAME OF THE TEST IN QUOTES' */
-export const LOAD_TEST_VUS = 2; /* The number of threads for actual test */
-export const LOAD_TEST_DURATION = '50s'; /* The duration of the actual test run */
-export const WARMUP_TEST_VUS = 1; /* The number of threads for warming up the system */
-export const WARMUP_TEST_DURATION = '10s'; /* The duration of the warmup */
+export const LOAD_TEST_VUS = 2; /* THE NUMBER OF THREADS OF ACTUAL TEST */
+export const LOAD_TEST_DURATION = '50s'; /* THE DURATION FOR THE ACTUAL TEST RUN */
+export const WARMUP_TEST_VUS = 1; /* THE NUMBER OF THREADS FOR WARMING UP THE SYSTEM */
+export const WARMUP_TEST_DURATION = '10s'; /* THE DURATION FOR THE WARMUP RUN */
+export const LOAD_TEST_START_TIME = '10s'; /* THE TIME TO WAIT AFTER WHICH THE LOAD TEST STARTS
+                                              USUALLY THIS WOULD BE EQUAL TO WARMUP_TEST_DURATION */
 
 export const options = {
 scenarios:  {
@@ -266,18 +268,17 @@ scenarios:  {
       vus: WARMUP_TEST_VUS,
       duration: WARMUP_TEST_DURATION,
       gracefulStop: '0s',
-      tags: { scenario: 'warmup' }, // Tag these requests to filter them out
+      tags: { scenario: 'warmup' },
     },
     load_test: {
       executor: 'constant-vus',
       vus: LOAD_TEST_VUS,
       duration: LOAD_TEST_DURATION,
-      startTime: '10s', // Start after warmup completes
+      startTime: LOAD_TEST_START_TIME,
       tags: { scenario: 'load_test' },
     },
   },
   thresholds: {
-    // Real thresholds that won't fail the test
     'http_req_waiting{scenario:load_test}': [
       { threshold: `p(90)<${TTFB_THRESHOLD}`, abortOnFail: false }
     ],
