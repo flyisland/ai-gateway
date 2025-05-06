@@ -46,7 +46,7 @@ GEM
       base64 (~> 0.2.0)
       httparty (~> 0.20)
       terminal-table (>= 1.5.1)
-    gitlab-dangerfiles (4.8.1)
+    gitlab-dangerfiles (4.9.1)
       danger (>= 9.3.0)
       danger-gitlab (>= 8.0.0)
       rake (~> 13.0)
@@ -88,7 +88,7 @@ PLATFORMS
   x86_64-linux
 
 DEPENDENCIES
-  gitlab-dangerfiles (~> 4.8.0)
+  gitlab-dangerfiles (~> 4.9.0)
 
 BUNDLED WITH
    2.6.3
