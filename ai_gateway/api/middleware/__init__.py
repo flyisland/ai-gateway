@@ -24,11 +24,11 @@ from .model_config import ModelConfigMiddleware
 
 __all__ = [
     "AccessLogMiddleware",
-    "DistributedTraceMiddleware",
     "FeatureFlagMiddleware",
-    "InternalEventMiddleware",
     "MiddlewareAuthentication",
+    "InternalEventMiddleware",
     "ModelConfigMiddleware",
+    "DistributedTraceMiddleware",
     "X_GITLAB_CLIENT_NAME",
     "X_GITLAB_CLIENT_TYPE",
     "X_GITLAB_CLIENT_VERSION",
