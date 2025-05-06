@@ -261,7 +261,7 @@ def test_middleware_distributed_trace(fastapi_server_app: FastAPI, test_path, ex
     client = TestClient(server)
 
     with patch(
-        "ai_gateway.api.middleware.base.tracing_context"
+        "ai_gateway.api.middleware.distributed_trace.tracing_context"
     ) as mock_tracing_context:
         client.post(
             test_path,
