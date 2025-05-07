@@ -1,3 +1,6 @@
+from datetime import datetime
+
+from asgi_correlation_id.context import correlation_id
 import logging
 from typing import Optional, Tuple
 
@@ -28,7 +31,8 @@ from starlette_context import context as starlette_context
 
 from ai_gateway.api.auth_utils import StarletteUser
 from ai_gateway.api.timing import timing
-from ai_gateway.api.middleware._path_resolver import _PathResolver
+
+from ai_gateway.api.middleware.base import _PathResolver
 
 
 log = logging.getLogger("codesuggestions")
