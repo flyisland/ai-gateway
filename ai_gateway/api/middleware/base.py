@@ -60,7 +60,6 @@ from .headers import (
     X_GITLAB_VERSION_HEADER,
 )
 
-from .authentication import MiddlewareAuthentication
 
 
 log = logging.getLogger("codesuggestions")
