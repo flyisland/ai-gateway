@@ -29,6 +29,7 @@ from ai_gateway.api.middleware.base import _PathResolver
 
 log = logging.getLogger("codesuggestions")
 
+
 class MiddlewareAuthentication(Middleware):
     class AuthBackend(AuthenticationBackend):
         def __init__(
