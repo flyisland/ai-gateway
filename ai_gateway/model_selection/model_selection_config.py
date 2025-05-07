@@ -1,3 +1,4 @@
+from itertools import chain
 from pathlib import Path
 from typing import Any, Optional
 
@@ -71,11 +72,11 @@ class ModelSelectionConfig:
 
         errors: set[str] = set()
         for unit_primitive_config in unit_primitive_configs:
-            ids = [
-                unit_primitive_config.default_model,
-                *unit_primitive_config.selectable_models,
-                *unit_primitive_config.beta_models,
-            ]
+            ids = chain(
+                [unit_primitive_config.default_model],
+                unit_primitive_config.selectable_models,
+                unit_primitive_config.beta_models,
+            )
 
             errors.update(
                 gitlab_model_id
