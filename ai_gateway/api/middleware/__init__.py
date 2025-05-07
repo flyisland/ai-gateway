@@ -2,7 +2,6 @@ from .authentication import MiddlewareAuthentication
 from .base import (
     AccessLogMiddleware,
     DistributedTraceMiddleware,
-    
 
 )
 

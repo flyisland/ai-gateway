@@ -59,7 +59,7 @@ from .headers import (
     X_GITLAB_TEAM_MEMBER_HEADER,
     X_GITLAB_VERSION_HEADER,
 )
-
+from .authentication import MiddlewareAuthentication
 
 log = logging.getLogger("codesuggestions")
 access_logger = structlog.stdlib.get_logger("api.access")
