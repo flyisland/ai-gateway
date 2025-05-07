@@ -77,9 +77,7 @@ class CurrentFile(BaseModel):
 class AdditionalContext(BaseModel):
     category: Literal[
         "repository",
-        "directory",
         "file",
-        "codebase_search_result",
         "snippet",
         "merge_request",
         "issue",

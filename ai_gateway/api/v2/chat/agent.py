@@ -60,8 +60,6 @@ def authorize_additional_context(
                     ]
                     if (current_user.can(unit_primitive)
                         or unit_primitive == "INCLUDE_REPOSITORY_CONTEXT"
-                        or unit_primitive == "INCLUDE_DIRECTORY_CONTEXT"
-                        or unit_primitive == "INCLUDE_CODEBASE_SEARCH_RESULT_CONTEXT"
                     ):
                         internal_event_client.track_event(
                             f"request_{unit_primitive}",
