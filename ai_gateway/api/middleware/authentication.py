@@ -1,5 +1,6 @@
 import logging
 from typing import Optional, Tuple
+
 from fastapi import status
 from fastapi.encoders import jsonable_encoder
 from gitlab_cloud_connector import (
@@ -24,8 +25,8 @@ from starlette.responses import JSONResponse
 from starlette_context import context as starlette_context
 
 from ai_gateway.api.auth_utils import StarletteUser
-from ai_gateway.api.timing import timing
 from ai_gateway.api.middleware.base import _PathResolver
+from ai_gateway.api.timing import timing
 
 log = logging.getLogger("codesuggestions")
 
