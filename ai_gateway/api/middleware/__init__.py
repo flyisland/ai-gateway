@@ -20,9 +20,9 @@ from .headers import (
     X_GITLAB_TEAM_MEMBER_HEADER,
     X_GITLAB_VERSION_HEADER,
 )
+from .authentication import MiddlewareAuthentication
 from .internal_event import InternalEventMiddleware
 from .model_config import ModelConfigMiddleware
-from .authentication import MiddlewareAuthentication
 
 __all__ = [
     "AccessLogMiddleware",
