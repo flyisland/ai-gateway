@@ -25,8 +25,8 @@ from starlette.responses import JSONResponse
 from starlette_context import context as starlette_context
 
 from ai_gateway.api.auth_utils import StarletteUser
-from ai_gateway.api.timing import timing
 from ai_gateway.api.middleware.base import _PathResolver
+from ai_gateway.api.timing import timing
 
 log = logging.getLogger("codesuggestions")
 
