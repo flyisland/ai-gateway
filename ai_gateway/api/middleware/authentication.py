@@ -32,7 +32,7 @@ from starlette_context import context as starlette_context
 from ai_gateway.api.auth_utils import StarletteUser
 from ai_gateway.api.timing import timing
 
-from ai_gateway.api.middleware.base import _PathResolver
+from .base import _PathResolver
 
 
 log = logging.getLogger("codesuggestions")
