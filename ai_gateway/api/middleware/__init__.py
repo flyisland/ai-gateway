@@ -1,8 +1,12 @@
+from .authentication import MiddlewareAuthentication
 from .base import (
     AccessLogMiddleware,
     DistributedTraceMiddleware,
-    MiddlewareAuthentication,
+
 )
+
+ 
+
 from .feature_flag import FeatureFlagMiddleware
 from .headers import (
     X_GITLAB_CLIENT_NAME,
