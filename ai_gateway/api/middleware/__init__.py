@@ -1,7 +1,7 @@
 from .base import (
     AccessLogMiddleware,
     DistributedTraceMiddleware,
-    MiddlewareAuthentication,
+    
 )
 from .feature_flag import FeatureFlagMiddleware
 from .headers import (
@@ -23,6 +23,7 @@ from .headers import (
 )
 from .internal_event import InternalEventMiddleware
 from .model_config import ModelConfigMiddleware
+from .authentication import MiddlewareAuthentication
 
 __all__ = [
     "AccessLogMiddleware",
