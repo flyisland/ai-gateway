@@ -61,7 +61,6 @@ from .headers import (
 )
 
 
-
 log = logging.getLogger("codesuggestions")
 access_logger = structlog.stdlib.get_logger("api.access")
 

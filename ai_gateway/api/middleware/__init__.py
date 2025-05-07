@@ -1,9 +1,12 @@
+from .authentication import MiddlewareAuthentication
 from .base import (
     AccessLogMiddleware,
     DistributedTraceMiddleware,
+    
+
 )
 
-from .authentication import MiddlewareAuthentication
+ 
 
 from .feature_flag import FeatureFlagMiddleware
 from .headers import (
