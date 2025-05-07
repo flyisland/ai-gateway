@@ -7,8 +7,8 @@ from gitlab_cloud_connector import (
     AuthProvider,
     CloudConnectorAuthError,
     CloudConnectorUser,
+    authenticate as cloud_connector_authenticate,
 )
-from gitlab_cloud_connector import authenticate as cloud_connector_authenticate
 from gitlab_cloud_connector.auth import AUTH_HEADER
 from starlette.authentication import (
     AuthCredentials,
@@ -24,9 +24,9 @@ from starlette.middleware.base import Request
 from starlette.responses import JSONResponse
 from starlette_context import context as starlette_context
 
-from ai_gateway.api.auth_utils import StarletteUser
 from ai_gateway.api.middleware.base import _PathResolver
 from ai_gateway.api.timing import timing
+from ai_gateway.api.auth_utils import StarletteUser
 
 log = logging.getLogger("codesuggestions")
 
