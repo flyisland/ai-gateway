@@ -102,3 +102,11 @@ configurable_unit_primitives:
       - "claude-3-haiku-20240307"
       - "claude-3-5-haiku-20241022"
       - "claude-3-5-sonnet-20240620"
+  - feature_setting: "glab_ask_git_command"
+    unit_primitives:
+      - "glab_ask_git_command"
+    default_model: "claude_3_5_haiku_20241022"
+    selectable_models:
+      - "claude-3-haiku-20240307"
+      - "claude-3-5-haiku-20241022"
+      - "claude-3-5-sonnet-20240620"
