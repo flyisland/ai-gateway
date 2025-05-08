@@ -65,7 +65,7 @@ class ModelSelectionConfig:
 
         return self._unit_primitive_configs
 
-    def validate(self) -> bool:
+    def validate(self) -> None:
         unit_primitive_configs = self.get_unit_primitive_config()
         models = self.get_llm_definitions()
         gitlab_models_ids = models.keys()
@@ -88,8 +88,6 @@ class ModelSelectionConfig:
             raise ValueError(
                 f"The following gitlab models ids are used but are not defined in models.yml: {", ".join(errors)}"
             )
-
-        return True
 
     def refresh(self):
         """Refresh the configuration by reloading from source files."""

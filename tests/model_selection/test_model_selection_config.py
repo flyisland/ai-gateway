@@ -120,7 +120,7 @@ def test_get_gitlab_model_missing_key(selection_config):
 
 
 def test_validate_without_error(mock_fs):
-    assert ModelSelectionConfig().validate()
+    assert ModelSelectionConfig().validate() is None
 
 
 def test_validate_with_error(fs: FakeFilesystem):
