@@ -2,39 +2,18 @@ import logging
 import time
 import traceback
 from datetime import datetime, timezone
-from typing import Optional, Tuple
+from typing import Optional
 
 import structlog
 from asgi_correlation_id.context import correlation_id
 from fastapi import status
-from fastapi.encoders import jsonable_encoder
-from gitlab_cloud_connector import (
-    X_GITLAB_DUO_SEAT_COUNT_HEADER,
-    AuthProvider,
-    CloudConnectorAuthError,
-    CloudConnectorUser,
-)
-from gitlab_cloud_connector import authenticate as cloud_connector_authenticate
-from gitlab_cloud_connector.auth import AUTH_HEADER
+from gitlab_cloud_connector import X_GITLAB_DUO_SEAT_COUNT_HEADER
 from langsmith.run_helpers import tracing_context
-from starlette.authentication import (
-    AuthCredentials,
-    AuthenticationError,
-    HTTPConnection,
-)
 from starlette.datastructures import CommaSeparatedStrings, MutableHeaders
-from starlette.middleware import Middleware
-from starlette.middleware.authentication import (
-    AuthenticationBackend,
-    AuthenticationMiddleware,
-)
 from starlette.middleware.base import Request
-from starlette.responses import JSONResponse
 from starlette_context import context as starlette_context
 from uvicorn.protocols.utils import get_path_with_query_string
 
-from ai_gateway.api.auth_utils import StarletteUser
-from ai_gateway.api.timing import timing
 from ai_gateway.internal_events import (
     EventContext,
     current_event_context,
