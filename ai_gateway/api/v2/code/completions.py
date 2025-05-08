@@ -336,20 +336,31 @@ def _resolve_prompt_code_generations(
     prompt_registry: BasePromptRegistry,
     generations_agent_factory: Factory[CodeGenerations],
 ) -> CodeGenerations:
-    model_metadata = ModelMetadata(
-        name=payload.model_name,
-        endpoint=payload.model_endpoint,
-        api_key=payload.model_api_key,
-        provider="custom_openai",
-        identifier=payload.model_identifier,
+    has_model_info = (
+        payload.model_name is not None and payload.model_provider is not None
     )
 
-    prompt = prompt_registry.get_on_behalf(
-        current_user,
-        payload.prompt_id,
-        model_metadata=model_metadata,
-        internal_event_category=__name__,
-    )
+    if has_model_info:
+        model_metadata = ModelMetadata(
+            name=payload.model_name,
+            endpoint=payload.model_endpoint,
+            api_key=payload.model_api_key,
+            provider="custom_openai",
+            identifier=payload.model_identifier,
+        )
+        prompt = prompt_registry.get_on_behalf(
+            current_user,
+            payload.prompt_id,
+            model_metadata=model_metadata,
+            internal_event_category=__name__,
+        )
+    else:
+        prompt = prompt_registry.get_on_behalf(
+            current_user,
+            payload.prompt_id,
+            model_metadata=None,  # Don't provide model_metadata
+            internal_event_category=__name__,
+        )
 
     return generations_agent_factory(model__prompt=prompt)
 

@@ -1741,10 +1741,13 @@ class TestCodeGenerations:
                 ["flag_a", "flag_b"],
             ),  # v3 with prompt - litellm
             (
-                2,
+                3,
                 "code_suggestions/generations",
                 "foo",
-                "prompt",
+                [
+                    {"role": "system", "content": "foo"},
+                    {"role": "user", "content": "bar"},
+                ],
                 "litellm",
                 "mistral",
                 "http://localhost:11434/v1",
