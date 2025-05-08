@@ -86,7 +86,7 @@ class ModelSelectionConfig:
 
         if errors:
             raise ValueError(
-                f"The following gitlab models ids are used but are not defined in models.yml: {",".join(errors)}"
+                f"The following gitlab models ids are used but are not defined in models.yml: {", ".join(errors)}"
             )
 
         return True
