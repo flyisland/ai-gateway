@@ -1711,6 +1711,34 @@ class TestCodeGenerations:
             ),
             (
                 3,
+                None,
+                "foo",
+                [
+                    {"role": "system", "content": "foo"},
+                    {"role": "user", "content": "bar"},
+                ],
+                "anthropic",
+                "claude-2-1",
+                None,
+                None,
+                "foo",
+                False,
+                True,
+                False,
+                False,
+                200,
+                "bar",
+                [
+                    {
+                        "text": "foo",
+                        "index": 0,
+                        "finish_reason": "length",
+                    }
+                ],
+                ["flag_a", "flag_b"],
+            ),  # v2 with prompt - anthropic (now using chat version)
+            (
+                3,
                 "",
                 "foo",
                 [
