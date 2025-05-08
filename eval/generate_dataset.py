@@ -8,6 +8,7 @@ from eli5.datasets.generator import generate_dataset as eli5_generate_dataset
 from jinja2 import PackageLoader
 from jinja2.loaders import BaseLoader
 from jinja2.sandbox import SandboxedEnvironment
+from langsmith import Client
 
 from ai_gateway.config import Config
 from ai_gateway.container import ContainerApplication
@@ -101,6 +102,17 @@ def run(
     ),
     num_examples: int = typer.Option(10, help="Number of examples to generate"),
     temperature: float = typer.Option(0.7, help="Temperature setting for generation"),
+    upload: bool = typer.Option(
+        False,
+        "--upload",
+        "-u",
+        help="Upload the dataset to LangSmith after generation",
+    ),
+    description: Optional[str] = typer.Option(
+        None,
+        "--description",
+        help="Optional description for the LangSmith dataset (only used with --upload)",
+    ),
 ):
     """
     Generate a synthetic dataset for evaluating prompts using templates from the prompt registry.
@@ -112,6 +124,8 @@ def run(
         output_dir: Directory to save the dataset file (defaults to the project root directory)
         num_examples: Number of examples to generate (default: 10)
         temperature: Temperature setting for generation (higher values = more diverse examples)
+        upload: Whether to upload the dataset to LangSmith
+        description: Optional description for the LangSmith dataset
 
     Returns:
         Path to the generated dataset file
@@ -119,6 +133,21 @@ def run(
     container_application = ContainerApplication()
     container_application.config.from_dict(Config().model_dump())
     container_application.wire(modules=[__name__])
+
+    langsmith_client = None
+    if upload:
+        # pylint: disable=direct-environment-variable-reference
+        langsmith_api_key = os.environ.get("LANGCHAIN_API_KEY")
+        # pylint: enable=direct-environment-variable-reference
+        if not langsmith_api_key:
+            raise typer.BadParameter(
+                "LangSmith API key is required for upload. Set the LANGCHAIN_API_KEY environment variable."
+            )
+        try:
+            langsmith_client = Client(api_key=langsmith_api_key)
+        except Exception as e:
+            typer.echo(f"Error connecting to LangSmith: {e}", err=True)
+            raise typer.Exit(code=1)
 
     typer.echo(
         f"Generating dataset with {num_examples} examples from prompt: {prompt_id}"
@@ -132,9 +161,14 @@ def run(
         output_dir=output_dir,
         num_examples=num_examples,
         temperature=temperature,
+        upload=upload,
+        langsmith_client=langsmith_client,
+        dataset_description=description,
     )
 
     typer.echo(f"Dataset generated successfully: {output_file.resolve()}")
+    if upload:
+        typer.echo(f"Dataset '{dataset_name}' uploaded to LangSmith")
 
     return output_file
 

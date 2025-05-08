@@ -958,7 +958,7 @@ websockets = "~15.0.0"
 type = "git"
 url = "https://gitlab.com/gitlab-org/modelops/ai-model-validation-and-research/prompt-library.git"
 reference = "ml-add-dataset-generator"
-resolved_reference = "2dda0c30d80c6d08d69d50ffb24d9a0bc061627e"
+resolved_reference = "43e7fb4cc5e8f421059433e3de966cb7b1ac641e"
 subdirectory = "eli5"
 
 [[package]]
