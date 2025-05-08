@@ -35,7 +35,7 @@ lint:doc:
 lint:commit:
   stage: test
   image: registry.hub.docker.com/library/node:alpine
-  needs: [ ]
+  needs: []
   variables:
     GIT_DEPTH: 0
   before_script:
