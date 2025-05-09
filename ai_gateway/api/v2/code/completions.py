@@ -432,10 +432,15 @@ def _resolve_code_completions_litellm(
 ) -> CodeCompletions:
     if payload.prompt_version == 2 and not payload.prompt:
         if payload.model_provider == KindModelProvider.GITLAB:
+            if not payload.model_identifier:
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail="model_identifier is required when provider is gitlab",
+                )
             model_metadata = create_model_metadata(
                 {
                     "provider": KindModelProvider.GITLAB,
-                    "identifier": payload.model_identifier or payload.model_name,
+                    "identifier": payload.model_identifier,
                 }
             )
         else:
@@ -495,6 +500,7 @@ def _build_code_completions(
     elif payload.model_provider in (
         KindModelProvider.LITELLM,
         KindModelProvider.MISTRALAI,
+        KindModelProvider.GITLAB,
     ):
         LiteLlmHandler(payload, request, kwargs).update_completion_params()
         code_completions = _resolve_code_completions_litellm(
