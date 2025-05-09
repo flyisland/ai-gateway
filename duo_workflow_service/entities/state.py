@@ -51,6 +51,7 @@ class WorkflowStatusEnum(StrEnum):
     CANCELLED = "Cancelled"
     INPUT_REQUIRED = "input_required"
     PLAN_APPROVAL_REQUIRED = "plan_approval_required"
+    TOOL_CALL_APPROVAL_REQUIRED = "tool_call_approval_required"
 
 
 class MessageTypeEnum(StrEnum):
@@ -219,7 +220,8 @@ def _restore_message_consistency(messages: List[BaseMessage]) -> List[BaseMessag
                 result.append(msg)
             else:
                 # Convert invalid ToolMessage to HumanMessage
-                result.append(HumanMessage(content=msg.content))
+                if msg.content:
+                    result.append(HumanMessage(content=msg.content))
         else:
             result.append(msg)
 
@@ -279,4 +281,27 @@ class SearchAndReplaceWorkflowState(TypedDict):
     pending_files: List[str]
 
 
-DuoWorkflowStateType = Union[WorkflowState, SearchAndReplaceWorkflowState]
+class ChatWorkflowState(TypedDict):
+    plan: Plan
+    status: WorkflowStatusEnum
+    conversation_history: Annotated[
+        Dict[str, List[BaseMessage]], _conversation_history_reducer
+    ]
+    ui_chat_log: Annotated[List[UiChatLog], _ui_chat_log_reducer]
+    last_human_input: Union[WorkflowEvent, None]
+
+
+DuoWorkflowStateType = Union[
+    WorkflowState, SearchAndReplaceWorkflowState, ChatWorkflowState
+]
+
+
+class WorkflowContext(TypedDict):
+    id: int
+    plan: Plan
+    goal: str
+    summary: str
+
+
+class Context(TypedDict):
+    workflow: WorkflowContext

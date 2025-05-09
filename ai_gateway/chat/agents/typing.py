@@ -64,7 +64,7 @@ TypeAgentEvent = TypeVar("TypeAgentEvent", bound=AgentEventType)
 
 class AgentStep(BaseModel):
     action: Optional[AgentToolAction] = None
-    observation: str
+    observation: str = ""
 
 
 class CurrentFile(BaseModel):
@@ -83,6 +83,8 @@ class AdditionalContext(BaseModel):
         "dependency",
         "local_git",
         "terminal",
+        "repository",
+        "directory",
     ]
     id: Optional[str] = None
     content: Optional[str] = None

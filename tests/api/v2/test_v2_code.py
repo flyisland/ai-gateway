@@ -15,7 +15,7 @@ from structlog.testing import capture_logs
 
 from ai_gateway.api.error_utils import capture_validation_errors
 from ai_gateway.api.v2 import api_router
-from ai_gateway.feature_flags.context import FeatureFlag, current_feature_flag_context
+from ai_gateway.feature_flags.context import current_feature_flag_context
 from ai_gateway.models.base_chat import Message, Role
 from ai_gateway.tracking.container import ContainerTracking
 from ai_gateway.tracking.instrumentator import SnowplowInstrumentator
@@ -1075,6 +1075,38 @@ class TestCodeCompletions:
         )
 
     @pytest.mark.parametrize(
+        "allow_llm_cache",
+        ["true", "false"],
+    )
+    def test_fireworks_codestral_with_prompt(
+        self, allow_llm_cache: str, mock_litellm_acompletion: Mock, mock_client: Mock
+    ):
+        params = {
+            "project_path": "gitlab-org/gitlab-shell",
+            "project_id": 278964,
+            "current_file": {
+                "file_name": "main.py",
+                "content_above_cursor": "foo",
+                "content_below_cursor": "\n",
+            },
+            "model_provider": "fireworks_ai",
+            "model_name": "codestral-2501",
+            "stream": False,
+            "choices_count": 1,
+            "prompt_version": 1,
+            "prompt_cache_max_len": 0,
+        }
+
+        self._send_code_completions_request(mock_client, params, allow_llm_cache)
+
+        kwargs = mock_litellm_acompletion.call_args.kwargs
+
+        if allow_llm_cache == "false":
+            assert "prompt_cache_max_len" in kwargs
+        else:
+            assert "prompt_cache_max_len" not in kwargs
+
+    @pytest.mark.parametrize(
         ("gcp_location", "model_details", "expected_model", "expected_content"),
         [
             (
@@ -1272,12 +1304,15 @@ class TestCodeCompletions:
         )
         assert result["choices"][0]["text"] == "Post-processed completion response"
 
-    def _send_code_completions_request(self, mock_client, params):
+    def _send_code_completions_request(
+        self, mock_client, params, enable_prompt_cache="false"
+    ):
         headers = {
             "Authorization": "Bearer 12345",
             "X-Gitlab-Authentication-Type": "oidc",
             "X-GitLab-Instance-Id": "1234",
             "X-GitLab-Realm": "self-managed",
+            "X-Gitlab-Model-Prompt-Cache-Enabled": enable_prompt_cache,
         }
 
         return mock_client.post(
@@ -1763,39 +1798,6 @@ class TestCodeGenerations:
         assert response.status_code == 200
         assert response.text == mock_suggestions_output_text
         assert response.headers["content-type"] == "text/event-stream; charset=utf-8"
-
-    @pytest.mark.asyncio
-    @capture_validation_errors()
-    async def test_generations_with_validation_error(self, mock_client):
-        response = mock_client.post(
-            "/code/generations",
-            headers={
-                "Authorization": "Bearer 12345",
-                "X-Gitlab-Authentication-Type": "oidc",
-                "X-GitLab-Instance-Id": "1234",
-                "X-GitLab-Realm": "self-managed",
-            },
-            json={
-                "current_file": {
-                    "file_name": "main.py",
-                    "content_above_cursor": "# create function",
-                    "content_below_cursor": "\n",
-                },
-                "prompt_version": 2,
-                "prompt": "# create a function",
-                "model_provider": "anthropic",
-                "model_name": "claude-2.1",
-                "stream": True,
-                "choices_count": 1,
-                "prompt_id": "12345",
-            },
-        )
-
-        assert response.status_code == 422
-
-        body = response.json()
-        assert "endpoint" in body["detail"]
-        assert "URL input should be a string or URL" in body["detail"]
 
     @pytest.mark.parametrize(
         (

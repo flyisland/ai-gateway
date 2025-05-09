@@ -56,6 +56,7 @@ async def test_eval(mock_request, abuse_detector):
 
 @pytest.mark.asyncio
 async def test_eval_failure(mock_request):
+
     body = '{"messages": [{"role": "user", "content": "How can I create an issue in GitLab?"}]}'
     expected_usecase = "Asking a question about how to use GitLab."
 
