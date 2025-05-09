@@ -6,13 +6,13 @@ Similarly, when testing AI logic, we have the same granularity level and need to
 
 Comparing testing AI logic to classical deterministic logic, we need to mention that AI logic is non-deterministic and often requires special techniques and metrics.
 For instance, a traditional unit test might verify that a function returns exactly "400" for a specific input.
-In contrast, when testing an AI component, we might measure that it produces contextually appropriate responses 85% of the time across a test dataset.
-Thus, to reflect the probabilistic nature of AI systems, machine learning engineers use the term "evaluate" rather than "test."
-We're going to continue using the term "evaluate" when referring to testing AI features.
+In contrast, when testing an AI component, we might measure that it produces contextually appropriate responses the vast majority of the time across a test dataset.
+Thus, to reflect the probabilistic nature of AI systems, machine learning engineers use the term "evaluate" rather than "test".
+For consistency, we're going to continue using the term "evaluate" when referring to testing AI features throughout this document.
 
 **Evaluation Framework at GitLab:**
 We use the [Centralized Evaluation Framework (CEF)](https://gitlab.com/gitlab-org/modelops/ai-model-validation-and-research/ai-evaluation/prompt-library) and LangSmith for any sort of evaluation.
-When evaluation of the full AI feature is required (e2e), please feel free to rely on the [Evaluation Runner](link), which is an approach built on top of CEF to automate certain configurations.
+When evaluating the full AI feature is required (e2e), please feel free to rely on the [Evaluation Runner](link), which is an approach built on top of CEF to automate certain configurations.
 
 To better match the unit-test concept described above, the AIGW now supports running evaluation pipelines for the "prompt" components.
 We also plan to support evaluating RAG components and will keep updating this document with follow-up changes.
@@ -28,7 +28,7 @@ As with every AI evaluation pipeline, Prompt Evaluations require an input datase
 
 #### Datasets
 
-The structure of the input dataset very much depends on the prompt variables.
+The structure of the input dataset very much depends on the prompt variables (see prompt registry [documentation](aigw_prompt_registry.md) for additional details).
 However, the general requirements are:
 
 - Use LangSmith `inputs` to store prompt variables. Our evaluation scripts rely on the `inputs` to build the ready-to-use prompt. 
