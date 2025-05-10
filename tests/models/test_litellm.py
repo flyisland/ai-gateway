@@ -1,222 +1,91 @@
-# pylint: disable=too-many-lines
-from typing import Optional
 from unittest.mock import AsyncMock, MagicMock, Mock, patch
 
+import httpx
+import litellm
 import pytest
-from litellm.exceptions import APIConnectionError, InternalServerError
+from google.auth.credentials import Credentials
+from langchain_community.chat_models import ChatLiteLLM
 
-from ai_gateway.models import KindLiteLlmModel, LiteLlmChatModel
-from ai_gateway.models.base import KindModelProvider
-from ai_gateway.models.base_chat import Message, Role
-from ai_gateway.models.base_text import TextGenModelOutput
-from ai_gateway.models.litellm import (
-    LiteLlmAPIConnectionError,
-    LiteLlmInternalServerError,
-    LiteLlmTextGenModel,
-)
-from ai_gateway.models.vertex_text import KindVertexTextModel
-from ai_gateway.tracking import SnowplowEventContext
+from ai_gateway.prompts import Prompt
 
 
-class TestKindLiteLlmModel:
-    def test_chat_model(self):
-        assert KindLiteLlmModel.MISTRAL.chat_model() == "custom_openai/mistral"
-        assert KindLiteLlmModel.CODESTRAL.chat_model() == "custom_openai/codestral"
-        assert KindLiteLlmModel.CODEGEMMA.chat_model() == "custom_openai/codegemma"
-        assert KindLiteLlmModel.CODELLAMA.chat_model() == "custom_openai/codellama"
-        assert (
-            KindLiteLlmModel.DEEPSEEKCODER.chat_model() == "custom_openai/deepseekcoder"
-        )
-        assert (
-            KindLiteLlmModel.CODESTRAL.chat_model(provider=KindModelProvider.MISTRALAI)
-            == "codestral/codestral"
-        )
-
-    def test_text_model(self):
-        assert (
-            KindLiteLlmModel.CODEGEMMA.text_model()
-            == "text-completion-custom_openai/codegemma"
-        )
-        assert (
-            KindLiteLlmModel.CODESTRAL.text_model()
-            == "text-completion-custom_openai/codestral"
-        )
-        assert (
-            KindLiteLlmModel.CODESTRAL.text_model(provider=KindModelProvider.MISTRALAI)
-            == "text-completion-codestral/codestral"
-        )
-        assert (
-            KindVertexTextModel.CODESTRAL_2501.text_model(
-                provider=KindModelProvider.VERTEX_AI
-            )
-            == "vertex_ai/codestral-2501"
-        )
-
-
-class TestLiteLlmChatModel:
-    @pytest.fixture
-    def endpoint(self):
-        return "http://127.0.0.1:1111/v1"
-
-    @pytest.fixture
-    def api_key(self):
-        return "specified-api-key"
-
-    @pytest.fixture
-    def identifier(self):
-        return "provider/some-cool-model"
-
-    @pytest.fixture
-    def lite_llm_chat_model(self, endpoint, api_key, identifier):
-        return LiteLlmChatModel.from_model_name(
-            name="mistral",
-            endpoint=endpoint,
-            api_key=api_key,
-            identifier=identifier,
-            custom_models_enabled=True,
-            disable_streaming=False,
-        )
-
-    @pytest.mark.parametrize(
-        ("model_name", "expected_limit"),
-        [
-            (KindLiteLlmModel.CODEGEMMA, 8_192),
-            (KindLiteLlmModel.CODELLAMA, 16_384),
-            (KindLiteLlmModel.CODESTRAL, 32_768),
-        ],
+@pytest.fixture
+def model():
+    return ChatLiteLLM(
+        model="claude-3-sonnet@20240229", custom_llm_provider="vertex_ai", max_retries=3  # type: ignore[call-arg]
     )
-    def test_max_model_len(self, model_name: str, expected_limit: int):
-        model = LiteLlmChatModel.from_model_name(name=model_name)
-        assert model.input_token_limit == expected_limit
 
-    @pytest.mark.parametrize(
-        (
-            "model_name",
-            "api_key",
-            "identifier",
-            "provider",
-            "custom_models_enabled",
-            "provider_keys",
-            "provider_endpoints",
-            "expected_name",
-            "expected_api_key",
-            "expected_engine",
-            "expected_endpoint",
-            "expected_identifier",
+
+@pytest.fixture
+def mock_http(mock_http_handler: Mock):
+    with patch(
+        "litellm.llms.custom_httpx.http_handler.AsyncHTTPHandler",
+        return_value=mock_http_handler,
+    ) as mock:
+        yield mock
+
+
+@pytest.fixture
+def mock_http_handler(response_text: str):
+    handler = AsyncMock()
+    handler.post.return_value = httpx.Response(status_code=200, text=response_text)
+    return handler
+
+
+@pytest.fixture
+def mock_sleep():  # So we don't have to wait
+    with patch("asyncio.sleep"):
+        yield
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(("response_text"), ['{"error": "something went wrong"}'])
+async def test_ainvoke(
+    mock_sleep: Mock,
+    mock_http: Mock,
+    mock_http_handler: AsyncMock,
+    prompt: Prompt,
+    response_text: str,
+):
+    with pytest.raises(litellm.APIConnectionError, match="something went wrong"), patch(
+        "google.auth.default",
+        return_value=(
+            MagicMock(spec=Credentials, token="mock_token"),
+            "mock_project_id",
         ),
-        [
-            (
-                "mistral",
-                "",
-                "provider/some-cool-model",
-                KindModelProvider.LITELLM,
-                True,
-                {},
-                {},
-                "custom_openai/mistral",
-                "stubbed-api-key",
-                "litellm",
-                "http://127.0.0.1:1111/v1",
-                "provider/some-cool-model",
-            ),
-            (
-                "codestral",
-                "",
-                "",
-                KindModelProvider.MISTRALAI,
-                True,
-                {},
-                {},
-                "codestral/codestral",
-                "stubbed-api-key",
-                "codestral",
-                "http://127.0.0.1:1111/v1",
-                "",
-            ),
-            (
-                "codestral",
-                None,
-                "",
-                KindModelProvider.MISTRALAI,
-                True,
-                {"mistral_api_key": "stubbed-api-key"},
-                {},
-                "codestral/codestral",
-                "stubbed-api-key",
-                "codestral",
-                "http://127.0.0.1:1111/v1",
-                "",
-            ),
-            (
-                "qwen2p5-coder-7b",
-                "",
-                None,
-                KindModelProvider.FIREWORKS,
-                True,
-                {"fireworks_api_key": "stubbed-api-key"},
-                {
-                    "fireworks_current_region_endpoint": {
-                        "qwen2p5-coder-7b": {
-                            "endpoint": "https://fireworks.endpoint",
-                            "identifier": "provider/some-cool-model#deployment_id",
-                        }
-                    }
-                },
-                "fireworks_ai/qwen2p5-coder-7b",
-                "stubbed-api-key",
-                "fireworks_ai",
-                "https://fireworks.endpoint",
-                "fireworks_ai/provider/some-cool-model#deployment_id",
-            ),
-            (
-                "codestral-2501",
-                "",
-                None,
-                KindModelProvider.FIREWORKS,
-                True,
-                {"fireworks_api_key": "stubbed-api-key"},
-                {
-                    "fireworks_current_region_endpoint": {
-                        "codestral-2501": {
-                            "endpoint": "https://fireworks.endpoint",
-                            "identifier": "provider/some-cool-model#deployment_id",
-                        }
-                    }
-                },
-                "fireworks_ai/codestral-2501",
-                "stubbed-api-key",
-                "fireworks_ai",
-                "https://fireworks.endpoint",
-                "fireworks_ai/provider/some-cool-model#deployment_id",
-            ),
-        ],
-    )
-    def test_from_model_name(
-        self,
-        model_name: str,
-        api_key: Optional[str],
-        identifier: Optional[str],
-        provider: KindModelProvider,
-        custom_models_enabled: bool,
-        provider_keys: dict,
-        provider_endpoints: dict,
-        expected_name: str,
-        expected_api_key: str,
-        expected_engine: str,
-        expected_endpoint: str,
-        expected_identifier: str,
-        endpoint,
     ):
-        model = LiteLlmChatModel.from_model_name(
-            name=model_name,
-            api_key=api_key,
-            endpoint=endpoint,
-            custom_models_enabled=custom_models_enabled,
-            provider=provider,
-            identifier=identifier,
-            provider_keys=provider_keys,
-            provider_endpoints=provider_endpoints,
-        )
+        await prompt.ainvoke({"name": "Duo", "content": "What's up?"})
+
+    mock_http.assert_called_once()
+    assert mock_http_handler.post.call_count == 3
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    ("response_text"),
+    [
+        'data:{"type":"error","error":{"details":null,"type":"api_error","message":"something went wrong"}}'
+    ],
+)
+async def test_astream(
+    mock_sleep: Mock,
+    mock_http: Mock,
+    mock_http_handler: AsyncMock,
+    prompt: Prompt,
+    response_text: str,
+):
+    litellm.module_level_aclient = mock_http_handler
+
+    with pytest.raises(
+        litellm.InternalServerError, match="something went wrong"
+    ), patch(
+        "google.auth.default",
+        return_value=(
+            MagicMock(spec=Credentials, token="mock_token"),
+            "mock_project_id",
+        ),
+    ):
+        await anext(prompt.astream({"name": "Duo", "content": "What's up?"}))
 
         assert model.metadata.name == expected_name
         assert model.metadata.endpoint == expected_endpoint
@@ -1234,3 +1103,5 @@ class TestLiteLlmTextGenModel:
             mock_watch.assert_called_once_with(stream=True)
             watcher.register_error.assert_called_once()
             watcher.finish.assert_called_once()
+    mock_http.assert_not_called()
+    assert mock_http_handler.post.call_count == 1

@@ -234,10 +234,15 @@ def test_middleware_authentication(fastapi_server_app: FastAPI, auth_enabled: bo
 def test_middleware_log_request(fastapi_server_app: FastAPI):
     client = TestClient(fastapi_server_app)
 
-    with capture_logs() as cap_logs:
-        client.post("/v2/chat/agent")
-        correlation_ids = [log.get("correlation_id") for log in cap_logs]
-        assert len(correlation_ids) > 0
+    with caplog.at_level("INFO"):
+        client.post("/v1/chat/agent")
+        log_messages = [record.__dict__ for record in caplog.records]
+        assert any(
+            "correlation_id" in record.get("msg", {})
+            for record in log_messages
+        )
+
+    caplog.clear()
 
 
 @pytest.mark.usefixtures("fastapi_server_app")
