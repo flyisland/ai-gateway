@@ -237,10 +237,7 @@ def test_middleware_log_request(fastapi_server_app: FastAPI):
     with caplog.at_level("INFO"):
         client.post("/v1/chat/agent")
         log_messages = [record.__dict__ for record in caplog.records]
-        assert any(
-            "correlation_id" in record.get("msg", {})
-            for record in log_messages
-        )
+        assert any("correlation_id" in record.get("msg", {}) for record in log_messages)
 
     caplog.clear()
 
