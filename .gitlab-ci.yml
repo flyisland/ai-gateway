@@ -42,6 +42,8 @@ variables:
 
   DS_STATIC_REACHABILITY_ENABLED: "true"
   DS_ENFORCE_NEW_ANALYZER: "true"
+  # Workaround until https://gitlab.com/gitlab-org/gitlab/-/issues/541988 is addressed
+  DS_EXCLUDED_PATHS: "spec, test, tests, tmp, **/requirements.txt"
   SECURE_LOG_LEVEL: "debug"
 
 include:
