@@ -40,6 +40,9 @@ variables:
   SAST_EXCLUDED_PATHS: "tests, tmp, api"
   CS_IMAGE: $TARGET_IMAGE
 
+  DS_STATIC_REACHABILITY_ENABLED: "true"
+  DS_ENFORCE_NEW_ANALYZER: "true"
+
 include:
   - local: .gitlab/ci/build.gitlab-ci.yml
   - local: .gitlab/ci/lint.gitlab-ci.yml
@@ -48,9 +51,9 @@ include:
   - local: .gitlab/ci/release.gitlab-ci.yml
   - local: .gitlab/ci/ingest.gitlab-ci.yml
   - template: Jobs/Container-Scanning.latest.gitlab-ci.yml
-  - template: Jobs/Dependency-Scanning.latest.gitlab-ci.yml
   - template: Jobs/SAST.latest.gitlab-ci.yml
   - template: Jobs/Secret-Detection.latest.gitlab-ci.yml
+  - component: $CI_SERVER_FQDN/components/dependency-scanning/main@0
 
   # Includes a base template for running kaniko easily
   # see https://gitlab.com/gitlab-com/gl-infra/common-ci-tasks/-/blob/main/kaniko.md
@@ -79,6 +82,18 @@ include:
   - component: ${CI_SERVER_FQDN}/gitlab-org/components/danger-review/danger-review@2.1.0
     rules:
       - if: $CI_SERVER_HOST == "gitlab.com"
+
+build:
+  stage: build
+  image: "python:latest"
+  script:
+    - "pip install -r requirements.txt"
+    - "pip install pipdeptree"
+    - "pipdeptree --json > pipdeptree.json"
+  artifacts:
+    when: on_success
+    access: developer
+    paths: ["**/pipdeptree.json"]
 
 cache:
   key:
