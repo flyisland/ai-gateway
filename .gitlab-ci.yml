@@ -53,7 +53,7 @@ include:
   - template: Jobs/Container-Scanning.latest.gitlab-ci.yml
   - template: Jobs/SAST.latest.gitlab-ci.yml
   - template: Jobs/Secret-Detection.latest.gitlab-ci.yml
-  - component: $CI_SERVER_FQDN/components/dependency-scanning/main@0
+  - template: Jobs/Dependency-Scanning.latest.gitlab-ci.yml
 
   # Includes a base template for running kaniko easily
   # see https://gitlab.com/gitlab-com/gl-infra/common-ci-tasks/-/blob/main/kaniko.md
@@ -83,17 +83,7 @@ include:
     rules:
       - if: $CI_SERVER_HOST == "gitlab.com"
 
-build:
-  stage: build
-  image: "python:latest"
-  script:
-    - "pip install -r requirements.txt"
-    - "pip install pipdeptree"
-    - "pipdeptree --json > pipdeptree.json"
-  artifacts:
-    when: on_success
-    access: developer
-    paths: ["**/pipdeptree.json"]
+
 
 cache:
   key:
