@@ -42,6 +42,7 @@ variables:
 
   DS_STATIC_REACHABILITY_ENABLED: "true"
   DS_ENFORCE_NEW_ANALYZER: "true"
+  SECURE_LOG_LEVEL: "debug"
 
 include:
   - local: .gitlab/ci/build.gitlab-ci.yml
