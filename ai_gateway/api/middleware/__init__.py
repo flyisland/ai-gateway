@@ -23,9 +23,9 @@ from .model_config import ModelConfigMiddleware
 
 __all__ = [
     "AccessLogMiddleware",
-    "InternalEventMiddleware",
-    "MiddlewareAuthentication",
     "FeatureFlagMiddleware",
+    "MiddlewareAuthentication",
+    "InternalEventMiddleware",
     "DistributedTraceMiddleware",
     "ModelConfigMiddleware",
     "X_GITLAB_REALM_HEADER",
