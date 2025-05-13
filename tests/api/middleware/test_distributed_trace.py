@@ -3,7 +3,7 @@ from unittest.mock import AsyncMock, patch
 import pytest
 from starlette.requests import Request
 
-from ai_gateway.api.middleware import DistributedTraceMiddleware
+from ai_gateway.api.middleware.distributed_trace import DistributedTraceMiddleware
 
 
 @pytest.fixture
