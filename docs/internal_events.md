@@ -65,7 +65,7 @@ See [this section](https://docs.gitlab.com/ee/development/internal_analytics/int
    ```
 
 1. Run snowplow micro with `gdk start snowplow-micro`.
-1. Run AI Gateway with `poetry run ai_gateway` or `gdk start gitlab-ai-gateway`
+1. Run AI Gateway with `poetry run ai_gateway` or `gdk start gitlab-ai-gateway`.
 
 Visit [the UI dashboard](http://localhost:9091/micro/ui) to see the events received by snowplow micro.
 
