@@ -64,6 +64,8 @@ _READ_ONLY_GITLAB_TOOLS: list[Type[BaseTool]] = [
     tools.ListIssueNotes,
     tools.GetIssueNote,
     tools.GetRepositoryFile,
+    tools.ListKubernetesResources,
+    tools.CreateKubernetesResourceInNamespace,
 ]
 
 _AGENT_PRIVILEGES: dict[str, list[Type[BaseTool]]] = {
@@ -93,6 +95,9 @@ _AGENT_PRIVILEGES: dict[str, list[Type[BaseTool]]] = {
     "read_only_gitlab": _READ_ONLY_GITLAB_TOOLS,
     "run_commands": [
         tools.RunCommand,
+    ],
+    "modify_kubernetes_cluster": [
+        tools.CreateKubernetesResourceInNamespace,
     ],
 }
 

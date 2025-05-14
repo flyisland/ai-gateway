@@ -17,3 +17,4 @@ from .repository_files import *
 from .request_user_clarification import *
 from .search import *
 from .toolset import *
+from .gitlab_agent_for_kubernetes import *

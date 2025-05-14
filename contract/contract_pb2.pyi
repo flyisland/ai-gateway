@@ -56,7 +56,7 @@ class ActionResponse(_message.Message):
     def __init__(self, requestID: _Optional[str] = ..., response: _Optional[str] = ...) -> None: ...
 
 class Action(_message.Message):
-    __slots__ = ("requestID", "runCommand", "runHTTPRequest", "runReadFile", "runWriteFile", "runGitCommand", "runEditFile", "newCheckpoint")
+    __slots__ = ("requestID", "runCommand", "runHTTPRequest", "runReadFile", "runWriteFile", "runGitCommand", "runEditFile", "newCheckpoint", "runGitLabAgentKubernetesRequest")
     REQUESTID_FIELD_NUMBER: _ClassVar[int]
     RUNCOMMAND_FIELD_NUMBER: _ClassVar[int]
     RUNHTTPREQUEST_FIELD_NUMBER: _ClassVar[int]
@@ -65,6 +65,7 @@ class Action(_message.Message):
     RUNGITCOMMAND_FIELD_NUMBER: _ClassVar[int]
     RUNEDITFILE_FIELD_NUMBER: _ClassVar[int]
     NEWCHECKPOINT_FIELD_NUMBER: _ClassVar[int]
+    RUNGITLABAGENTKUBERNETESREQUEST_FIELD_NUMBER: _ClassVar[int]
     requestID: str
     runCommand: RunCommandAction
     runHTTPRequest: RunHTTPRequest
@@ -73,7 +74,8 @@ class Action(_message.Message):
     runGitCommand: RunGitCommand
     runEditFile: EditFile
     newCheckpoint: NewCheckpoint
-    def __init__(self, requestID: _Optional[str] = ..., runCommand: _Optional[_Union[RunCommandAction, _Mapping]] = ..., runHTTPRequest: _Optional[_Union[RunHTTPRequest, _Mapping]] = ..., runReadFile: _Optional[_Union[ReadFile, _Mapping]] = ..., runWriteFile: _Optional[_Union[WriteFile, _Mapping]] = ..., runGitCommand: _Optional[_Union[RunGitCommand, _Mapping]] = ..., runEditFile: _Optional[_Union[EditFile, _Mapping]] = ..., newCheckpoint: _Optional[_Union[NewCheckpoint, _Mapping]] = ...) -> None: ...
+    runGitLabAgentKubernetesRequest: GitLabAgentKubernetesRequest
+    def __init__(self, requestID: _Optional[str] = ..., runCommand: _Optional[_Union[RunCommandAction, _Mapping]] = ..., runHTTPRequest: _Optional[_Union[RunHTTPRequest, _Mapping]] = ..., runReadFile: _Optional[_Union[ReadFile, _Mapping]] = ..., runWriteFile: _Optional[_Union[WriteFile, _Mapping]] = ..., runGitCommand: _Optional[_Union[RunGitCommand, _Mapping]] = ..., runEditFile: _Optional[_Union[EditFile, _Mapping]] = ..., newCheckpoint: _Optional[_Union[NewCheckpoint, _Mapping]] = ..., runGitLabAgentKubernetesRequest: _Optional[_Union[GitLabAgentKubernetesRequest, _Mapping]] = ...) -> None: ...
 
 class RunCommandAction(_message.Message):
     __slots__ = ("program", "arguments", "flags")
@@ -118,6 +120,18 @@ class RunHTTPRequest(_message.Message):
     path: str
     body: str
     def __init__(self, method: _Optional[str] = ..., path: _Optional[str] = ..., body: _Optional[str] = ...) -> None: ...
+
+class GitLabAgentKubernetesRequest(_message.Message):
+    __slots__ = ("agent_id", "method", "path", "body")
+    AGENT_ID_FIELD_NUMBER: _ClassVar[int]
+    METHOD_FIELD_NUMBER: _ClassVar[int]
+    PATH_FIELD_NUMBER: _ClassVar[int]
+    BODY_FIELD_NUMBER: _ClassVar[int]
+    agent_id: int
+    method: str
+    path: str
+    body: str
+    def __init__(self, agent_id: _Optional[int] = ..., method: _Optional[str] = ..., path: _Optional[str] = ..., body: _Optional[str] = ...) -> None: ...
 
 class RunGitCommand(_message.Message):
     __slots__ = ("command", "arguments", "repository_url")
