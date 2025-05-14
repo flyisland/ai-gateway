@@ -458,6 +458,7 @@ class EditFile(DuoBaseTool):
 
 class ListDirInput(BaseModel):
     directory: str = Field(description="Directory path relative to the repository root")
+    depth: str = Field(default="1", description="Directory depth to list. 1 for immediate files and folders, 2 for nested ones etc.")
 
 
 class ListDir(DuoBaseTool):
