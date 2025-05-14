@@ -493,68 +493,6 @@ class UpdateEpic(EpicBaseTool):
         return f"Update epic #{args.epic_iid}"
 
 
-
-class ListEpicNotesInput(BaseModel):
-    group_id: Union[int] = Field(description="The ID of the group")
-    epic_iid: int = Field(description="The internal ID of the epic")
-    epic_id: int = Field(description="The ID of a group epic")
-    sort: Optional[str] = Field(
-        default=None,
-        description="Return epic notes sorted in asc or desc order. Default is desc",
-    )
-    order_by: Optional[str] = Field(
-        default=None,
-        description="Return epic notes ordered by created_at or updated_at fields. Default is created_at",
-    )
-
-
-class ListEpicNotes(DuoBaseTool):
-    name: str = "list_epic_notes"
-    description: str = "Get a list of all notes (comments) for a specific epic."
-    args_schema: Type[BaseModel] = ListEpicNotesInput
-
-    async def _arun(self, group_id: Union[int, str], epic_id: int, **kwargs: Any) -> str:
-        params = {k: v for k, v in kwargs.items() if v is not None}
-
-        try:
-            response = await self.gitlab_client.aget(
-                path=f"/api/v4/groups/{group_id}/epics/{epic_id}/notes",
-                params=params,
-                parse_json=False,
-            )
-            return json.dumps({"notes": response})
-        except Exception as e:
-            return json.dumps({"error": str(e)})
-
-    def format_display_message(self, args: ListEpicNotesInput) -> str:
-        return f"Read comments on epic #{args.epic_id} in group {args.group_id}"
-
-
-class GetEpicNoteInput(BaseModel):
-    group_id: Union[int] = Field(description="The ID of the group")
-    epic_id: int = Field(description="The internal ID of the epic")
-    note_id: int = Field(description="The ID of the note")
-
-
-class GetEpicNote(DuoBaseTool):
-    name: str = "get_epic_note"
-    description: str = "Get a single note (comment) from a specific epic."
-    args_schema: Type[BaseModel] = GetEpicNoteInput
-
-    async def _arun(self, group_id: Union[int, str], epic_id: int, note_id: int) -> str:
-        try:
-            response = await self.gitlab_client.aget(
-                path=f"/api/v4/groups/{group_id}/epics/{epic_id}/notes/{note_id}",
-                parse_json=False,
-            )
-            return json.dumps({"note": response})
-        except Exception as e:
-            return json.dumps({"error": str(e)})
-
-    def format_display_message(self, args: GetEpicNoteInput) -> str:
-        return f"Read comment #{args.note_id} on epic #{args.epic_id} in group {args.group_id}"
-
-
 class ListEpicNotesInput(EpicResourceInput):
     sort: Optional[str] = Field(
         default=None,
