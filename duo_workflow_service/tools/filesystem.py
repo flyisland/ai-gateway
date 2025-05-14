@@ -467,11 +467,11 @@ class ListDir(DuoBaseTool):
     )
     args_schema: Type[BaseModel] = ListDirInput  # type: ignore
 
-    async def _arun(self, directory: str) -> str:
+    async def _arun(self, directory: str, depth: str) -> str:
         return await _execute_action(
             self.metadata,  # type: ignore
             contract_pb2.Action(
-                listDirectory=contract_pb2.ListDirectory(directory=directory)
+                listDirectory=contract_pb2.ListDirectory(directory=directory, depth=depth)
             ),
         )
 

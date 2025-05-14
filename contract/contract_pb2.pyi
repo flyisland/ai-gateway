@@ -166,7 +166,9 @@ class NewCheckpoint(_message.Message):
     def __init__(self, status: _Optional[str] = ..., checkpoint: _Optional[str] = ..., goal: _Optional[str] = ..., errors: _Optional[_Iterable[str]] = ...) -> None: ...
 
 class ListDirectory(_message.Message):
-    __slots__ = ("directory",)
+    __slots__ = ("directory", "depth")
     DIRECTORY_FIELD_NUMBER: _ClassVar[int]
+    DEPTH_FIELD_NUMBER: _ClassVar[int]
     directory: str
-    def __init__(self, directory: _Optional[str] = ...) -> None: ...
+    depth: str
+    def __init__(self, directory: _Optional[str] = ..., depth: _Optional[str] = ...) -> None: ...
