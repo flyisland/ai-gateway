@@ -4,71 +4,35 @@ models:
     gitlab_identifier: "claude_3_haiku_20240307"
     provider: "anthropic"
     provider_identifier: "claude-3-haiku-20240307"
-    params:
-      temperature: 0.2
-      max_tokens: 4_096
-      max_retries: 1
   - name: "Claude Sonnet 3.7 - Anthropic"
     gitlab_identifier: "claude_sonnet_3_7_20250219"
     provider: "anthropic"
     provider_identifier: "claude-3-7-sonnet-20250219"
-    params:
-      temperature: 0.0
-      max_tokens: 4_096
-      max_retries: 1
   - name: "Claude Sonnet 3.7 - Vertex"
     gitlab_identifier: "claude_sonnet_3_7_20250219_vertex"
     provider: "vertex_ai"
     provider_identifier: "claude-3-7-sonnet@20250219"
-    params:
-      temperature: 0.0
-      max_tokens: 4_096
-      max_retries: 1
   - name: "Claude Sonnet 3.5 - Anthropic"
     gitlab_identifier: "claude_3_5_sonnet_20240620"
     provider: "anthropic"
     provider_identifier: "claude-3-5-sonnet-20240620"
-    params:
-      temperature: 0.0
-      max_tokens: 4_096
-      max_retries: 1
   - name: "Claude 3 Haiku - Anthropic"
     gitlab_identifier: "claude_3_haiku_20240307"
     provider: "anthropic"
     provider_identifier: "claude-3-haiku-20240307"
-    params:
-      temperature: 0.0
-      max_tokens: 4_096
-      max_retries: 1
   - name: "Claude 3.5 Haiku - Anthropic"
     gitlab_identifier: "claude_3_5_haiku_20241022"
     provider: "anthropic"
     provider_identifier: "claude-3-5-haiku-20241022"
-    params:
-      temperature: 0.0
-      max_tokens: 4_096
-      max_retries: 1
   - name: "Claude Sonnet 3 - Anthropic" # used by troubleshoot only
     gitlab_identifier: "claude_3_sonnet_20240229"
     provider: "anthropic"
     provider_identifier: "claude-3-sonnet-20240229"
-    params:
-      temperature: 0.1
-      max_tokens: 2_048
-      max_retries: 1
   - name: "Codestral 25.01 - Fireworks"
     gitlab_identifier: "codestral_2501_fireworks"
     provider: "fireworks_ai"
     provider_identifier: "fireworks_ai/codestral-2501"
-    params:
-      temperature: 0.7
-      max_tokens: 64
-      max_retries: 1
   - name: "Codestral 25.01 - Vertex"
     gitlab_identifier: "codestral_2501_vertex"
     provider: "vertex_ai"
     provider_identifier: "vertex_ai/codestral-2501"
-    params:
-      temperature: 0.7
-      max_tokens: 64
-      max_retries: 1
