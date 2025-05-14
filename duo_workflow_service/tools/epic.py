@@ -40,7 +40,6 @@ class EpicIdsResult(NamedTuple):
     errors: List[str]
 
 
-
 class EpicBaseTool(DuoBaseTool):
     def _validate_group_url(
         self, url: Optional[str], group_id: Optional[int | str]
@@ -182,12 +181,11 @@ class EpicBaseTool(DuoBaseTool):
                             f"Could not find epic_id for epic with iid {epic_iid}"
                         )
                         return EpicIdsResult(group_id, epic_iid, None, errors)
-
-                    return EpicIdsResult(group_id, epic_iid, epic_id, errors)
                 except Exception as e:
                     errors.append(f"Error looking up epic: {str(e)}")
                     return EpicIdsResult(group_id, epic_iid, None, errors)
-        elif group_id is None or epic_id is None:
+
+        if group_id is None or epic_id is None:
             if group_id is None:
                 errors.append("'group_id' must be provided when 'url' is not")
             if epic_id is None:
@@ -206,16 +204,16 @@ class GroupResourceInput(BaseModel):
         default=None,
         description="The ID or URL-encoded path of the group. Required if URL is not provided.",
     )
-    epic_id: Optional[int] = Field(
-        default=None,
-        description="The ID of the epic.",
-    )
 
 
 class EpicResourceInput(GroupResourceInput):
     epic_iid: Optional[int] = Field(
         default=None,
         description="The internal ID of the epic. Required if URL is not provided.",
+    )
+    epic_id: Optional[int] = Field(
+        default=None,
+        description="The ID of the epic.",
     )
 
 
