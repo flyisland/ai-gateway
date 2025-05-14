@@ -135,7 +135,7 @@ def _git_output(command_output: list[str], state: WorkflowState):
     logs: list[UiChatLog] = [
         UiChatLog(
             message_type=MessageTypeEnum.TOOL,
-            content=f"Git command output: {command_output[0]}",
+            content=f"{command_output[-1]}",
             timestamp=datetime.now(timezone.utc).isoformat(),
             status=ToolStatus.SUCCESS,
             correlation_id=None,
@@ -229,7 +229,7 @@ class Workflow(AbstractWorkflow):
 
         # deterministic git nodes
         graph.add_node(
-            "git_add",
+            "git_actions",
             RunToolNode[WorkflowState](
                 tool=tools_registry.get("run_git_command"),  # type: ignore
                 input_parser=lambda _: [
@@ -237,32 +237,12 @@ class Workflow(AbstractWorkflow):
                         "repository_url": self._project["http_url_to_repo"],
                         "command": "add",
                         "args": "-A",
-                    }
-                ],
-                output_parser=_git_output,  # type: ignore
-            ).run,
-        )
-
-        graph.add_node(
-            "git_commit",
-            RunToolNode[WorkflowState](
-                tool=tools_registry.get("run_git_command"),  # type: ignore
-                input_parser=lambda state: [
+                    },
                     {
                         "repository_url": self._project["http_url_to_repo"],
                         "command": "commit",
                         "args": "-m 'Duo Workflow: Convert to GitLab CI'",
-                    }
-                ],
-                output_parser=_git_output,  # type: ignore
-            ).run,
-        )
-
-        graph.add_node(
-            "git_push",
-            RunToolNode[WorkflowState](
-                tool=tools_registry.get("run_git_command"),  # type: ignore
-                input_parser=lambda state: [
+                    },
                     {
                         "repository_url": self._project["http_url_to_repo"],
                         "command": "push",
@@ -295,12 +275,10 @@ class Workflow(AbstractWorkflow):
             {
                 Routes.AGENT: "request_translation",
                 Routes.END: "complete",
-                Routes.COMMIT_CHANGES: "git_add",
+                Routes.COMMIT_CHANGES: "git_actions",
             },
         )
-        graph.add_edge("git_add", "git_commit")
-        graph.add_edge("git_commit", "git_push")
-        graph.add_edge("git_push", "complete")
+        graph.add_edge("git_actions", "complete")
         graph.add_edge("complete", END)
         return graph
 
