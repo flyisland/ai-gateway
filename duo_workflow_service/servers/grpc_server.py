@@ -100,7 +100,9 @@ class GrpcServer(contract_pb2_grpc.DuoWorkflowServicer):
                     streaming_action = workflow.get_from_streaming_outbox()
                     if isinstance(streaming_action, contract_pb2.Action):
                         yield streaming_action
-                        continue
+                        _event: contract_pb2.ClientEvent = await anext(
+                            aiter(request_iterator)
+                        )
 
                     action = await workflow.get_from_outbox()
 
@@ -116,6 +118,7 @@ class GrpcServer(contract_pb2_grpc.DuoWorkflowServicer):
                     event: contract_pb2.ClientEvent = await anext(
                         aiter(request_iterator)
                     )
+
 
                     workflow.add_to_inbox(event)
                     if (

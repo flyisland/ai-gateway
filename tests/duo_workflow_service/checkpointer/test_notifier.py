@@ -86,6 +86,7 @@ def test_workflow_status_mapping():
         WorkflowStatusEnum.NOT_STARTED: "CREATED",
         WorkflowStatusEnum.COMPLETED: "FINISHED",
         WorkflowStatusEnum.CANCELLED: "STOPPED",
+        WorkflowStatusEnum.TOOL_CALL_APPROVAL_REQUIRED: "REQUIRE_TOOL_CALL_APPROVAL",
     }
 
     # Check that all expected keys and values are in the actual mapping
