@@ -109,6 +109,7 @@ export interface Action {
   runGitCommand?: RunGitCommand | undefined;
   runEditFile?: EditFile | undefined;
   newCheckpoint?: NewCheckpoint | undefined;
+  runGitLabAgentKubernetesRequest?: GitLabAgentKubernetesRequest | undefined;
 }
 
 export interface RunCommandAction {
@@ -133,6 +134,13 @@ export interface EditFile {
 }
 
 export interface RunHTTPRequest {
+  method: string;
+  path: string;
+  body?: string | undefined;
+}
+
+export interface GitLabAgentKubernetesRequest {
+  agentId: number;
   method: string;
   path: string;
   body?: string | undefined;
@@ -499,6 +507,7 @@ function createBaseAction(): Action {
     runGitCommand: undefined,
     runEditFile: undefined,
     newCheckpoint: undefined,
+    runGitLabAgentKubernetesRequest: undefined,
   };
 }
 
@@ -527,6 +536,9 @@ export const Action: MessageFns<Action> = {
     }
     if (message.newCheckpoint !== undefined) {
       NewCheckpoint.encode(message.newCheckpoint, writer.uint32(66).fork()).join();
+    }
+    if (message.runGitLabAgentKubernetesRequest !== undefined) {
+      GitLabAgentKubernetesRequest.encode(message.runGitLabAgentKubernetesRequest, writer.uint32(74).fork()).join();
     }
     return writer;
   },
@@ -602,6 +614,14 @@ export const Action: MessageFns<Action> = {
           message.newCheckpoint = NewCheckpoint.decode(reader, reader.uint32());
           continue;
         }
+        case 9: {
+          if (tag !== 74) {
+            break;
+          }
+
+          message.runGitLabAgentKubernetesRequest = GitLabAgentKubernetesRequest.decode(reader, reader.uint32());
+          continue;
+        }
       }
       if ((tag & 7) === 4 || tag === 0) {
         break;
@@ -621,6 +641,9 @@ export const Action: MessageFns<Action> = {
       runGitCommand: isSet(object.runGitCommand) ? RunGitCommand.fromJSON(object.runGitCommand) : undefined,
       runEditFile: isSet(object.runEditFile) ? EditFile.fromJSON(object.runEditFile) : undefined,
       newCheckpoint: isSet(object.newCheckpoint) ? NewCheckpoint.fromJSON(object.newCheckpoint) : undefined,
+      runGitLabAgentKubernetesRequest: isSet(object.runGitLabAgentKubernetesRequest)
+        ? GitLabAgentKubernetesRequest.fromJSON(object.runGitLabAgentKubernetesRequest)
+        : undefined,
     };
   },
 
@@ -649,6 +672,11 @@ export const Action: MessageFns<Action> = {
     }
     if (message.newCheckpoint !== undefined) {
       obj.newCheckpoint = NewCheckpoint.toJSON(message.newCheckpoint);
+    }
+    if (message.runGitLabAgentKubernetesRequest !== undefined) {
+      obj.runGitLabAgentKubernetesRequest = GitLabAgentKubernetesRequest.toJSON(
+        message.runGitLabAgentKubernetesRequest,
+      );
     }
     return obj;
   },
@@ -680,6 +708,10 @@ export const Action: MessageFns<Action> = {
     message.newCheckpoint = (object.newCheckpoint !== undefined && object.newCheckpoint !== null)
       ? NewCheckpoint.fromPartial(object.newCheckpoint)
       : undefined;
+    message.runGitLabAgentKubernetesRequest =
+      (object.runGitLabAgentKubernetesRequest !== undefined && object.runGitLabAgentKubernetesRequest !== null)
+        ? GitLabAgentKubernetesRequest.fromPartial(object.runGitLabAgentKubernetesRequest)
+        : undefined;
     return message;
   },
 };
@@ -1089,6 +1121,114 @@ export const RunHTTPRequest: MessageFns<RunHTTPRequest> = {
   },
   fromPartial<I extends Exact<DeepPartial<RunHTTPRequest>, I>>(object: I): RunHTTPRequest {
     const message = createBaseRunHTTPRequest();
+    message.method = object.method ?? "";
+    message.path = object.path ?? "";
+    message.body = object.body ?? undefined;
+    return message;
+  },
+};
+
+function createBaseGitLabAgentKubernetesRequest(): GitLabAgentKubernetesRequest {
+  return { agentId: 0, method: "", path: "", body: undefined };
+}
+
+export const GitLabAgentKubernetesRequest: MessageFns<GitLabAgentKubernetesRequest> = {
+  encode(message: GitLabAgentKubernetesRequest, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
+    if (message.agentId !== 0) {
+      writer.uint32(8).int64(message.agentId);
+    }
+    if (message.method !== "") {
+      writer.uint32(18).string(message.method);
+    }
+    if (message.path !== "") {
+      writer.uint32(26).string(message.path);
+    }
+    if (message.body !== undefined) {
+      writer.uint32(34).string(message.body);
+    }
+    return writer;
+  },
+
+  decode(input: BinaryReader | Uint8Array, length?: number): GitLabAgentKubernetesRequest {
+    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+    let end = length === undefined ? reader.len : reader.pos + length;
+    const message = createBaseGitLabAgentKubernetesRequest();
+    while (reader.pos < end) {
+      const tag = reader.uint32();
+      switch (tag >>> 3) {
+        case 1: {
+          if (tag !== 8) {
+            break;
+          }
+
+          message.agentId = longToNumber(reader.int64());
+          continue;
+        }
+        case 2: {
+          if (tag !== 18) {
+            break;
+          }
+
+          message.method = reader.string();
+          continue;
+        }
+        case 3: {
+          if (tag !== 26) {
+            break;
+          }
+
+          message.path = reader.string();
+          continue;
+        }
+        case 4: {
+          if (tag !== 34) {
+            break;
+          }
+
+          message.body = reader.string();
+          continue;
+        }
+      }
+      if ((tag & 7) === 4 || tag === 0) {
+        break;
+      }
+      reader.skip(tag & 7);
+    }
+    return message;
+  },
+
+  fromJSON(object: any): GitLabAgentKubernetesRequest {
+    return {
+      agentId: isSet(object.agentId) ? globalThis.Number(object.agentId) : 0,
+      method: isSet(object.method) ? globalThis.String(object.method) : "",
+      path: isSet(object.path) ? globalThis.String(object.path) : "",
+      body: isSet(object.body) ? globalThis.String(object.body) : undefined,
+    };
+  },
+
+  toJSON(message: GitLabAgentKubernetesRequest): unknown {
+    const obj: any = {};
+    if (message.agentId !== 0) {
+      obj.agentId = Math.round(message.agentId);
+    }
+    if (message.method !== "") {
+      obj.method = message.method;
+    }
+    if (message.path !== "") {
+      obj.path = message.path;
+    }
+    if (message.body !== undefined) {
+      obj.body = message.body;
+    }
+    return obj;
+  },
+
+  create<I extends Exact<DeepPartial<GitLabAgentKubernetesRequest>, I>>(base?: I): GitLabAgentKubernetesRequest {
+    return GitLabAgentKubernetesRequest.fromPartial(base ?? ({} as any));
+  },
+  fromPartial<I extends Exact<DeepPartial<GitLabAgentKubernetesRequest>, I>>(object: I): GitLabAgentKubernetesRequest {
+    const message = createBaseGitLabAgentKubernetesRequest();
+    message.agentId = object.agentId ?? 0;
     message.method = object.method ?? "";
     message.path = object.path ?? "";
     message.body = object.body ?? undefined;

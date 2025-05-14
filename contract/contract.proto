@@ -40,6 +40,7 @@ message Action {
         RunGitCommand runGitCommand = 6;
         EditFile runEditFile = 7;
         NewCheckpoint newCheckpoint = 8;
+        GitLabAgentKubernetesRequest runGitLabAgentKubernetesRequest = 9;
     };
 }
 
@@ -70,6 +71,13 @@ message RunHTTPRequest {
     string method = 1;
     string path = 2;
     optional string body = 3;
+}
+
+message GitLabAgentKubernetesRequest {
+    int64 agent_id = 1;
+    string method = 2;
+    string path = 3;
+    optional string body = 4;
 }
 
 message RunGitCommand {

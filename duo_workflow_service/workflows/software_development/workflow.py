@@ -102,6 +102,8 @@ EXECUTOR_TOOLS = [
     "create_epic",
     "update_epic",
     "get_repository_file",
+    "list_kubernetes_resources",
+    "create_kubernetes_resource_in_namespace",
 ]
 
 CONTEXT_BUILDER_TOOLS = [
@@ -128,6 +130,7 @@ CONTEXT_BUILDER_TOOLS = [
     "get_epic",
     "list_epics",
     "get_repository_file",
+    "list_kubernetes_resources",
 ]
 
 PLANNER_TOOLS = [
