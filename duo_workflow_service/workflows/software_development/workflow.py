@@ -102,6 +102,7 @@ EXECUTOR_TOOLS = [
     "create_epic",
     "update_epic",
     "get_repository_file",
+    # "list_dir",
 ]
 
 CONTEXT_BUILDER_TOOLS = [

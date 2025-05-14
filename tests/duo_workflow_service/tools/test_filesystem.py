@@ -1,10 +1,8 @@
-import os
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
 from contract import contract_pb2
-from duo_workflow_service.tools import ReadFile, WriteFile
 from duo_workflow_service.tools.filesystem import (
     EditFile,
     EditFileInput,
@@ -13,6 +11,8 @@ from duo_workflow_service.tools.filesystem import (
     FindFilesInput,
     Grep,
     GrepInput,
+    ListDir,
+    ListDirInput,
     LsFiles,
     LsFilesInput,
     Mkdir,
@@ -215,6 +215,58 @@ class TestLsFiles:
 
         with pytest.raises(NotImplementedError):
             ls_files._run("")
+
+
+class TestLsDir:
+    @pytest.mark.asyncio
+    async def test_list_dir_success(self):
+        # Set up the mock outbox and inbox
+        mock_outbox = MagicMock()
+        mock_outbox.put = AsyncMock()
+
+        mock_inbox = MagicMock()
+        mock_inbox.get = AsyncMock(
+            return_value=contract_pb2.ClientEvent(
+                actionResponse=contract_pb2.ActionResponse(
+                    response="file1.txt file2.txt dir1 dir2"
+                )
+            )
+        )
+
+        metadata = {"outbox": mock_outbox, "inbox": mock_inbox}
+
+        # Create the tool and set its metadata
+        list_dir_tool = ListDir()
+        list_dir_tool.metadata = metadata
+
+        # Call the method being tested
+        result = await list_dir_tool._arun(directory=".")
+
+        # Assert the result
+        assert result == "file1.txt file2.txt dir1 dir2"
+
+        # Verify the outbox was used as expected
+        mock_outbox.put.assert_called_once()
+
+        # You can add additional assertions to verify the details of what was put on the outbox
+        action = mock_outbox.put.call_args[0][0]
+        assert action.listDirectory.directory == "."
+
+    @pytest.mark.asyncio
+    async def test_list_dir_not_implemented_error(self):
+        list_dir_tool = ListDir()
+
+        with pytest.raises(NotImplementedError):
+            list_dir_tool._run("test_dir")
+
+    def test_list_dir_format_display_message(self):
+        list_dir_tool = ListDir()
+
+        input_data = ListDirInput(directory="./src")
+        message = list_dir_tool.format_display_message(input_data)
+
+        expected_message = "Using list_dir: directory=./src"
+        assert message == expected_message
 
 
 class TestGrep:

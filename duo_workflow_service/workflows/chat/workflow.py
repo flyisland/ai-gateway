@@ -65,6 +65,7 @@ CHAT_READ_ONLY_TOOLS = [
     "get_epic",
     "list_epics",
     "scan_directory_tree",
+    # "list_dir",
 ]
 
 

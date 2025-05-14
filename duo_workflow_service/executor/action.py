@@ -47,6 +47,12 @@ async def _execute_action(metadata: Dict[str, Any], action: contract_pb2.Action)
             requestID=action.requestID,
             action_class=contract_pb2.EditFile,
         )
+    elif action.listDirectory:
+        log.debug(
+            "Attempting action from the egress queue",
+            requestID=action.requestID,
+            action_class=contract_pb2.ListDirectory,
+        )
 
     await outbox.put(action)
 
