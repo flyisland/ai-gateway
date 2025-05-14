@@ -97,6 +97,11 @@ class GrpcServer(contract_pb2_grpc.DuoWorkflowServicer):
         async def send_events():
             while not workflow.is_done:
                 try:
+                    streaming_action = workflow.get_from_streaming_outbox()
+                    if isinstance(streaming_action, contract_pb2.Action):
+                        yield streaming_action
+                        continue
+
                     action = await workflow.get_from_outbox()
 
                     if isinstance(action, contract_pb2.Action):
@@ -107,6 +112,7 @@ class GrpcServer(contract_pb2_grpc.DuoWorkflowServicer):
                         )
 
                     yield action
+
                     event: contract_pb2.ClientEvent = await anext(
                         aiter(request_iterator)
                     )
@@ -120,7 +126,6 @@ class GrpcServer(contract_pb2_grpc.DuoWorkflowServicer):
                             "Wrote ClientEvent into the ingres queue",
                             requestID=event.actionResponse.requestID,
                         )
-
                 except TimeoutError as err:
                     log.debug("Timeout on reading from queue, trying again", err=err)
 
