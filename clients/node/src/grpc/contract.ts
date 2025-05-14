@@ -189,6 +189,7 @@ export interface NewCheckpoint {
 
 export interface ListDirectory {
   directory: string;
+  depth: string;
 }
 
 export interface Grep {
@@ -1916,13 +1917,16 @@ export const NewCheckpoint: MessageFns<NewCheckpoint> = {
 };
 
 function createBaseListDirectory(): ListDirectory {
-  return { directory: "" };
+  return { directory: "", depth: "" };
 }
 
 export const ListDirectory: MessageFns<ListDirectory> = {
   encode(message: ListDirectory, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
     if (message.directory !== "") {
       writer.uint32(10).string(message.directory);
+    }
+    if (message.depth !== "") {
+      writer.uint32(18).string(message.depth);
     }
     return writer;
   },
@@ -1942,6 +1946,14 @@ export const ListDirectory: MessageFns<ListDirectory> = {
           message.directory = reader.string();
           continue;
         }
+        case 2: {
+          if (tag !== 18) {
+            break;
+          }
+
+          message.depth = reader.string();
+          continue;
+        }
       }
       if ((tag & 7) === 4 || tag === 0) {
         break;
@@ -1952,13 +1964,19 @@ export const ListDirectory: MessageFns<ListDirectory> = {
   },
 
   fromJSON(object: any): ListDirectory {
-    return { directory: isSet(object.directory) ? globalThis.String(object.directory) : "" };
+    return {
+      directory: isSet(object.directory) ? globalThis.String(object.directory) : "",
+      depth: isSet(object.depth) ? globalThis.String(object.depth) : "",
+    };
   },
 
   toJSON(message: ListDirectory): unknown {
     const obj: any = {};
     if (message.directory !== "") {
       obj.directory = message.directory;
+    }
+    if (message.depth !== "") {
+      obj.depth = message.depth;
     }
     return obj;
   },
@@ -1969,6 +1987,7 @@ export const ListDirectory: MessageFns<ListDirectory> = {
   fromPartial<I extends Exact<DeepPartial<ListDirectory>, I>>(object: I): ListDirectory {
     const message = createBaseListDirectory();
     message.directory = object.directory ?? "";
+    message.depth = object.depth ?? "";
     return message;
   },
 };
