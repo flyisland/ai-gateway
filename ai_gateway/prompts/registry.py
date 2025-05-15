@@ -9,9 +9,12 @@ from poetry.core.constraints.version import Version, parse_constraint
 from ai_gateway.config import ConfigModelLimits
 from ai_gateway.internal_events.client import InternalEventsClient
 from ai_gateway.model_metadata import TypeModelMetadata
+from ai_gateway.model_selection.model_selection_config import LLMDefinition, UnitPrimitiveConfig
 from ai_gateway.prompts.base import BasePromptRegistry, Prompt
 from ai_gateway.prompts.config import BaseModelConfig, ModelClassProvider, PromptConfig
 from ai_gateway.prompts.typing import TypeModelFactory
+from ai_gateway.model_selection import ModelSelectionConfig
+
 
 __all__ = ["LocalPromptRegistry", "PromptRegistered"]
 
@@ -139,22 +142,17 @@ class LocalPromptRegistry(BasePromptRegistry):
 
         base_path = Path(__file__).parent
         prompts_definitions_dir = base_path / "definitions"
-        model_configs_dir = (
-            base_path / "model_configs"
-        )  # New directory for model configs
         prompts_registered = {}
 
-        # Parse model config YAML files
-        model_configs = {
-            file.stem: cls._parse_base_model(file)
-            for file in model_configs_dir.glob("*.yml")
-        }
+        llm_configurations = ModelSelectionConfig.get_llm_definitions
+        unit_primitive_configuration = ModelSelectionConfig.get_unit_primitive_config
+
 
         # Iterate over each folder
         for path in prompts_definitions_dir.glob("**"):
             # Iterate over each version file
             versions = {
-                version.stem: cls._process_version_file(version, model_configs)
+                version.stem: cls._process_version_file(version, llm_configurations, unit_primitive_configuration)
                 for version in path.glob("*.yml")
             }
 
@@ -187,27 +185,10 @@ class LocalPromptRegistry(BasePromptRegistry):
         )
 
     @classmethod
-    def _parse_base_model(cls, file_name: Path) -> BaseModelConfig:
-        """Parses a YAML file and converts its content to a BaseModelConfig object.
-
-        This method reads the specified YAML file, extracts the configuration
-        parameters, and constructs a BaseModelConfig object. It handles the
-        conversion of YAML data types to appropriate Python types.
-
-        Args:
-            file (Path): A Path object pointing to the YAML file to be parsed.
-
-        Returns:
-            BaseModelConfig: An instance of BaseModelConfig containing the
-            parsed configuration data.
-        """
-
-        with open(file_name, "r") as fp:
-            return BaseModelConfig(**yaml.safe_load(fp))
-
-    @classmethod
     def _process_version_file(
-        cls, version_file: Path, model_configs: dict[str, BaseModelConfig]
+        cls, version_file: Path,
+        llm_configurations:dict[str,LLMDefinition], 
+        unit_primitive_configuration:dict[str,UnitPrimitiveConfig]
     ) -> PromptConfig:
         """Processes a single version YAML file and returns a PromptConfig.
 
@@ -219,12 +200,17 @@ class LocalPromptRegistry(BasePromptRegistry):
             PromptConfig: Processed prompt configuration
         """
 
+        # TODO: improve the programatic way of accessing grand parent director
+        unit_primitive = version_file.parts[3]
+
         with open(version_file, "r") as fp:
             prompt_config_params = yaml.safe_load(fp)
 
-            if "config_file" in prompt_config_params["model"]:
-                model_config = prompt_config_params["model"]["config_file"]
-                config_for_general_model = model_configs.get(model_config)
+            unit_primitive_config = cls.get_config_for_unit_primitive(unit_primitive_configuration, unit_primitive)
+            gitlab_identifier = unit_primitive_config.default_model
+
+            prompt_config_params = llm_configurations[gitlab_identifier].params
+
                 if config_for_general_model:
                     prompt_config_params = cls._patch_model_configuration(
                         config_for_general_model, prompt_config_params
@@ -248,3 +234,20 @@ class LocalPromptRegistry(BasePromptRegistry):
                 "params": params,
             },
         }
+    
+    def get_config_for_unit_primitive(configs, unit_primitive) -> UnitPrimitiveConfig
+        """
+        Find the UnitPrimitiveConfig object that contains the specified unit_primitive
+        in its unit_primitives list.
+        
+        Args:
+            configs: List of UnitPrimitiveConfig objects
+            unit_primitive: The unit primitive to search for
+            
+        Returns:
+            The matching UnitPrimitiveConfig or None if not found
+        """
+        for config in configs:
+            if unit_primitive in config.unit_primitives:
+                return config
+        return None
