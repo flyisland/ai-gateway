@@ -75,7 +75,7 @@ priority = "supplemental"
 optional = true
 
 [tool.poetry.group.eval.dependencies]
-eli5 = { git = "https://gitlab.com/gitlab-org/modelops/ai-model-validation-and-research/prompt-library.git", branch = "ml-add-dataset-generator", subdirectory = "eli5" }
+eli5 = { git = "https://gitlab.com/gitlab-org/modelops/ai-model-validation-and-research/prompt-library.git", subdirectory = "eli5" }
 
 [tool.poetry.group.test]
 optional = true

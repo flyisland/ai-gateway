@@ -1,5 +1,5 @@
 import os
-from typing import Dict, Optional, cast
+from typing import Annotated, Optional, cast
 
 import typer
 from dependency_injector.wiring import Provide, inject
@@ -14,7 +14,7 @@ from ai_gateway.container import ContainerApplication
 from ai_gateway.prompts.base import BasePromptRegistry
 
 
-def get_message_source(prompt_template: Dict[str, str]) -> Dict[str, str]:
+def get_message_source(prompt_template: dict[str, str]) -> dict[str, str]:
     """
     Gets the raw Jinja templates content from include statements.
 
@@ -36,7 +36,7 @@ def get_message_source(prompt_template: Dict[str, str]) -> Dict[str, str]:
         # For direct content without includes, use the original template string
         try:
             ast = jinja_env.parse(template_str)
-            if not ast.body or not hasattr(ast.body[0], 'template'):
+            if not ast.body or not hasattr(ast.body[0], "template"):
                 raw_templates[role] = template_str
                 continue
 
@@ -95,31 +95,62 @@ def get_prompt_source(
         "prompt_template": {
             "system": source_messages.get("system", None),
             "user": f"{user_message}\n\n{"\n\n".join(other_messages)}",
-        }
+        },
     }
 
 
+def create_langsmith_client(upload: bool = False) -> Optional[Client]:
+    if not upload:
+        return None
+
+    # pylint: disable=direct-environment-variable-reference
+    langsmith_api_key = os.environ.get("LANGCHAIN_API_KEY")
+    # pylint: enable=direct-environment-variable-reference
+    if not langsmith_api_key:
+        raise typer.BadParameter(
+            "LangSmith API key is required for upload. Set the LANGCHAIN_API_KEY environment variable."
+        )
+    try:
+        return Client(api_key=langsmith_api_key)
+    except Exception as e:
+        typer.echo(f"Error connecting to LangSmith: {e}", err=True)
+        raise typer.Exit(code=1)
+
+
 def run(
-    prompt_id: str = typer.Argument(..., help="Prompt ID (e.g., 'chat/explain_code')"),
-    prompt_version: str = typer.Argument(..., help="Prompt version constraint"),
-    dataset_name: str = typer.Argument(..., help="Name for the dataset"),
-    output_dir: Optional[str] = typer.Option(
-        os.path.join(os.path.dirname(__file__), ".."),
-        help="Directory to save the dataset (default: current directory)",
-    ),
-    num_examples: int = typer.Option(10, help="Number of examples to generate"),
-    temperature: float = typer.Option(0.7, help="Temperature setting for generation"),
-    upload: bool = typer.Option(
-        False,
-        "--upload",
-        "-u",
-        help="Upload the dataset to LangSmith after generation",
-    ),
-    description: Optional[str] = typer.Option(
-        None,
-        "--description",
-        help="Optional description for the LangSmith dataset (only used with --upload)",
-    ),
+    prompt_id: Annotated[
+        str, typer.Argument(help="Prompt ID (e.g., 'chat/explain_code')")
+    ],
+    prompt_version: Annotated[str, typer.Argument(help="Prompt version constraint")],
+    dataset_name: Annotated[str, typer.Argument(help="Name for the dataset")],
+    output_dir: Annotated[
+        Optional[str],
+        typer.Option(
+            os.path.join(os.path.dirname(__file__), ".."),
+            help="Directory to save the dataset (default: current directory)",
+        ),
+    ] = None,
+    num_examples: Annotated[
+        int, typer.Option(help="Number of examples to generate")
+    ] = 10,
+    temperature: Annotated[
+        float, typer.Option(help="Temperature setting for generation")
+    ] = 0.7,
+    upload: Annotated[
+        bool,
+        typer.Option(
+            "--upload",
+            "-u",
+            help="Upload the dataset to LangSmith after generation",
+        ),
+    ] = False,
+    description: Annotated[
+        Optional[str],
+        typer.Option(
+            "--description",
+            help="Optional description for the LangSmith dataset (only used with --upload)",
+        ),
+    ] = None,
 ):
     """
     Generate a synthetic dataset for evaluating prompts using templates from the prompt registry.
@@ -141,20 +172,7 @@ def run(
     container_application.config.from_dict(Config().model_dump())
     container_application.wire(modules=[__name__])
 
-    langsmith_client = None
-    if upload:
-        # pylint: disable=direct-environment-variable-reference
-        langsmith_api_key = os.environ.get("LANGCHAIN_API_KEY")
-        # pylint: enable=direct-environment-variable-reference
-        if not langsmith_api_key:
-            raise typer.BadParameter(
-                "LangSmith API key is required for upload. Set the LANGCHAIN_API_KEY environment variable."
-            )
-        try:
-            langsmith_client = Client(api_key=langsmith_api_key)
-        except Exception as e:
-            typer.echo(f"Error connecting to LangSmith: {e}", err=True)
-            raise typer.Exit(code=1)
+    langsmith_client = create_langsmith_client(upload)
 
     typer.echo(
         f"Generating dataset with {num_examples} examples from prompt: {prompt_id}"
