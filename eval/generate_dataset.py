@@ -1,5 +1,4 @@
 import os
-import re
 from typing import Dict, Optional, cast
 
 import typer
@@ -34,18 +33,19 @@ def get_message_source(prompt_template: Dict[str, str]) -> Dict[str, str]:
     for role, template_str in prompt_template.items():
         # Extract the template path from include statement
         # Example: "{% include 'chat/explain_code/system/1.0.0.jinja' %}\n"
-        if "{% include" in template_str:
-            match = re.search(r"{% include '([^']+)' %}", template_str)
-            if match:
-                template_path = match.group(1)
-                try:
-                    loader = cast(BaseLoader, jinja_env.loader)
-                    raw_content = loader.get_source(jinja_env, template_path)[0]
-                    raw_templates[role] = raw_content
-                except Exception as e:
-                    print(f"Error loading template {template_path}: {e}")
-        else:
-            raw_templates[role] = template_str
+        # For direct content without includes, use the original template string
+        try:
+            ast = jinja_env.parse(template_str)
+            if not ast.body or not hasattr(ast.body[0], 'template'):
+                raw_templates[role] = template_str
+                continue
+
+            template_path = ast.body[0].template.value
+            loader = cast(BaseLoader, jinja_env.loader)
+            raw_content = loader.get_source(jinja_env, template_path)[0]
+            raw_templates[role] = raw_content
+        except Exception as e:
+            raise ValueError(f"Error loading template {template_str}: {e}")
 
     return raw_templates
 
