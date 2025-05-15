@@ -5,6 +5,9 @@ import structlog
 import uvicorn
 from fastapi import Depends, FastAPI, WebSocket, WebSocketDisconnect
 
+from duo_workflow_service.interceptors.authentication_interceptor import (
+    AuthenticationMiddleware,
+)
 from duo_workflow_service.interceptors.correlation_id_interceptor import (
     CorrelationIdMiddleware,
 )
@@ -31,6 +34,7 @@ class WebSocketServer:
                 MiddlewareChain(
                     [
                         CorrelationIdMiddleware(),
+                        AuthenticationMiddleware(),
                         FeatureFlagMiddleware(),
                     ]
                 )
