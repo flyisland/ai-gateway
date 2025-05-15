@@ -109,6 +109,7 @@ export interface Action {
   runGitCommand?: RunGitCommand | undefined;
   runEditFile?: EditFile | undefined;
   newCheckpoint?: NewCheckpoint | undefined;
+  listDirectory?: ListDirectory | undefined;
 }
 
 export interface RunCommandAction {
@@ -163,6 +164,11 @@ export interface NewCheckpoint {
   checkpoint: string;
   goal: string;
   errors: string[];
+}
+
+export interface ListDirectory {
+  directory: string;
+  depth: number;
 }
 
 function createBaseClientEvent(): ClientEvent {
@@ -499,6 +505,7 @@ function createBaseAction(): Action {
     runGitCommand: undefined,
     runEditFile: undefined,
     newCheckpoint: undefined,
+    listDirectory: undefined,
   };
 }
 
@@ -527,6 +534,9 @@ export const Action: MessageFns<Action> = {
     }
     if (message.newCheckpoint !== undefined) {
       NewCheckpoint.encode(message.newCheckpoint, writer.uint32(66).fork()).join();
+    }
+    if (message.listDirectory !== undefined) {
+      ListDirectory.encode(message.listDirectory, writer.uint32(74).fork()).join();
     }
     return writer;
   },
@@ -602,6 +612,14 @@ export const Action: MessageFns<Action> = {
           message.newCheckpoint = NewCheckpoint.decode(reader, reader.uint32());
           continue;
         }
+        case 9: {
+          if (tag !== 74) {
+            break;
+          }
+
+          message.listDirectory = ListDirectory.decode(reader, reader.uint32());
+          continue;
+        }
       }
       if ((tag & 7) === 4 || tag === 0) {
         break;
@@ -621,6 +639,7 @@ export const Action: MessageFns<Action> = {
       runGitCommand: isSet(object.runGitCommand) ? RunGitCommand.fromJSON(object.runGitCommand) : undefined,
       runEditFile: isSet(object.runEditFile) ? EditFile.fromJSON(object.runEditFile) : undefined,
       newCheckpoint: isSet(object.newCheckpoint) ? NewCheckpoint.fromJSON(object.newCheckpoint) : undefined,
+      listDirectory: isSet(object.listDirectory) ? ListDirectory.fromJSON(object.listDirectory) : undefined,
     };
   },
 
@@ -649,6 +668,9 @@ export const Action: MessageFns<Action> = {
     }
     if (message.newCheckpoint !== undefined) {
       obj.newCheckpoint = NewCheckpoint.toJSON(message.newCheckpoint);
+    }
+    if (message.listDirectory !== undefined) {
+      obj.listDirectory = ListDirectory.toJSON(message.listDirectory);
     }
     return obj;
   },
@@ -679,6 +701,9 @@ export const Action: MessageFns<Action> = {
       : undefined;
     message.newCheckpoint = (object.newCheckpoint !== undefined && object.newCheckpoint !== null)
       ? NewCheckpoint.fromPartial(object.newCheckpoint)
+      : undefined;
+    message.listDirectory = (object.listDirectory !== undefined && object.listDirectory !== null)
+      ? ListDirectory.fromPartial(object.listDirectory)
       : undefined;
     return message;
   },
@@ -1503,6 +1528,82 @@ export const NewCheckpoint: MessageFns<NewCheckpoint> = {
     message.checkpoint = object.checkpoint ?? "";
     message.goal = object.goal ?? "";
     message.errors = object.errors?.map((e) => e) || [];
+    return message;
+  },
+};
+
+function createBaseListDirectory(): ListDirectory {
+  return { directory: "", depth: 0 };
+}
+
+export const ListDirectory: MessageFns<ListDirectory> = {
+  encode(message: ListDirectory, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
+    if (message.directory !== "") {
+      writer.uint32(10).string(message.directory);
+    }
+    if (message.depth !== 0) {
+      writer.uint32(16).int32(message.depth);
+    }
+    return writer;
+  },
+
+  decode(input: BinaryReader | Uint8Array, length?: number): ListDirectory {
+    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+    let end = length === undefined ? reader.len : reader.pos + length;
+    const message = createBaseListDirectory();
+    while (reader.pos < end) {
+      const tag = reader.uint32();
+      switch (tag >>> 3) {
+        case 1: {
+          if (tag !== 10) {
+            break;
+          }
+
+          message.directory = reader.string();
+          continue;
+        }
+        case 2: {
+          if (tag !== 16) {
+            break;
+          }
+
+          message.depth = reader.int32();
+          continue;
+        }
+      }
+      if ((tag & 7) === 4 || tag === 0) {
+        break;
+      }
+      reader.skip(tag & 7);
+    }
+    return message;
+  },
+
+  fromJSON(object: any): ListDirectory {
+    return {
+      directory: isSet(object.directory) ? globalThis.String(object.directory) : "",
+      depth: isSet(object.depth) ? globalThis.Number(object.depth) : 0,
+    };
+  },
+
+  toJSON(message: ListDirectory): unknown {
+    const obj: any = {};
+    if (message.directory !== "") {
+      obj.directory = message.directory;
+    }
+    if (message.depth !== 0) {
+      obj.depth = Math.round(message.depth);
+    }
+    return obj;
+  },
+
+  create<I extends Exact<DeepPartial<ListDirectory>, I>>(base?: I): ListDirectory {
+    return ListDirectory.fromPartial(base ?? ({} as any));
+  },
+  fromPartial<I extends Exact<DeepPartial<ListDirectory>, I>>(object: I): ListDirectory {
+    const message = createBaseListDirectory();
+    message.directory = object.directory ?? "";
+    message.depth = object.depth ?? 0;
     return message;
   },
 };

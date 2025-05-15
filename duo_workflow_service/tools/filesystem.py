@@ -456,6 +456,27 @@ class EditFile(DuoBaseTool):
         return "Edit file"
 
 
+class ListDirInput(BaseModel):
+    directory: str = Field(description="Directory path relative to the repository root")
+    depth: str = Field(default="1", description="Directory depth to list. 1 for immediate files and folders, 2 for nested ones etc.")
+
+
+class ListDir(DuoBaseTool):
+    name: str = "list_dir"
+    description: str = (
+        """Lists files in the given directory relative to the root of the project."""
+    )
+    args_schema: Type[BaseModel] = ListDirInput  # type: ignore
+
+    async def _arun(self, directory: str, depth: int) -> str:
+        return await _execute_action(
+            self.metadata,  # type: ignore
+            contract_pb2.Action(
+                listDirectory=contract_pb2.ListDirectory(directory=directory, depth=depth)
+            ),
+        )
+
+
 def _format_no_matches_message(pattern, search_directory=None):
     search_scope = f" in '{search_directory}'" if search_directory else ""
     return f"No matches found for pattern '{pattern}'{search_scope}."

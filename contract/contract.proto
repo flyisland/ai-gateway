@@ -40,6 +40,7 @@ message Action {
         RunGitCommand runGitCommand = 6;
         EditFile runEditFile = 7;
         NewCheckpoint newCheckpoint = 8;
+        ListDirectory listDirectory = 9;
     };
 }
 
@@ -105,4 +106,9 @@ message NewCheckpoint {
     string checkpoint = 2;
     string goal = 3;
     repeated string errors = 4;
+}
+
+message ListDirectory {
+    string directory = 1;
+    int32 depth = 2;
 }

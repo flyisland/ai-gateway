@@ -56,7 +56,7 @@ class ActionResponse(_message.Message):
     def __init__(self, requestID: _Optional[str] = ..., response: _Optional[str] = ...) -> None: ...
 
 class Action(_message.Message):
-    __slots__ = ("requestID", "runCommand", "runHTTPRequest", "runReadFile", "runWriteFile", "runGitCommand", "runEditFile", "newCheckpoint")
+    __slots__ = ("requestID", "runCommand", "runHTTPRequest", "runReadFile", "runWriteFile", "runGitCommand", "runEditFile", "newCheckpoint", "listDirectory")
     REQUESTID_FIELD_NUMBER: _ClassVar[int]
     RUNCOMMAND_FIELD_NUMBER: _ClassVar[int]
     RUNHTTPREQUEST_FIELD_NUMBER: _ClassVar[int]
@@ -65,6 +65,7 @@ class Action(_message.Message):
     RUNGITCOMMAND_FIELD_NUMBER: _ClassVar[int]
     RUNEDITFILE_FIELD_NUMBER: _ClassVar[int]
     NEWCHECKPOINT_FIELD_NUMBER: _ClassVar[int]
+    LISTDIRECTORY_FIELD_NUMBER: _ClassVar[int]
     requestID: str
     runCommand: RunCommandAction
     runHTTPRequest: RunHTTPRequest
@@ -73,7 +74,8 @@ class Action(_message.Message):
     runGitCommand: RunGitCommand
     runEditFile: EditFile
     newCheckpoint: NewCheckpoint
-    def __init__(self, requestID: _Optional[str] = ..., runCommand: _Optional[_Union[RunCommandAction, _Mapping]] = ..., runHTTPRequest: _Optional[_Union[RunHTTPRequest, _Mapping]] = ..., runReadFile: _Optional[_Union[ReadFile, _Mapping]] = ..., runWriteFile: _Optional[_Union[WriteFile, _Mapping]] = ..., runGitCommand: _Optional[_Union[RunGitCommand, _Mapping]] = ..., runEditFile: _Optional[_Union[EditFile, _Mapping]] = ..., newCheckpoint: _Optional[_Union[NewCheckpoint, _Mapping]] = ...) -> None: ...
+    listDirectory: ListDirectory
+    def __init__(self, requestID: _Optional[str] = ..., runCommand: _Optional[_Union[RunCommandAction, _Mapping]] = ..., runHTTPRequest: _Optional[_Union[RunHTTPRequest, _Mapping]] = ..., runReadFile: _Optional[_Union[ReadFile, _Mapping]] = ..., runWriteFile: _Optional[_Union[WriteFile, _Mapping]] = ..., runGitCommand: _Optional[_Union[RunGitCommand, _Mapping]] = ..., runEditFile: _Optional[_Union[EditFile, _Mapping]] = ..., newCheckpoint: _Optional[_Union[NewCheckpoint, _Mapping]] = ..., listDirectory: _Optional[_Union[ListDirectory, _Mapping]] = ...) -> None: ...
 
 class RunCommandAction(_message.Message):
     __slots__ = ("program", "arguments", "flags")
@@ -162,3 +164,11 @@ class NewCheckpoint(_message.Message):
     goal: str
     errors: _containers.RepeatedScalarFieldContainer[str]
     def __init__(self, status: _Optional[str] = ..., checkpoint: _Optional[str] = ..., goal: _Optional[str] = ..., errors: _Optional[_Iterable[str]] = ...) -> None: ...
+
+class ListDirectory(_message.Message):
+    __slots__ = ("directory", "depth")
+    DIRECTORY_FIELD_NUMBER: _ClassVar[int]
+    DEPTH_FIELD_NUMBER: _ClassVar[int]
+    directory: str
+    depth: int
+    def __init__(self, directory: _Optional[str] = ..., depth: _Optional[int] = ...) -> None: ...
