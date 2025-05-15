@@ -123,6 +123,9 @@ class AbstractWorkflow(ABC):
         except asyncio.QueueEmpty:
             return None
 
+    def outbox_empty(self):
+        return self._outbox.empty()
+
     async def get_from_outbox(self):
         item = await asyncio.wait_for(self._outbox.get(), self.OUTBOX_CHECK_INTERVAL)
         self._outbox.task_done()

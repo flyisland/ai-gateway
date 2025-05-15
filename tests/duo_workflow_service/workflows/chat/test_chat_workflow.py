@@ -285,7 +285,7 @@ async def test_workflow_run(
         "duo_workflow_service.workflows.chat.workflow.StateGraph"
     ) as mock_graph_cls:
         compiled_graph = MagicMock()
-        compiled_graph.astream = AsyncMock(return_value=AsyncMock())
+        compiled_graph.astream.return_value = AsyncIterator()
         mock_graph = mock_graph_cls.return_value
         mock_graph.compile.return_value = compiled_graph
 
