@@ -2,10 +2,10 @@ from dependency_injector import containers, providers
 from litellm.llms.custom_httpx.http_handler import AsyncHTTPHandler
 
 from ai_gateway.integrations.amazon_q.chat import ChatAmazonQ
-from ai_gateway.integrations.litellm.chat import CustomChatLiteLLM
 from ai_gateway.models import mock
 from ai_gateway.models.base import init_anthropic_client, log_request
 from ai_gateway.models.v2.anthropic_claude import ChatAnthropic
+from ai_gateway.models.v2.chat_litellm import ChatLiteLLM
 from ai_gateway.prompts.typing import Model
 
 __all__ = [
@@ -18,7 +18,7 @@ def _litellm_factory(*args, **kwargs) -> Model:
     if kwargs.get("custom_llm_provider", "") == "vertex_ai":
         kwargs["client"] = AsyncHTTPHandler(event_hooks={"request": [log_request]})
 
-    return CustomChatLiteLLM(*args, **kwargs)
+    return ChatLiteLLM(*args, **kwargs)
 
 
 class ContainerModels(containers.DeclarativeContainer):

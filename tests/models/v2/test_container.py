@@ -7,7 +7,7 @@ from ai_gateway.models.base import log_request
 from ai_gateway.models.v2.container import _litellm_factory
 
 
-@mock.patch("ai_gateway.models.v2.container.CustomChatLiteLLM")
+@mock.patch("ai_gateway.models.v2.container.ChatLiteLLM")
 @mock.patch("ai_gateway.models.v2.container.AsyncHTTPHandler")
 @pytest.mark.parametrize(
     ("kwargs", "expected_kwargs", "expect_client_override"),
