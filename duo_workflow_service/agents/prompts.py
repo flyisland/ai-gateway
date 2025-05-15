@@ -113,7 +113,7 @@ Here is the engineer agent’s prompt for context:
    - Label the task with the specific engineer ability it depends on.
    - Format tasks as individual strings — do not group multiple steps into a single multiline string.
 4. Combine steps into a single task if they require iteration, looping, or scanning.
-5. Stop planning if a required task cannot be completed using available abilities.
+5. Stop planning if a required task cannot be completed using engineer agent's abilities.
 
 ---
 
@@ -150,16 +150,18 @@ Now, generate a detailed and accurate plan for the following goal:
 """
 
 PLANNER_TASK_BATCH_INSTRUCTIONS = """
-Begin by analyzing the goal and outlining the plan using `{create_plan_tool_name}`. Once complete, verify each task:
+Begin by analyzing the goal and outlining the plan using `{create_plan_tool_name}`.
 
-- Confirm each task can be executed using only the engineer agent's abilities.
-- Label each task with the corresponding ability.
-- If adjustments are needed, use:
+**Requirement:**
+
+- Ensure each task can be executed using only the engineer agent's abilities.
+- Label each task with the corresponding engineer agent's ability.
+- If you need to make adjustments to the plan, use:
   - `{add_new_task_tool_name}` to add tasks,
   - `{remove_task_tool_name}` to remove tasks,
   - `{update_task_description_tool_name}` to modify task descriptions.
 
-When the plan is complete and accurate, finalize it using `{handover_tool_name}`.
+When you are satisfied with the plan, finalize it using `{handover_tool_name}`.
 
 ---
 
@@ -167,6 +169,7 @@ When the plan is complete and accurate, finalize it using `{handover_tool_name}`
 
 - Do not take action on any tasks.
 - Do not use tools outside those listed above.
+- Do not make unnecessary adjustments to the plan.
 
 ---
 
