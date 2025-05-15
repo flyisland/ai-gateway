@@ -2,7 +2,6 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
-from duo_workflow_service.gitlab.gitlab_project import Project
 from duo_workflow_service.internal_events import InternalEventAdditionalProperties
 from duo_workflow_service.internal_events.event_enum import CategoryEnum, EventEnum
 from duo_workflow_service.workflows.abstract_workflow import (
@@ -13,8 +12,8 @@ from duo_workflow_service.workflows.abstract_workflow import (
 
 # Concrete implementation for testing
 class MockGraph:
-    async def astream(self, input, config):
-        yield {"step1": {"key": "value"}}
+    async def astream(self, input, config, stream_mode):
+        yield "updates", {"step1": {"key": "value"}}
 
 
 class MockWorkflow(AbstractWorkflow):
@@ -119,6 +118,7 @@ async def test_add_to_inbox(workflow):
 
 
 @pytest.mark.asyncio
+@patch("duo_workflow_service.workflows.abstract_workflow.fetch_workflow_config")
 @patch(
     "duo_workflow_service.workflows.abstract_workflow.fetch_project_data_with_workflow_id"
 )
@@ -128,6 +128,7 @@ async def test_compile_and_run_graph(
     mock_tools_registry,
     mock_gitlab_workflow,
     mock_fetch_project,
+    mock_workflow_config,
     workflow,
     mock_project,
 ):
@@ -219,6 +220,7 @@ def test_track_internal_event(mock_track_event, workflow):
 
 
 @pytest.mark.asyncio
+@patch("duo_workflow_service.workflows.abstract_workflow.fetch_workflow_config")
 @patch(
     "duo_workflow_service.workflows.abstract_workflow.fetch_project_data_with_workflow_id"
 )
@@ -228,6 +230,7 @@ async def test_compile_and_run_graph_with_exception(
     mock_tools_registry,
     mock_gitlab_workflow,
     mock_fetch_project,
+    mock_workflow_config,
     workflow,
     mock_project,
 ):
