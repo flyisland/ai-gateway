@@ -168,7 +168,7 @@ export interface NewCheckpoint {
 
 export interface ListDirectory {
   directory: string;
-  depth: string;
+  depth: number;
 }
 
 function createBaseClientEvent(): ClientEvent {
@@ -1533,7 +1533,7 @@ export const NewCheckpoint: MessageFns<NewCheckpoint> = {
 };
 
 function createBaseListDirectory(): ListDirectory {
-  return { directory: "", depth: "" };
+  return { directory: "", depth: 0 };
 }
 
 export const ListDirectory: MessageFns<ListDirectory> = {
@@ -1541,8 +1541,8 @@ export const ListDirectory: MessageFns<ListDirectory> = {
     if (message.directory !== "") {
       writer.uint32(10).string(message.directory);
     }
-    if (message.depth !== "") {
-      writer.uint32(18).string(message.depth);
+    if (message.depth !== 0) {
+      writer.uint32(16).int32(message.depth);
     }
     return writer;
   },
@@ -1563,11 +1563,11 @@ export const ListDirectory: MessageFns<ListDirectory> = {
           continue;
         }
         case 2: {
-          if (tag !== 18) {
+          if (tag !== 16) {
             break;
           }
 
-          message.depth = reader.string();
+          message.depth = reader.int32();
           continue;
         }
       }
@@ -1582,7 +1582,7 @@ export const ListDirectory: MessageFns<ListDirectory> = {
   fromJSON(object: any): ListDirectory {
     return {
       directory: isSet(object.directory) ? globalThis.String(object.directory) : "",
-      depth: isSet(object.depth) ? globalThis.String(object.depth) : "",
+      depth: isSet(object.depth) ? globalThis.Number(object.depth) : 0,
     };
   },
 
@@ -1591,8 +1591,8 @@ export const ListDirectory: MessageFns<ListDirectory> = {
     if (message.directory !== "") {
       obj.directory = message.directory;
     }
-    if (message.depth !== "") {
-      obj.depth = message.depth;
+    if (message.depth !== 0) {
+      obj.depth = Math.round(message.depth);
     }
     return obj;
   },
@@ -1603,7 +1603,7 @@ export const ListDirectory: MessageFns<ListDirectory> = {
   fromPartial<I extends Exact<DeepPartial<ListDirectory>, I>>(object: I): ListDirectory {
     const message = createBaseListDirectory();
     message.directory = object.directory ?? "";
-    message.depth = object.depth ?? "";
+    message.depth = object.depth ?? 0;
     return message;
   },
 };

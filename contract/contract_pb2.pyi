@@ -170,5 +170,5 @@ class ListDirectory(_message.Message):
     DIRECTORY_FIELD_NUMBER: _ClassVar[int]
     DEPTH_FIELD_NUMBER: _ClassVar[int]
     directory: str
-    depth: str
-    def __init__(self, directory: _Optional[str] = ..., depth: _Optional[str] = ...) -> None: ...
+    depth: int
+    def __init__(self, directory: _Optional[str] = ..., depth: _Optional[int] = ...) -> None: ...
