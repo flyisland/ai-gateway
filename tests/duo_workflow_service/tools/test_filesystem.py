@@ -265,7 +265,7 @@ class TestLsDir:
         input_data = ListDirInput(directory="./src")
         message = list_dir_tool.format_display_message(input_data)
 
-        expected_message = "Using list_dir: directory=./src"
+        expected_message = "Using list_dir: directory=./src, depth=1"
         assert message == expected_message
 
 

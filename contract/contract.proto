@@ -128,7 +128,7 @@ message NewCheckpoint {
 
 message ListDirectory {
     string directory = 1;
-    string depth = 2;
+    int32 depth = 2;
 }
 
 message Grep {
