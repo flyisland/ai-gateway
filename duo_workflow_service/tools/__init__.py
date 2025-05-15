@@ -1,5 +1,6 @@
 # flake8: noqa
 
+from .commit import *
 from .command import *
 from .duo_base_tool import format_tool_display_message
 from .epic import *

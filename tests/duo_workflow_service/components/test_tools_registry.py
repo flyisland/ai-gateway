@@ -89,6 +89,8 @@ _outbox = MagicMock(spec=asyncio.Queue)
                 "get_repository_file",
                 "list_epic_notes",
                 "get_epic_note",
+                "get_commit",
+                "list_commits",
             },
         ),
         (
@@ -134,6 +136,8 @@ _outbox = MagicMock(spec=asyncio.Queue)
                 "get_repository_file",
                 "list_epic_notes",
                 "get_epic_note",
+                "list_commits",
+                "get_commit",
             },
         ),
         (
@@ -260,6 +264,8 @@ def test_registry_initialization_initialises_tools_with_correct_attributes(
         "get_repository_file": tools.GetRepositoryFile(metadata=tool_metadata),
         "list_epic_notes": tools.ListEpicNotes(metadata=tool_metadata),
         "get_epic_note": tools.GetEpicNote(metadata=tool_metadata),
+        "list_commits": tools.ListCommits(metadata=tool_metadata),
+        "get_commit": tools.GetCommit(metadata=tool_metadata),
     }
 
     assert registry._enabled_tools == expected_tools
