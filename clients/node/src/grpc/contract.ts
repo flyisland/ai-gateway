@@ -110,6 +110,7 @@ export interface Action {
   runEditFile?: EditFile | undefined;
   newCheckpoint?: NewCheckpoint | undefined;
   listDirectory?: ListDirectory | undefined;
+  standardGrep?: StandardGrep | undefined;
 }
 
 export interface RunCommandAction {
@@ -169,6 +170,15 @@ export interface NewCheckpoint {
 export interface ListDirectory {
   directory: string;
   depth: number;
+}
+
+export interface StandardGrep {
+  searchDirectory: string;
+  pattern: string;
+  caseInsensitive: boolean;
+  fixedStrings: boolean;
+  filesWithMatches: boolean;
+  filesWithoutMatch: boolean;
 }
 
 function createBaseClientEvent(): ClientEvent {
@@ -506,6 +516,7 @@ function createBaseAction(): Action {
     runEditFile: undefined,
     newCheckpoint: undefined,
     listDirectory: undefined,
+    standardGrep: undefined,
   };
 }
 
@@ -537,6 +548,9 @@ export const Action: MessageFns<Action> = {
     }
     if (message.listDirectory !== undefined) {
       ListDirectory.encode(message.listDirectory, writer.uint32(74).fork()).join();
+    }
+    if (message.standardGrep !== undefined) {
+      StandardGrep.encode(message.standardGrep, writer.uint32(82).fork()).join();
     }
     return writer;
   },
@@ -620,6 +634,14 @@ export const Action: MessageFns<Action> = {
           message.listDirectory = ListDirectory.decode(reader, reader.uint32());
           continue;
         }
+        case 10: {
+          if (tag !== 82) {
+            break;
+          }
+
+          message.standardGrep = StandardGrep.decode(reader, reader.uint32());
+          continue;
+        }
       }
       if ((tag & 7) === 4 || tag === 0) {
         break;
@@ -640,6 +662,7 @@ export const Action: MessageFns<Action> = {
       runEditFile: isSet(object.runEditFile) ? EditFile.fromJSON(object.runEditFile) : undefined,
       newCheckpoint: isSet(object.newCheckpoint) ? NewCheckpoint.fromJSON(object.newCheckpoint) : undefined,
       listDirectory: isSet(object.listDirectory) ? ListDirectory.fromJSON(object.listDirectory) : undefined,
+      standardGrep: isSet(object.standardGrep) ? StandardGrep.fromJSON(object.standardGrep) : undefined,
     };
   },
 
@@ -671,6 +694,9 @@ export const Action: MessageFns<Action> = {
     }
     if (message.listDirectory !== undefined) {
       obj.listDirectory = ListDirectory.toJSON(message.listDirectory);
+    }
+    if (message.standardGrep !== undefined) {
+      obj.standardGrep = StandardGrep.toJSON(message.standardGrep);
     }
     return obj;
   },
@@ -704,6 +730,9 @@ export const Action: MessageFns<Action> = {
       : undefined;
     message.listDirectory = (object.listDirectory !== undefined && object.listDirectory !== null)
       ? ListDirectory.fromPartial(object.listDirectory)
+      : undefined;
+    message.standardGrep = (object.standardGrep !== undefined && object.standardGrep !== null)
+      ? StandardGrep.fromPartial(object.standardGrep)
       : undefined;
     return message;
   },
@@ -1604,6 +1633,153 @@ export const ListDirectory: MessageFns<ListDirectory> = {
     const message = createBaseListDirectory();
     message.directory = object.directory ?? "";
     message.depth = object.depth ?? 0;
+    return message;
+  },
+};
+
+function createBaseStandardGrep(): StandardGrep {
+  return {
+    searchDirectory: "",
+    pattern: "",
+    caseInsensitive: false,
+    fixedStrings: false,
+    filesWithMatches: false,
+    filesWithoutMatch: false,
+  };
+}
+
+export const StandardGrep: MessageFns<StandardGrep> = {
+  encode(message: StandardGrep, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
+    if (message.searchDirectory !== "") {
+      writer.uint32(10).string(message.searchDirectory);
+    }
+    if (message.pattern !== "") {
+      writer.uint32(18).string(message.pattern);
+    }
+    if (message.caseInsensitive !== false) {
+      writer.uint32(24).bool(message.caseInsensitive);
+    }
+    if (message.fixedStrings !== false) {
+      writer.uint32(32).bool(message.fixedStrings);
+    }
+    if (message.filesWithMatches !== false) {
+      writer.uint32(40).bool(message.filesWithMatches);
+    }
+    if (message.filesWithoutMatch !== false) {
+      writer.uint32(48).bool(message.filesWithoutMatch);
+    }
+    return writer;
+  },
+
+  decode(input: BinaryReader | Uint8Array, length?: number): StandardGrep {
+    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+    let end = length === undefined ? reader.len : reader.pos + length;
+    const message = createBaseStandardGrep();
+    while (reader.pos < end) {
+      const tag = reader.uint32();
+      switch (tag >>> 3) {
+        case 1: {
+          if (tag !== 10) {
+            break;
+          }
+
+          message.searchDirectory = reader.string();
+          continue;
+        }
+        case 2: {
+          if (tag !== 18) {
+            break;
+          }
+
+          message.pattern = reader.string();
+          continue;
+        }
+        case 3: {
+          if (tag !== 24) {
+            break;
+          }
+
+          message.caseInsensitive = reader.bool();
+          continue;
+        }
+        case 4: {
+          if (tag !== 32) {
+            break;
+          }
+
+          message.fixedStrings = reader.bool();
+          continue;
+        }
+        case 5: {
+          if (tag !== 40) {
+            break;
+          }
+
+          message.filesWithMatches = reader.bool();
+          continue;
+        }
+        case 6: {
+          if (tag !== 48) {
+            break;
+          }
+
+          message.filesWithoutMatch = reader.bool();
+          continue;
+        }
+      }
+      if ((tag & 7) === 4 || tag === 0) {
+        break;
+      }
+      reader.skip(tag & 7);
+    }
+    return message;
+  },
+
+  fromJSON(object: any): StandardGrep {
+    return {
+      searchDirectory: isSet(object.searchDirectory) ? globalThis.String(object.searchDirectory) : "",
+      pattern: isSet(object.pattern) ? globalThis.String(object.pattern) : "",
+      caseInsensitive: isSet(object.caseInsensitive) ? globalThis.Boolean(object.caseInsensitive) : false,
+      fixedStrings: isSet(object.fixedStrings) ? globalThis.Boolean(object.fixedStrings) : false,
+      filesWithMatches: isSet(object.filesWithMatches) ? globalThis.Boolean(object.filesWithMatches) : false,
+      filesWithoutMatch: isSet(object.filesWithoutMatch) ? globalThis.Boolean(object.filesWithoutMatch) : false,
+    };
+  },
+
+  toJSON(message: StandardGrep): unknown {
+    const obj: any = {};
+    if (message.searchDirectory !== "") {
+      obj.searchDirectory = message.searchDirectory;
+    }
+    if (message.pattern !== "") {
+      obj.pattern = message.pattern;
+    }
+    if (message.caseInsensitive !== false) {
+      obj.caseInsensitive = message.caseInsensitive;
+    }
+    if (message.fixedStrings !== false) {
+      obj.fixedStrings = message.fixedStrings;
+    }
+    if (message.filesWithMatches !== false) {
+      obj.filesWithMatches = message.filesWithMatches;
+    }
+    if (message.filesWithoutMatch !== false) {
+      obj.filesWithoutMatch = message.filesWithoutMatch;
+    }
+    return obj;
+  },
+
+  create<I extends Exact<DeepPartial<StandardGrep>, I>>(base?: I): StandardGrep {
+    return StandardGrep.fromPartial(base ?? ({} as any));
+  },
+  fromPartial<I extends Exact<DeepPartial<StandardGrep>, I>>(object: I): StandardGrep {
+    const message = createBaseStandardGrep();
+    message.searchDirectory = object.searchDirectory ?? "";
+    message.pattern = object.pattern ?? "";
+    message.caseInsensitive = object.caseInsensitive ?? false;
+    message.fixedStrings = object.fixedStrings ?? false;
+    message.filesWithMatches = object.filesWithMatches ?? false;
+    message.filesWithoutMatch = object.filesWithoutMatch ?? false;
     return message;
   },
 };

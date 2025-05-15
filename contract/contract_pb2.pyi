@@ -56,7 +56,7 @@ class ActionResponse(_message.Message):
     def __init__(self, requestID: _Optional[str] = ..., response: _Optional[str] = ...) -> None: ...
 
 class Action(_message.Message):
-    __slots__ = ("requestID", "runCommand", "runHTTPRequest", "runReadFile", "runWriteFile", "runGitCommand", "runEditFile", "newCheckpoint", "listDirectory")
+    __slots__ = ("requestID", "runCommand", "runHTTPRequest", "runReadFile", "runWriteFile", "runGitCommand", "runEditFile", "newCheckpoint", "listDirectory", "standardGrep")
     REQUESTID_FIELD_NUMBER: _ClassVar[int]
     RUNCOMMAND_FIELD_NUMBER: _ClassVar[int]
     RUNHTTPREQUEST_FIELD_NUMBER: _ClassVar[int]
@@ -66,6 +66,7 @@ class Action(_message.Message):
     RUNEDITFILE_FIELD_NUMBER: _ClassVar[int]
     NEWCHECKPOINT_FIELD_NUMBER: _ClassVar[int]
     LISTDIRECTORY_FIELD_NUMBER: _ClassVar[int]
+    STANDARDGREP_FIELD_NUMBER: _ClassVar[int]
     requestID: str
     runCommand: RunCommandAction
     runHTTPRequest: RunHTTPRequest
@@ -75,7 +76,8 @@ class Action(_message.Message):
     runEditFile: EditFile
     newCheckpoint: NewCheckpoint
     listDirectory: ListDirectory
-    def __init__(self, requestID: _Optional[str] = ..., runCommand: _Optional[_Union[RunCommandAction, _Mapping]] = ..., runHTTPRequest: _Optional[_Union[RunHTTPRequest, _Mapping]] = ..., runReadFile: _Optional[_Union[ReadFile, _Mapping]] = ..., runWriteFile: _Optional[_Union[WriteFile, _Mapping]] = ..., runGitCommand: _Optional[_Union[RunGitCommand, _Mapping]] = ..., runEditFile: _Optional[_Union[EditFile, _Mapping]] = ..., newCheckpoint: _Optional[_Union[NewCheckpoint, _Mapping]] = ..., listDirectory: _Optional[_Union[ListDirectory, _Mapping]] = ...) -> None: ...
+    standardGrep: StandardGrep
+    def __init__(self, requestID: _Optional[str] = ..., runCommand: _Optional[_Union[RunCommandAction, _Mapping]] = ..., runHTTPRequest: _Optional[_Union[RunHTTPRequest, _Mapping]] = ..., runReadFile: _Optional[_Union[ReadFile, _Mapping]] = ..., runWriteFile: _Optional[_Union[WriteFile, _Mapping]] = ..., runGitCommand: _Optional[_Union[RunGitCommand, _Mapping]] = ..., runEditFile: _Optional[_Union[EditFile, _Mapping]] = ..., newCheckpoint: _Optional[_Union[NewCheckpoint, _Mapping]] = ..., listDirectory: _Optional[_Union[ListDirectory, _Mapping]] = ..., standardGrep: _Optional[_Union[StandardGrep, _Mapping]] = ...) -> None: ...
 
 class RunCommandAction(_message.Message):
     __slots__ = ("program", "arguments", "flags")
@@ -172,3 +174,19 @@ class ListDirectory(_message.Message):
     directory: str
     depth: int
     def __init__(self, directory: _Optional[str] = ..., depth: _Optional[int] = ...) -> None: ...
+
+class StandardGrep(_message.Message):
+    __slots__ = ("search_directory", "pattern", "case_insensitive", "fixed_strings", "files_with_matches", "files_without_match")
+    SEARCH_DIRECTORY_FIELD_NUMBER: _ClassVar[int]
+    PATTERN_FIELD_NUMBER: _ClassVar[int]
+    CASE_INSENSITIVE_FIELD_NUMBER: _ClassVar[int]
+    FIXED_STRINGS_FIELD_NUMBER: _ClassVar[int]
+    FILES_WITH_MATCHES_FIELD_NUMBER: _ClassVar[int]
+    FILES_WITHOUT_MATCH_FIELD_NUMBER: _ClassVar[int]
+    search_directory: str
+    pattern: str
+    case_insensitive: bool
+    fixed_strings: bool
+    files_with_matches: bool
+    files_without_match: bool
+    def __init__(self, search_directory: _Optional[str] = ..., pattern: _Optional[str] = ..., case_insensitive: bool = ..., fixed_strings: bool = ..., files_with_matches: bool = ..., files_without_match: bool = ...) -> None: ...
