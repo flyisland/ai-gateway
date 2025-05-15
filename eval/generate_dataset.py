@@ -72,23 +72,30 @@ def get_prompt_source(
         elif message.__class__.__name__ == "AIMessagePromptTemplate":
             role = "assistant"
         else:
-            message_type = getattr(message, "message_type", None)
-            if message_type:
-                role = message_type
-            else:
-                role = getattr(message, "type", message.__class__.__name__)
+            role = message.__class__.__name__
 
         template = message.prompt.template
         prompt_template[role] = template
 
     source_messages = get_message_source(prompt_template)
 
+    user_message = source_messages.get("user", None)
+    if not user_message:
+        raise ValueError("Prompt must include a user message")
+
+    # The LLM prompt in ELI5 that's used to generate the dataset examples only expects system or user messages.
+    # Append any other messages to the user message.
+    other_messages = []
+    for role, content in source_messages.items():
+        if role not in ["system", "user"] and content:
+            other_messages.append(f"[{role}]: {content}")
+
     return {
         "name": prompt.name,
         "prompt_template": {
             "system": source_messages.get("system", None),
-            "user": source_messages.get("user", None),
-        },
+            "user": f"{user_message}\n\n{"\n\n".join(other_messages)}",
+        }
     }
 
 
