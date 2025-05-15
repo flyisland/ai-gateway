@@ -240,7 +240,7 @@ class TestLsDir:
         list_dir_tool.metadata = metadata
 
         # Call the method being tested
-        result = await list_dir_tool._arun(directory=".")
+        result = await list_dir_tool._arun(directory=".", depth=1)
 
         # Assert the result
         assert result == "file1.txt file2.txt dir1 dir2"
