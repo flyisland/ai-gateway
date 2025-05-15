@@ -1,3 +1,5 @@
+from pydantic import BaseModel, ConfigDict, model_validator
+
 X_GITLAB_REALM_HEADER = "X-Gitlab-Realm"
 X_GITLAB_INSTANCE_ID_HEADER = "X-Gitlab-Instance-Id"
 X_GITLAB_GLOBAL_USER_ID_HEADER = "X-Gitlab-Global-User-Id"
@@ -17,3 +19,28 @@ X_GITLAB_CLIENT_TYPE = "X-Gitlab-Client-Type"
 X_GITLAB_CLIENT_VERSION = "X-Gitlab-Client-Version"
 X_GITLAB_CLIENT_NAME = "X-Gitlab-Client-Name"
 X_GITLAB_INTERFACE = "X-Gitlab-Interface"
+
+
+class BaseGitLabHeaders(BaseModel):
+    """Base model for common GitLab headers with 4KiB size limit"""
+
+    model_config = ConfigDict(extra='forbid')
+    valid_headers: set[str] = set()
+    header_values: dict[str, str] = {}  # Store the actual header values
+
+
+    @model_validator(mode='after')
+    def validate_valid_header_name(self):
+        # Determine if the provider headers start with X_GITLAB_* 
+        for header_name in self.valid_headers:
+            if not header_name.startswith('X-Gitlab'):
+                raise ValueError(f"Header '{header_name}' is not a valid GitLab header. Valid headers must start with 'X-Gitlab-*'. ")
+        return self
+
+    @model_validator(mode='after')
+    def validate_total_size(self):
+        # Calculate total size of all headers
+        total_size = sum(len(key) + len(str(value)) for key, value in self.header_values.items())
+        if total_size > 4 * 1024:  # 4KiB limit
+            raise ValueError("Total header size exceeds 4KiB limit")
+        return self
