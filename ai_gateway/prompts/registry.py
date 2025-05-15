@@ -200,7 +200,7 @@ class LocalPromptRegistry(BasePromptRegistry):
             PromptConfig: Processed prompt configuration
         """
 
-        # TODO: improve the programatic way of accessing grand parent director
+        # TODO: improve the programatic way of accessing grandparent directory
         unit_primitive = version_file.parts[3]
 
         with open(version_file, "r") as fp:
@@ -209,12 +209,12 @@ class LocalPromptRegistry(BasePromptRegistry):
             unit_primitive_config = cls.get_config_for_unit_primitive(unit_primitive_configuration, unit_primitive)
             gitlab_identifier = unit_primitive_config.default_model
 
-            prompt_config_params = llm_configurations[gitlab_identifier].params
+            model_selection_prompt_config_params = llm_configurations[gitlab_identifier].params
+            model_selection_prompt_config_params["name"] = unit_primitive_config.default_model
 
-                if config_for_general_model:
-                    prompt_config_params = cls._patch_model_configuration(
-                        config_for_general_model, prompt_config_params
-                    )
+            prompt_config_params = cls._patch_model_configuration(
+                model_selection_prompt_config_params, prompt_config_params
+            )
 
             return PromptConfig(**prompt_config_params)
 
@@ -235,6 +235,7 @@ class LocalPromptRegistry(BasePromptRegistry):
             },
         }
     
+    @classmethod
     def get_config_for_unit_primitive(configs, unit_primitive) -> UnitPrimitiveConfig
         """
         Find the UnitPrimitiveConfig object that contains the specified unit_primitive
