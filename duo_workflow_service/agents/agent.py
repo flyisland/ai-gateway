@@ -23,8 +23,8 @@ from duo_workflow_service.errors.error_handler import ModelError, ModelErrorHand
 from duo_workflow_service.gitlab.events import get_event
 from duo_workflow_service.gitlab.http_client import GitlabHttpClient
 from duo_workflow_service.internal_events import (
-    DuoWorkflowInternalEvent,
     InternalEventAdditionalProperties,
+    DuoWorkflowInternalEvent,
 )
 from duo_workflow_service.internal_events.event_enum import (
     CategoryEnum,
