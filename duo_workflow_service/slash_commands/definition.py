@@ -30,7 +30,7 @@ class SlashCommandDefinition(BaseModel):
     description: str = ""
     system_prompt: str = ""
     goal: str = ""
-    parameters: Dict[str, Any] = Field(default_factory=dict)
+    parameters: Dict[Any, Any] = Field(default_factory=dict)
 
     def __repr__(self) -> str:
         return f"SlashCommandDefinition(name={self.name}, description={self.description}, parameters={self.parameters})"
