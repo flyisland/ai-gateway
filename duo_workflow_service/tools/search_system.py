@@ -6,7 +6,7 @@ from pydantic import BaseModel, Field
 from duo_workflow_service.tools.duo_base_tool import DuoBaseTool
 
 
-class StandardGrepInput(BaseModel):
+class GrepInput(BaseModel):
     search_directory: Optional[str] = Field(
         default=".",
         description="The relative path of directory in which to search. Defaults to current directory.",
@@ -18,7 +18,7 @@ class StandardGrepInput(BaseModel):
     )
 
 
-class StandardGrep(DuoBaseTool):
+class Grep(DuoBaseTool):
     name: str = "standard_grep"
     description: str = """Search for text patterns in files.
     This tool uses searches, recursively, through all files in the given directory, respecting .gitignore rules.
@@ -33,7 +33,7 @@ class StandardGrep(DuoBaseTool):
     - Case-insensitive search: standard_grep(pattern="error", case_insensitive=True)
     - Search in specific directory: standard_grep(pattern="bug", search_directory="src/")
     """
-    args_schema: Type[BaseModel] = StandardGrepInput  # type: ignore
+    args_schema: Type[BaseModel] = GrepInput  # type: ignore
 
     async def _arun(
         self,
@@ -64,6 +64,6 @@ class StandardGrep(DuoBaseTool):
 
         return result
 
-    def format_display_message(self, args: StandardGrepInput) -> str:
+    def format_display_message(self, args: GrepInput) -> str:
         message = f"Search for '{args.pattern}' in files in '{args.search_directory}'"
         return message

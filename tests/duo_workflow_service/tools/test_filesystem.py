@@ -522,7 +522,7 @@ def test_grep_format_display_message():
 
     # Test with options
     input_data = GrepInput(
-        pattern="TODO", search_directory="./src", recursive=True, case_insensitive=True
+        pattern="TODO", search_directory="./src", case_insensitive=True
     )
     message = tool.format_display_message(input_data)
     expected_message = "Search for 'TODO' in files in './src'"
@@ -532,13 +532,7 @@ def test_grep_format_display_message():
     input_data = GrepInput(
         pattern="TODO",
         search_directory="./src",
-        recursive=True,
         case_insensitive=True,
-        include_untracked=True,
-        files_with_matches=True,
-        files_without_match=True,
-        no_recursive=True,
-        fixed_strings=True,
     )
     message = tool.format_display_message(input_data)
     expected_message = "Search for 'TODO' in files in './src'"
@@ -556,7 +550,7 @@ def test_grep_format_display_message_no_directory():
 
     # Test with options and no directory
     input_data = GrepInput(
-        pattern="TODO", search_directory=None, recursive=True, case_insensitive=True
+        pattern="TODO", search_directory=None, case_insensitive=True
     )
     message = tool.format_display_message(input_data)
     expected_message = "Search for 'TODO' in directory"
