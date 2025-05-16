@@ -6,7 +6,6 @@ from contract import contract_pb2
 from duo_workflow_service.tools.filesystem import (
     EditFile,
     EditFileInput,
-    FilesScopeEnum,
     FindFiles,
     FindFilesInput,
     ListDir,
