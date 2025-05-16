@@ -19,7 +19,7 @@ class GrepInput(BaseModel):
 
 
 class Grep(DuoBaseTool):
-    name: str = "standard_grep"
+    name: str = "grep"
     description: str = """Search for text patterns in files.
     This tool uses searches, recursively, through all files in the given directory, respecting .gitignore rules.
 
@@ -29,9 +29,9 @@ class Grep(DuoBaseTool):
     - Searches recursively by default
 
     Examples:
-    - Search for "TODO" in all files: standard_grep(pattern="TODO")
-    - Case-insensitive search: standard_grep(pattern="error", case_insensitive=True)
-    - Search in specific directory: standard_grep(pattern="bug", search_directory="src/")
+    - Search for "TODO" in all files: grep(pattern="TODO")
+    - Case-insensitive search: grep(pattern="error", case_insensitive=True)
+    - Search in specific directory: grep(pattern="bug", search_directory="src/")
     """
     args_schema: Type[BaseModel] = GrepInput  # type: ignore
 
@@ -47,11 +47,10 @@ class Grep(DuoBaseTool):
         if search_directory and ".." in search_directory:
             return "Searching above the current directory is not allowed"
 
-        # Pass the parameters directly to the action
         result = await _execute_action(
             self.metadata,  # type: ignore
             contract_pb2.Action(
-                standardGrep=contract_pb2.Grep(
+                grep=contract_pb2.Grep(
                     pattern=pattern,
                     search_directory=search_directory,
                     case_insensitive=case_insensitive,
