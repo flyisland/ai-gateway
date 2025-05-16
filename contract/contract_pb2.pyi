@@ -184,3 +184,9 @@ class StandardGrep(_message.Message):
     pattern: str
     case_insensitive: bool
     def __init__(self, search_directory: _Optional[str] = ..., pattern: _Optional[str] = ..., case_insensitive: bool = ...) -> None: ...
+
+class FindFiles(_message.Message):
+    __slots__ = ("name_pattern",)
+    NAME_PATTERN_FIELD_NUMBER: _ClassVar[int]
+    name_pattern: str
+    def __init__(self, name_pattern: _Optional[str] = ...) -> None: ...

@@ -1163,6 +1163,51 @@ func (x *StandardGrep) GetCaseInsensitive() bool {
 	return false
 }
 
+type FindFiles struct {
+	state         protoimpl.MessageState
+	sizeCache     protoimpl.SizeCache
+	unknownFields protoimpl.UnknownFields
+
+	NamePattern string `protobuf:"bytes,1,opt,name=name_pattern,json=namePattern,proto3" json:"name_pattern,omitempty"`
+}
+
+func (x *FindFiles) Reset() {
+	*x = FindFiles{}
+	mi := &file_contract_contract_proto_msgTypes[16]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *FindFiles) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*FindFiles) ProtoMessage() {}
+
+func (x *FindFiles) ProtoReflect() protoreflect.Message {
+	mi := &file_contract_contract_proto_msgTypes[16]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use FindFiles.ProtoReflect.Descriptor instead.
+func (*FindFiles) Descriptor() ([]byte, []int) {
+	return file_contract_contract_proto_rawDescGZIP(), []int{16}
+}
+
+func (x *FindFiles) GetNamePattern() string {
+	if x != nil {
+		return x.NamePattern
+	}
+	return ""
+}
+
 var File_contract_contract_proto protoreflect.FileDescriptor
 
 var file_contract_contract_proto_rawDesc = []byte{
@@ -1301,7 +1346,10 @@ var file_contract_contract_proto_rawDesc = []byte{
 	0x74, 0x65, 0x72, 0x6e, 0x18, 0x02, 0x20, 0x01, 0x28, 0x09, 0x52, 0x07, 0x70, 0x61, 0x74, 0x74,
 	0x65, 0x72, 0x6e, 0x12, 0x29, 0x0a, 0x10, 0x63, 0x61, 0x73, 0x65, 0x5f, 0x69, 0x6e, 0x73, 0x65,
 	0x6e, 0x73, 0x69, 0x74, 0x69, 0x76, 0x65, 0x18, 0x03, 0x20, 0x01, 0x28, 0x08, 0x52, 0x0f, 0x63,
-	0x61, 0x73, 0x65, 0x49, 0x6e, 0x73, 0x65, 0x6e, 0x73, 0x69, 0x74, 0x69, 0x76, 0x65, 0x2a, 0x7b,
+	0x61, 0x73, 0x65, 0x49, 0x6e, 0x73, 0x65, 0x6e, 0x73, 0x69, 0x74, 0x69, 0x76, 0x65, 0x22, 0x2e,
+	0x0a, 0x09, 0x46, 0x69, 0x6e, 0x64, 0x46, 0x69, 0x6c, 0x65, 0x73, 0x12, 0x21, 0x0a, 0x0c, 0x6e,
+	0x61, 0x6d, 0x65, 0x5f, 0x70, 0x61, 0x74, 0x74, 0x65, 0x72, 0x6e, 0x18, 0x01, 0x20, 0x01, 0x28,
+	0x09, 0x52, 0x0b, 0x6e, 0x61, 0x6d, 0x65, 0x50, 0x61, 0x74, 0x74, 0x65, 0x72, 0x6e, 0x2a, 0x7b,
 	0x0a, 0x12, 0x43, 0x6f, 0x6e, 0x74, 0x65, 0x78, 0x74, 0x45, 0x6c, 0x65, 0x6d, 0x65, 0x6e, 0x74,
 	0x54, 0x79, 0x70, 0x65, 0x12, 0x13, 0x0a, 0x0f, 0x55, 0x53, 0x45, 0x52, 0x5f, 0x50, 0x52, 0x45,
 	0x46, 0x45, 0x52, 0x45, 0x4e, 0x43, 0x45, 0x10, 0x00, 0x12, 0x11, 0x0a, 0x0d, 0x53, 0x45, 0x4c,
@@ -1340,7 +1388,7 @@ func file_contract_contract_proto_rawDescGZIP() []byte {
 }
 
 var file_contract_contract_proto_enumTypes = make([]protoimpl.EnumInfo, 1)
-var file_contract_contract_proto_msgTypes = make([]protoimpl.MessageInfo, 16)
+var file_contract_contract_proto_msgTypes = make([]protoimpl.MessageInfo, 17)
 var file_contract_contract_proto_goTypes = []any{
 	(ContextElementType)(0),       // 0: ContextElementType
 	(*ClientEvent)(nil),           // 1: ClientEvent
@@ -1359,6 +1407,7 @@ var file_contract_contract_proto_goTypes = []any{
 	(*NewCheckpoint)(nil),         // 14: NewCheckpoint
 	(*ListDirectory)(nil),         // 15: ListDirectory
 	(*StandardGrep)(nil),          // 16: StandardGrep
+	(*FindFiles)(nil),             // 17: FindFiles
 }
 var file_contract_contract_proto_depIdxs = []int32{
 	2,  // 0: ClientEvent.startRequest:type_name -> StartWorkflowRequest
@@ -1413,7 +1462,7 @@ func file_contract_contract_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: file_contract_contract_proto_rawDesc,
 			NumEnums:      1,
-			NumMessages:   16,
+			NumMessages:   17,
 			NumExtensions: 0,
 			NumServices:   1,
 		},

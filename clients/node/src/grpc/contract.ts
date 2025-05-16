@@ -178,6 +178,10 @@ export interface StandardGrep {
   caseInsensitive: boolean;
 }
 
+export interface FindFiles {
+  namePattern: string;
+}
+
 function createBaseClientEvent(): ClientEvent {
   return { startRequest: undefined, actionResponse: undefined };
 }
@@ -1722,6 +1726,64 @@ export const StandardGrep: MessageFns<StandardGrep> = {
     message.searchDirectory = object.searchDirectory ?? "";
     message.pattern = object.pattern ?? "";
     message.caseInsensitive = object.caseInsensitive ?? false;
+    return message;
+  },
+};
+
+function createBaseFindFiles(): FindFiles {
+  return { namePattern: "" };
+}
+
+export const FindFiles: MessageFns<FindFiles> = {
+  encode(message: FindFiles, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
+    if (message.namePattern !== "") {
+      writer.uint32(10).string(message.namePattern);
+    }
+    return writer;
+  },
+
+  decode(input: BinaryReader | Uint8Array, length?: number): FindFiles {
+    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+    let end = length === undefined ? reader.len : reader.pos + length;
+    const message = createBaseFindFiles();
+    while (reader.pos < end) {
+      const tag = reader.uint32();
+      switch (tag >>> 3) {
+        case 1: {
+          if (tag !== 10) {
+            break;
+          }
+
+          message.namePattern = reader.string();
+          continue;
+        }
+      }
+      if ((tag & 7) === 4 || tag === 0) {
+        break;
+      }
+      reader.skip(tag & 7);
+    }
+    return message;
+  },
+
+  fromJSON(object: any): FindFiles {
+    return { namePattern: isSet(object.namePattern) ? globalThis.String(object.namePattern) : "" };
+  },
+
+  toJSON(message: FindFiles): unknown {
+    const obj: any = {};
+    if (message.namePattern !== "") {
+      obj.namePattern = message.namePattern;
+    }
+    return obj;
+  },
+
+  create<I extends Exact<DeepPartial<FindFiles>, I>>(base?: I): FindFiles {
+    return FindFiles.fromPartial(base ?? ({} as any));
+  },
+  fromPartial<I extends Exact<DeepPartial<FindFiles>, I>>(object: I): FindFiles {
+    const message = createBaseFindFiles();
+    message.namePattern = object.namePattern ?? "";
     return message;
   },
 };

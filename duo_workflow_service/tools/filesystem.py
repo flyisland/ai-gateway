@@ -74,92 +74,39 @@ class FilesScopeEnum(IntEnum):
 class FindFilesInput(BaseModel):
     name_pattern: str = Field(
         description=(
-            "The pattern to search for files. IMPORTANT: This pattern is delimited by spaces before being passed to git."
-            "For complex patterns,you must handle proper escaping"
+            "The pattern to search for files."
         )
-    )
-    files_scope: Optional[FilesScopeEnum] = Field(
-        default=FilesScopeEnum.ALL.value,
-        description="""
-        - 0: (Default): Finds all files matching the pattern. (equivalent to using --cached --others flags together)",
-        - 1: Finds only tracked files. (equivalent to using --cached flag only)
-        - 2: Finds only untracked files. (equivalent to using --others flag only)
-        - 3: Finds only modified files . (equivalent to using --modified flag only)
-        - 4: Finds only deleted files (equivalent to using --deleted flag only)
-        """,
     )
 
 
 class FindFiles(DuoBaseTool):
     name: str = "find_files"
-    description: str = """Find files matching a specific pattern in the repository
+    description: str = """Find files, recursively, with names matching a specific pattern in the repository.
 
-    IMPORTANT: This tool uses git ls-files to recursively find files.
-        - The `name_pattern` is delimited by spaces before being passed to git (similar to shell word splitting)
-        - Patterns with spaces need proper escaping or quoting
-        - The tool always passes `--exclude-standard` flag, so files ignored by git won't be found
-        - By default, both tracked and untracked files are included unless you specify otherwise via `files_scope`
+    It includes all files (tracked and untracked) and respects .gitignore rules.
+
+    This name_pattern uses the same syntax as `find --name` or `bash` filename expansion and matches are done against the full path relative to the project root.
     """
     args_schema: Type[BaseModel] = FindFilesInput  # type: ignore
 
     async def _arun(
-        self, name_pattern: str, files_scope: FilesScopeEnum = FilesScopeEnum.ALL
+        self, name_pattern: str,
     ) -> str:
-        run_git_command = GitCommand(metadata=self.metadata)
-
-        # Always exclude files ignored by git
-        ls_files_args = ["--exclude-standard"]
-
-        # Process tracking flags
-        match files_scope:
-            case FilesScopeEnum.ALL.value:
-                ls_files_args.extend(["--cached", "--others"])
-
-            case FilesScopeEnum.TRACKED.value:
-                ls_files_args.append("--cached")
-
-            case FilesScopeEnum.UNTRACKED.value:
-                ls_files_args.append("--others")
-
-            case FilesScopeEnum.MODIFIED.value:
-                ls_files_args.append("--modified")
-
-            case FilesScopeEnum.DELETED.value:
-                ls_files_args.append("--deleted")
-
-        if name_pattern:
-            ls_files_args.append(name_pattern)
-
-        result = await run_git_command._arun(
-            repository_url="",
-            command="ls-files",
-            args=" ".join(ls_files_args),
+        result = await _execute_action(
+            self.metadata,  # type: ignore
+            contract_pb2.Action(
+                standardGrep=contract_pb2.FindFiles(
+                    name_pattern=name_pattern,
+                )
+            ),
         )
-
-        if not result or result.isspace():
-            return _format_no_matches_message(name_pattern)
 
         return result
 
     def format_display_message(self, args: FindFilesInput) -> str:
         mode = ""
-        match args.files_scope:
-            case FilesScopeEnum.ALL:
-                mode = " (All files)"
 
-            case FilesScopeEnum.TRACKED:
-                mode = " (tracked only)"
-
-            case FilesScopeEnum.UNTRACKED:
-                mode = " (untracked only)"
-
-            case FilesScopeEnum.MODIFIED:
-                mode = " (modified only)"
-
-            case FilesScopeEnum.DELETED:
-                mode = " (deleted only)"
-
-        return f"Search files with pattern '{args.name_pattern}'{mode}"
+        return f"Search files with pattern {args.name_pattern}"
 
 
 class LsFilesInput(BaseModel):

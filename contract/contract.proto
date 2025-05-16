@@ -119,3 +119,7 @@ message StandardGrep {
   string pattern = 2;
   bool case_insensitive = 3;
 }
+
+message FindFiles {
+  string name_pattern = 1;
+}
