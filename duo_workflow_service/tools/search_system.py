@@ -51,7 +51,7 @@ class Grep(DuoBaseTool):
         result = await _execute_action(
             self.metadata,  # type: ignore
             contract_pb2.Action(
-                standardGrep=contract_pb2.StandardGrep(
+                standardGrep=contract_pb2.Grep(
                     pattern=pattern,
                     search_directory=search_directory,
                     case_insensitive=case_insensitive,
