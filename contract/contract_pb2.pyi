@@ -176,17 +176,11 @@ class ListDirectory(_message.Message):
     def __init__(self, directory: _Optional[str] = ..., depth: _Optional[int] = ...) -> None: ...
 
 class StandardGrep(_message.Message):
-    __slots__ = ("search_directory", "pattern", "case_insensitive", "fixed_strings", "files_with_matches", "files_without_match")
+    __slots__ = ("search_directory", "pattern", "case_insensitive")
     SEARCH_DIRECTORY_FIELD_NUMBER: _ClassVar[int]
     PATTERN_FIELD_NUMBER: _ClassVar[int]
     CASE_INSENSITIVE_FIELD_NUMBER: _ClassVar[int]
-    FIXED_STRINGS_FIELD_NUMBER: _ClassVar[int]
-    FILES_WITH_MATCHES_FIELD_NUMBER: _ClassVar[int]
-    FILES_WITHOUT_MATCH_FIELD_NUMBER: _ClassVar[int]
     search_directory: str
     pattern: str
     case_insensitive: bool
-    fixed_strings: bool
-    files_with_matches: bool
-    files_without_match: bool
-    def __init__(self, search_directory: _Optional[str] = ..., pattern: _Optional[str] = ..., case_insensitive: bool = ..., fixed_strings: bool = ..., files_with_matches: bool = ..., files_without_match: bool = ...) -> None: ...
+    def __init__(self, search_directory: _Optional[str] = ..., pattern: _Optional[str] = ..., case_insensitive: bool = ...) -> None: ...

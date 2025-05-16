@@ -176,9 +176,6 @@ export interface StandardGrep {
   searchDirectory: string;
   pattern: string;
   caseInsensitive: boolean;
-  fixedStrings: boolean;
-  filesWithMatches: boolean;
-  filesWithoutMatch: boolean;
 }
 
 function createBaseClientEvent(): ClientEvent {
@@ -1638,14 +1635,7 @@ export const ListDirectory: MessageFns<ListDirectory> = {
 };
 
 function createBaseStandardGrep(): StandardGrep {
-  return {
-    searchDirectory: "",
-    pattern: "",
-    caseInsensitive: false,
-    fixedStrings: false,
-    filesWithMatches: false,
-    filesWithoutMatch: false,
-  };
+  return { searchDirectory: "", pattern: "", caseInsensitive: false };
 }
 
 export const StandardGrep: MessageFns<StandardGrep> = {
@@ -1658,15 +1648,6 @@ export const StandardGrep: MessageFns<StandardGrep> = {
     }
     if (message.caseInsensitive !== false) {
       writer.uint32(24).bool(message.caseInsensitive);
-    }
-    if (message.fixedStrings !== false) {
-      writer.uint32(32).bool(message.fixedStrings);
-    }
-    if (message.filesWithMatches !== false) {
-      writer.uint32(40).bool(message.filesWithMatches);
-    }
-    if (message.filesWithoutMatch !== false) {
-      writer.uint32(48).bool(message.filesWithoutMatch);
     }
     return writer;
   },
@@ -1702,30 +1683,6 @@ export const StandardGrep: MessageFns<StandardGrep> = {
           message.caseInsensitive = reader.bool();
           continue;
         }
-        case 4: {
-          if (tag !== 32) {
-            break;
-          }
-
-          message.fixedStrings = reader.bool();
-          continue;
-        }
-        case 5: {
-          if (tag !== 40) {
-            break;
-          }
-
-          message.filesWithMatches = reader.bool();
-          continue;
-        }
-        case 6: {
-          if (tag !== 48) {
-            break;
-          }
-
-          message.filesWithoutMatch = reader.bool();
-          continue;
-        }
       }
       if ((tag & 7) === 4 || tag === 0) {
         break;
@@ -1740,9 +1697,6 @@ export const StandardGrep: MessageFns<StandardGrep> = {
       searchDirectory: isSet(object.searchDirectory) ? globalThis.String(object.searchDirectory) : "",
       pattern: isSet(object.pattern) ? globalThis.String(object.pattern) : "",
       caseInsensitive: isSet(object.caseInsensitive) ? globalThis.Boolean(object.caseInsensitive) : false,
-      fixedStrings: isSet(object.fixedStrings) ? globalThis.Boolean(object.fixedStrings) : false,
-      filesWithMatches: isSet(object.filesWithMatches) ? globalThis.Boolean(object.filesWithMatches) : false,
-      filesWithoutMatch: isSet(object.filesWithoutMatch) ? globalThis.Boolean(object.filesWithoutMatch) : false,
     };
   },
 
@@ -1757,15 +1711,6 @@ export const StandardGrep: MessageFns<StandardGrep> = {
     if (message.caseInsensitive !== false) {
       obj.caseInsensitive = message.caseInsensitive;
     }
-    if (message.fixedStrings !== false) {
-      obj.fixedStrings = message.fixedStrings;
-    }
-    if (message.filesWithMatches !== false) {
-      obj.filesWithMatches = message.filesWithMatches;
-    }
-    if (message.filesWithoutMatch !== false) {
-      obj.filesWithoutMatch = message.filesWithoutMatch;
-    }
     return obj;
   },
 
@@ -1777,9 +1722,6 @@ export const StandardGrep: MessageFns<StandardGrep> = {
     message.searchDirectory = object.searchDirectory ?? "";
     message.pattern = object.pattern ?? "";
     message.caseInsensitive = object.caseInsensitive ?? false;
-    message.fixedStrings = object.fixedStrings ?? false;
-    message.filesWithMatches = object.filesWithMatches ?? false;
-    message.filesWithoutMatch = object.filesWithoutMatch ?? false;
     return message;
   },
 };
