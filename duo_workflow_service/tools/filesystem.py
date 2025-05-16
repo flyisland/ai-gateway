@@ -1,5 +1,5 @@
 from enum import IntEnum
-from typing import Optional, Type
+from typing import Type
 
 from pydantic import BaseModel, Field
 
@@ -7,7 +7,6 @@ from contract import contract_pb2
 from duo_workflow_service.executor.action import _execute_action
 from duo_workflow_service.tools.command import RunCommand
 from duo_workflow_service.tools.duo_base_tool import DuoBaseTool
-from duo_workflow_service.tools.git import Command as GitCommand
 
 
 class ReadFileInput(BaseModel):
@@ -113,31 +112,6 @@ class LsFilesInput(BaseModel):
     directory: str = Field(
         description="The directory to run ls on. Pass `.` for current directory."
     )
-
-
-class LsFiles(DuoBaseTool):
-    name: str = "ls_files"
-    description: str = """Lists the contents of a given directory by running the git ls-tree --name-only HEAD:dir command.
-          The command lists only git tracked files (cached in Git’s index)."""
-    args_schema: Type[BaseModel] = LsFilesInput  # type: ignore
-
-    async def _arun(
-        self,
-        directory: str,
-    ) -> str:
-        run_git_command = GitCommand(metadata=self.metadata)
-
-        if not directory.endswith("/"):
-            directory += "/"
-
-        return await run_git_command._arun(
-            repository_url="",
-            command="ls-tree",
-            args=f"--name-only HEAD:{directory}",
-        )
-
-    def format_display_message(self, args: LsFilesInput) -> str:
-        return f"List files in '{args.directory}'"
 
 
 class MkdirInput(BaseModel):
