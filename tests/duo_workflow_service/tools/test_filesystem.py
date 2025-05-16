@@ -9,8 +9,6 @@ from duo_workflow_service.tools.filesystem import (
     FilesScopeEnum,
     FindFiles,
     FindFilesInput,
-    Grep,
-    GrepInput,
     ListDir,
     ListDirInput,
     LsFiles,
@@ -23,6 +21,11 @@ from duo_workflow_service.tools.filesystem import (
     WriteFileInput,
 )
 
+# TODO: Move to test_search_system.py or move Grep to filesystem.py
+from duo_workflow_service.tools.search_system import (
+        Grep,
+        GrepInput,
+)
 
 @pytest.mark.asyncio
 async def test_read_file():
