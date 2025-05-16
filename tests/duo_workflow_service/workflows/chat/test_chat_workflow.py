@@ -3,8 +3,10 @@ from unittest.mock import AsyncMock, MagicMock, Mock, patch
 
 import pytest
 from langchain_core.messages import AIMessage, HumanMessage, SystemMessage
+from langgraph.types import Command, Send
 
 from duo_workflow_service.agents.prompts import CHAT_SYSTEM_PROMPT
+from duo_workflow_service.checkpointer.gitlab_workflow import WorkflowStatusEventEnum
 from duo_workflow_service.components.tools_registry import ToolsRegistry
 from duo_workflow_service.entities import (
     MessageTypeEnum,
@@ -313,3 +315,75 @@ def test_tools_registry_interaction(
 
     for tool in expected_tools:
         assert tool in tools_passed_to_get_batch
+
+
+@pytest.mark.asyncio
+async def test_get_graph_input_start_event(workflow_with_project):
+    """Test get_graph_input with START event"""
+    result = await workflow_with_project.get_graph_input(
+        "Test chat goal", WorkflowStatusEventEnum.START
+    )
+
+    assert result["status"] == WorkflowStatusEnum.NOT_STARTED
+    assert len(result["ui_chat_log"]) == 1
+    assert "Starting chat: Test chat goal" in result["ui_chat_log"][0]["content"]
+
+    expected_system_prompt = CHAT_SYSTEM_PROMPT.format(
+        project_id="123",
+        project_name="test-project",
+        project_url="https://example.com/test-project",
+    )
+    assert (
+        result["conversation_history"][AGENT_NAME][0].content == expected_system_prompt
+    )
+
+
+@pytest.mark.asyncio
+async def test_get_graph_input_resume_event(workflow_with_project):
+    """Test get_graph_input with RESUME event"""
+    mock_event = {"mock": "event_data"}
+    workflow_with_project._http_client.get.return_value = mock_event
+
+    with patch(
+        "duo_workflow_service.workflows.chat.workflow.get_event",
+        new=AsyncMock(return_value=mock_event),
+    ):
+        result = await workflow_with_project.get_graph_input(
+            "Test chat goal", WorkflowStatusEventEnum.RESUME
+        )
+
+        assert result.resume == mock_event
+        assert result.goto == Send(
+            "append_goal",
+            {
+                "status": WorkflowStatusEnum.EXECUTION,
+            },
+        )
+
+
+@pytest.mark.asyncio
+async def test_get_graph_input_other_event(workflow_with_project):
+    """Test get_graph_input with an event other than START or RESUME"""
+    result = await workflow_with_project.get_graph_input(
+        "Test chat goal", "UNKNOWN_EVENT"
+    )
+
+    assert result is None
+
+
+@pytest.mark.asyncio
+async def test_get_graph_input_resume_event_calls_get_event(workflow_with_project):
+    """Test that get_event is called with the correct parameters during RESUME"""
+    mock_event = {"mock": "event_data"}
+    mock_get_event = AsyncMock(return_value=mock_event)
+
+    with patch(
+        "duo_workflow_service.workflows.chat.workflow.get_event", new=mock_get_event
+    ):
+        await workflow_with_project.get_graph_input(
+            "Test chat goal", WorkflowStatusEventEnum.RESUME
+        )
+
+        mock_get_event.assert_called_once_with(
+            workflow_with_project._http_client, "test-id"
+        )

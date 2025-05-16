@@ -170,7 +170,7 @@ class Workflow(AbstractWorkflow):
                 event = await get_event(self._http_client, self._workflow_id)
                 return Command(
                     resume=event,
-                    send=Send(
+                    goto=Send(
                         "append_goal",
                         {
                             "status": WorkflowStatusEnum.EXECUTION,
