@@ -94,7 +94,7 @@ class FindFiles(DuoBaseTool):
         result = await _execute_action(
             self.metadata,  # type: ignore
             contract_pb2.Action(
-                standardGrep=contract_pb2.FindFiles(
+                findFiles=contract_pb2.FindFiles(
                     name_pattern=name_pattern,
                 )
             ),
@@ -103,16 +103,7 @@ class FindFiles(DuoBaseTool):
         return result
 
     def format_display_message(self, args: FindFilesInput) -> str:
-        mode = ""
-
-        return f"Search files with pattern {args.name_pattern}"
-
-
-class LsFilesInput(BaseModel):
-    directory: str = Field(
-        description="The directory to run ls on. Pass `.` for current directory."
-    )
-
+        return f"Search files with pattern '{args.name_pattern}'"
 
 class MkdirInput(BaseModel):
     directory_path: str = Field(
@@ -248,7 +239,7 @@ class EditFile(DuoBaseTool):
 
 class ListDirInput(BaseModel):
     directory: str = Field(description="Directory path relative to the repository root")
-    depth: str = Field(default="1", description="Directory depth to list. 1 for immediate files and folders, 2 for nested ones etc.")
+
 
 
 class ListDir(DuoBaseTool):
@@ -258,11 +249,11 @@ class ListDir(DuoBaseTool):
     )
     args_schema: Type[BaseModel] = ListDirInput  # type: ignore
 
-    async def _arun(self, directory: str, depth: int) -> str:
+    async def _arun(self, directory: str) -> str:
         return await _execute_action(
             self.metadata,  # type: ignore
             contract_pb2.Action(
-                listDirectory=contract_pb2.ListDirectory(directory=directory, depth=depth)
+                listDirectory=contract_pb2.ListDirectory(directory=directory)
             ),
         )
 
