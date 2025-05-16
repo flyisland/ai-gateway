@@ -1,6 +1,7 @@
 # pylint: disable=direct-environment-variable-reference
 
 import asyncio
+import aiohttp
 import json
 import os
 from typing import AsyncIterable, AsyncIterator
@@ -40,6 +41,7 @@ from duo_workflow_service.workflows.abstract_workflow import (
     TypeWorkflow,
 )
 from duo_workflow_service.workflows.registry import resolve_workflow_class
+from duo_workflow_service.gitlab.direct_http_client import DirectGitLabHttpClient
 
 log = structlog.stdlib.get_logger("server")
 
@@ -95,11 +97,15 @@ class GrpcServer(contract_pb2_grpc.DuoWorkflowServicer):
 
         workflow_type = string_to_category_enum(workflow_definition)
         workflow_class: TypeWorkflow = resolve_workflow_class(workflow_definition)
+
+        invocation_metadata = dict(context.invocation_metadata())
+
         workflow: AbstractWorkflow = workflow_class(
             workflow_id=workflow_id,
             workflow_metadata=workflow_metadata,
             workflow_type=workflow_type,
             context_elements=context_elements,
+            invocation_metadata={"base_url": invocation_metadata.get("x-gitlab-base-url", ""), "gitlab_token": invocation_metadata.get("x-gitlab-oauth-token", "")},
         )
 
         async def send_events():
@@ -218,6 +224,11 @@ async def grpc_serve(port: int) -> None:
         pings to be sent even if there are no calls in flight.
     For more details, check: https://github.com/grpc/grpc/blob/master/doc/keepalive.md
     """
+    # Initialize the HTTP client connection pool
+    await DirectGitLabHttpClient.initialize_pool(
+        pool_size=100,  # Adjust based on your needs
+        timeout=aiohttp.ClientTimeout(total=30)
+    )
     server_options = [
         ("grpc.keepalive_time_ms", 20 * 1000),
         ("grpc.http2.min_ping_interval_without_data_ms", 10 * 1000),
@@ -247,4 +258,7 @@ async def grpc_serve(port: int) -> None:
     log.info("Starting gRPC server on port %d", port)
     await server.start()
     log.info("Started server")
-    await server.wait_for_termination()
+    try:
+        await server.wait_for_termination()
+    finally:
+        await DirectGitLabHttpClient.close_pool()
