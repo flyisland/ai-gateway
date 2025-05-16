@@ -166,12 +166,8 @@ class Workflow(AbstractWorkflow):
         graph = StateGraph(WorkflowState)
 
         # Setup workflow graph
-        graph.set_entry_point("load_files")
-        translator_components = self._setup_translator_nodes(tools_registry)
-
         graph = self._setup_workflow_graph(
             graph,
-            translator_components,
             tools_registry,
             goal,
         )
@@ -207,10 +203,12 @@ class Workflow(AbstractWorkflow):
     def _setup_workflow_graph(
         self,
         graph: StateGraph,
-        translator_components,
         tools_registry,
         ci_config_file_path,
     ):
+        graph.set_entry_point("load_files")
+        translator_components = self._setup_translator_nodes(tools_registry)
+
         self.log.info("Starting %s workflow graph compilation", self._workflow_type)
         # Add nodes to the graph
         graph.set_entry_point("load_files")
@@ -262,7 +260,7 @@ class Workflow(AbstractWorkflow):
 
         graph.add_edge("load_files", translator_components["start_node"])
         graph.add_conditional_edges(
-            "request_translation",
+            translator_components["start_node"],
             _tools_execution_requested,
             {
                 Routes.CONTINUE: "execution_tools",
@@ -273,7 +271,7 @@ class Workflow(AbstractWorkflow):
             "execution_tools",
             _router,
             {
-                Routes.AGENT: "request_translation",
+                Routes.AGENT: translator_components["start_node"],
                 Routes.END: "complete",
                 Routes.COMMIT_CHANGES: "git_actions",
             },

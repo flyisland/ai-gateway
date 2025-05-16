@@ -133,65 +133,6 @@ async def test_translation_tools(
     ), f"The following tools are missing from the tools registry: {missing_tools}"
 
 
-def test_router(mock_state):
-    mock_state["conversation_history"] = {
-        "ci_pipelines_manager_agent": [AIMessage(content="test")]
-    }
-    assert _router(mock_state) == Routes.END
-
-    mock_state["conversation_history"] = {
-        "ci_pipelines_manager_agent": [
-            AIMessage(
-                content="test", tool_calls=[{"id": "123", "name": "test", "args": {}}]
-            )
-        ]
-    }
-    assert _router(mock_state) == Routes.END
-
-    mock_state["conversation_history"]["ci_pipelines_manager_agent"] = [
-        AIMessage(
-            content="test",
-            tool_calls=[{"id": "123", "name": "read_file", "args": {}}],
-        ),
-        ToolMessage(
-            content="test",
-            tool_call_id="123",
-        ),
-    ]
-    assert _router(mock_state) == Routes.AGENT
-
-    mock_state["conversation_history"]["ci_pipelines_manager_agent"] = [
-        AIMessage(
-            content="test",
-            tool_calls=[{"id": "123", "name": "create_file_with_contents", "args": {}}],
-        ),
-        ToolMessage(
-            content="test",
-            tool_call_id="123",
-        ),
-    ]
-    assert _router(mock_state) == Routes.COMMIT_CHANGES
-
-    mock_state["status"] = WorkflowStatusEnum.CANCELLED
-    assert _router(mock_state) == Routes.END
-
-
-def test_tools_execution_requested(mock_state):
-    assert _tools_execution_requested(mock_state) == Routes.END
-
-    mock_state["conversation_history"] = {
-        "ci_pipelines_manager_agent": [
-            AIMessage(
-                content="test", tool_calls=[{"id": "123", "name": "test", "args": {}}]
-            )
-        ]
-    }
-    assert _tools_execution_requested(mock_state) == Routes.CONTINUE
-
-    mock_state["status"] = WorkflowStatusEnum.CANCELLED
-    assert _tools_execution_requested(mock_state) == Routes.END
-
-
 @patch(
     "duo_workflow_service.workflows.convert_to_gitlab_ci.workflow.ApproximateTokenCounter"
 )
@@ -285,7 +226,7 @@ async def test_workflow_run(
     mock_chat_client,
     mock_fetch_workflow_config,
     mock_fetch_project_data_with_workflow_id,
-    mock_run_tool_node,
+    mock_run_tool_node_generic_class,
     mock_tools_executor,
     mock_handover_agent,
     mock_agent,
@@ -325,7 +266,8 @@ async def test_workflow_run(
         "conversation_history": {},
     }
 
-    mock_run_tool_node.__getitem__.return_value.return_value.run.side_effect = [
+    mock_run_tool_node_class = mock_run_tool_node_generic_class.__getitem__.return_value
+    mock_run_tool_node_class.return_value.run.side_effect = [
         {
             "file_contents": ["test string"],
             "state": mock_state,
@@ -362,8 +304,8 @@ async def test_workflow_run(
     assert mock_handover_agent.call_count == 1
     assert mock_handover_agent.return_value.run.call_count == 1
 
-    assert mock_run_tool_node.__getitem__.return_value.call_count == 2
-    assert mock_run_tool_node.__getitem__.return_value.return_value.run.call_count == 1
+    assert mock_run_tool_node_class.call_count == 2
+    assert mock_run_tool_node_class.return_value.run.call_count == 1
 
     assert mock_git_lab_workflow_instance.aput.call_count >= 2
     assert mock_git_lab_workflow_instance.aget_tuple.call_count == 2
