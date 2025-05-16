@@ -1,5 +1,4 @@
-from typing import Dict, List
-from unittest.mock import AsyncMock, MagicMock, Mock, patch
+from unittest.mock import ANY, AsyncMock, MagicMock, Mock, patch
 
 import pytest
 from langchain_core.messages import AIMessage, HumanMessage, SystemMessage
@@ -81,16 +80,90 @@ async def test_workflow_initialization(workflow_with_project):
     assert initial_state["ui_chat_log"][0]["status"] == ToolStatus.SUCCESS
 
 
+@pytest.mark.asyncio
+async def test_execute_agent(workflow_with_project):
+    # Setup test data
+    test_message = "Test response"
+    mock_agent_result = {
+        "conversation_history": {
+            AGENT_NAME: [
+                SystemMessage(content="test system"),
+                AIMessage(content=test_message),
+            ]
+        },
+        "status": WorkflowStatusEnum.EXECUTION,
+    }
+
+    workflow_with_project._agent = AsyncMock()
+    workflow_with_project._agent.run.return_value = mock_agent_result
+
+    state = ChatWorkflowState(
+        plan={"steps": []},
+        status=WorkflowStatusEnum.EXECUTION,
+        conversation_history={AGENT_NAME: []},
+        ui_chat_log=[],
+        last_human_input=None,
+    )
+
+    result = await workflow_with_project._execute_agent(state)
+
+    assert result["status"] == WorkflowStatusEnum.INPUT_REQUIRED
+    assert len(result["ui_chat_log"]) == 1
+    assert result["ui_chat_log"][0]["content"] == test_message
+    assert result["ui_chat_log"][0]["message_type"] == MessageTypeEnum.AGENT
+    assert result["ui_chat_log"][0]["status"] == ToolStatus.SUCCESS
+
+
+@pytest.mark.asyncio
+async def test_execute_agent_with_tools(workflow_with_project):
+    # Setup test data
+    test_message = "Test response"
+    mock_agent_result = {
+        "conversation_history": {
+            AGENT_NAME: [
+                SystemMessage(content="test system"),
+                AIMessage(
+                    content=test_message,
+                    tool_calls=[
+                        {
+                            "name": "list_issues",
+                            "args": {"project_id": "123"},
+                            "id": "1",
+                        }
+                    ],
+                ),
+            ]
+        },
+        "status": WorkflowStatusEnum.EXECUTION,
+    }
+
+    workflow_with_project._agent = AsyncMock()
+    workflow_with_project._agent.run.return_value = mock_agent_result
+
+    state = ChatWorkflowState(
+        plan={"steps": []},
+        status=WorkflowStatusEnum.EXECUTION,
+        conversation_history={AGENT_NAME: []},
+        ui_chat_log=[],
+        last_human_input=None,
+    )
+
+    result = await workflow_with_project._execute_agent(state)
+
+    assert result["status"] == WorkflowStatusEnum.INPUT_REQUIRED
+    assert "ui_chat_log" not in result
+
+
 @pytest.mark.parametrize(
     "message_content, expected_result",
     [
         (
             "Just text without tool calls",
-            Routes.SHOW_AGENT_MESSAGE,
+            Routes.STOP,
         ),
         (
             [{"type": "text", "text": "Just text without tool calls"}],
-            Routes.SHOW_AGENT_MESSAGE,
+            Routes.STOP,
         ),
     ],
     ids=[
@@ -113,6 +186,14 @@ def test_are_tools_called_with_various_content(message_content, expected_result)
         "last_human_input": None,
     }
     assert workflow._are_tools_called(state) == expected_result
+
+    # Test cancelled state
+    state["status"] = WorkflowStatusEnum.CANCELLED
+    assert workflow._are_tools_called(state) == Routes.STOP
+
+    # Test error state
+    state["status"] = WorkflowStatusEnum.ERROR
+    assert workflow._are_tools_called(state) == Routes.STOP
 
 
 def test_are_tools_called_with_tool_use():
@@ -141,77 +222,8 @@ def test_are_tools_called_with_tool_use():
     assert workflow._are_tools_called(state) == Routes.TOOL_USE
 
 
-def test_show_agent_message_with_message():
-    workflow = Workflow(
-        workflow_id="test-id",
-        workflow_metadata={},
-        workflow_type=CategoryEnum.WORKFLOW_CHAT,
-    )
-
-    state: ChatWorkflowState = {
-        "conversation_history": {
-            AGENT_NAME: [AIMessage(content="Hello, I'm the agent")]
-        },
-        "plan": {"steps": []},
-        "status": WorkflowStatusEnum.EXECUTION,
-        "ui_chat_log": [],
-        "last_human_input": None,
-    }
-
-    result = workflow._show_agent_message(state)
-    assert "ui_chat_log" in result
-    assert len(result["ui_chat_log"]) == 1
-    assert result["ui_chat_log"][0]["message_type"] == MessageTypeEnum.AGENT
-    assert result["ui_chat_log"][0]["content"] == "Hello, I'm the agent"
-    assert result["ui_chat_log"][0]["status"] == ToolStatus.SUCCESS
-
-
-@pytest.mark.parametrize(
-    "conversation_history, expected_result",
-    [
-        ({AGENT_NAME: []}, {"status": WorkflowStatusEnum.EXECUTION}),
-    ],
-)
-def test_show_agent_message_without_history(
-    conversation_history: Dict[str, List], expected_result: Dict
-):
-    workflow = Workflow(
-        workflow_id="test-id",
-        workflow_metadata={},
-        workflow_type=CategoryEnum.WORKFLOW_CHAT,
-    )
-
-    state: ChatWorkflowState = {
-        "plan": {"steps": []},
-        "status": WorkflowStatusEnum.EXECUTION,
-        "conversation_history": conversation_history,
-        "ui_chat_log": [],
-        "last_human_input": None,
-    }
-
-    result = workflow._show_agent_message(state)
-    assert result == expected_result
-
-
-def test_append_goal_with_existing_goal(workflow_with_project):
-    workflow_with_project._goal = "Test chat goal"
-
-    mock_state_with_history = {
-        "plan": {"steps": []},
-        "status": WorkflowStatusEnum.EXECUTION,
-        "ui_chat_log": [],
-        "last_human_input": None,
-        "conversation_history": {
-            AGENT_NAME: [
-                HumanMessage(content="Test chat goal"),
-            ]
-        },
-    }
-    result = workflow_with_project._append_goal(mock_state_with_history)
-    assert len(result["conversation_history"][AGENT_NAME]) == 0
-
-
 @pytest.mark.asyncio
+@patch("duo_workflow_service.workflows.chat.workflow.new_chat_client")
 @patch("duo_workflow_service.workflows.abstract_workflow.ToolsRegistry")
 @patch("duo_workflow_service.workflows.abstract_workflow.GitLabWorkflow", autospec=True)
 @patch(
@@ -220,12 +232,16 @@ def test_append_goal_with_existing_goal(workflow_with_project):
 @patch(
     "duo_workflow_service.workflows.abstract_workflow.fetch_workflow_config",
 )
+@patch("duo_workflow_service.workflows.abstract_workflow.UserInterface", autospec=True)
 async def test_workflow_run(
+    mock_user_interface,
     mock_fetch_workflow_config,
     mock_fetch_project_data,
     mock_gitlab_workflow,
     mock_tools_registry,
+    mock_chat_client,
 ):
+    mock_user_interface_instance = mock_user_interface.return_value
     mock_tools_registry.configure = AsyncMock(
         return_value=MagicMock(spec=ToolsRegistry)
     )
@@ -249,12 +265,29 @@ async def test_workflow_run(
         }
     )
 
+    state = {"status": "Not Started", "ui_chat_log": []}
+
+    class AsyncIterator:
+        def __init__(self):
+            self.call_count = 0
+
+        def __aiter__(self):
+            return self
+
+        async def __anext__(self):
+            self.call_count += 1
+            if self.call_count > 1:
+                raise StopAsyncIteration
+            else:
+                return ("values", state)
+
     with patch(
         "duo_workflow_service.workflows.chat.workflow.StateGraph"
     ) as mock_graph_cls:
         compiled_graph = MagicMock()
-        compiled_graph.astream = AsyncMock(return_value=AsyncMock())
-        mock_graph_cls.return_value.compile.return_value = compiled_graph
+        compiled_graph.astream.return_value = AsyncIterator()
+        mock_graph = mock_graph_cls.return_value
+        mock_graph.compile.return_value = compiled_graph
 
         workflow = Workflow(
             workflow_id="test-id",
@@ -266,6 +299,11 @@ async def test_workflow_run(
 
         assert workflow.is_done
 
+        mock_user_interface_instance.send_event.assert_called_with(
+            type="values", state=state, stream=True
+        )
+        assert mock_user_interface_instance.send_event.call_count == 1
+
 
 @pytest.mark.parametrize(
     "feature_flag_value, expected_tools",
@@ -276,8 +314,13 @@ async def test_workflow_run(
 )
 @patch("duo_workflow_service.workflows.chat.workflow.current_feature_flag_context")
 @patch("duo_workflow_service.components.tools_registry.ToolsRegistry.toolset")
+@patch("duo_workflow_service.workflows.chat.workflow.Agent")
 def test_tools_registry_interaction(
-    mock_toolset, mock_feature_flag_context, feature_flag_value, expected_tools
+    mock_agent,
+    mock_toolset,
+    mock_feature_flag_context,
+    feature_flag_value,
+    expected_tools,
 ):
     mock_feature_flag_context.get.return_value = (
         [feature_flag_value] if feature_flag_value else []
@@ -303,3 +346,8 @@ def test_tools_registry_interaction(
 
     for tool in expected_tools:
         assert tool in tools_passed_to_get_batch
+
+    # Verify Agent initialization parameters
+    mock_agent.assert_called_once()
+    _, kwargs = mock_agent.call_args
+    assert kwargs.get("check_events") is False

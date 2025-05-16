@@ -1223,14 +1223,14 @@ smmap = ">=3.0.1,<6"
 
 [[package]]
 name = "gitlab-cloud-connector"
-version = "2.10.0"
+version = "2.11.0"
 description = "Cloud Connector library for Python backends"
 optional = false
 python-versions = ">=3.11,<4.0"
 groups = ["main"]
 files = [
-    {file = "gitlab_cloud_connector-2.10.0-py3-none-any.whl", hash = "sha256:3e8f099fed32b740d44130677d52d1339d2bfd583347a8677c4aeb8f3c8ac212"},
-    {file = "gitlab_cloud_connector-2.10.0.tar.gz", hash = "sha256:cee73189958e6fabfc650eacb26265d2919792ab5aceb31cc7426fe500378521"},
+    {file = "gitlab_cloud_connector-2.11.0-py3-none-any.whl", hash = "sha256:50b40911ca394272cfd1526527cefd5dbe5999cd4d7e1de27a2ece9727be3d9b"},
+    {file = "gitlab_cloud_connector-2.11.0.tar.gz", hash = "sha256:3a03fdc7c038369cd3d6ea076e16f807c1bb68750c9dae3244b2dda3df54e8d3"},
 ]
 
 [package.dependencies]
@@ -5050,14 +5050,14 @@ sqlcipher = ["sqlcipher3_binary"]
 
 [[package]]
 name = "sse-starlette"
-version = "2.3.3"
+version = "2.3.5"
 description = "SSE plugin for Starlette"
 optional = false
 python-versions = ">=3.9"
 groups = ["main"]
 files = [
-    {file = "sse_starlette-2.3.3-py3-none-any.whl", hash = "sha256:8b0a0ced04a329ff7341b01007580dd8cf71331cc21c0ccea677d500618da1e0"},
-    {file = "sse_starlette-2.3.3.tar.gz", hash = "sha256:fdd47c254aad42907cfd5c5b83e2282be15be6c51197bf1a9b70b8e990522072"},
+    {file = "sse_starlette-2.3.5-py3-none-any.whl", hash = "sha256:251708539a335570f10eaaa21d1848a10c42ee6dc3a9cf37ef42266cdb1c52a8"},
+    {file = "sse_starlette-2.3.5.tar.gz", hash = "sha256:228357b6e42dcc73a427990e2b4a03c023e2495ecee82e14f07ba15077e334b2"},
 ]
 
 [package.dependencies]
@@ -6164,4 +6164,4 @@ cffi = ["cffi (>=1.11)"]
 [metadata]
 lock-version = "2.1"
 python-versions = "~3.12.0"
-content-hash = "0ae1c4894a67deb4a9b9b6f5ac36174db84449f74fef772a04c8c2c8ee5440a4"
+content-hash = "2eb1d8efe11e2fbd31fa759524b6bf074bd89649520bec1206733685dd65c75b"

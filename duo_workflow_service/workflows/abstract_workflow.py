@@ -19,6 +19,7 @@ from duo_workflow_service.checkpointer.gitlab_workflow import (
     GitLabWorkflow,
     WorkflowStatusEventEnum,
 )
+from duo_workflow_service.checkpointer.notifier import UserInterface
 from duo_workflow_service.components import ToolsRegistry
 from duo_workflow_service.entities import DuoWorkflowStateType
 from duo_workflow_service.gitlab.events import get_event
@@ -56,6 +57,7 @@ class AbstractWorkflow(ABC):
 
     _outbox: asyncio.Queue
     _inbox: asyncio.Queue
+    _streaming_outbox: asyncio.Queue
     _workflow_id: str
     _project: Project
     _workflow_config: dict[str, Any]
@@ -63,6 +65,7 @@ class AbstractWorkflow(ABC):
     _workflow_metadata: dict[str, Any]
     is_done: bool = False
     _workflow_type: CategoryEnum
+    _stream: bool = False
 
     def __init__(
         self,
@@ -72,6 +75,7 @@ class AbstractWorkflow(ABC):
     ):
         self._outbox = asyncio.Queue(maxsize=QUEUE_MAX_SIZE)
         self._inbox = asyncio.Queue(maxsize=QUEUE_MAX_SIZE)
+        self._streaming_outbox = asyncio.Queue(maxsize=QUEUE_MAX_SIZE)
         self._workflow_id = workflow_id
         self._workflow_metadata = workflow_metadata
         self.log = structlog.stdlib.get_logger("workflow").bind(workflow_id=workflow_id)
@@ -86,14 +90,20 @@ class AbstractWorkflow(ABC):
             tracing_metadata = {
                 "git_url": self._workflow_metadata.get("git_url", ""),
                 "git_sha": self._workflow_metadata.get("git_sha", ""),
+                "workflow_type": self._workflow_type.value
             }
 
             with tracing_context(enabled=extended_logging):
-                # pylint: disable=unexpected-keyword-arg
-                await self._compile_and_run_graph(
-                    goal=goal,
-                    langsmith_extra={"metadata": tracing_metadata},
-                )
+                try:
+                    # pylint: disable=unexpected-keyword-arg
+                    await self._compile_and_run_graph(
+                        goal=goal,
+                        langsmith_extra={"metadata": tracing_metadata},
+                    )
+                except TraceableException:
+                    # Intentionally suppressing the exception here after it has been
+                    # properly traced in Langsmith via the TraceableException
+                    pass
 
     @abstractmethod
     async def _handle_workflow_failure(
@@ -109,6 +119,17 @@ class AbstractWorkflow(ABC):
         checkpointer: BaseCheckpointSaver,
     ) -> Any:
         pass
+
+    def get_from_streaming_outbox(self):
+        try:
+            item = self._streaming_outbox.get_nowait()
+            self._streaming_outbox.task_done()
+            return item
+        except asyncio.QueueEmpty:
+            return None
+
+    def outbox_empty(self):
+        return self._outbox.empty()
 
     async def get_from_outbox(self):
         item = await asyncio.wait_for(self._outbox.get(), self.OUTBOX_CHECK_INTERVAL)
@@ -160,6 +181,9 @@ class AbstractWorkflow(ABC):
                 gl_http_client=self._http_client,
                 gitlab_host=gitlab_host,
             )
+            checkpoint_notifier = UserInterface(
+                outbox=self._streaming_outbox, goal=goal
+            )
 
             async with GitLabWorkflow(
                 self._http_client, self._workflow_id, self._workflow_type
@@ -174,17 +198,24 @@ class AbstractWorkflow(ABC):
                 compiled_graph = self._compile(goal, tools_registry, checkpointer)
                 graph_input = await self.get_graph_input(goal, status_event)
 
-                async for steps in compiled_graph.astream(
+                async for type, state in compiled_graph.astream(
                     input=graph_input,
                     config=graph_config,
+                    stream_mode=["values", "messages", "updates"],
                 ):
-                    for step in steps:
-                        self.log.info(f"step: {step}")
-                        element = steps[step]
-                        self.log_workflow_elements(element)
+                    if type == "updates":
+                        for step in state:
+                            self.log.info(f"step: {step}")
+                            element = state[step]
+                            self.log_workflow_elements(element)
+                    else:
+                        await checkpoint_notifier.send_event(
+                            type=type, state=state, stream=self._stream
+                        )
 
         except BaseException as e:
             await self._handle_workflow_failure(e, compiled_graph, graph_config)
+            raise TraceableException(e)
         finally:
             self.is_done = True
 
@@ -213,6 +244,7 @@ class AbstractWorkflow(ABC):
             self.is_done = True
 
             self._drain_queue(workflow_id, self._outbox, "outbox")
+            self._drain_queue(workflow_id, self._streaming_outbox, "streaming outbox")
             self._drain_queue(workflow_id, self._inbox, "inbox")
 
             self.log.info("Workflow cleanup completed.")
@@ -271,3 +303,12 @@ class AbstractWorkflow(ABC):
 
 
 TypeWorkflow = type[AbstractWorkflow]
+
+
+class TraceableException(Exception):
+    def __init__(self, original_exception: BaseException):
+        self.original_exception = original_exception
+        super().__init__(str(original_exception))
+
+    def __repr__(self):
+        return f"<TraceableException wrapping {repr(self.original_exception)}>"
