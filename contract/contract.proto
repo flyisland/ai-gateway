@@ -41,7 +41,8 @@ message Action {
         EditFile runEditFile = 7;
         NewCheckpoint newCheckpoint = 8;
         ListDirectory listDirectory = 9;
-        StandardGrep standardGrep = 10;
+        Grep grep = 10;
+        FindFiles findFiles = 11;
     };
 }
 
@@ -114,7 +115,7 @@ message ListDirectory {
     int32 depth = 2;
 }
 
-message StandardGrep {
+message Grep {
   string search_directory = 1;
   string pattern = 2;
   bool case_insensitive = 3;

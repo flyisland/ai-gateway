@@ -110,7 +110,8 @@ export interface Action {
   runEditFile?: EditFile | undefined;
   newCheckpoint?: NewCheckpoint | undefined;
   listDirectory?: ListDirectory | undefined;
-  standardGrep?: StandardGrep | undefined;
+  grep?: Grep | undefined;
+  findFiles?: FindFiles | undefined;
 }
 
 export interface RunCommandAction {
@@ -172,7 +173,7 @@ export interface ListDirectory {
   depth: number;
 }
 
-export interface StandardGrep {
+export interface Grep {
   searchDirectory: string;
   pattern: string;
   caseInsensitive: boolean;
@@ -517,7 +518,8 @@ function createBaseAction(): Action {
     runEditFile: undefined,
     newCheckpoint: undefined,
     listDirectory: undefined,
-    standardGrep: undefined,
+    grep: undefined,
+    findFiles: undefined,
   };
 }
 
@@ -550,8 +552,11 @@ export const Action: MessageFns<Action> = {
     if (message.listDirectory !== undefined) {
       ListDirectory.encode(message.listDirectory, writer.uint32(74).fork()).join();
     }
-    if (message.standardGrep !== undefined) {
-      StandardGrep.encode(message.standardGrep, writer.uint32(82).fork()).join();
+    if (message.grep !== undefined) {
+      Grep.encode(message.grep, writer.uint32(82).fork()).join();
+    }
+    if (message.findFiles !== undefined) {
+      FindFiles.encode(message.findFiles, writer.uint32(90).fork()).join();
     }
     return writer;
   },
@@ -640,7 +645,15 @@ export const Action: MessageFns<Action> = {
             break;
           }
 
-          message.standardGrep = StandardGrep.decode(reader, reader.uint32());
+          message.grep = Grep.decode(reader, reader.uint32());
+          continue;
+        }
+        case 11: {
+          if (tag !== 90) {
+            break;
+          }
+
+          message.findFiles = FindFiles.decode(reader, reader.uint32());
           continue;
         }
       }
@@ -663,7 +676,8 @@ export const Action: MessageFns<Action> = {
       runEditFile: isSet(object.runEditFile) ? EditFile.fromJSON(object.runEditFile) : undefined,
       newCheckpoint: isSet(object.newCheckpoint) ? NewCheckpoint.fromJSON(object.newCheckpoint) : undefined,
       listDirectory: isSet(object.listDirectory) ? ListDirectory.fromJSON(object.listDirectory) : undefined,
-      standardGrep: isSet(object.standardGrep) ? StandardGrep.fromJSON(object.standardGrep) : undefined,
+      grep: isSet(object.grep) ? Grep.fromJSON(object.grep) : undefined,
+      findFiles: isSet(object.findFiles) ? FindFiles.fromJSON(object.findFiles) : undefined,
     };
   },
 
@@ -696,8 +710,11 @@ export const Action: MessageFns<Action> = {
     if (message.listDirectory !== undefined) {
       obj.listDirectory = ListDirectory.toJSON(message.listDirectory);
     }
-    if (message.standardGrep !== undefined) {
-      obj.standardGrep = StandardGrep.toJSON(message.standardGrep);
+    if (message.grep !== undefined) {
+      obj.grep = Grep.toJSON(message.grep);
+    }
+    if (message.findFiles !== undefined) {
+      obj.findFiles = FindFiles.toJSON(message.findFiles);
     }
     return obj;
   },
@@ -732,8 +749,9 @@ export const Action: MessageFns<Action> = {
     message.listDirectory = (object.listDirectory !== undefined && object.listDirectory !== null)
       ? ListDirectory.fromPartial(object.listDirectory)
       : undefined;
-    message.standardGrep = (object.standardGrep !== undefined && object.standardGrep !== null)
-      ? StandardGrep.fromPartial(object.standardGrep)
+    message.grep = (object.grep !== undefined && object.grep !== null) ? Grep.fromPartial(object.grep) : undefined;
+    message.findFiles = (object.findFiles !== undefined && object.findFiles !== null)
+      ? FindFiles.fromPartial(object.findFiles)
       : undefined;
     return message;
   },
@@ -1638,12 +1656,12 @@ export const ListDirectory: MessageFns<ListDirectory> = {
   },
 };
 
-function createBaseStandardGrep(): StandardGrep {
+function createBaseGrep(): Grep {
   return { searchDirectory: "", pattern: "", caseInsensitive: false };
 }
 
-export const StandardGrep: MessageFns<StandardGrep> = {
-  encode(message: StandardGrep, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
+export const Grep: MessageFns<Grep> = {
+  encode(message: Grep, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
     if (message.searchDirectory !== "") {
       writer.uint32(10).string(message.searchDirectory);
     }
@@ -1656,10 +1674,10 @@ export const StandardGrep: MessageFns<StandardGrep> = {
     return writer;
   },
 
-  decode(input: BinaryReader | Uint8Array, length?: number): StandardGrep {
+  decode(input: BinaryReader | Uint8Array, length?: number): Grep {
     const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
     let end = length === undefined ? reader.len : reader.pos + length;
-    const message = createBaseStandardGrep();
+    const message = createBaseGrep();
     while (reader.pos < end) {
       const tag = reader.uint32();
       switch (tag >>> 3) {
@@ -1696,7 +1714,7 @@ export const StandardGrep: MessageFns<StandardGrep> = {
     return message;
   },
 
-  fromJSON(object: any): StandardGrep {
+  fromJSON(object: any): Grep {
     return {
       searchDirectory: isSet(object.searchDirectory) ? globalThis.String(object.searchDirectory) : "",
       pattern: isSet(object.pattern) ? globalThis.String(object.pattern) : "",
@@ -1704,7 +1722,7 @@ export const StandardGrep: MessageFns<StandardGrep> = {
     };
   },
 
-  toJSON(message: StandardGrep): unknown {
+  toJSON(message: Grep): unknown {
     const obj: any = {};
     if (message.searchDirectory !== "") {
       obj.searchDirectory = message.searchDirectory;
@@ -1718,11 +1736,11 @@ export const StandardGrep: MessageFns<StandardGrep> = {
     return obj;
   },
 
-  create<I extends Exact<DeepPartial<StandardGrep>, I>>(base?: I): StandardGrep {
-    return StandardGrep.fromPartial(base ?? ({} as any));
+  create<I extends Exact<DeepPartial<Grep>, I>>(base?: I): Grep {
+    return Grep.fromPartial(base ?? ({} as any));
   },
-  fromPartial<I extends Exact<DeepPartial<StandardGrep>, I>>(object: I): StandardGrep {
-    const message = createBaseStandardGrep();
+  fromPartial<I extends Exact<DeepPartial<Grep>, I>>(object: I): Grep {
+    const message = createBaseGrep();
     message.searchDirectory = object.searchDirectory ?? "";
     message.pattern = object.pattern ?? "";
     message.caseInsensitive = object.caseInsensitive ?? false;
