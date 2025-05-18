@@ -33,7 +33,7 @@ tests:performance:
       artifacts: true
   trigger:
     project: gitlab-org/quality/component-performance-testing
-    branch: vp-adding-service-name-to-report
+    branch: vp-fetch-master-baseline-package
     strategy: depend
     forward:
       pipeline_variables: true
