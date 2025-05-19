@@ -206,11 +206,9 @@ class Workflow(AbstractWorkflow):
         tools_registry,
         ci_config_file_path,
     ):
-        graph.set_entry_point("load_files")
         translator_components = self._setup_translator_nodes(tools_registry)
 
         self.log.info("Starting %s workflow graph compilation", self._workflow_type)
-        # Add nodes to the graph
         graph.set_entry_point("load_files")
         # Load jenkins file contents
         graph.add_node(
@@ -225,7 +223,7 @@ class Workflow(AbstractWorkflow):
         graph.add_node(translator_components["start_node"], translator_components["agent"].run)
         graph.add_node("execution_tools", translator_components["tools_executor"].run)
 
-        # deterministic git nodes
+        # deterministic git actions
         graph.add_node(
             "git_actions",
             RunToolNode[WorkflowState](
