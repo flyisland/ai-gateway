@@ -91,7 +91,7 @@ class CommitBaseTool(DuoBaseTool):
 
 class ListCommitsInput(ProjectResourceInput):
     all: Optional[bool] = Field(
-        default=None,
+        default=False,
         description="Retrieve every commit from the repository. Default is false.",
     )
     author: Optional[str] = Field(
@@ -99,7 +99,7 @@ class ListCommitsInput(ProjectResourceInput):
         description="Search commits by commit author.",
     )
     first_parent: Optional[bool] = Field(
-        default=None,
+        default=False,
         description="Follow only the first parent commit upon seeing a merge commit. Default is false.",
     )
     order: Optional[str] = Field(
@@ -119,15 +119,15 @@ class ListCommitsInput(ProjectResourceInput):
         description="Only commits after or on this date are returned in ISO 8601 format (YYYY-MM-DDTHH:MM:SSZ).",
     )
     trailers: Optional[bool] = Field(
-        default=None,
-        description="Parse and include Git trailers for every commit.",
+        default=False,
+        description="Parse and include Git trailers for every commit. Default is false.",
     )
     until: Optional[str] = Field(
         default=None,
         description="Only commits before or on this date are returned in ISO 8601 format (YYYY-MM-DDTHH:MM:SSZ).",
     )
     with_stats: Optional[bool] = Field(
-        default=None,
+        default=False,
         description="Include commit stats. Default is false.",
     )
 

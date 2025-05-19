@@ -102,8 +102,12 @@ async def test_validate_commit_url_no_url_no_ids(metadata):
     assert validation_result.project_id is None
     assert validation_result.commit_sha is None
     assert len(validation_result.errors) == 2
-    assert "'project_id' must be provided when 'url' is not" in validation_result.errors
-    assert "'commit_sha' must be provided when 'url' is not" in validation_result.errors
+    assert (
+        "'project_id' must be provided when 'url' is absent" in validation_result.errors
+    )
+    assert (
+        "'commit_sha' must be provided when 'url' is absent" in validation_result.errors
+    )
 
 
 @pytest.mark.asyncio
@@ -117,7 +121,9 @@ async def test_validate_commit_url_no_url_no_project_id(metadata):
     assert validation_result.project_id is None
     assert validation_result.commit_sha == "c34bb66f7a5e3a45b5e2d70edd9be12d64855cd6"
     assert len(validation_result.errors) == 1
-    assert "'project_id' must be provided when 'url' is not" in validation_result.errors
+    assert (
+        "'project_id' must be provided when 'url' is absent" in validation_result.errors
+    )
 
 
 @pytest.mark.asyncio
@@ -131,7 +137,9 @@ async def test_validate_commit_url_no_url_no_commit_sha(metadata):
     assert validation_result.project_id == "namespace/project"
     assert validation_result.commit_sha is None
     assert len(validation_result.errors) == 1
-    assert "'commit_sha' must be provided when 'url' is not" in validation_result.errors
+    assert (
+        "'commit_sha' must be provided when 'url' is absent" in validation_result.errors
+    )
 
 
 @pytest.mark.asyncio
