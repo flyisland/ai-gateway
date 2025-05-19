@@ -119,7 +119,9 @@ class TestFindFiles:
     async def test_find_files_empty_result(self, mock_find_files_class):
         # Create a mock instance with a mocked _arun method
         mock_instance = mock_find_files_class.return_value
-        mock_instance._arun = AsyncMock(return_value="No matches found for pattern '*.nonexistent'")
+        mock_instance._arun = AsyncMock(
+            return_value="No matches found for pattern '*.nonexistent'"
+        )
 
         # Now use the mock instance instead of creating a real one
         name_pattern = "*.nonexistent"
@@ -134,6 +136,7 @@ class TestFindFiles:
             NotImplementedError, match="This tool can only be run asynchronously"
         ):
             tool._run(".", "*.py")
+
 
 class TestLsDir:
     @pytest.mark.asyncio
@@ -185,6 +188,7 @@ class TestLsDir:
 
         expected_message = "Using list_dir: directory=./src"
         assert message == expected_message
+
 
 class TestMkdir:
     @pytest.mark.asyncio
@@ -328,6 +332,7 @@ def test_find_files_format_display_message():
     message = tool.format_display_message(input_data)
     expected_message = "Search files with pattern '*.py'"
     assert message == expected_message
+
 
 def test_mkdir_format_display_message():
     tool = Mkdir(description="Mkdir description")
