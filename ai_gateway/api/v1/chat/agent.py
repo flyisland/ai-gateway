@@ -50,6 +50,8 @@ __all__ = [
     "router",
 ]
 
+"Testing MR"
+
 router = APIRouter()
 
 CHAT_INVOKABLES = [
