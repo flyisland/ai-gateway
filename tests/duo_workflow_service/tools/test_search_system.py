@@ -3,20 +3,18 @@ from unittest.mock import AsyncMock, MagicMock
 import pytest
 
 from contract import contract_pb2
-from duo_workflow_service.tools.search_system import (
-        Grep,
-        GrepInput,
-)
+from duo_workflow_service.tools.search_system import Grep, GrepInput
 
 
 class TestGrep:
     valid_test_cases = [
         # Basic recursive search
         pytest.param(
-            {"pattern": "test",
-             "search_directory": ".",
-             "case_insensitive": False,
-             },
+            {
+                "pattern": "test",
+                "search_directory": ".",
+                "case_insensitive": False,
+            },
             "test.py:10:test line",
             "-r test",
             id="basic_recursive_grep",
@@ -34,7 +32,7 @@ class TestGrep:
         ),
         # Test with case_insensitive
         pytest.param(
-            {"pattern": "test","search_directory": ".", "case_insensitive": True},
+            {"pattern": "test", "search_directory": ".", "case_insensitive": True},
             "test.py:10:TEST line",
             "-i test",
             id="ignore_case",
@@ -52,9 +50,7 @@ class TestGrep:
         mock_inbox = MagicMock()
         mock_inbox.get = AsyncMock(
             return_value=contract_pb2.ClientEvent(
-                actionResponse=contract_pb2.ActionResponse(
-                    response=expected_output
-                )
+                actionResponse=contract_pb2.ActionResponse(response=expected_output)
             )
         )
 
@@ -119,9 +115,7 @@ def test_grep_format_display_message_no_directory():
     assert message == expected_message
 
     # Test with options and no directory
-    input_data = GrepInput(
-        pattern="TODO", search_directory=None, case_insensitive=True
-    )
+    input_data = GrepInput(pattern="TODO", search_directory=None, case_insensitive=True)
     message = tool.format_display_message(input_data)
     expected_message = "Search for 'TODO' in files in 'directory'"
     assert message == expected_message
