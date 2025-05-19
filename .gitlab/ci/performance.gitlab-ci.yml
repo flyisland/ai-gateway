@@ -33,7 +33,7 @@ tests:performance:
       artifacts: true
   trigger:
     project: gitlab-org/quality/component-performance-testing
-    branch: vp-fetch-master-baseline-package
+    branch: main
     strategy: depend
     forward:
       pipeline_variables: true
