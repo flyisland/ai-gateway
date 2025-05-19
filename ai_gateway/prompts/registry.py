@@ -11,7 +11,7 @@ from ai_gateway.internal_events.client import InternalEventsClient
 from ai_gateway.model_metadata import TypeModelMetadata
 from ai_gateway.model_selection.model_selection_config import LLMDefinition, UnitPrimitiveConfig
 from ai_gateway.prompts.base import BasePromptRegistry, Prompt
-from ai_gateway.prompts.config import BaseModelConfig, ModelClassProvider, PromptConfig
+from ai_gateway.prompts.config import ModelClassProvider, PromptConfig
 from ai_gateway.prompts.typing import TypeModelFactory
 from ai_gateway.model_selection import ModelSelectionConfig
 
@@ -155,7 +155,7 @@ class LocalPromptRegistry(BasePromptRegistry):
         for path in prompts_definitions_dir.glob("**"):
             # Iterate over each version file
             versions = {
-                version.stem: cls._process_version_file(version,prompts_definitions_dir, llm_configurations, unit_primitive_configuration)
+                version.stem: cls._process_version_file(version, llm_configurations, unit_primitive_configuration)
                 for version in path.glob("*.yml")
             }
 
@@ -190,7 +190,6 @@ class LocalPromptRegistry(BasePromptRegistry):
     @classmethod
     def _process_version_file(
         cls, version_file: Path,
-        prompts_definitions_dir: Path, 
         llm_configurations:dict[str,LLMDefinition], 
         unit_primitive_configuration: list[UnitPrimitiveConfig]
     ) -> PromptConfig:
@@ -220,22 +219,25 @@ class LocalPromptRegistry(BasePromptRegistry):
             )
 
             import pdb; pdb.set_trace()
-
             return PromptConfig(**prompt_config_params)
 
     @classmethod
     def _patch_model_configuration(
-        cls, config_for_general_model: BaseModelConfig, prompt_config_params: dict
+        cls, model_selection_prompt_config_params: dict, prompt_config_params: dict
     ) -> dict:
+        log.info("Model Selection params", model_selection_prompt_config_params=model_selection_prompt_config_params)
+        params_without_name = model_selection_prompt_config_params.copy()
+        params_without_name.pop('name', None)
+        
         params = {
-            **config_for_general_model.params.model_dump(),
+            **params_without_name,
             **prompt_config_params["model"].get("params", {}),
         }
 
         return {
             **prompt_config_params,
             "model": {
-                "name": config_for_general_model.name,
+                "name": model_selection_prompt_config_params['name'],
                 "params": params,
             },
         }
