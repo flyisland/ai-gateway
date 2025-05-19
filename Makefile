@@ -74,8 +74,8 @@ gen-proto-python: install-test-deps
 
 .PHONY: gen-proto-ruby
 gen-proto-ruby:
-	(cd clients/ruby; asdf exec bundle install)
-	asdf exec grpc_tools_ruby_protoc -I contract --ruby_out=clients/ruby/lib/proto --grpc_out=clients/ruby/lib/proto contract/contract.proto
+	(cd clients/ruby; bundle install)
+	grpc_tools_ruby_protoc -I contract --ruby_out=clients/ruby/lib/proto --grpc_out=clients/ruby/lib/proto contract/contract.proto
 	sed -i.bak "s/require 'contract_pb'/require_relative 'contract_pb'/" clients/ruby/lib/proto/contract_services_pb.rb
 	rm clients/ruby/lib/proto/contract_services_pb.rb.bak
 
