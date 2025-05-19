@@ -1,9 +1,11 @@
+from typing import Optional, Type
+
+from pydantic import BaseModel, Field
+
 from contract import contract_pb2
 from duo_workflow_service.executor.action import _execute_action
-from duo_workflow_service.tools.filesystem import _format_no_matches_message
-from typing import Optional, Type
-from pydantic import BaseModel, Field
 from duo_workflow_service.tools.duo_base_tool import DuoBaseTool
+from duo_workflow_service.tools.filesystem import _format_no_matches_message
 
 
 class GrepInput(BaseModel):

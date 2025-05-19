@@ -1,11 +1,9 @@
+from unittest.mock import AsyncMock, MagicMock
+
 import pytest
 
-from unittest.mock import AsyncMock, MagicMock
 from contract import contract_pb2
-from duo_workflow_service.tools.search_system import (
-    Grep,
-    GrepInput,
-)
+from duo_workflow_service.tools.search_system import Grep, GrepInput
 
 
 class TestGrep:
