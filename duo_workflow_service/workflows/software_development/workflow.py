@@ -89,7 +89,7 @@ EXECUTOR_TOOLS = [
     "create_file_with_contents",
     "edit_file",
     "find_files",
-    "grep_files",
+    "grep",
     "mkdir",
     "add_new_task",
     "remove_task",
@@ -102,6 +102,7 @@ EXECUTOR_TOOLS = [
     "create_epic",
     "update_epic",
     "get_repository_file",
+    "list_dir",
 ]
 
 CONTEXT_BUILDER_TOOLS = [
