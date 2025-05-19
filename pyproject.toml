@@ -75,7 +75,7 @@ priority = "supplemental"
 optional = true
 
 [tool.poetry.group.eval.dependencies]
-eli5 = { git = "https://gitlab.com/gitlab-org/modelops/ai-model-validation-and-research/prompt-library.git", subdirectory = "eli5" }
+eli5 = { version = "^0.3.1", source = "prompt_library" }
 typer = "^0.15.4"
 
 [tool.poetry.group.test]
