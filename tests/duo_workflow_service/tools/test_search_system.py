@@ -115,7 +115,7 @@ def test_grep_format_display_message_no_directory():
     # Basic test with no directory
     input_data = GrepInput(pattern="TODO", search_directory=None)
     message = tool.format_display_message(input_data)
-    expected_message = "Search for 'TODO' in directory"
+    expected_message = "Search for 'TODO' in files in 'directory'"
     assert message == expected_message
 
     # Test with options and no directory
@@ -123,5 +123,5 @@ def test_grep_format_display_message_no_directory():
         pattern="TODO", search_directory=None, case_insensitive=True
     )
     message = tool.format_display_message(input_data)
-    expected_message = "Search for 'TODO' in directory"
+    expected_message = "Search for 'TODO' in files in 'directory'"
     assert message == expected_message
