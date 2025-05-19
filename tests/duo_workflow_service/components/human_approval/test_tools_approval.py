@@ -7,6 +7,7 @@ import pytest
 from langchain_core.messages import AIMessage
 from langgraph.graph import END, StateGraph
 from langgraph.utils.runnable import Runnable
+from pydantic import ValidationError
 
 from duo_workflow_service.agents import HumanApprovalCheckExecutor
 from duo_workflow_service.components.human_approval.tools_approval import (
@@ -30,14 +31,14 @@ def set_up_graph(
 ) -> tuple[Runnable, AsyncMock, AsyncMock, AsyncMock]:
     graph = StateGraph(WorkflowState)
     graph.set_entry_point("first_node")
-    mock_entry_node = AsyncMock(return_value=node_return_value)
+    mock_entry_node = AsyncMock(side_effect=node_return_value)
     graph.add_node("first_node", mock_entry_node)
 
-    mock_termination_node = AsyncMock(return_value=node_return_value)
+    mock_termination_node = AsyncMock(side_effect=node_return_value)
     graph.add_node("termination", mock_termination_node)
     graph.add_edge("termination", END)
 
-    mock_continuation_node = AsyncMock(return_value=node_return_value)
+    mock_continuation_node = AsyncMock(side_effect=node_return_value)
     graph.add_node("continuation", mock_continuation_node)
     graph.add_edge("continuation", END)
     entry_point = component.attach(
@@ -47,7 +48,14 @@ def set_up_graph(
         next_node="continuation",
     )
 
-    graph.add_edge("first_node", entry_point)
+    graph.add_conditional_edges(
+        "first_node",
+        lambda s: (
+            "termination"
+            if s["status"] == WorkflowStatusEnum.CANCELLED
+            else entry_point
+        ),
+    )
     return (
         graph.compile(),
         mock_entry_node,
@@ -56,9 +64,9 @@ def set_up_graph(
     )
 
 
-def node_return_value(messages):
+def node_return_value(messages, status=WorkflowStatusEnum.PLANNING):
     return {
-        "status": WorkflowStatusEnum.PLANNING,
+        "status": status,
         "conversation_history": {"test-agent": messages},
         "last_human_input": None,
         "handover": [],
@@ -81,7 +89,7 @@ class TestToolsApprovalComponent:
 
     @pytest.fixture
     def mock_toolset(self, mock_tool):
-        mock = MagicMock(spec=Toolset)
+        mock = MagicMock()
         mock.bindable = []
         mock.__getitem__.return_value = mock_tool
         mock.approved.return_value = True
@@ -99,10 +107,10 @@ class TestToolsApprovalComponent:
     async def test_tools_approval_with_multiple_tools(
         self,
         component: ToolsApprovalComponent,
+        mock_toolset,
+        mock_tool,
         graph_config,
         graph_input: WorkflowState,
-        mock_tool,
-        mock_toolset,
         mock_check_executor,
     ):
 
@@ -125,20 +133,27 @@ class TestToolsApprovalComponent:
                 "name": "pre_approved_tool",
                 "args": {"arg3": "value3"},
             }
-            mock_toolset.approved.side_effect = [False, False, True]
 
-            node_resp = node_return_value(
-                messages=[
-                    AIMessage(
-                        content="Testing tools",
-                        tool_calls=[
-                            tool1_call,
-                            tool2_call,
-                            pre_aprroved_tool_call,
-                        ],
-                    )
-                ]
-            )
+            mock_toolset.approved.side_effect = [None, None, None, False, False, True]
+            mock_input_schema = MagicMock()
+            mock_input_schema.model_validate.return_value = True
+            mock_tool.get_input_schema.return_value = mock_input_schema
+            mock_toolset.__getitem__.return_value = mock_tool
+
+            node_resp = [
+                node_return_value(
+                    messages=[
+                        AIMessage(
+                            content="Testing tools",
+                            tool_calls=[
+                                tool1_call,
+                                tool2_call,
+                                pre_aprroved_tool_call,
+                            ],
+                        )
+                    ]
+                )
+            ]
 
             graph, mock_entry_node, mock_continuation_node, mock_termination_node = (
                 set_up_graph(node_resp, component)
@@ -164,8 +179,14 @@ class TestToolsApprovalComponent:
             assert chat_log["status"] == ToolStatus.SUCCESS
             assert chat_log["tool_info"] is None
 
-            mock_toolset.__getitem__.assert_has_calls([call("tool1"), call("tool2")])
-            assert len(mock_format_tool_msg.mock_calls) == 2
+            assert mock_toolset.__getitem__.call_args_list == [
+                call("tool1"),
+                call("tool2"),
+                call("pre_approved_tool"),
+                call("tool1"),
+                call("tool2"),
+            ]
+
             mock_format_tool_msg.assert_has_calls(
                 [
                     call(mock_tool, tool1_call["args"]),
@@ -190,35 +211,39 @@ class TestToolsApprovalComponent:
             "duo_workflow_service.components.human_approval.component.HumanApprovalCheckExecutor",
             return_value=mock_check_executor,
         ), patch.dict(os.environ, {"WORKFLOW_INTERRUPT": "True"}):
-            node_resp = node_return_value(
-                messages=[
-                    AIMessage(
-                        content="Testing tools",
-                        tool_calls=[],
-                    )
-                ]
-            )
+            node_resp = [
+                node_return_value(
+                    messages=[
+                        AIMessage(
+                            content="Testing no tools",
+                            tool_calls=[],
+                        )
+                    ]
+                ),
+                node_return_value(
+                    status=WorkflowStatusEnum.CANCELLED,
+                    messages=[
+                        AIMessage(
+                            content="Cancel the execution to allow graph to complete without further errors",
+                            tool_calls=[],
+                        )
+                    ],
+                ),
+            ]
 
-            graph, mock_entry_node, mock_continuation_node, mock_termination_node = (
-                set_up_graph(node_resp, component)
+            graph, mock_entry_node, mock_continuation_node, _ = set_up_graph(
+                node_resp, component
             )
-
-            mock_check_executor.run.return_value = {
-                "last_human_input": {
-                    "event_type": WorkflowEventType.RESUME,
-                }
-            }
 
             response = await graph.ainvoke(input=graph_input, config=graph_config)
 
+            assert mock_entry_node.call_count == 2
             assert "ui_chat_log" in response
             assert len(response["ui_chat_log"]) == 0
 
             mock_toolset.__getitem__.assert_not_called()
             mock_check_executor.run.assert_not_called()
-            mock_entry_node.assert_called_once()
-            mock_continuation_node.assert_called_once()
-            mock_termination_node.assert_not_called()
+            mock_continuation_node.assert_not_called()
 
     @pytest.mark.asyncio
     async def test_tools_approval_with_no_messages(
@@ -237,26 +262,22 @@ class TestToolsApprovalComponent:
         ) as mock_format_tool_msg, patch.dict(
             os.environ, {"WORKFLOW_INTERRUPT": "True"}
         ):
-            node_resp = node_return_value(
-                messages=[
-                    AIMessage(
-                        content="Testing tools",
-                        tool_calls=[
-                            {"id": "1", "name": "tool1", "args": {"arg1": "value1"}}
-                        ],
-                    )
-                ]
-            )
+            node_resp = [
+                node_return_value(
+                    messages=[
+                        AIMessage(
+                            content="Testing tools",
+                            tool_calls=[
+                                {"id": "1", "name": "tool1", "args": {"arg1": "value1"}}
+                            ],
+                        )
+                    ]
+                )
+            ]
 
             graph, mock_entry_node, mock_continuation_node, mock_termination_node = (
                 set_up_graph(node_resp, component)
             )
-
-            mock_check_executor.run.return_value = {
-                "last_human_input": {
-                    "event_type": WorkflowEventType.RESUME,
-                }
-            }
 
             with pytest.raises(
                 RuntimeError, match="No valid tool calls were found to display."
@@ -267,56 +288,6 @@ class TestToolsApprovalComponent:
                 mock_entry_node.assert_called_once()
                 mock_continuation_node.assert_not_called()
                 mock_termination_node.assert_not_called()
-
-    @pytest.mark.asyncio
-    async def test_tools_approval_with_only_non_existent_tool(
-        self,
-        component: ToolsApprovalComponent,
-        graph_config,
-        graph_input: WorkflowState,
-        mock_toolset,
-        mock_check_executor,
-    ):
-        with patch(
-            "duo_workflow_service.components.human_approval.component.HumanApprovalCheckExecutor",
-            return_value=mock_check_executor,
-        ), patch.dict(os.environ, {"WORKFLOW_INTERRUPT": "True"}):
-            # Configure the toolset to raise UnknownToolError for the non-existent tool
-            non_existent_tool_call = {
-                "id": "1",
-                "name": "non_existent_tool",
-                "args": {"arg1": "value1"},
-            }
-            mock_toolset.approved.side_effect = UnknownToolError(
-                f"Tool '{non_existent_tool_call['name']}' does not exist"
-            )
-
-            node_resp = node_return_value(
-                messages=[
-                    AIMessage(
-                        content="Testing non-existent tool",
-                        tool_calls=[non_existent_tool_call],
-                    )
-                ]
-            )
-
-            graph, mock_entry_node, mock_continuation_node, mock_termination_node = (
-                set_up_graph(node_resp, component)
-            )
-
-            response = await graph.ainvoke(input=graph_input, config=graph_config)
-
-            assert "ui_chat_log" in response
-            assert len(response["ui_chat_log"]) == 0
-
-            mock_toolset.approved.assert_called_once_with(
-                non_existent_tool_call["name"]
-            )
-
-            mock_check_executor.run.assert_not_called()
-            mock_entry_node.assert_called_once()
-            mock_continuation_node.assert_called_once()
-            mock_termination_node.assert_not_called()
 
     @pytest.mark.asyncio
     async def test_tools_approval_with_mixed_tools_including_non_existent(
@@ -366,18 +337,191 @@ class TestToolsApprovalComponent:
                 ),
             ]
 
-            node_resp = node_return_value(
-                messages=[
-                    AIMessage(
-                        content="Testing mixed tools",
-                        tool_calls=[
-                            valid_tool_call,
-                            pre_approved_tool_call,
-                            non_existent_tool_call,
-                        ],
-                    )
+            node_resp = [
+                node_return_value(
+                    messages=[
+                        AIMessage(
+                            content="Testing mixed tools",
+                            tool_calls=[
+                                valid_tool_call,
+                                pre_approved_tool_call,
+                                non_existent_tool_call,
+                            ],
+                        )
+                    ]
+                ),
+                node_return_value(
+                    status=WorkflowStatusEnum.CANCELLED,
+                    messages=[
+                        AIMessage(
+                            content="Cancel the execution to allow graph to complete without further errors",
+                            tool_calls=[],
+                        )
+                    ],
+                ),
+            ]
+
+            graph, mock_entry_node, mock_continuation_node, _ = set_up_graph(
+                node_resp, component
+            )
+
+            response = await graph.ainvoke(input=graph_input, config=graph_config)
+
+            assert "ui_chat_log" in response
+            assert len(response["ui_chat_log"]) == 0
+
+            # Verify that graph execution returned back to the Agent
+            assert mock_entry_node.call_count == 2
+
+            # Verify the execution terminated without calling check executor or other nodes
+            mock_format_tool_msg.assert_not_called()
+            mock_check_executor.run.assert_not_called()
+            mock_continuation_node.assert_not_called()
+
+            # Verify that all three approved calls were made
+            assert mock_toolset.approved.call_count == 3
+            mock_toolset.approved.assert_has_calls(
+                [
+                    call(valid_tool_call["name"]),
+                    call(pre_approved_tool_call["name"]),
+                    call(non_existent_tool_call["name"]),
                 ]
             )
+
+    @pytest.mark.asyncio
+    async def test_tools_approval_with_mallformed_tool_call_arguments(
+        self,
+        component: ToolsApprovalComponent,
+        graph_config,
+        graph_input: WorkflowState,
+        mock_tool,
+        mock_toolset,
+        mock_check_executor,
+    ):
+        with patch(
+            "duo_workflow_service.components.human_approval.component.HumanApprovalCheckExecutor",
+            return_value=mock_check_executor,
+        ), patch(
+            "duo_workflow_service.components.human_approval.tools_approval.format_tool_display_message",
+            return_value="Using mock tool1: {'arg1': 'value1'}",
+        ) as mock_format_tool_msg, patch.dict(
+            os.environ, {"WORKFLOW_INTERRUPT": "True"}
+        ):
+            # Configure a mix of valid and non-existent tools
+            invalid_tool_call = {
+                "id": "1",
+                "name": "valid_tool",
+                "args": {"list_arg1": "[value1]"},
+            }
+
+            mock_toolset.approved.side_effect = [
+                False,
+            ]
+            mock_input_schema = MagicMock()
+            mock_input_schema.model_validate.side_effect = (
+                ValidationError.from_exception_data(title="test", line_errors=[])
+            )
+            mock_tool.get_input_schema.return_value = mock_input_schema
+
+            node_resp = [
+                node_return_value(
+                    messages=[
+                        AIMessage(
+                            content="Testing invalid tools",
+                            tool_calls=[
+                                invalid_tool_call,
+                            ],
+                        )
+                    ]
+                ),
+                node_return_value(
+                    status=WorkflowStatusEnum.CANCELLED,
+                    messages=[
+                        AIMessage(
+                            content="Cancel the execution to allowllow graph to complete without further errors",
+                            tool_calls=[],
+                        )
+                    ],
+                ),
+            ]
+
+            graph, mock_entry_node, mock_continuation_node, _ = set_up_graph(
+                node_resp, component
+            )
+
+            response = await graph.ainvoke(input=graph_input, config=graph_config)
+
+            assert "ui_chat_log" in response
+            assert len(response["ui_chat_log"]) == 0
+
+            # Verify schema was validated
+            mock_tool.get_input_schema.assert_called_once()
+            mock_input_schema.model_validate.assert_called_once_with(
+                invalid_tool_call["args"]
+            )
+
+            # Verify that graph execution returned back to the Agent
+            assert mock_entry_node.call_count == 2
+
+            # Verify the execution terminated without calling check executor or other nodes
+            mock_format_tool_msg.assert_not_called()
+            mock_check_executor.run.assert_not_called()
+            mock_continuation_node.assert_not_called()
+
+    @pytest.mark.asyncio
+    async def test_tools_approval_with_no_op_tool(
+        self,
+        component: ToolsApprovalComponent,
+        mock_toolset,
+        mock_tool,
+        graph_config,
+        graph_input: WorkflowState,
+        mock_check_executor,
+    ):
+
+        with patch(
+            "duo_workflow_service.components.human_approval.component.HumanApprovalCheckExecutor",
+            return_value=mock_check_executor,
+        ), patch(
+            "duo_workflow_service.components.human_approval.tools_approval.format_tool_display_message",
+            side_effect=[
+                "Using mock tool1: {'arg1': 'value1'}",
+                "Using mock tool2: {'arg2': 'value2'}",
+            ],
+        ) as mock_format_tool_msg, patch.dict(
+            os.environ, {"WORKFLOW_INTERRUPT": "True"}
+        ):
+            tool1_call = {"id": "1", "name": "tool1", "args": {"arg1": "value1"}}
+            on_op_tool_call = {
+                "id": "3",
+                "name": "no_op_tool",
+                "args": {"arg3": "value3"},
+            }
+
+            mock_toolset.approved.side_effect = [None, None, False, True]
+            mock_input_schema = MagicMock()
+            mock_input_schema.model_validate.return_value = True
+            mock_tool.get_input_schema.return_value = mock_input_schema
+            mock_toolset.__getitem__.side_effect = [
+                mock_tool,
+                KeyError(),
+                mock_tool,
+                KeyError(),
+            ]
+
+            node_resp = [
+                node_return_value(
+                    messages=[
+                        AIMessage(
+                            content="Testing tools",
+                            tool_calls=[
+                                tool1_call,
+                                on_op_tool_call,
+                            ],
+                        )
+                    ]
+                )
+            ]
 
             graph, mock_entry_node, mock_continuation_node, mock_termination_node = (
                 set_up_graph(node_resp, component)
@@ -395,25 +539,25 @@ class TestToolsApprovalComponent:
             assert len(response["ui_chat_log"]) == 1
             chat_log = response["ui_chat_log"][0]
             assert chat_log["correlation_id"] is None
+            assert chat_log["message_type"] == MessageTypeEnum.REQUEST
             assert "Using mock tool1: {'arg1': 'value1'}" in chat_log["content"]
             assert "In order to complete the current task" in chat_log["content"]
+            assert chat_log["timestamp"] is not None
+            assert chat_log["status"] == ToolStatus.SUCCESS
+            assert chat_log["tool_info"] is None
 
-            # Verify that all three approved calls were made
-            assert mock_toolset.approved.call_count == 3
-            mock_toolset.approved.assert_has_calls(
+            assert mock_toolset.__getitem__.call_args_list == [
+                call("tool1"),
+                call("no_op_tool"),
+                call("tool1"),
+                # no_op_tool is preapproved, therefore it does not appear in call args twice
+            ]
+
+            mock_format_tool_msg.assert_has_calls(
                 [
-                    call(valid_tool_call["name"]),
-                    call(pre_approved_tool_call["name"]),
-                    call(non_existent_tool_call["name"]),
+                    call(mock_tool, tool1_call["args"]),
                 ]
             )
-
-            # Verify format_tool_display_message was called
-            mock_format_tool_msg.assert_called_once_with(
-                mock_tool, valid_tool_call["args"]
-            )
-
-            # Verify the execution continued normally
             mock_check_executor.run.assert_called_once()
             mock_entry_node.assert_called_once()
             mock_continuation_node.assert_called_once()
