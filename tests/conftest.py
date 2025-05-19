@@ -56,6 +56,8 @@ from duo_workflow_service.server import CONTAINER_APPLICATION_PACKAGES
 from duo_workflow_service.workflows.type_definitions import AdditionalContext
 from lib.feature_flags.context import current_feature_flag_context
 from lib.internal_events.client import InternalEventsClient
+from ai_gateway.structured_logging import setup_logging
+from ai_gateway.config import ConfigLogging
 
 pytest_plugins = ("pytest_asyncio",)
 
@@ -88,7 +90,8 @@ def stub_auth_provider():
 
 
 @pytest.fixture(scope="class")
-def test_client(fast_api_router, stub_auth_provider):
+def test_client(fast_api_router, stub_auth_provider, request):
+    setup_logging(ConfigLogging())
     middlewares = [
         Middleware(RawContextMiddleware),
         Middleware(AccessLogMiddleware, skip_endpoints=[]),
