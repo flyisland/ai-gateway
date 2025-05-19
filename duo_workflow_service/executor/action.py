@@ -21,6 +21,11 @@ async def _execute_action(metadata: Dict[str, Any], action: contract_pb2.Action)
     inbox: asyncio.Queue = metadata["inbox"]
     log = structlog.stdlib.get_logger("workflow")
 
+    log.debug(
+        "Attempting action from the egress queue",
+        requestID=action.requestID,
+        action_class=action.WhichOneof("action"),
+    )
     action_class = action.WhichOneof("action")
     log.info(
         "Attempting action from the egress queue",

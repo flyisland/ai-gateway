@@ -58,12 +58,12 @@ CHAT_READ_ONLY_TOOLS = [
     "gitlab_issue_search",
     "gitlab_merge_request_search",
     "read_file",
-    "ls_files",
     "find_files",
-    "grep_files",
+    "grep",
     "get_epic",
     "list_epics",
     "scan_directory_tree",
+    "list_dir",
 ]
 
 
