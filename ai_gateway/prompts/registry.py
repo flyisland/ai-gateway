@@ -31,6 +31,7 @@ class LocalPromptRegistry(BasePromptRegistry):
 
     def __init__(
         self,
+        model_selection: ModelSelectionConfig,
         prompts_registered: dict[str, PromptRegistered],
         model_factories: dict[ModelClassProvider, TypeModelFactory],
         default_prompts: dict[str, str],
@@ -39,6 +40,7 @@ class LocalPromptRegistry(BasePromptRegistry):
         custom_models_enabled: bool,
         disable_streaming: bool = False,
     ):
+        self.model_selection = model_selection
         self.prompts_registered = prompts_registered
         self.model_factories = model_factories
         self.default_prompts = default_prompts
@@ -125,6 +127,7 @@ class LocalPromptRegistry(BasePromptRegistry):
     @classmethod
     def from_local_yaml(
         cls,
+        model_selection: ModelSelectionConfig,
         class_overrides: dict[str, Type[Prompt]],
         model_factories: dict[ModelClassProvider, TypeModelFactory],
         default_prompts: dict[str, str],
@@ -144,15 +147,15 @@ class LocalPromptRegistry(BasePromptRegistry):
         prompts_definitions_dir = base_path / "definitions"
         prompts_registered = {}
 
-        llm_configurations = ModelSelectionConfig.get_llm_definitions
-        unit_primitive_configuration = ModelSelectionConfig.get_unit_primitive_config
+        llm_configurations = model_selection.get_llm_definitions()
+        unit_primitive_configuration = model_selection.get_unit_primitive_config()
 
 
         # Iterate over each folder
         for path in prompts_definitions_dir.glob("**"):
             # Iterate over each version file
             versions = {
-                version.stem: cls._process_version_file(version, llm_configurations, unit_primitive_configuration)
+                version.stem: cls._process_version_file(version,prompts_definitions_dir, llm_configurations, unit_primitive_configuration)
                 for version in path.glob("*.yml")
             }
 
@@ -187,8 +190,9 @@ class LocalPromptRegistry(BasePromptRegistry):
     @classmethod
     def _process_version_file(
         cls, version_file: Path,
+        prompts_definitions_dir: Path, 
         llm_configurations:dict[str,LLMDefinition], 
-        unit_primitive_configuration:dict[str,UnitPrimitiveConfig]
+        unit_primitive_configuration: list[UnitPrimitiveConfig]
     ) -> PromptConfig:
         """Processes a single version YAML file and returns a PromptConfig.
 
@@ -200,13 +204,12 @@ class LocalPromptRegistry(BasePromptRegistry):
             PromptConfig: Processed prompt configuration
         """
 
-        # TODO: improve the programatic way of accessing grandparent directory
-        unit_primitive = version_file.parts[3]
 
         with open(version_file, "r") as fp:
             prompt_config_params = yaml.safe_load(fp)
 
-            unit_primitive_config = cls.get_config_for_unit_primitive(unit_primitive_configuration, unit_primitive)
+            unit_primitives = prompt_config_params['unit_primitives']
+            unit_primitive_config = cls.get_config_for_unit_primitive(unit_primitive_configuration, unit_primitives)
             gitlab_identifier = unit_primitive_config.default_model
 
             model_selection_prompt_config_params = llm_configurations[gitlab_identifier].params
@@ -215,6 +218,8 @@ class LocalPromptRegistry(BasePromptRegistry):
             prompt_config_params = cls._patch_model_configuration(
                 model_selection_prompt_config_params, prompt_config_params
             )
+
+            import pdb; pdb.set_trace()
 
             return PromptConfig(**prompt_config_params)
 
@@ -236,19 +241,26 @@ class LocalPromptRegistry(BasePromptRegistry):
         }
     
     @classmethod
-    def get_config_for_unit_primitive(configs, unit_primitive) -> UnitPrimitiveConfig
+    def get_config_for_unit_primitive(cls, configs: list[UnitPrimitiveConfig], unit_primitives: list[str]) -> UnitPrimitiveConfig:
         """
-        Find the UnitPrimitiveConfig object that contains the specified unit_primitive
-        in its unit_primitives list.
+        Find the UnitPrimitiveConfig object that has exactly the same unit_primitives list
+        as the specified unit_primitives.
         
         Args:
             configs: List of UnitPrimitiveConfig objects
-            unit_primitive: The unit primitive to search for
+            unit_primitives: The list of unit primitives to match exactly
             
         Returns:
             The matching UnitPrimitiveConfig or None if not found
         """
+        # Convert the input unit_primitives to a set of strings
+        unit_primitives_set = set(unit_primitives)
+        
         for config in configs:
-            if unit_primitive in config.unit_primitives:
+            # Convert the enum values to strings for comparison
+            config_unit_primitives_set = {str(primitive) for primitive in config.unit_primitives}
+            
+            # Check if the sets contain exactly the same elements
+            if config_unit_primitives_set == unit_primitives_set:
                 return config
         return None
