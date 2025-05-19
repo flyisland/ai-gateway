@@ -32,10 +32,9 @@ class TestLLM:
         assert isinstance(response, TextGenModelOutput)
 
         generate_params = inspect.signature(model.generate).parameters
-        expected_substrings = (
-            [prefix]
-            + ([suffix] if suffix else [])
-            + _build_expected_substrings_from_kwargs(generate_params, kwargs)
+        expected_substrings = [prefix, suffix] if suffix else [prefix]
+        expected_substrings.extend(
+            _build_expected_substrings_from_kwargs(generate_params, kwargs)
         )
 
         assert all(substring in response.text for substring in expected_substrings)
@@ -52,10 +51,9 @@ class TestLLM:
 
         actual_text = "".join([chunk.text async for chunk in response])
         generate_params = inspect.signature(model.generate).parameters
-        expected_substrings = (
-            [prefix]
-            + ([suffix] if suffix else [])
-            + _build_expected_substrings_from_kwargs(generate_params, kwargs)
+        expected_substrings = [prefix, suffix] if suffix else [prefix]
+        expected_substrings.extend(
+            _build_expected_substrings_from_kwargs(generate_params, kwargs)
         )
 
         assert all(substring in actual_text for substring in expected_substrings)
