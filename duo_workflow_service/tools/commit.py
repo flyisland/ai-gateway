@@ -58,9 +58,9 @@ class CommitBaseTool(DuoBaseTool):
 
         if not url:
             if not project_id:
-                errors.append("'project_id' must be provided when 'url' is not")
+                errors.append("'project_id' must be provided when 'url' is absent")
             if not commit_sha:
-                errors.append("'commit_sha' must be provided when 'url' is not")
+                errors.append("'commit_sha' must be provided when 'url' is absent")
             return CommitURLValidationResult(
                 str(project_id) if project_id is not None else None, commit_sha, errors
             )
