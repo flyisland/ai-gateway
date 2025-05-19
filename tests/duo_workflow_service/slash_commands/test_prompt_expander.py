@@ -1,94 +1,184 @@
-"""Tests for the slash_commands.prompt_expander module."""
-
 # pylint: disable=file-naming-for-tests,unused-import
 
 from unittest.mock import MagicMock, patch
 
 import pytest
 
-from duo_workflow_service.slash_commands.prompt_expander import ProcessSlashCommand
+from duo_workflow_service.slash_commands.error_handler import SlashCommandError
+from duo_workflow_service.slash_commands.goal_parser import (
+    ParsedSlashCommand,
+    SlashCommandsGoalParser,
+)
+from duo_workflow_service.slash_commands.prompt_expander import (
+    SlashCommandsPromptExpander,
+)
+from lib.result import Error, Ok
+
+GOAL_PARSER_PATH = (
+    "duo_workflow_service.slash_commands.goal_parser.SlashCommandsGoalParser"
+)
+PARSED_SLASH_COMMAND = (
+    "duo_workflow_service.slash_commands.goal_parser.ParsedSlashCommand"
+)
+DEFINITION_PATH = (
+    "duo_workflow_service.slash_commands.definition.SlashCommandDefinition"
+)
+LOAD_DEFINITION_PATH = f"{DEFINITION_PATH}.load_slash_command_definition"
+PROMPT_EXPANDER_PARSER_PATH = (
+    "duo_workflow_service.slash_commands.prompt_expander.SlashCommandsGoalParser"
+)
+LOG_COMMAND_ERROR_PATH = (
+    "duo_workflow_service.slash_commands.prompt_expander.log_command_error"
+)
+LOG_PATH = "duo_workflow_service.slash_commands.prompt_expander.log"
 
 
-@patch("duo_workflow_service.slash_commands.goal_parser.parse")
-@patch("duo_workflow_service.slash_commands.definition.SlashCommandDefinition")
-def test_process_slash_command_not_slash_command(_mock_definition, _mock_parser):
-    """Test processing a non-slash command message."""
-    # TODO: Implement this test once process_slash_command is implemented
-    # mock_parser_instance = MagicMock()
-    # mock_parser.return_value = mock_parser_instance
-    # mock_parser_instance.parse.return_value = None
+class TestSlashCommandsPromptExpander:
+    @pytest.fixture
+    def processor(self):
+        return SlashCommandsPromptExpander()
 
-    # processor = ProcessSlashCommand()
-    # result = processor.process("This is not a slash command")
+    @pytest.fixture
+    def mock_parser_instance(self):
+        return MagicMock()
 
-    # assert result is None
-    # mock_parser_instance.parse.assert_called_once_with("This is not a slash command")
-    pytest.skip()
+    @patch(GOAL_PARSER_PATH)
+    @patch(LOAD_DEFINITION_PATH)
+    def test_not_slash_command(
+        self, mock_definition_load, mock_parser, processor, mock_parser_instance
+    ):
+        mock_parser.return_value = mock_parser_instance
 
+        mock_parsed_command = MagicMock(spec=ParsedSlashCommand)
+        mock_parsed_command.configure_mock(
+            command_type=None, remaining_text="This is not a slash command"
+        )
 
-@patch("duo_workflow_service.slash_commands.goal_parser.parse")
-@patch("duo_workflow_service.slash_commands.definition.SlashCommandDefinition")
-def test_process_slash_command_success(_mock_definition, _mock_parser):
-    """Test successful processing of a slash command."""
-    # TODO: Implement this test once process_slash_command is implemented
-    # Set up mocks for a successful slash command processing
-    # mock_parser_instance = MagicMock()
-    # mock_parser.return_value = mock_parser_instance
-    # parsed_command = MagicMock()
-    # parsed_command.command_type = "explain"
-    # parsed_command.remaining_text = "def add(a, b): return a + b"
-    # mock_parser_instance.parse.return_value = parsed_command
+        mock_parser_instance.parse.return_value = mock_parsed_command
 
-    # mock_definition.load_slash_command_definition.return_value = MagicMock(
-    #     name="explain",
-    #     system_prompt="You are a helpful assistant",
-    #     goal="Explain this code: {code}",
-    #     parameters={"code": "string"}
-    # )
+        result = processor.process("This is not a slash command", "code")
 
-    # mock_result.return_value = MagicMock(success=True)
+        assert isinstance(result, Ok)
+        assert result.value is None
 
-    # processor = ProcessSlashCommand()
-    # result = processor.process("/explain def add(a, b): return a + b")
+    @patch(PARSED_SLASH_COMMAND)
+    @patch(GOAL_PARSER_PATH)
+    @patch(LOAD_DEFINITION_PATH)
+    def test_success(
+        self,
+        mock_definition_load,
+        mock_parser,
+        parsed_slash_command,
+        processor,
+        mock_parser_instance,
+    ):
+        mock_command_def = MagicMock(
+            name="explain",
+            system_prompt="You are an expert at explaining code",
+            goal="Explain this code: {code}",
+            parameters={"max_tokens": 1024},
+        )
+        mock_definition_load.return_value = mock_command_def
 
-    # assert result.success is True
-    # mock_parser_instance.parse.assert_called_once_with("/explain def add(a, b): return a + b")
-    # mock_definition.load_slash_command_definition.assert_called_once_with("explain")
-    pytest.skip()
+        parsed_command = ParsedSlashCommand(
+            command_type="explain", remaining_text="def add(a, b): return a + b"
+        )
 
+        parsed_slash_command.return_value = parsed_command
 
-@patch("duo_workflow_service.slash_commands.goal_parser.parse")
-@patch("duo_workflow_service.slash_commands.definition.SlashCommandDefinition")
-def test_process_slash_command_error(_mock_definition, _mock_parser):
-    """Test error handling in slash command processing."""
-    # TODO: Implement this test once process_slash_command is implemented
-    # Set up mocks for slash command processing with error
-    # mock_parser_instance = MagicMock()
-    # mock_parser.return_value = mock_parser_instance
-    # parsed_command = MagicMock()
-    # parsed_command.command_type = "nonexistent"
-    # parsed_command.remaining_text = "some text"
-    # mock_parser_instance.parse.return_value = parsed_command
+        mock_parser.return_value = parsed_slash_command
 
-    # mock_definition.load_slash_command_definition.side_effect = Exception("Command not found")
+        result = processor.process("/explain def add(a, b): return a + b", "code")
 
-    # mock_result.return_value = MagicMock(success=False, error="Command not found")
+        assert isinstance(result, Ok)
+        assert result.value["success"] is True
+        assert result.value["command_name"] == "explain"
+        assert result.value["system_prompt"] == "You are an expert at explaining code"
+        assert result.value["goal"] == "Explain this code: {code}"
+        assert result.value["message_context"] == "def add(a, b): return a + b"
+        mock_definition_load.assert_called_once_with("explain")
 
-    # processor = ProcessSlashCommand()
-    # result = processor.process("/nonexistent some text")
+    @patch(GOAL_PARSER_PATH)
+    @patch(DEFINITION_PATH)
+    def test_command_not_found_error(
+        self, mock_definition, mock_parser, processor, mock_parser_instance
+    ):
+        """
+        To be implemented after MR for SlashCommandGoalParser and SlashCommandDefinition have been implemented
+        """
+        mock_parser.return_value = mock_parser_instance
+        parsed_command = ParsedSlashCommand(
+            command_type="nonexistent", remaining_text="some text"
+        )
+        mock_parser_instance.parse.return_value = parsed_command
 
-    # assert result.success is False
-    # assert result.error == "Command not found"
-    # mock_parser_instance.parse.assert_called_once_with("/nonexistent some text")
-    # mock_definition.load_slash_command_definition.assert_called_once_with("nonexistent")
-    pytest.skip()
+        error_message = "Slash command configuration file for 'nonexistent' not found"
 
+        result = processor.process("/nonexistent some text", "code")
 
-@patch("duo_workflow_service.slash_commands.goal_parser.parse")
-@patch("duo_workflow_service.slash_commands.definition.SlashCommandDefinition")
-def test_process_slash_command_missing_parameters(_mock_definition, _mock_parser):
-    """Test handling missing required parameters."""
-    # TODO: Implement this test once process_slash_command is implemented
-    # This would test the case where a slash command is missing required parameters
-    # Set up mocks similar to the success test, but with validation error
-    pytest.skip()
+        pytest.skip()
+        assert isinstance(result, Error)
+        assert str(result.error) == error_message
+
+    @patch(GOAL_PARSER_PATH)
+    @patch(DEFINITION_PATH)
+    def test_missing_required_parameters(
+        self, mock_definition, mock_parser, processor, mock_parser_instance
+    ):
+        """
+        To be implemented after MR for SlashCommandGoalParser and SlashCommandDefinition have been implemented
+        """
+        mock_parser.return_value = mock_parser_instance
+        parsed_command = ParsedSlashCommand(command_type="test", remaining_text="")
+        mock_parser_instance.parse.return_value = parsed_command
+
+        mock_definition_instance = MagicMock(
+            name="test",
+            system_prompt="Test system prompt",
+            goal="Test goal with required params",
+            parameters={"required_param": {"type": "string", "required": True}},
+        )
+        mock_definition.load_slash_command_definition.return_value = (
+            mock_definition_instance
+        )
+
+        result = processor.process("/test", "code")
+
+        pytest.skip()
+        assert isinstance(result, Error)
+
+    @patch(PROMPT_EXPANDER_PARSER_PATH)
+    @patch(LOG_COMMAND_ERROR_PATH)
+    def test_slash_command_error_handling(
+        self, mock_log_command_error, mock_parser_class, processor
+    ):
+        mock_parser = MagicMock()
+        mock_parser_class.return_value = mock_parser
+
+        test_error = SlashCommandError("Test slash command error")
+        mock_parser.parse.side_effect = test_error
+
+        result = processor.process("/test command", "code")
+
+        assert isinstance(result, Error)
+        assert result.error == test_error
+        mock_log_command_error.assert_called_once_with(
+            command_name=None, error=test_error
+        )
+
+    @patch(PROMPT_EXPANDER_PARSER_PATH)
+    @patch(LOG_PATH)
+    def test_general_exception_handling(self, mock_log, mock_parser_class, processor):
+        mock_parser = MagicMock()
+        mock_parser_class.return_value = mock_parser
+
+        test_error = Exception("Test general exception")
+        mock_parser.parse.side_effect = test_error
+
+        result = processor.process("/test command", "code")
+
+        assert isinstance(result, Error)
+        assert result.error == test_error
+        mock_log.error.assert_called_once_with(
+            f"Error processing slash command: {str(test_error)}"
+        )
