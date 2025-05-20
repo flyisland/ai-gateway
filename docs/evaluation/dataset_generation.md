@@ -6,9 +6,9 @@ This document explains how to generate synthetic evaluation datasets directly fr
 
 The dataset generation tool allows you to:
 
-1. Select any prompt from the AIGW registry
-1. Generate synthetic examples based on the prompt structure
-1. Export a LangSmith-compatible dataset in JSONL format
+1. Select any prompt from the AIGW registry.
+1. Generate synthetic examples based on the prompt structure.
+1. Export a LangSmith-compatible dataset in JSONL format.
 
 ## Using the Dataset Generator
 
@@ -75,14 +75,14 @@ poetry run generate-dataset \
 
 ## How It Works
 
-1. **Prompt Loading**: The tool loads the specified prompt from the AI Gateway registry
-1. **Template Resolution**: All Jinja templates referenced in the prompt are resolved using `get_message_source()` function
+1. **Prompt Loading**: The tool loads the specified prompt from the AI Gateway registry.
+1. **Template Resolution**: All Jinja templates referenced in the prompt are resolved using `get_message_source()` function.
 1. **Dataset Generation**: The tool uses ELI5 libraries to generate examples:
-   - Extracts system and user templates from the prompt structure
-   - Creates diverse input examples with realistic values
-   - Generates expected outputs
-   - Formats everything in a LangSmith-compatible structure
-1. **Export**: The dataset is exported as a JSONL file and can be uploaded to LangSmith using the `--upload` option
+   - Extracts system and user templates from the prompt structure.
+   - Creates diverse input examples with realistic values.
+   - Generates expected outputs.
+   - Formats everything in a LangSmith-compatible structure.
+1. **Export**: The dataset is exported as a JSONL file and can be uploaded to LangSmith using the `--upload` option.
 
 ## Output Format
 
