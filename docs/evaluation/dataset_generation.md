@@ -98,4 +98,4 @@ The generated dataset will be in JSONL format, with each line representing a tes
 The generated datasets are compatible with LangSmith. To use a generated dataset in LangSmith:
 
 1. **Upload the dataset** using the `--upload` option
-1. **Run evaluations** against this dataset using the [eval command](tests.md#running-prompt-evaluations-locally)
+1. **Run evaluations** against this dataset using the [eval command](../tests.md#running-prompt-evaluations-locally)
