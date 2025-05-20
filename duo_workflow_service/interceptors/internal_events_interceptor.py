@@ -8,10 +8,10 @@ from duo_workflow_service.interceptors import (
     X_GITLAB_GLOBAL_USER_ID_HEADER,
     X_GITLAB_HOST_NAME,
     X_GITLAB_INSTANCE_ID_HEADER,
+    X_GITLAB_IS_A_GITLAB_MEMBER,
     X_GITLAB_NAMESPACE_ID,
     X_GITLAB_PROJECT_ID,
     X_GITLAB_REALM_HEADER,
-    X_GITLAB_IS_A_GITLAB_MEMBER,
 )
 from duo_workflow_service.interceptors.correlation_id_interceptor import correlation_id
 from duo_workflow_service.internal_events import EventContext, current_event_context

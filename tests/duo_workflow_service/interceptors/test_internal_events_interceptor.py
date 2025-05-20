@@ -116,6 +116,7 @@ async def test_interceptor_with_empty_project_and_namespace_ids(
     assert event_context.project_id is None
     assert event_context.namespace_id is None
 
+
 @pytest.mark.asyncio
 async def test_interceptor_with_gitlab_member_false(
     interceptor,
