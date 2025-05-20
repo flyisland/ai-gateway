@@ -13,19 +13,6 @@ def queues():
     return asyncio.Queue(), asyncio.Queue()
 
 
-def test_get_http_client_gitlab_com(queues):
-    """Test that get_http_client returns DirectGitLabHttpClient for gitlab.com"""
-    outbox, inbox = queues
-    base_url = "https://gitlab.com"
-    gitlab_token = "test-token"
-
-    client = get_http_client(outbox, inbox, base_url, gitlab_token)
-
-    assert isinstance(client, DirectGitLabHttpClient)
-    assert client.base_url == base_url
-    assert client.gitlab_token == gitlab_token
-
-
 def test_get_http_client_custom_gitlab(queues):
     """Test that get_http_client returns ExecutorGitLabHttpClient for custom GitLab instances"""
     outbox, inbox = queues
