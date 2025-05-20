@@ -220,7 +220,9 @@ class Workflow(AbstractWorkflow):
             ).run,
         )
         # translator nodes
-        graph.add_node(translator_components["start_node"], translator_components["agent"].run)
+        graph.add_node(
+            translator_components["start_node"], translator_components["agent"].run
+        )
         graph.add_node("execution_tools", translator_components["tools_executor"].run)
 
         # deterministic git actions
@@ -243,7 +245,7 @@ class Workflow(AbstractWorkflow):
                         "repository_url": self._project["http_url_to_repo"],
                         "command": "push",
                         "args": "-o merge_request.create",
-                    }
+                    },
                 ],
                 output_parser=_git_output,  # type: ignore
             ).run,
