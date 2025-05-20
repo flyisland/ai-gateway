@@ -126,4 +126,4 @@ async def test_interceptor_with_gitlab_member_false(
         mock_continuation, handler_call_details_with_empty_project_and_namespace_id
     )
     event_context = current_event_context.get()
-    event_context.is_gitlab_team_member = False
+    assert event_context.is_gitlab_team_member is False
