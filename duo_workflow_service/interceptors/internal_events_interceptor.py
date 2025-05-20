@@ -35,7 +35,9 @@ class InternalEventsInterceptor(grpc.aio.ServerInterceptor):
         metadata = dict(handler_call_details.invocation_metadata)
 
         is_gitlab_member = metadata.get(X_GITLAB_IS_A_GITLAB_MEMBER, None)
-        is_gitlab_member = is_gitlab_member.lower() == "true" if is_gitlab_member else None
+        is_gitlab_member = (
+            is_gitlab_member.lower() == "true" if is_gitlab_member else None
+        )
 
         feature_enabled_by_namespace_ids = metadata.get(
             X_GITLAB_FEATURE_ENABLED_BY_NAMESPACE_IDS, None
