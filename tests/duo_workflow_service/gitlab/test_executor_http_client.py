@@ -152,13 +152,14 @@ async def test_executor_gitlab_http_client_json_decode_error(
     monkeypatch_execute_action,
 ):
     # Setup non-JSON response
-    monkeypatch_execute_action.return_value = "This is not valid JSON"
+    invalid_json = "This is not valid JSON"
+    monkeypatch_execute_action.return_value = invalid_json
 
     # Call with parse_json=True to trigger JSON decode error
     result = await client.aget("/api/v4/test", parse_json=True)
 
-    # Should return empty dict on JSON decode error
-    assert result == {}
+    # Should return the raw string when JSON parsing fails
+    assert result == invalid_json
 
 
 @pytest.mark.asyncio

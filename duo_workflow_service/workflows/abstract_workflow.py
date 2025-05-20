@@ -1,7 +1,7 @@
 import asyncio
 import os
 from abc import ABC, abstractmethod
-from typing import Any, Dict, TypedDict, Union
+from typing import Any, Dict, TypedDict
 
 import structlog
 from langchain_core.runnables import RunnableConfig
@@ -47,6 +47,7 @@ DEBUG = os.getenv("DEBUG")
 MAX_MESSAGES_TO_DISPLAY = 5
 MAX_MESSAGE_LENGTH = 200
 
+
 class InvocationMetadata(TypedDict):
     base_url: str
     gitlab_token: str
@@ -78,8 +79,11 @@ class AbstractWorkflow(ABC):
         workflow_id: str,
         workflow_metadata: Dict[str, Any],
         workflow_type: CategoryEnum,
-        context_elements: list = None,
-        invocation_metadata: Union[InvocationMetadata] = {},
+        context_elements: list = None,  # type: ignore[assignment]
+        invocation_metadata: InvocationMetadata = {
+            "base_url": "",
+            "gitlab_token": "",
+        },
     ):
         self._outbox = asyncio.Queue(maxsize=QUEUE_MAX_SIZE)
         self._inbox = asyncio.Queue(maxsize=QUEUE_MAX_SIZE)
@@ -89,10 +93,10 @@ class AbstractWorkflow(ABC):
         self._context_elements = context_elements or []
         self.log = structlog.stdlib.get_logger("workflow").bind(workflow_id=workflow_id)
         self._http_client = get_http_client(
-            self._outbox, 
-            self._inbox, 
+            self._outbox,
+            self._inbox,
             invocation_metadata.get("base_url", ""),
-            invocation_metadata.get("gitlab_token", "")
+            invocation_metadata.get("gitlab_token", ""),
         )
         self._workflow_type = workflow_type
 

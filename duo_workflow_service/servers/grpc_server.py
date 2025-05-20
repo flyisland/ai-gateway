@@ -1,11 +1,11 @@
 # pylint: disable=direct-environment-variable-reference
 
 import asyncio
-import aiohttp
 import json
 import os
 from typing import AsyncIterable, AsyncIterator
 
+import aiohttp
 import grpc
 import structlog
 from gitlab_cloud_connector import (
@@ -17,6 +17,7 @@ from gitlab_cloud_connector import (
 from grpc_reflection.v1alpha import reflection
 
 from contract import contract_pb2, contract_pb2_grpc
+from duo_workflow_service.gitlab.direct_http_client import DirectGitLabHttpClient
 from duo_workflow_service.interceptors.authentication_interceptor import (
     AuthenticationInterceptor,
     current_user,
@@ -41,7 +42,6 @@ from duo_workflow_service.workflows.abstract_workflow import (
     TypeWorkflow,
 )
 from duo_workflow_service.workflows.registry import resolve_workflow_class
-from duo_workflow_service.gitlab.direct_http_client import DirectGitLabHttpClient
 
 log = structlog.stdlib.get_logger("server")
 
@@ -105,7 +105,10 @@ class GrpcServer(contract_pb2_grpc.DuoWorkflowServicer):
             workflow_metadata=workflow_metadata,
             workflow_type=workflow_type,
             context_elements=context_elements,
-            invocation_metadata={"base_url": invocation_metadata.get("x-gitlab-base-url", ""), "gitlab_token": invocation_metadata.get("x-gitlab-oauth-token", "")},
+            invocation_metadata={
+                "base_url": invocation_metadata.get("x-gitlab-base-url", ""),
+                "gitlab_token": invocation_metadata.get("x-gitlab-oauth-token", ""),
+            },
         )
 
         async def send_events():
@@ -227,7 +230,7 @@ async def grpc_serve(port: int) -> None:
     # Initialize the HTTP client connection pool
     await DirectGitLabHttpClient.initialize_pool(
         pool_size=100,  # Adjust based on your needs
-        timeout=aiohttp.ClientTimeout(total=30)
+        timeout=aiohttp.ClientTimeout(total=30),
     )
     server_options = [
         ("grpc.keepalive_time_ms", 20 * 1000),

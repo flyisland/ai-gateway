@@ -1,4 +1,4 @@
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import AsyncMock, patch
 
 import pytest
 from langchain_core.messages import AIMessage, HumanMessage, SystemMessage, ToolMessage
@@ -222,3 +222,41 @@ def test_checkpoint_decoder():
     regular_json = {"key": "value"}
     result = checkpoint_decoder(regular_json)
     assert result == {"key": "value"}
+
+
+def test_parse_response():
+    """Test the _parse_response method of GitlabHttpClient."""
+    client = MockGitLabHttpClient()
+
+    # Test 1: Valid JSON string
+    json_str = '{"key": "value", "number": 42}'
+    result = client._parse_response(json_str)
+    assert result == {"key": "value", "number": 42}
+
+    # Test 2: Valid JSON string with object hook
+    message_json = '{"type": "SystemMessage", "content": "Test message", "additional_kwargs": {}, "response_metadata": {}}'
+    result = client._parse_response(message_json, object_hook=checkpoint_decoder)
+    assert isinstance(result, SystemMessage)
+    assert result.content == "Test message"
+
+    # Test 3: Non-JSON string with parse_json=False
+    non_json = "This is not JSON"
+    result = client._parse_response(non_json, parse_json=False)
+    assert result == "This is not JSON"
+
+    # Test 4: Non-JSON string with parse_json=True (should handle error)
+    result = client._parse_response(non_json)
+    assert result == non_json  # Should return the original string
+
+    # Test 5: Already parsed JSON (dict)
+    parsed_json = {"already": "parsed"}
+    result = client._parse_response(parsed_json)
+    assert result == parsed_json
+
+    # Test 6: Empty string (should handle error)
+    result = client._parse_response("")
+    assert result == ""
+
+    # Test 7: None input (should return None on error)
+    result = client._parse_response(None)
+    assert result is None

@@ -1,11 +1,9 @@
+import json
 import logging
 from abc import ABC, abstractmethod
 from typing import Any, Callable, Dict, Optional, Union
-from urllib.parse import urlencode
 
 from langchain_core.messages import AIMessage, HumanMessage, SystemMessage, ToolMessage
-
-from duo_workflow_service.executor.action import _execute_action
 
 # Setup logger
 logger = logging.getLogger(__name__)
@@ -52,6 +50,40 @@ class GitlabHttpClient(ABC):
     async def apatch(self, path: str, body: str, parse_json: bool = True) -> Any:
         return await self._call(path, "PATCH", parse_json, data=body)
 
+    def _parse_response(
+        self,
+        response: Any,
+        parse_json: bool = True,
+        object_hook: Union[Callable, None] = None,
+    ) -> Union[Dict[str, Any], list, str, None]:
+        """Parse the response from the API call.
+
+        Args:
+            response: The raw response (string or other data)
+            parse_json: Whether to parse the response as JSON
+            object_hook: Optional JSON decoder hook for custom object deserialization
+
+        Returns:
+            Parsed response data (dict/list) if parsing succeeds,
+            or raw response (str) if parsing fails or is not requested,
+            or None if response is None
+        """
+        if not parse_json:
+            return response
+
+        try:
+            if isinstance(response, str):
+                if object_hook:
+                    return json.loads(response, object_hook=object_hook)
+                return json.loads(response)
+            return response  # Already parsed JSON (dict/list)
+        except json.JSONDecodeError as e:
+            logger.error(f"JSON decode error: {str(e)}. ")
+            logger.error(
+                f"Raw response type: {type(response)}, content: {repr(response)}"
+            )
+            return response if isinstance(response, str) else None
+
     @abstractmethod
     async def _call(
         self,
@@ -63,4 +95,3 @@ class GitlabHttpClient(ABC):
         object_hook: Union[Callable, None] = None,
     ) -> Any:
         pass
-

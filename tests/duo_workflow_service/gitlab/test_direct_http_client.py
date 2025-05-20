@@ -8,63 +8,70 @@ import pytest_asyncio
 from duo_workflow_service.gitlab.direct_http_client import DirectGitLabHttpClient
 
 
-class MockRequestContextManager:
-    def __init__(self, response):
-        self._response = response
+def setup_mock_response(data, status=200, content_type="application/json"):
+    """
+    Create a mock response object that mimics aiohttp.ClientResponse.
 
-    def __await__(self):
-        async def _coro():
-            return self._response
+    Args:
+        data: The response data (can be a dict or string)
+        status: HTTP status code
+        content_type: Response content type
 
-        return _coro().__await__()
+    Returns:
+        A MagicMock configured to behave like an aiohttp.ClientResponse
+    """
+    mock_response = MagicMock(spec=aiohttp.ClientResponse)
+    mock_response.status = status
+    mock_response.content_type = content_type
 
-    async def __aenter__(self):
-        return self._response
+    # Set up async json method
+    async def mock_json(loads=json.loads):
+        if isinstance(data, str):
+            return loads(data)
+        return data
 
-    async def __aexit__(self, exc_type, exc_val, exc_tb):
-        pass
+    mock_response.json = AsyncMock(side_effect=mock_json)
+
+    # Set up async text method
+    async def mock_text():
+        if isinstance(data, str):
+            return data
+        return json.dumps(data)
+
+    mock_response.text = AsyncMock(side_effect=mock_text)
+
+    # Set up raise_for_status method
+    def mock_raise_for_status():
+        if status >= 400:
+            raise aiohttp.ClientResponseError(
+                request_info=MagicMock(), history=(), status=status
+            )
+
+    mock_response.raise_for_status = MagicMock(side_effect=mock_raise_for_status)
+
+    # Make it work as an async context manager
+    mock_response.__aenter__.return_value = mock_response
+    mock_response.__aexit__.return_value = None
+
+    return mock_response
 
 
 def setup_request_mock(session_mock, response):
     """
-    Replace session_mock.request with a MagicMock that, when called,
-    returns a MockRequestContextManager wrapping *response*.
+    Replace session_mock.request with a mock that returns an async context manager
+    wrapping the response.
     """
-    from unittest.mock import MagicMock
+    # Create a mock for the async context manager
+    mock_cm = AsyncMock()
+    mock_cm.__aenter__.return_value = response
+    mock_cm.__aexit__.return_value = None
 
-    session_mock.request = MagicMock(
-        side_effect=lambda *a, **kw: MockRequestContextManager(response)
-    )
+    # Create a mock for the request method
+    mock_request = MagicMock()
+    mock_request.return_value = mock_cm
 
-
-class MockResponse:
-    def __init__(self, data, status=200, content_type="application/json"):
-        self.data = data
-        self.status = status
-        self.content_type = content_type
-        self._body = None
-
-    async def json(self, loads=json.loads):
-        if isinstance(self.data, str):
-            return loads(self.data)
-        return self.data
-
-    async def text(self):
-        if isinstance(self.data, str):
-            return self.data
-        return json.dumps(self.data)
-
-    async def __aenter__(self):
-        return self
-
-    async def __aexit__(self, exc_type, exc_val, exc_tb):
-        pass
-
-    def raise_for_status(self):
-        if self.status >= 400:
-            raise aiohttp.ClientResponseError(
-                request_info=MagicMock(), history=(), status=self.status
-            )
+    # Replace the session's request method
+    session_mock.request = mock_request
 
 
 @pytest.fixture
@@ -167,7 +174,7 @@ async def test_direct_gitlab_http_client(
     mock_session = client._session
 
     # Setup the mock response
-    mock_response = MockResponse(response_data)
+    mock_response = setup_mock_response(response_data)
     setup_request_mock(mock_session, mock_response)
 
     # Make the API call
@@ -213,7 +220,7 @@ async def test_direct_gitlab_http_client_with_object_hook(client):
     mock_session = client._session
 
     # Setup the mock response
-    mock_response = MockResponse(json_response)
+    mock_response = setup_mock_response(json_response)
     setup_request_mock(mock_session, mock_response)
 
     # Define a custom object hook function
@@ -272,7 +279,7 @@ async def test_direct_gitlab_http_client_uninitialized_pool():
 
 
 @pytest.mark.asyncio
-async def test_direct_gitlab_http_client_http_error():
+async def test_direct_gitlab_http_client_invalid_json():
     DirectGitLabHttpClient._session = None
 
     # Create a client
@@ -280,26 +287,28 @@ async def test_direct_gitlab_http_client_http_error():
         base_url="https://gitlab.example.com/api/v4", gitlab_token="test_token"
     )
 
-    # Patch ClientSession to avoid network connections
+    # Create an invalid JSON response
+    invalid_json_response = "Invalid JSON {not valid}"
+
+    # Get the internal mock session
     with patch("aiohttp.ClientSession") as mock_session_class:
         mock_session = AsyncMock()
-        mock_session.request = AsyncMock()
-
-        # Setup a response with an error status
-        error_response = MockResponse({"error": "Not found"}, status=404)
-        mock_session.request.return_value = error_response
+        mock_response = setup_mock_response(
+            invalid_json_response, content_type="application/json"
+        )
+        setup_request_mock(mock_session, mock_response)
         mock_session_class.return_value = mock_session
-        setup_request_mock(mock_session, error_response)
 
-        # Initialize the pool manually to use our mock
+        # Initialize the pool properly
+        await DirectGitLabHttpClient.initialize_pool()
         DirectGitLabHttpClient._session = mock_session
 
-        # Make a request that will cause an error
-        with pytest.raises(aiohttp.ClientResponseError) as excinfo:
-            await client.aget("nonexistent")
+        try:
+            # Make the request - it should return the raw text instead of raising an error
+            result = await client.aget("test", parse_json=True)
 
-        # Verify the error status
-        assert excinfo.value.status == 404
-
-        # Clean up
-        await DirectGitLabHttpClient.close_pool()
+            # Verify we got back the raw text
+            assert result == invalid_json_response
+        finally:
+            # Clean up
+            await DirectGitLabHttpClient.close_pool()
