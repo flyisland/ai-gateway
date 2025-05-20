@@ -40,6 +40,9 @@ class ModelMetadata(BaseModelMetadata):
     def to_params(self) -> Dict[str, Any]:
         params: Dict[str, str] = {}
 
+        if self.provider == "anthropic":
+            return {"model": self.identifier}
+
         if self.endpoint:
             params["api_base"] = str(self.endpoint).removesuffix("/")
         if self.api_key:
