@@ -162,6 +162,12 @@ class ToolsRegistry:
 
         for privilege in enabled_tools:
             for tool_cls in _AGENT_PRIVILEGES[privilege]:
+                if (
+                    tool_cls in [tools.GetCommit, tools.ListCommits]
+                    and "duo_workflow_commit_tools" not in feature_flags
+                ):
+                    continue
+
                 tool = tool_cls(metadata=tool_metadata)
                 self._enabled_tools[tool.name] = tool
                 if privilege in preapproved_tools:
