@@ -214,7 +214,6 @@ test: install-test-deps
 	@echo "Running tests..."
 	@poetry run pytest -n auto
 
-
 .PHONY: test-watch
 test-watch: install-test-deps
 	@echo "Running tests in watch mode..."
