@@ -1,5 +1,7 @@
 ROOT_DIR := $(shell pwd)
 AI_GATEWAY_DIR := ${ROOT_DIR}/ai_gateway
+DUO_WORKFLOW_SERVICE_DIR := ${ROOT_DIR}/duo_workflow_service
+LIB_DIR := ${ROOT_DIR}/lib
 EVAL_DIR := ${ROOT_DIR}/eval
 LINTS_DIR := ${ROOT_DIR}/lints
 SCRIPTS_DIR := ${ROOT_DIR}/scripts
@@ -7,6 +9,8 @@ TESTS_DIR := ${ROOT_DIR}/tests
 INTEGRATION_TESTS_DIR := ${ROOT_DIR}/integration_tests
 
 LINT_WORKING_DIR ?= ${AI_GATEWAY_DIR} \
+	${DUO_WORKFLOW_SERVICE_DIR} \
+	${LIB_DIR} \
 	${EVAL_DIR} \
 	${LINTS_DIR} \
 	${SCRIPTS_DIR} \
@@ -183,7 +187,7 @@ check-isort: install-lint-deps
 .PHONY: check-pylint
 check-pylint: install-lint-deps
 	@echo "Running pylint check..."
-	@poetry run pylint ${LINT_WORKING_DIR} --ignore=vendor --ignore-paths=$(TESTS_DIR)/duo_workflow_service,$(TESTS_DIR)/lib,$(TESTS_DIR)/lints
+	@poetry run pylint ${LINT_WORKING_DIR} --ignore=vendor
 
 .PHONY: check-mypy
 check-mypy: install-lint-deps
@@ -203,32 +207,33 @@ check-codespell: install-lint-deps
 .PHONY: install-test-deps
 install-test-deps:
 	@echo "Installing test dependencies..."
-	@poetry install --with test
+	@poetry install --with test,eval
 
 .PHONY: test
 test: install-test-deps
 	@echo "Running tests..."
-	@poetry run pytest -n 2
+	@poetry run pytest -n auto
+
 
 .PHONY: test-watch
 test-watch: install-test-deps
 	@echo "Running tests in watch mode..."
-	@poetry run ptw . -n 2
+	@poetry run ptw . -n auto
 
 .PHONY: test-coverage
 test-coverage: install-test-deps
 	@echo "Running tests with coverage..."
-	@poetry run pytest --cov=ai_gateway --cov=lints --cov-report term --cov-report html -n 2
+	@poetry run pytest --cov=ai_gateway --cov=lints --cov-report term --cov-report html -n auto
 
 .PHONY: test-coverage-ci
 test-coverage-ci: install-test-deps
 	@echo "Running tests with coverage on CI..."
-	@poetry run pytest --cov=ai_gateway --cov=lints --cov-report term --cov-report xml:.test-reports/coverage.xml --junitxml=".test-reports/tests.xml" -n 2
+	@poetry run pytest --cov=ai_gateway --cov=lints --cov-report term --cov-report xml:.test-reports/coverage.xml --junitxml=".test-reports/tests.xml" -n auto
 
 .PHONY: test-integration
 test-integration: install-test-deps
 	@echo "Running integration tests..."
-	@poetry run pytest integration_tests/ -n 2
+	@poetry run pytest integration_tests/ -n auto
 
 .PHONY: lint-doc
 lint-doc: vale markdownlint
