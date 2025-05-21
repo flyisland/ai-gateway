@@ -14,14 +14,20 @@ from langchain_core.messages import (
 from langchain_core.runnables import Runnable
 
 from contract.contract_pb2 import ContextElement, ContextElementType
-from duo_workflow_service.entities.event import WorkflowEvent, WorkflowEventType
+from duo_workflow_service.entities.event import (
+    WorkflowEvent,
+    WorkflowEventType,
+)
 from duo_workflow_service.entities.state import (
     DuoWorkflowStateType,
     MessageTypeEnum,
     UiChatLog,
     WorkflowStatusEnum,
 )
-from duo_workflow_service.errors.error_handler import ModelError, ModelErrorHandler
+from duo_workflow_service.errors.error_handler import (
+    ModelError,
+    ModelErrorHandler,
+)
 from duo_workflow_service.gitlab.events import get_event
 from duo_workflow_service.gitlab.http_client import GitlabHttpClient
 from duo_workflow_service.internal_events import (
@@ -39,6 +45,10 @@ from duo_workflow_service.token_counter.approximate_token_counter import (
     ApproximateTokenCounter,
 )
 from duo_workflow_service.tools import Toolset
+
+import structlog
+
+log = structlog.stdlib.get_logger("agent")
 
 
 class Agent:
@@ -105,7 +115,10 @@ class Agent:
                     self.name: [*messages, *model_completion]
                 }
 
-            return {**updates, **self._respond_to_human(state, model_completion)}
+            return {
+                **updates,
+                **self._respond_to_human(state, model_completion),
+            }
 
     def _respond_to_human(self, state, model_completion) -> dict[str, Any]:
         if not isinstance(model_completion[0], AIMessage):
@@ -118,7 +131,7 @@ class Agent:
         ):
             content = self._parse_model_content(model_completion[0].content)
             return {
-                "ui_chat_log": [self._create_ui_chat_log(content)] if content else [],
+                "ui_chat_log": ([self._create_ui_chat_log(content)] if content else []),
                 "last_human_input": None,
             }
 
@@ -138,6 +151,14 @@ class Agent:
                     model=model_name, request_type=f"{self.name}_completion"
                 ):
                     response = await self._model.ainvoke(messages)
+                    response_metadata = (
+                        response.response_metadata if response.response_metadata else {}
+                    )
+                    duo_workflow_metrics.count_llm_response(
+                        model=model_name,
+                        request_type=f"{self.name}_completion",
+                        stop_reason=response_metadata.get("stop_reason"),
+                    )
 
                 self._track_tokens_data(response, approximate_token_count)
                 return [response]
