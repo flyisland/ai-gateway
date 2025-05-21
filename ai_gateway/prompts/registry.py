@@ -207,25 +207,31 @@ class LocalPromptRegistry(BasePromptRegistry):
         with open(version_file, "r") as fp:
             prompt_config_params = yaml.safe_load(fp)
 
-            unit_primitives = prompt_config_params['unit_primitives']
-            unit_primitive_config = cls.get_config_for_unit_primitive(unit_primitive_configuration, unit_primitives)
-            gitlab_identifier = unit_primitive_config.default_model
+            # Model metadata not associated with the following unit primitive 
+            if not prompt_config_params['model']['name']:
+                unit_primitives = prompt_config_params['unit_primitives']
+                unit_primitive_config = cls.get_config_for_unit_primitive(unit_primitive_configuration, unit_primitives)
 
-            model_selection_prompt_config_params = llm_configurations[gitlab_identifier].params
-            model_selection_prompt_config_params["name"] = unit_primitive_config.default_model
+                gitlab_identifier = unit_primitive_config.default_model
+
+                model_selection_prompt_config_params = llm_configurations[gitlab_identifier].params
+                model_selection_prompt_config_params['model_class_provider'] = llm_configurations[gitlab_identifier].provider
+                model_selection_prompt_config_params["name"] = unit_primitive_config.default_model
+
+                log.info("Model selection params", model_selection_prompt_config_params=model_selection_prompt_config_params, version_file=version_file)
 
             prompt_config_params = cls._patch_model_configuration(
-                model_selection_prompt_config_params, prompt_config_params
+                model_selection_prompt_config_params or {}, prompt_config_params
             )
 
             import pdb; pdb.set_trace()
+            log.info("Prompt final config", prompt_config_params=prompt_config_params, version_file=version_file)
             return PromptConfig(**prompt_config_params)
 
     @classmethod
     def _patch_model_configuration(
         cls, model_selection_prompt_config_params: dict, prompt_config_params: dict
     ) -> dict:
-        log.info("Model Selection params", model_selection_prompt_config_params=model_selection_prompt_config_params)
         params_without_name = model_selection_prompt_config_params.copy()
         params_without_name.pop('name', None)
         
