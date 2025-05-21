@@ -242,21 +242,36 @@ def test_parse_response():
     # Test 3: Non-JSON string with parse_json=False
     non_json = "This is not JSON"
     result = client._parse_response(non_json, parse_json=False)
-    assert result == "This is not JSON"
+    assert (
+        result == "This is not JSON"
+    )  # Should return original string when parse_json=False
 
     # Test 4: Non-JSON string with parse_json=True (should handle error)
     result = client._parse_response(non_json)
-    assert result == non_json  # Should return the original string
+    assert result == {}  # Returns empty dict on JSON decode error
 
     # Test 5: Already parsed JSON (dict)
     parsed_json = {"already": "parsed"}
     result = client._parse_response(parsed_json)
     assert result == parsed_json
 
-    # Test 6: Empty string (should handle error)
+    # Test 6: Already parsed JSON (list) - should return empty dict
+    parsed_list = ["item1", "item2"]
+    result = client._parse_response(parsed_list)
+    assert result == {}
+
+    # Test 7: Empty string with parse_json=True (should return empty dict)
     result = client._parse_response("")
+    assert result == {}
+
+    # Test 8: Empty string with parse_json=False (should return empty string)
+    result = client._parse_response("", parse_json=False)
     assert result == ""
 
-    # Test 7: None input (should return None on error)
+    # Test 9: None input with parse_json=True (should return empty dict)
     result = client._parse_response(None)
+    assert result == {}
+
+    # Test 10: None input with parse_json=False (should return None)
+    result = client._parse_response(None, parse_json=False)
     assert result is None

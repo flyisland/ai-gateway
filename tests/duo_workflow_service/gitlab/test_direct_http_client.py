@@ -41,15 +41,6 @@ def setup_mock_response(data, status=200, content_type="application/json"):
 
     mock_response.text = AsyncMock(side_effect=mock_text)
 
-    # Set up raise_for_status method
-    def mock_raise_for_status():
-        if status >= 400:
-            raise aiohttp.ClientResponseError(
-                request_info=MagicMock(), history=(), status=status
-            )
-
-    mock_response.raise_for_status = MagicMock(side_effect=mock_raise_for_status)
-
     # Make it work as an async context manager
     mock_response.__aenter__.return_value = mock_response
     mock_response.__aexit__.return_value = None
@@ -256,4 +247,4 @@ async def test_direct_gitlab_http_client_invalid_json(client, mock_session):
     result = await client.aget("test", parse_json=True)
 
     # Verify we got back the raw text
-    assert result == invalid_json_response
+    assert result == {}

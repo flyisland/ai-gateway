@@ -76,13 +76,16 @@ class GitlabHttpClient(ABC):
                 if object_hook:
                     return json.loads(response, object_hook=object_hook)
                 return json.loads(response)
-            return response  # Already parsed JSON (dict/list)
+            elif isinstance(response, (dict)):
+                return response  # Already parsed JSON (dict)
+
+            return {}
         except json.JSONDecodeError as e:
             logger.error(f"JSON decode error: {str(e)}. ")
             logger.error(
                 f"Raw response type: {type(response)}, content: {repr(response)}"
             )
-            return response if isinstance(response, str) else None
+            return {}
 
     @abstractmethod
     async def _call(

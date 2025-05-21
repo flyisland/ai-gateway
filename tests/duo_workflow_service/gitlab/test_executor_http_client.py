@@ -159,7 +159,7 @@ async def test_executor_gitlab_http_client_json_decode_error(
     result = await client.aget("/api/v4/test", parse_json=True)
 
     # Should return the raw string when JSON parsing fails
-    assert result == invalid_json
+    assert result == {}
 
 
 @pytest.mark.asyncio

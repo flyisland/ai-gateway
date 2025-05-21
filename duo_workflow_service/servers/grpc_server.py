@@ -261,7 +261,4 @@ async def grpc_serve(port: int) -> None:
         log.info("Starting gRPC server on port %d", port)
         await server.start()
         log.info("Started server")
-        try:
-            await server.wait_for_termination()
-        finally:
-            pass  # Connection pool will be closed by the context manager
+        await server.wait_for_termination()
