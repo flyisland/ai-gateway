@@ -280,6 +280,7 @@ def _agent_responses(status: WorkflowStatusEnum, agent_name: str):
 #     assert workflow.is_done
 #
 
+
 @pytest.mark.asyncio
 @patch("duo_workflow_service.workflows.abstract_workflow.UserInterface", autospec=True)
 @patch("duo_workflow_service.workflows.abstract_workflow.ToolsRegistry", autospec=True)
