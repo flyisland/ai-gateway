@@ -158,7 +158,12 @@ def _agent_responses(status: WorkflowStatusEnum, agent_name: str):
 )
 @patch("duo_workflow_service.workflows.abstract_workflow.UserInterface", autospec=True)
 @patch.dict(
-    os.environ, {"DW_INTERNAL_EVENT__ENABLED": "true", "WORKFLOW_INTERRUPT": "false"}
+    os.environ,
+    {
+        "DW_INTERNAL_EVENT__ENABLED": "true",
+        "WORKFLOW_INTERRUPT": "true",
+        "USE_MEMSAVER": "true",
+    },
 )
 async def test_workflow_run(
     mock_checkpoint_notifier,
