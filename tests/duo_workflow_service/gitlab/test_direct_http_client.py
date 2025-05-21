@@ -5,6 +5,7 @@ import aiohttp
 import pytest
 import pytest_asyncio
 
+from duo_workflow_service.gitlab.connection_pool import connection_pool
 from duo_workflow_service.gitlab.direct_http_client import DirectGitLabHttpClient
 
 
@@ -74,38 +75,31 @@ def setup_request_mock(session_mock, response):
     session_mock.request = mock_request
 
 
-@pytest.fixture
-def mock_session():
-    with patch.object(
-        DirectGitLabHttpClient, "_session", new_callable=AsyncMock
-    ) as mock_session:
-        mock_session.request = AsyncMock()
-        yield mock_session
+@pytest_asyncio.fixture
+async def mock_session():
+    """Fixture that provides a mock session and configures the connection pool."""
+    # Create a mock session
+    mock_session = AsyncMock()
+    mock_session.close = AsyncMock()
+    mock_session.request = AsyncMock()
+
+    # Patch ClientSession to return our mock
+    with patch("aiohttp.ClientSession", return_value=mock_session):
+        # Configure the connection pool
+        connection_pool.set_options(
+            pool_size=100, timeout=aiohttp.ClientTimeout(total=30)
+        )
+        async with connection_pool:
+            yield mock_session
 
 
 @pytest_asyncio.fixture
-async def client():
-    # Patching to avoid actual network connections during tests
-    with patch.object(DirectGitLabHttpClient, "_session", None):
-        # Create an instance of client with a mock URL
-        client = DirectGitLabHttpClient(
-            base_url="https://gitlab.example.com/api/v4", gitlab_token="test_token"
-        )
-
-        # Patch the initialize_pool method to avoid real network connections
-        with patch(
-            "aiohttp.ClientSession", new_callable=AsyncMock
-        ) as mock_session_class:
-            mock_session = AsyncMock()
-            mock_session.close = AsyncMock()
-            mock_session.request = AsyncMock()
-            mock_session_class.return_value = mock_session
-
-            # Initialize pool but use our mock session
-            await DirectGitLabHttpClient.initialize_pool()
-            DirectGitLabHttpClient._session = mock_session
-
-            yield client
+async def client(mock_session):
+    """Fixture that provides a configured client using the mock session."""
+    client = DirectGitLabHttpClient(
+        base_url="https://gitlab.example.com/api/v4", gitlab_token="test_token"
+    )
+    yield client
 
 
 @pytest.mark.asyncio
@@ -162,6 +156,7 @@ async def client():
 )
 async def test_direct_gitlab_http_client(
     client,
+    mock_session,
     method,
     path,
     body,
@@ -170,9 +165,7 @@ async def test_direct_gitlab_http_client(
     response_data,
     expected_result,
 ):
-    # Get the internal mock session
-    mock_session = client._session
-
+    """Test all HTTP methods with various inputs and expected outputs."""
     # Setup the mock response
     mock_response = setup_mock_response(response_data)
     setup_request_mock(mock_session, mock_response)
@@ -212,12 +205,10 @@ async def test_direct_gitlab_http_client(
 
 
 @pytest.mark.asyncio
-async def test_direct_gitlab_http_client_with_object_hook(client):
+async def test_direct_gitlab_http_client_with_object_hook(client, mock_session):
+    """Test JSON parsing with a custom object hook."""
     # Create a test JSON response
     json_response = '{"nested": {"id": 1}}'
-
-    # Get the internal mock session
-    mock_session = client._session
 
     # Setup the mock response
     mock_response = setup_mock_response(json_response)
@@ -237,41 +228,14 @@ async def test_direct_gitlab_http_client_with_object_hook(client):
 
 
 @pytest.mark.asyncio
-async def test_direct_gitlab_http_client_initialize_close_pool():
-    DirectGitLabHttpClient._session = None
-
-    # Patch ClientSession to avoid real network connections
-    with patch("aiohttp.ClientSession") as mock_session_class:
-        mock_session = AsyncMock()
-        mock_session.close = AsyncMock()
-        mock_session_class.return_value = mock_session
-
-        # Initialize the pool
-        await DirectGitLabHttpClient.initialize_pool(pool_size=50)
-
-        # Check that the session was created
-        assert DirectGitLabHttpClient._session is not None
-        mock_session_class.assert_called_once()
-
-        # Close the pool
-        await DirectGitLabHttpClient.close_pool()
-
-        # Check that the session was closed
-        mock_session.close.assert_called_once()
-        assert DirectGitLabHttpClient._session is None
-
-
-@pytest.mark.asyncio
 async def test_direct_gitlab_http_client_uninitialized_pool():
-    # Start with no session
-    DirectGitLabHttpClient._session = None
-
+    """Test that using the client without initializing the connection pool raises an error."""
     # Create a client
     client = DirectGitLabHttpClient(
         base_url="https://gitlab.example.com/api/v4", gitlab_token="test_token"
     )
 
-    # Try to make a request without initializing the pool
+    # Try to make a request without initializing the connection pool
     with pytest.raises(
         RuntimeError, match="HTTP client connection pool is not initialized"
     ):
@@ -279,36 +243,17 @@ async def test_direct_gitlab_http_client_uninitialized_pool():
 
 
 @pytest.mark.asyncio
-async def test_direct_gitlab_http_client_invalid_json():
-    DirectGitLabHttpClient._session = None
-
-    # Create a client
-    client = DirectGitLabHttpClient(
-        base_url="https://gitlab.example.com/api/v4", gitlab_token="test_token"
-    )
-
+async def test_direct_gitlab_http_client_invalid_json(client, mock_session):
+    """Test handling of invalid JSON responses."""
     # Create an invalid JSON response
     invalid_json_response = "Invalid JSON {not valid}"
+    mock_response = setup_mock_response(
+        invalid_json_response, content_type="application/json"
+    )
+    setup_request_mock(mock_session, mock_response)
 
-    # Get the internal mock session
-    with patch("aiohttp.ClientSession") as mock_session_class:
-        mock_session = AsyncMock()
-        mock_response = setup_mock_response(
-            invalid_json_response, content_type="application/json"
-        )
-        setup_request_mock(mock_session, mock_response)
-        mock_session_class.return_value = mock_session
+    # Make the request - it should return the raw text instead of raising an error
+    result = await client.aget("test", parse_json=True)
 
-        # Initialize the pool properly
-        await DirectGitLabHttpClient.initialize_pool()
-        DirectGitLabHttpClient._session = mock_session
-
-        try:
-            # Make the request - it should return the raw text instead of raising an error
-            result = await client.aget("test", parse_json=True)
-
-            # Verify we got back the raw text
-            assert result == invalid_json_response
-        finally:
-            # Clean up
-            await DirectGitLabHttpClient.close_pool()
+    # Verify we got back the raw text
+    assert result == invalid_json_response

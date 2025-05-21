@@ -1,9 +1,10 @@
 """Connection pool singleton for HTTP clients."""
 
-import aiohttp
-import structlog
 from types import TracebackType
 from typing import Optional, Type
+
+import aiohttp
+import structlog
 
 log = structlog.stdlib.get_logger(__name__)
 
@@ -29,8 +30,8 @@ class ConnectionPoolManager:
     async def __aenter__(self):
         """Initialize the connection pool when entering the context."""
         # Use default values if not set externally
-        pool_size = getattr(self, '_pool_size', 100)
-        session_kwargs = getattr(self, '_session_kwargs', {})
+        pool_size = getattr(self, "_pool_size", 100)
+        session_kwargs = getattr(self, "_session_kwargs", {})
         if self._session is None:
             log.info("Initializing HTTP connection pool", pool_size=pool_size)
             connector = aiohttp.TCPConnector(limit=pool_size)

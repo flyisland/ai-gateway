@@ -5,7 +5,6 @@ import structlog
 from duo_workflow_service.gitlab.connection_pool import connection_pool
 from duo_workflow_service.gitlab.http_client import GitlabHttpClient
 
-
 log = structlog.stdlib.get_logger(__name__)
 
 
@@ -60,8 +59,6 @@ class DirectGitLabHttpClient(GitlabHttpClient):
         # Get the session from the singleton connection pool
         session = connection_pool.session
 
-        async with session.request(
-            method, url, headers=headers, **kwargs
-        ) as response:
+        async with session.request(method, url, headers=headers, **kwargs) as response:
             raw_response = await response.text()
             return self._parse_response(raw_response, parse_json, object_hook)
