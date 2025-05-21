@@ -5,32 +5,20 @@ from unittest.mock import MagicMock, patch
 import pytest
 
 from duo_workflow_service.slash_commands.error_handler import SlashCommandError
-from duo_workflow_service.slash_commands.goal_parser import (
-    ParsedSlashCommand,
-    SlashCommandsGoalParser,
-)
+from duo_workflow_service.slash_commands.goal_parser import parse
 from duo_workflow_service.slash_commands.prompt_expander import (
     SlashCommandsPromptExpander,
 )
 from lib.result import Error, Ok
 
-GOAL_PARSER_PATH = (
-    "duo_workflow_service.slash_commands.goal_parser.SlashCommandsGoalParser"
-)
-PARSED_SLASH_COMMAND = (
-    "duo_workflow_service.slash_commands.goal_parser.ParsedSlashCommand"
-)
-DEFINITION_PATH = (
-    "duo_workflow_service.slash_commands.definition.SlashCommandDefinition"
-)
+# Constants for patch paths
+MODULE_PATH = "duo_workflow_service.slash_commands"
+GOAL_PARSER_PATH = f"{MODULE_PATH}.goal_parser.parse"
+DEFINITION_PATH = f"{MODULE_PATH}.definition.SlashCommandDefinition"
 LOAD_DEFINITION_PATH = f"{DEFINITION_PATH}.load_slash_command_definition"
-PROMPT_EXPANDER_PARSER_PATH = (
-    "duo_workflow_service.slash_commands.prompt_expander.SlashCommandsGoalParser"
-)
-LOG_COMMAND_ERROR_PATH = (
-    "duo_workflow_service.slash_commands.prompt_expander.log_command_error"
-)
-LOG_PATH = "duo_workflow_service.slash_commands.prompt_expander.log"
+PROMPT_EXPANDER_PARSER_PATH = f"{MODULE_PATH}.prompt_expander.parse"
+LOG_COMMAND_ERROR_PATH = f"{MODULE_PATH}.prompt_expander.log_command_error"
+LOG_PATH = f"{MODULE_PATH}.prompt_expander.log"
 
 
 class TestSlashCommandsPromptExpander:
@@ -43,34 +31,22 @@ class TestSlashCommandsPromptExpander:
         return MagicMock()
 
     @patch(GOAL_PARSER_PATH)
-    @patch(LOAD_DEFINITION_PATH)
-    def test_not_slash_command(
-        self, mock_definition_load, mock_parser, processor, mock_parser_instance
-    ):
-        mock_parser.return_value = mock_parser_instance
+    def test_not_slash_command(self, mock_parser, processor):
 
-        mock_parsed_command = MagicMock(spec=ParsedSlashCommand)
-        mock_parsed_command.configure_mock(
-            command_type=None, remaining_text="This is not a slash command"
-        )
-
-        mock_parser_instance.parse.return_value = mock_parsed_command
+        mock_parser.parse().return_value = (None, "This is not a slash command")
 
         result = processor.process("This is not a slash command", "code")
 
         assert isinstance(result, Ok)
         assert result.value is None
 
-    @patch(PARSED_SLASH_COMMAND)
     @patch(GOAL_PARSER_PATH)
     @patch(LOAD_DEFINITION_PATH)
     def test_success(
         self,
         mock_definition_load,
         mock_parser,
-        parsed_slash_command,
         processor,
-        mock_parser_instance,
     ):
         mock_command_def = MagicMock(
             name="explain",
@@ -80,13 +56,7 @@ class TestSlashCommandsPromptExpander:
         )
         mock_definition_load.return_value = mock_command_def
 
-        parsed_command = ParsedSlashCommand(
-            command_type="explain", remaining_text="def add(a, b): return a + b"
-        )
-
-        parsed_slash_command.return_value = parsed_command
-
-        mock_parser.return_value = parsed_slash_command
+        mock_parser.parse().return_value = ("explain", "def add(a, b): return a + b")
 
         result = processor.process("/explain def add(a, b): return a + b", "code")
 
@@ -99,24 +69,16 @@ class TestSlashCommandsPromptExpander:
         mock_definition_load.assert_called_once_with("explain")
 
     @patch(GOAL_PARSER_PATH)
-    @patch(DEFINITION_PATH)
-    def test_command_not_found_error(
-        self, mock_definition, mock_parser, processor, mock_parser_instance
-    ):
+    def test_command_not_found_error(self, mock_parser, processor):
         """
         To be implemented after MR for SlashCommandGoalParser and SlashCommandDefinition have been implemented
         """
-        mock_parser.return_value = mock_parser_instance
-        parsed_command = ParsedSlashCommand(
-            command_type="nonexistent", remaining_text="some text"
-        )
-        mock_parser_instance.parse.return_value = parsed_command
+        mock_parser.parse().return_value = ("nonexistent", "some text")
 
         error_message = "Slash command configuration file for 'nonexistent' not found"
 
         result = processor.process("/nonexistent some text", "code")
 
-        pytest.skip()
         assert isinstance(result, Error)
         assert str(result.error) == error_message
 
@@ -129,7 +91,7 @@ class TestSlashCommandsPromptExpander:
         To be implemented after MR for SlashCommandGoalParser and SlashCommandDefinition have been implemented
         """
         mock_parser.return_value = mock_parser_instance
-        parsed_command = ParsedSlashCommand(command_type="test", remaining_text="")
+        parsed_command = ("test", "")
         mock_parser_instance.parse.return_value = parsed_command
 
         mock_definition_instance = MagicMock(
@@ -144,21 +106,19 @@ class TestSlashCommandsPromptExpander:
 
         result = processor.process("/test", "code")
 
-        pytest.skip()
         assert isinstance(result, Error)
 
-    @patch(PROMPT_EXPANDER_PARSER_PATH)
     @patch(LOG_COMMAND_ERROR_PATH)
+    @patch(PROMPT_EXPANDER_PARSER_PATH)
     def test_slash_command_error_handling(
-        self, mock_log_command_error, mock_parser_class, processor
+        self, mock_parse, mock_log_command_error, processor
     ):
-        mock_parser = MagicMock()
-        mock_parser_class.return_value = mock_parser
-
+        mock_parse.parse().return_value = ("test_command", "remaining text")
         test_error = SlashCommandError("Test slash command error")
-        mock_parser.parse.side_effect = test_error
 
-        result = processor.process("/test command", "code")
+        mock_parse.side_effect = test_error
+
+        result = processor.process("/test_command remaining text", "test_context")
 
         assert isinstance(result, Error)
         assert result.error == test_error
@@ -166,16 +126,14 @@ class TestSlashCommandsPromptExpander:
             command_name=None, error=test_error
         )
 
-    @patch(PROMPT_EXPANDER_PARSER_PATH)
     @patch(LOG_PATH)
-    def test_general_exception_handling(self, mock_log, mock_parser_class, processor):
-        mock_parser = MagicMock()
-        mock_parser_class.return_value = mock_parser
+    @patch(PROMPT_EXPANDER_PARSER_PATH)
+    def test_general_exception_handling(self, mock_parse, mock_log, processor):
+        mock_parse.parse().return_value = ("test_command", "remaining text")
+        test_error = ValueError("Test general exception")
+        mock_parse.side_effect = test_error
 
-        test_error = Exception("Test general exception")
-        mock_parser.parse.side_effect = test_error
-
-        result = processor.process("/test command", "code")
+        result = processor.process("/test_command remaining text", "test_context")
 
         assert isinstance(result, Error)
         assert result.error == test_error
