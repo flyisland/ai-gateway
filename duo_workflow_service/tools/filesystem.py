@@ -71,11 +71,7 @@ class FilesScopeEnum(IntEnum):
 
 
 class FindFilesInput(BaseModel):
-    name_pattern: str = Field(
-        description=(
-            "The pattern to search for files."
-        )
-    )
+    name_pattern: str = Field(description=("The pattern to search for files."))
 
 
 class FindFiles(DuoBaseTool):
@@ -84,12 +80,14 @@ class FindFiles(DuoBaseTool):
 
     It includes all files (tracked and untracked) and respects .gitignore rules.
 
-    This name_pattern uses the same syntax as `find --name` or `bash` filename expansion and matches are done against the full path relative to the project root.
+    This name_pattern uses the same syntax as `find --name` or `bash` filename expansion and matches are done against the full path
+    relative to the project root.
     """
     args_schema: Type[BaseModel] = FindFilesInput  # type: ignore
 
     async def _arun(
-        self, name_pattern: str,
+        self,
+        name_pattern: str,
     ) -> str:
         result = await _execute_action(
             self.metadata,  # type: ignore
@@ -104,6 +102,7 @@ class FindFiles(DuoBaseTool):
 
     def format_display_message(self, args: FindFilesInput) -> str:
         return f"Search files with pattern '{args.name_pattern}'"
+
 
 class MkdirInput(BaseModel):
     directory_path: str = Field(
@@ -239,7 +238,6 @@ class EditFile(DuoBaseTool):
 
 class ListDirInput(BaseModel):
     directory: str = Field(description="Directory path relative to the repository root")
-
 
 
 class ListDir(DuoBaseTool):

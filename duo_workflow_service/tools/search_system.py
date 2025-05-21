@@ -64,7 +64,7 @@ class Grep(DuoBaseTool):
         return result
 
     def format_display_message(self, args: GrepInput) -> str:
-        if not (search_dir:= args.search_directory):
+        if not (search_dir := args.search_directory):
             search_dir = "directory"
         message = f"Search for '{args.pattern}' in files in '{search_dir}'"
         return message
