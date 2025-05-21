@@ -19,8 +19,14 @@ class SlashCommandsProcessor:
     appropriate responses.
     """
 
+<<<<<<< HEAD:duo_workflow_service/slash_commands/processor.py
     def process(self, message: str) -> Result:
         """Process a slash command.
+=======
+    def process(self, message: str, context_element_type: str) -> Result:
+        """
+        Process a slash command.
+>>>>>>> af768a54 (feat: update to slash commands prompt expander):duo_workflow_service/slash_commands/prompt_expander.py
 
         Args:
             message: The message text to process
@@ -29,12 +35,21 @@ class SlashCommandsProcessor:
         Returns:
             Result containing SlashCommandResult if successful, or Exception if an error occurred
         """
+<<<<<<< HEAD:duo_workflow_service/slash_commands/processor.py
 
         try:
             command_name, remaining_text = parse(message)
 
             if not command_name or not message.strip().startswith("/"):
                 return Error("The message does not contain a command after the slash.")
+=======
+
+        try:
+            command_name, remaining_text = parse(message)
+
+            if not command_name or not message.strip().startswith("/"):
+                return Ok(None)
+>>>>>>> af768a54 (feat: update to slash commands prompt expander):duo_workflow_service/slash_commands/prompt_expander.py
 
             try:
                 command_definition = (
@@ -47,6 +62,14 @@ class SlashCommandsProcessor:
             # Replace the <ContextElementType> with the actual context element type variable
             goal = command_definition.goal
 
+<<<<<<< HEAD:duo_workflow_service/slash_commands/processor.py
+=======
+            if context_element_type:
+                system_prompt = system_prompt.replace(
+                    "<ContextElementType>", context_element_type
+                )
+
+>>>>>>> af768a54 (feat: update to slash commands prompt expander):duo_workflow_service/slash_commands/prompt_expander.py
             # Build the result dictionary
             slash_command_result = {
                 "success": True,
