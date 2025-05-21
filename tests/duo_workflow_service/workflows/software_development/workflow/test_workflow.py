@@ -217,18 +217,11 @@ async def test_workflow_run(
         },
     ]
 
-    mock_handover_agent.return_value.run.side_effect = [
-        {
+    mock_handover_agent.return_value.run.return_value = {
             "plan": Plan(steps=[]),
             "status": WorkflowStatusEnum.COMPLETED,
             "conversation_history": {},
-        },
-        {
-            "plan": Plan(steps=[]),
-            "status": WorkflowStatusEnum.COMPLETED,
-            "conversation_history": {},
-        },
-    ]
+        }
 
     mock_agent.return_value.run.side_effect = [
         *_agent_responses(
