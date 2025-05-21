@@ -13,6 +13,7 @@ __all__ = [
     "SelfHostedGitlabDocumentation",
     "EpicReader",
     "BuildReader",
+    "CodebaseSearch",
 ]
 
 
@@ -49,6 +50,41 @@ class IssueReader(BaseRemoteTool):
           Based on this information you can present final answer about issue.
         Action: issue_reader
         Action Input: Please identify the author of #123 issue"""
+    )
+
+class CodebaseSearch(BaseRemoteTool):
+    name: str = "codebase_search"
+    resource: str = "codebase"
+    unit_primitive: GitLabUnitPrimitive = "semantic_search_codebase"
+    min_required_gl_version: Optional[str] = "17.9.0"
+
+    description: str = dedent(
+        """\
+        This tool executes a semantic search over a code embeddings representation of a codebase
+        ONLY if the user question fulfills EITHER of the usage conditions below.
+
+        **Usage Conditions:**
+        * **Condition 1: Repository additional context provided:** This tool MUST be used ONLY when the user provides a "repository" as additional context inside a <additional_context> tag.
+        * **Condition 2: Directory additional context provided:** This tool MUST be used ONLY when the user provides a "directory" as additional context inside a <additional_context> tag.
+
+        **Action Input:**
+        * The original question asked by the user."""
+    )
+
+    example: str = dedent(
+        """\
+        Question: Where is this method called?
+          User added additional context below enclosed in <additional_context></additional_context> tags. Each additional context has an ID, category, and content:
+          <additional_context>
+            <context id="1" category="repository">
+              <content>https://gitlab.com/gitlab-org/gitlab</content>
+            </context>
+          </additional_context>
+        Thought: You have access to the same resources as user who asks a question.
+          The question is about the content of a codebase, so you need to use "codebase_search" tool to search for the method.
+          Based on this information you can present final answer about method.
+        Action: codebase_search
+        Action Input: Where is this method called?"""
     )
 
 
