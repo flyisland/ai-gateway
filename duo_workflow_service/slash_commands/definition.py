@@ -26,11 +26,12 @@ class SlashCommandDefinition(BaseModel):
         goal: The intended outcome of the slash command
         parameters: Optional parameters that can be passed to the slash command
     """
+
     name: str = ""
     description: str = ""
     system_prompt: str = ""
     goal: str = ""
-    parameters: Dict[Any, Any] = Field(default_factory=dict)
+    parameters: Dict[str, Any] = Field(default_factory=dict)
 
     def __repr__(self) -> str:
         return f"SlashCommandDefinition(name={self.name}, description={self.description}, parameters={self.parameters})"
