@@ -208,27 +208,27 @@ install-test-deps:
 .PHONY: test
 test: install-test-deps
 	@echo "Running tests..."
-	@poetry run pytest -n auto
+	@poetry run pytest -n 7
 
 .PHONY: test-watch
 test-watch: install-test-deps
 	@echo "Running tests in watch mode..."
-	@poetry run ptw . -n auto
+	@poetry run ptw . -n 7
 
 .PHONY: test-coverage
 test-coverage: install-test-deps
 	@echo "Running tests with coverage..."
-	@poetry run pytest --cov=ai_gateway --cov=lints --cov-report term --cov-report html -n auto
+	@poetry run pytest --cov=ai_gateway --cov=lints --cov-report term --cov-report html -n 7
 
 .PHONY: test-coverage-ci
 test-coverage-ci: install-test-deps
 	@echo "Running tests with coverage on CI..."
-	@poetry run pytest --cov=ai_gateway --cov=lints --cov-report term --cov-report xml:.test-reports/coverage.xml --junitxml=".test-reports/tests.xml" -n auto
+	@poetry run pytest --cov=ai_gateway --cov=lints --cov-report term --cov-report xml:.test-reports/coverage.xml --junitxml=".test-reports/tests.xml" -n 7
 
 .PHONY: test-integration
 test-integration: install-test-deps
 	@echo "Running integration tests..."
-	@poetry run pytest integration_tests/ -n auto
+	@poetry run pytest integration_tests/ -n 7
 
 .PHONY: lint-doc
 lint-doc: vale markdownlint
