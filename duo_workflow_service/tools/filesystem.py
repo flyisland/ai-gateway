@@ -71,7 +71,7 @@ class FilesScopeEnum(IntEnum):
 
 
 class FindFilesInput(BaseModel):
-    name_pattern: str = Field(description=("The pattern to search for files."))
+    name_pattern: str = Field(description="The pattern to search for files.")
 
 
 class FindFiles(DuoBaseTool):
