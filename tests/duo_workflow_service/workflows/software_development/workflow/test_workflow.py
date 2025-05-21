@@ -169,9 +169,9 @@ def _agent_responses(status: WorkflowStatusEnum, agent_name: str):
 async def test_workflow_run(
     mock_checkpoint_notifier,
     mock_goal_disambiguator_component,
-    mock_gitlab_workflow,
     mock_plan_approval_component,
     mock_tools_approval_component,
+    mock_gitlab_workflow,
     mock_chat_client,
     mock_fetch_workflow_config,
     mock_fetch_project_data_with_workflow_id,
