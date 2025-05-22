@@ -10,12 +10,13 @@ TEST_TAG=v17.0.1-ee
 TEST_FILE=docs-${TEST_TAG}.sha256
 TEST_CLONE=/tmp/gitlab-docs-${TEST_TAG}
 
+REPO=${GITLAB_DOCS_REPO:-https://gitlab.com/gitlab-org/gitlab.git}
 GITLAB_DOCS_CLONE_DIR=${TEST_CLONE}
 GITLAB_DOCS_JSONL_EXPORT_PATH=${TEST_CLONE}/docs-${TEST_TAG}.jsonl
 
 echo "------------------------------------------------------- Clone Docs -------------------------------------------------------"
 rm -Rf "${GITLAB_DOCS_CLONE_DIR}" 
-git clone --branch "${TEST_TAG}" --depth 1 "${GITLAB_DOCS_REPO}" "${GITLAB_DOCS_CLONE_DIR}"
+git clone --branch "${TEST_TAG}" --depth 1 "${REPO}" "${GITLAB_DOCS_CLONE_DIR}"
 
 echo "------------------------------------------------------- Validating -------------------------------------------------------"
 "${STEPS_DIR}"/validate.sh
