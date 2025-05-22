@@ -87,6 +87,8 @@ _outbox = MagicMock(spec=asyncio.Queue)
                 "list_issue_notes",
                 "get_issue_note",
                 "get_repository_file",
+                "list_epic_notes",
+                "get_epic_note",
             },
         ),
         (
@@ -130,6 +132,8 @@ _outbox = MagicMock(spec=asyncio.Queue)
                 "list_issue_notes",
                 "get_issue_note",
                 "get_repository_file",
+                "list_epic_notes",
+                "get_epic_note",
             },
         ),
         (
@@ -158,9 +162,9 @@ _outbox = MagicMock(spec=asyncio.Queue)
                 "read_file",
                 "create_file_with_contents",
                 "edit_file",
-                "ls_files",
+                "list_dir",
                 "find_files",
-                "grep_files",
+                "grep",
                 "mkdir",
                 "handover_tool",
                 "request_user_clarification_tool",
@@ -236,11 +240,11 @@ def test_registry_initialization_initialises_tools_with_correct_attributes(
         "gitlab_wiki_blob_search": tools.WikiBlobSearch(metadata=tool_metadata),
         "gitlab_note_search": tools.NoteSearch(metadata=tool_metadata),
         "read_file": tools.ReadFile(metadata=tool_metadata),
-        "ls_files": tools.LsFiles(metadata=tool_metadata),
+        "list_dir": tools.ListDir(metadata=tool_metadata),
         "create_file_with_contents": tools.WriteFile(metadata=tool_metadata),
         "edit_file": tools.EditFile(metadata=tool_metadata),
         "find_files": tools.FindFiles(metadata=tool_metadata),
-        "grep_files": tools.Grep(metadata=tool_metadata),
+        "grep": tools.Grep(metadata=tool_metadata),
         "mkdir": tools.Mkdir(metadata=tool_metadata),
         "run_git_command": tools.git.Command(metadata=tool_metadata),
         "handover_tool": tools.HandoverTool,
@@ -254,6 +258,8 @@ def test_registry_initialization_initialises_tools_with_correct_attributes(
         "create_issue_note": tools.CreateIssueNote(metadata=tool_metadata),
         "create_merge_request": tools.CreateMergeRequest(metadata=tool_metadata),
         "get_repository_file": tools.GetRepositoryFile(metadata=tool_metadata),
+        "list_epic_notes": tools.ListEpicNotes(metadata=tool_metadata),
+        "get_epic_note": tools.GetEpicNote(metadata=tool_metadata),
     }
 
     assert registry._enabled_tools == expected_tools
@@ -392,9 +398,9 @@ def test_preapproved_tools_initialization(tool_metadata):
         "read_file",
         "create_file_with_contents",
         "edit_file",
-        "ls_files",
+        "list_dir",
         "find_files",
-        "grep_files",
+        "grep",
         "mkdir",
     }
 
@@ -445,9 +451,9 @@ async def test_registry_configuration_with_preapproved_tools(gl_http_client):
         "read_file",
         "create_file_with_contents",
         "edit_file",
-        "ls_files",
+        "list_dir",
         "find_files",
-        "grep_files",
+        "grep",
         "mkdir",
     }
     expected_preapproved = always_enabled_tools.union(read_write_tools)

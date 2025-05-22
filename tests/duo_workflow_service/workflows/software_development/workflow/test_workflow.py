@@ -153,6 +153,14 @@ def _agent_responses(status: WorkflowStatusEnum, agent_name: str):
 @patch("duo_workflow_service.workflows.software_development.workflow.new_chat_client")
 @patch("duo_workflow_service.workflows.abstract_workflow.GitLabWorkflow", autospec=True)
 @patch(
+    "duo_workflow_service.workflows.software_development.workflow.ToolsApprovalComponent",
+    autospec=True,
+)
+@patch(
+    "duo_workflow_service.workflows.software_development.workflow.PlanApprovalComponent",
+    autospec=True,
+)
+@patch(
     "duo_workflow_service.workflows.software_development.workflow.GoalDisambiguationComponent",
     autospec=True,
 )
@@ -161,6 +169,8 @@ def _agent_responses(status: WorkflowStatusEnum, agent_name: str):
 async def test_workflow_run(
     mock_checkpoint_notifier,
     mock_goal_disambiguator_component,
+    mock_plan_approval_component,
+    mock_tools_approval_component,
     mock_gitlab_workflow,
     mock_chat_client,
     mock_fetch_workflow_config,
@@ -217,18 +227,11 @@ async def test_workflow_run(
         },
     ]
 
-    mock_handover_agent.return_value.run.side_effect = [
-        {
-            "plan": Plan(steps=[]),
-            "status": WorkflowStatusEnum.COMPLETED,
-            "conversation_history": {},
-        },
-        {
-            "plan": Plan(steps=[]),
-            "status": WorkflowStatusEnum.COMPLETED,
-            "conversation_history": {},
-        },
-    ]
+    mock_handover_agent.return_value.run.return_value = {
+        "plan": Plan(steps=[]),
+        "status": WorkflowStatusEnum.COMPLETED,
+        "conversation_history": {},
+    }
 
     mock_agent.return_value.run.side_effect = [
         *_agent_responses(
@@ -247,6 +250,13 @@ async def test_workflow_run(
     }
 
     mock_goal_disambiguator_component.return_value.attach.return_value = "planning"
+    mock_plan_approval_component.return_value.attach.return_value = (
+        "set_status_to_execution"
+    )
+    mock_tools_approval_component.return_value.attach.side_effect = [
+        "build_context_tools",
+        "execution_tools",
+    ]
 
     workflow = Workflow(
         "123",
@@ -256,6 +266,8 @@ async def test_workflow_run(
     await workflow.run("test_goal")
 
     assert mock_goal_disambiguator_component.return_value.attach.call_count == 1
+    assert mock_plan_approval_component.return_value.attach.call_count == 1
+    assert mock_tools_approval_component.return_value.attach.call_count == 2
 
     assert mock_agent.call_count == 3
     assert mock_agent.return_value.run.call_count >= 5
@@ -264,7 +276,7 @@ async def test_workflow_run(
     assert mock_tools_executor.return_value.run.call_count >= 1
 
     assert mock_handover_agent.call_count == 3
-    assert mock_handover_agent.return_value.run.call_count >= 1
+    assert mock_handover_agent.return_value.run.call_count == 3
 
     assert mock_plan_supervisor_agent.call_count == 3
     assert mock_plan_supervisor_agent.return_value.run.call_count >= 2

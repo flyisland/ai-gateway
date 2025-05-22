@@ -1,5 +1,6 @@
 import os
-from typing import Optional, Type
+from contextlib import contextmanager
+from typing import Generator, Iterator, Optional, Type
 from unittest import mock
 from unittest.mock import Mock, call
 
@@ -14,6 +15,8 @@ from litellm.exceptions import Timeout
 from pydantic import AnyUrl
 
 from ai_gateway.api.auth_utils import StarletteUser
+from ai_gateway.config import ConfigModelLimits
+from ai_gateway.instrumentators.model_requests import ModelRequestInstrumentator
 from ai_gateway.model_metadata import (
     AmazonQModelMetadata,
     ModelMetadata,
@@ -27,21 +30,29 @@ from ai_gateway.prompts.typing import Model
 
 
 @pytest.fixture
-def mock_watcher():
-    return mock.AsyncMock()
-
-
-@pytest.fixture
-def mock_watch(mock_watcher: Mock):
+def mock_watch() -> Generator[mock.MagicMock, None, None]:
     with mock.patch(
-        "ai_gateway.instrumentators.model_requests.ModelRequestInstrumentator.watch"
+        "ai_gateway.prompts.base.ModelRequestInstrumentator.watch"
     ) as mock_watch:
+        mock_watcher = mock.AsyncMock(spec=ModelRequestInstrumentator.WatchContainer)
         mock_watch.return_value.__enter__.return_value = mock_watcher
 
         yield mock_watch
 
 
 class TestPrompt:
+    @contextmanager
+    def _mock_usage_metadata(
+        self, model_name: str, usage_metadata: UsageMetadata
+    ) -> Iterator[None]:
+        with mock.patch(
+            "ai_gateway.prompts.base.get_usage_metadata_callback"
+        ) as mock_get_usage_callback:
+            mock_callback = mock.MagicMock(usage_metadata={model_name: usage_metadata})
+            mock_get_usage_callback.return_value.__enter__.return_value = mock_callback
+
+            yield
+
     @pytest.mark.parametrize(
         ("model_params", "expected_model_engine"),
         [
@@ -108,12 +119,12 @@ class TestPrompt:
         self,
         mock_get_logger: mock.Mock,
         mock_watch: mock.Mock,
-        mock_watcher: mock.Mock,
         prompt: Prompt,
         model_response: str,
     ):
         response = ""
 
+        mock_watcher = mock_watch.return_value.__enter__.return_value
         mock_logger = mock.MagicMock()
         mock_get_logger.return_value = mock_logger
 
@@ -141,13 +152,15 @@ class TestPrompt:
     async def test_ainvoke_handle_usage_metadata(
         self,
         mock_watch: mock.Mock,
-        mock_watcher: mock.Mock,
         internal_event_client: mock.Mock,
         prompt: Prompt,
         usage_metadata: UsageMetadata,
     ):
+        mock_watcher = mock_watch.return_value.__enter__.return_value
+
         prompt.internal_event_client = internal_event_client
-        await prompt.ainvoke({"name": "Duo", "content": "What's up?"})
+        with self._mock_usage_metadata(prompt.model_name, usage_metadata):
+            await prompt.ainvoke({"name": "Duo", "content": "What's up?"})
 
         _assert_usage_metadata_handling(
             mock_watcher, internal_event_client, prompt, usage_metadata
@@ -161,16 +174,18 @@ class TestPrompt:
     async def test_astream_handle_usage_metadata(
         self,
         mock_watch: mock.Mock,
-        mock_watcher: mock.Mock,
         internal_event_client: mock.Mock,
         prompt: Prompt,
         usage_metadata: UsageMetadata,
     ):
+        mock_watcher = mock_watch.return_value.__enter__.return_value
+
         prompt.internal_event_client = internal_event_client
 
-        # Consume stream
-        async for _ in prompt.astream({"name": "Duo", "content": "What's up?"}):
-            pass
+        with self._mock_usage_metadata(prompt.model_name, usage_metadata):
+            # Consume stream
+            async for _ in prompt.astream({"name": "Duo", "content": "What's up?"}):
+                pass
 
         _assert_usage_metadata_handling(
             mock_watcher, internal_event_client, prompt, usage_metadata
@@ -244,10 +259,13 @@ class TestPromptTimeout:
 
 
 @pytest.fixture
-def registry(internal_event_client: Mock, prompt: Prompt):
+def registry(
+    internal_event_client: Mock, model_limits: ConfigModelLimits, prompt: Prompt
+):
     class Registry(BasePromptRegistry):
         def __init__(self):
             self.internal_event_client = internal_event_client
+            self.model_limits = model_limits
 
         def get(self, *args, **kwargs):
             return prompt

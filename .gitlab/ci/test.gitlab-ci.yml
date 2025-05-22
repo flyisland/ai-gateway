@@ -57,7 +57,7 @@ tests:evaluation:
 .test-variables: &test-variables
   LS_DATASET: "duo_workflow.swe-bench-verified-test.1"
   LANGCHAIN_PROJECT: "duo-workflow-ci-job"
-  DW_SERVICE_REF: $CI_COMMIT_REF
+  DW_SERVICE_REF: $CI_MERGE_REQUEST_SOURCE_BRANCH_SHA
   DW_CONCURRENCY: 3
   SWEBENCH_START: "true"
 
@@ -73,6 +73,7 @@ sanity-tests:
 regression-tests:
   <<: *test-base
   when: manual
+  allow_failure: true
   variables:
     <<: *test-variables
     LS_DATASET_SPLIT: "validation_stratified_b06f4db4_p30"

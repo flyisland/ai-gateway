@@ -89,7 +89,7 @@ EXECUTOR_TOOLS = [
     "create_file_with_contents",
     "edit_file",
     "find_files",
-    "grep_files",
+    "grep",
     "mkdir",
     "add_new_task",
     "remove_task",
@@ -102,6 +102,9 @@ EXECUTOR_TOOLS = [
     "create_epic",
     "update_epic",
     "get_repository_file",
+    "list_dir",
+    "list_epic_notes",
+    "get_epic_note",
 ]
 
 CONTEXT_BUILDER_TOOLS = [
@@ -123,11 +126,13 @@ CONTEXT_BUILDER_TOOLS = [
     "read_file",
     "ls_files",
     "find_files",
-    "grep_files",
+    "grep",
     "handover_tool",
     "get_epic",
     "list_epics",
     "get_repository_file",
+    "list_epic_notes",
+    "get_epic_note",
 ]
 
 PLANNER_TOOLS = [

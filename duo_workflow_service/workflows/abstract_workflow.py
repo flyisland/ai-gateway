@@ -1,7 +1,7 @@
 import asyncio
 import os
 from abc import ABC, abstractmethod
-from typing import Any, Dict
+from typing import Any, Dict, TypedDict
 
 import structlog
 from langchain_core.runnables import RunnableConfig
@@ -29,6 +29,7 @@ from duo_workflow_service.gitlab.gitlab_project import (
 )
 from duo_workflow_service.gitlab.gitlab_workflow_params import fetch_workflow_config
 from duo_workflow_service.gitlab.http_client import GitlabHttpClient
+from duo_workflow_service.gitlab.http_client_factory import get_http_client
 from duo_workflow_service.gitlab.url_parser import GitLabUrlParser
 from duo_workflow_service.internal_events import (
     DuoWorkflowInternalEvent,
@@ -45,6 +46,11 @@ RECURSION_LIMIT = 300
 DEBUG = os.getenv("DEBUG")
 MAX_MESSAGES_TO_DISPLAY = 5
 MAX_MESSAGE_LENGTH = 200
+
+
+class InvocationMetadata(TypedDict):
+    base_url: str
+    gitlab_token: str
 
 
 class AbstractWorkflow(ABC):
@@ -66,21 +72,31 @@ class AbstractWorkflow(ABC):
     is_done: bool = False
     _workflow_type: CategoryEnum
     _stream: bool = False
+    _context_elements: list
 
     def __init__(
         self,
         workflow_id: str,
         workflow_metadata: Dict[str, Any],
         workflow_type: CategoryEnum,
+        context_elements: list = None,  # type: ignore[assignment]
+        invocation_metadata: InvocationMetadata = {
+            "base_url": "",
+            "gitlab_token": "",
+        },
     ):
         self._outbox = asyncio.Queue(maxsize=QUEUE_MAX_SIZE)
         self._inbox = asyncio.Queue(maxsize=QUEUE_MAX_SIZE)
         self._streaming_outbox = asyncio.Queue(maxsize=QUEUE_MAX_SIZE)
         self._workflow_id = workflow_id
         self._workflow_metadata = workflow_metadata
+        self._context_elements = context_elements or []
         self.log = structlog.stdlib.get_logger("workflow").bind(workflow_id=workflow_id)
-        self._http_client = GitlabHttpClient(
-            {"outbox": self._outbox, "inbox": self._inbox}
+        self._http_client = get_http_client(
+            self._outbox,
+            self._inbox,
+            invocation_metadata.get("base_url", ""),
+            invocation_metadata.get("gitlab_token", ""),
         )
         self._workflow_type = workflow_type
 
@@ -90,7 +106,7 @@ class AbstractWorkflow(ABC):
             tracing_metadata = {
                 "git_url": self._workflow_metadata.get("git_url", ""),
                 "git_sha": self._workflow_metadata.get("git_sha", ""),
-                "workflow_type": self._workflow_type.value
+                "workflow_type": self._workflow_type.value,
             }
 
             with tracing_context(enabled=extended_logging):

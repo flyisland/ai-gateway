@@ -58,12 +58,14 @@ CHAT_READ_ONLY_TOOLS = [
     "gitlab_issue_search",
     "gitlab_merge_request_search",
     "read_file",
-    "ls_files",
+    "list_dir",
     "find_files",
-    "grep_files",
+    "grep",
     "get_epic",
     "list_epics",
     "scan_directory_tree",
+    "list_epic_notes",
+    "get_epic_note",
 ]
 
 
@@ -144,6 +146,7 @@ class Workflow(AbstractWorkflow):
             },
             ui_chat_log=[initial_ui_chat_log],
             last_human_input=None,
+            context_elements=self._context_elements or [],
         )
 
     async def get_graph_input(self, goal: str, status_event: str) -> Any:

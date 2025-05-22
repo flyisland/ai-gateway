@@ -16,7 +16,11 @@ from starlette.middleware import Middleware
 from starlette_context.middleware import RawContextMiddleware
 
 from ai_gateway.api.auth_utils import StarletteUser
-from ai_gateway.api.middleware import AccessLogMiddleware, MiddlewareAuthentication
+from ai_gateway.api.middleware import (
+    AccessLogMiddleware,
+    MiddlewareAuthentication,
+    ModelConfigMiddleware,
+)
 from ai_gateway.code_suggestions.base import CodeSuggestionsChunk, CodeSuggestionsOutput
 from ai_gateway.code_suggestions.processing.base import ModelEngineOutput
 from ai_gateway.code_suggestions.processing.typing import (
@@ -24,7 +28,7 @@ from ai_gateway.code_suggestions.processing.typing import (
     MetadataCodeContent,
     MetadataPromptBuilder,
 )
-from ai_gateway.config import Config
+from ai_gateway.config import Config, ConfigModelLimits
 from ai_gateway.container import ContainerApplication
 from ai_gateway.feature_flags.context import current_feature_flag_context
 from ai_gateway.internal_events.client import InternalEventsClient
@@ -83,6 +87,7 @@ def test_client(fast_api_router, stub_auth_provider, request):
         Middleware(RawContextMiddleware),
         Middleware(AccessLogMiddleware, skip_endpoints=[]),
         MiddlewareAuthentication(stub_auth_provider, False, None),
+        Middleware(ModelConfigMiddleware),
     ]
     app = FastAPI(middleware=middlewares)
     app.include_router(fast_api_router)
@@ -581,6 +586,11 @@ def prompt(
 @pytest.fixture
 def internal_event_client():
     return Mock(spec=InternalEventsClient)
+
+
+@pytest.fixture
+def model_limits():
+    return ConfigModelLimits()
 
 
 @pytest.fixture

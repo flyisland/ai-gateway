@@ -64,6 +64,8 @@ _READ_ONLY_GITLAB_TOOLS: list[Type[BaseTool]] = [
     tools.ListIssueNotes,
     tools.GetIssueNote,
     tools.GetRepositoryFile,
+    tools.ListEpicNotes,
+    tools.GetEpicNote,
 ]
 
 _AGENT_PRIVILEGES: dict[str, list[Type[BaseTool]]] = {
@@ -71,7 +73,7 @@ _AGENT_PRIVILEGES: dict[str, list[Type[BaseTool]]] = {
         tools.ReadFile,
         tools.WriteFile,
         tools.EditFile,
-        tools.LsFiles,
+        tools.ListDir,
         tools.FindFiles,
         tools.Grep,
         tools.Mkdir,
