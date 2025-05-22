@@ -14,20 +14,14 @@ from langchain_core.messages import (
 from langchain_core.runnables import Runnable
 
 from contract.contract_pb2 import ContextElement, ContextElementType
-from duo_workflow_service.entities.event import (
-    WorkflowEvent,
-    WorkflowEventType,
-)
+from duo_workflow_service.entities.event import WorkflowEvent, WorkflowEventType
 from duo_workflow_service.entities.state import (
     DuoWorkflowStateType,
     MessageTypeEnum,
     UiChatLog,
     WorkflowStatusEnum,
 )
-from duo_workflow_service.errors.error_handler import (
-    ModelError,
-    ModelErrorHandler,
-)
+from duo_workflow_service.errors.error_handler import ModelError, ModelErrorHandler
 from duo_workflow_service.gitlab.events import get_event
 from duo_workflow_service.gitlab.http_client import GitlabHttpClient
 from duo_workflow_service.internal_events import (
@@ -45,10 +39,6 @@ from duo_workflow_service.token_counter.approximate_token_counter import (
     ApproximateTokenCounter,
 )
 from duo_workflow_service.tools import Toolset
-
-import structlog
-
-log = structlog.stdlib.get_logger("agent")
 
 
 class Agent:
@@ -147,20 +137,22 @@ class Agent:
                 ).count_tokens(messages)
 
                 model_name = getattr(self._model, "model_name", "unknown")
+                request_type = f"{self.name}_completion"
                 with duo_workflow_metrics.time_llm_request(
-                    model=model_name, request_type=f"{self.name}_completion"
+                    model=model_name, request_type=request_type
                 ):
                     response = await self._model.ainvoke(messages)
-                    response_metadata = (
-                        response.response_metadata if response.response_metadata else {}
-                    )
-                    duo_workflow_metrics.count_llm_response(
-                        model=model_name,
-                        request_type=f"{self.name}_completion",
-                        stop_reason=response_metadata.get("stop_reason"),
-                    )
 
                 self._track_tokens_data(response, approximate_token_count)
+                duo_workflow_metrics.count_llm_response(
+                    model=model_name,
+                    request_type=request_type,
+                    stop_reason=(
+                        response.response_metadata.get("stop_reason")
+                        if response.response_metadata
+                        else None
+                    ),
+                )
                 return [response]
             except APIStatusError as e:
                 error_message = str(e)

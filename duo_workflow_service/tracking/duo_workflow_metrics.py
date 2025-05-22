@@ -1,7 +1,7 @@
 import time
 
 import structlog
-from prometheus_client import REGISTRY, Histogram, Counter
+from prometheus_client import REGISTRY, Counter, Histogram
 
 log = structlog.stdlib.get_logger("monitoring")
 
@@ -51,7 +51,7 @@ class DuoWorkflowMetrics:
         )
 
         self.llm_response_counter = Counter(
-            "duo_workflow_llm_response_stop_reason",
+            "duo_workflow_llm_response_total",
             "Response count of LLM calls in Duo Workflow with stop reason",
             ["model", "request_type", "stop_reason"],
             registry=registry,
@@ -60,8 +60,20 @@ class DuoWorkflowMetrics:
     def count_llm_response(
         self, model="unknown", request_type="unknown", stop_reason="unknown"
     ):
+        # Documented stop reasons for Anthropic models
+        anthropic_stop_reasons = [
+            "end_turn",
+            "max_tokens",
+            "stop_sequence",
+            "tool_use",
+            "unknown",
+        ]
         self.llm_response_counter.labels(
-            model=model, request_type=request_type, stop_reason=stop_reason
+            model=model,
+            request_type=request_type,
+            stop_reason=(
+                stop_reason if stop_reason in anthropic_stop_reasons else "other"
+            ),
         ).inc()
 
     def time_llm_request(self, model="unknown", request_type="unknown"):
