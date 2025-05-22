@@ -175,7 +175,7 @@ class TestDuoWorkflowMetrics(unittest.TestCase):
         cast(
             MagicMock, self.metrics.llm_response_counter.labels
         ).assert_called_once_with(
-            model="test_model", request_type="test_request", stop_reason="test_reason"
+            model="test_model", request_type="test_request", stop_reason="other"
         )
 
 
