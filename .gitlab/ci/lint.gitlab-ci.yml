@@ -1,7 +1,8 @@
 lint:
   extends: .poetry
   stage: test
-  needs: []
+  needs:
+    - install
   script:
     - make lint-code
     - poetry lock --no-cache
