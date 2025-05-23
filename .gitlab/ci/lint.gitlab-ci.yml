@@ -1,8 +1,11 @@
 lint:
   extends: .poetry
   stage: test
+  needs: []
   script:
+    - python --version
     - make lint-code
+    - poetry run mypy --version
     - poetry lock --no-cache
     - git diff --exit-code
   after_script:

@@ -7,6 +7,7 @@ LINTS_DIR := ${ROOT_DIR}/lints
 SCRIPTS_DIR := ${ROOT_DIR}/scripts
 TESTS_DIR := ${ROOT_DIR}/tests
 INTEGRATION_TESTS_DIR := ${ROOT_DIR}/integration_tests
+SHELL = sh -xv
 
 LINT_WORKING_DIR ?= ${AI_GATEWAY_DIR} \
 	${DUO_WORKFLOW_SERVICE_DIR} \
@@ -133,7 +134,7 @@ clean:
 .PHONY: install-lint-deps
 install-lint-deps:
 	@echo "Installing lint dependencies..."
-	@poetry install --only lint
+	@poetry install --with lint
 
 .PHONY: codespell
 codespell: install-lint-deps
