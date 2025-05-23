@@ -5,7 +5,11 @@ from unittest.mock import patch
 
 import pytest
 
-from duo_workflow_service.llm_factory import VertexConfig, validate_llm_access
+from duo_workflow_service.llm_factory import (
+    VertexConfig,
+    new_chat_client,
+    validate_llm_access,
+)
 
 
 @pytest.mark.parametrize(
@@ -120,4 +124,88 @@ def test_clients_receive_max_retries_from_config(
                 mock_anthropic_client.call_args.kwargs["max_retries"]
                 == expected_retries
             )
+            mock_vertex_client.assert_not_called()
+
+
+@pytest.mark.parametrize(
+    "env_vars,model_param,expected_model,calls_llm",
+    [
+        (
+            {
+                "DUO_WORKFLOW__VERTEX_PROJECT_ID": "test-proj",
+                "DUO_WORKFLOW__VERTEX_LOCATION": "test-loc",
+            },
+            "custom-model-name",
+            "custom-model-name",
+            "vertex",
+        ),
+        (
+            {
+                "DUO_WORKFLOW__VERTEX_PROJECT_ID": "test-proj",
+                "DUO_WORKFLOW__VERTEX_LOCATION": "test-loc",
+            },
+            None,
+            None,  # Will use config.model_name
+            "vertex",
+        ),
+        (
+            {
+                "ANTHROPIC_API_KEY": "test-key",
+            },
+            "custom-anthropic-model",
+            "custom-anthropic-model",
+            "anthropic",
+        ),
+        (
+            {
+                "ANTHROPIC_API_KEY": "test-key",
+            },
+            None,
+            None,  # Will use get_anthropic_model_name()
+            "anthropic",
+        ),
+    ],
+)
+@patch("duo_workflow_service.llm_factory.get_anthropic_model_name")
+@patch("duo_workflow_service.llm_factory.ChatAnthropicVertex")
+@patch("duo_workflow_service.llm_factory.ChatAnthropic")
+def test_new_chat_client_with_custom_model(
+    mock_anthropic_client,
+    mock_vertex_client,
+    mock_get_anthropic_model_name,
+    env_vars,
+    model_param,
+    expected_model,
+    calls_llm,
+):
+    config = VertexConfig()
+    mock_get_anthropic_model_name.return_value = "default-anthropic-model"
+
+    with patch("os.environ", env_vars):
+        new_chat_client(config=config, model=model_param)
+
+        if calls_llm == "vertex":
+            mock_vertex_client.assert_called_once()
+            if expected_model:
+                assert (
+                    mock_vertex_client.call_args.kwargs["model_name"] == expected_model
+                )
+            else:
+                assert (
+                    mock_vertex_client.call_args.kwargs["model_name"]
+                    == config.model_name
+                )
+            mock_anthropic_client.assert_not_called()
+        else:
+            mock_anthropic_client.assert_called_once()
+            if expected_model:
+                assert (
+                    mock_anthropic_client.call_args.kwargs["model_name"]
+                    == expected_model
+                )
+            else:
+                assert (
+                    mock_anthropic_client.call_args.kwargs["model_name"]
+                    == "default-anthropic-model"
+                )
             mock_vertex_client.assert_not_called()

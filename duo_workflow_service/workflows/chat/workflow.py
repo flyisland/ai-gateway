@@ -35,6 +35,14 @@ RECURSION_LIMIT = 500
 AGENT_NAME = "Chat Agent"
 
 
+def _get_chat_model() -> str:
+    vertex_project_id = os.environ.get("DUO_WORKFLOW__VERTEX_PROJECT_ID")
+    if vertex_project_id and len(vertex_project_id) > 1:
+        return "claude-3-7-sonnet@20250219"
+
+    return "claude-3-7-sonnet-20250219"
+
+
 class Routes(StrEnum):
     CONTINUE = "continue"
     NO_CONVERSATION_HISTORY = "no_conversation_history"
@@ -194,7 +202,9 @@ class Workflow(AbstractWorkflow):
             goal="",
             system_prompt="",
             name=AGENT_NAME,
-            model=new_chat_client(max_tokens=MAX_TOKENS_TO_SAMPLE),
+            model=new_chat_client(
+                max_tokens=MAX_TOKENS_TO_SAMPLE, model=_get_chat_model()
+            ),
             toolset=agents_toolset,
             workflow_id=self._workflow_id,
             http_client=self._http_client,

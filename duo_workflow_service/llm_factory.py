@@ -46,12 +46,14 @@ class VertexConfig:
         return 6
 
 
-def new_chat_client(config: VertexConfig = VertexConfig(), **kwargs) -> BaseChatModel:
+def new_chat_client(
+    config: VertexConfig = VertexConfig(), model=None, **kwargs
+) -> BaseChatModel:
     vertex_project_id = os.environ.get("DUO_WORKFLOW__VERTEX_PROJECT_ID")
 
     if vertex_project_id and len(vertex_project_id) > 1:
         return ChatAnthropicVertex(
-            model_name=config.model_name,
+            model_name=model if model else config.model_name,
             project=config.project_id,
             location=config.location,
             max_retries=config.max_retries,
@@ -59,7 +61,7 @@ def new_chat_client(config: VertexConfig = VertexConfig(), **kwargs) -> BaseChat
         )
 
     anthropic_api_key = os.environ.get("ANTHROPIC_API_KEY")
-    anthropic_model_name = get_anthropic_model_name()
+    anthropic_model_name = model if model else get_anthropic_model_name()
     if anthropic_api_key and len(anthropic_api_key) > 1:
         return ChatAnthropic(
             model_name=anthropic_model_name, **kwargs, max_retries=config.max_retries
