@@ -1,0 +1,6 @@
+{
+  "name": "gitlab_documentation",
+  "resource": "documentation answers",
+  "description": "This tool is beneficial when you need to answer questions concerning GitLab and its features.\nQuestions can be about GitLab's projects, groups, issues, merge requests,\nepics, work items, milestones, labels, CI/CD pipelines, git repositories, and more.",
+  "example": "Question: How do I set up a new project?\nThought: Question is about inner working of GitLab. \"gitlab_documentation\" tool is the right one for the job.\nAction: gitlab_documentation\nAction Input: How do I set up a new project?"
+}

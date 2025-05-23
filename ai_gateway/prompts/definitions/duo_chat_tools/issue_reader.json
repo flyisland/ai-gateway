@@ -1,0 +1,6 @@
+{
+  "name": "issue_reader",
+  "resource": "issues",
+  "description": "This tool retrieves the content of a specific issue\nONLY if the user question fulfills the strict usage conditions below.\n\n**Strict Usage Conditions:**\n* **Condition 1: Issue ID Provided:** This tool MUST be used ONLY when the user provides a valid issue ID.\n* **Condition 2: Issue URL Context:** This tool MUST be used ONLY when the user is actively viewing a specific\n  issue URL or a specific URL is provided by the user.\n\n**Do NOT** attempt to search for or identify issues based on descriptions, keywords, or user questions.\n\n**Action Input:**\n* The original question asked by the user.\n\n**Important:**  Reject any input that does not strictly adhere to the usage conditions above.\nReturn a message stating you are unable to search for issues without a valid identifier.",
+  "example": "Question: Please identify the author of #123 issue\nThought: You have access to the same resources as user who asks a question.\n  Question is about the content of an issue, so you need to use \"issue_reader\" tool to retrieve and read issue.\n  Based on this information you can present final answer about issue.\nAction: issue_reader\nAction Input: Please identify the author of #123 issue"
+}
