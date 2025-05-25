@@ -7,7 +7,7 @@ import pytest
 
 from duo_workflow_service.llm_factory import (
     VertexConfig,
-    new_chat_client,
+    create_chat_model,
     validate_llm_access,
 )
 
@@ -182,7 +182,7 @@ def test_new_chat_client_with_custom_model(
     mock_get_anthropic_model_name.return_value = "default-anthropic-model"
 
     with patch("os.environ", env_vars):
-        new_chat_client(config=config, model=model_param)
+        create_chat_model(config=config, model=model_param)
 
         if calls_llm == "vertex":
             mock_vertex_client.assert_called_once()
