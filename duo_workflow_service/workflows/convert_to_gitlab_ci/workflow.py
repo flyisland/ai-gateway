@@ -18,7 +18,7 @@ from duo_workflow_service.entities import (
     WorkflowStatusEnum,
 )
 from duo_workflow_service.internal_events.event_enum import CategoryEnum
-from duo_workflow_service.llm_factory import new_chat_client
+from duo_workflow_service.llm_factory import create_chat_model
 from duo_workflow_service.token_counter.approximate_token_counter import (
     ApproximateTokenCounter,
 )
@@ -149,6 +149,11 @@ def _git_output(command_output: list[str], state: WorkflowState):
 
 
 class Workflow(AbstractWorkflow):
+    def _get_chat_model(self) -> str:
+        """Use the default implementation from AbstractWorkflow."""
+        ## TODO: Implement other models than Anthropic for this workflow
+        return super()._get_chat_model()
+
     async def _handle_workflow_failure(
         self, error: BaseException, compiled_graph: Any, graph_config: Any
     ):
@@ -181,7 +186,10 @@ class Workflow(AbstractWorkflow):
             goal="N/A",
             system_prompt="N/A",
             name=AGENT_NAME,
-            model=new_chat_client(max_tokens=MAX_TOKENS_TO_SAMPLE),
+            model=create_chat_model(
+                max_tokens=MAX_TOKENS_TO_SAMPLE,
+                model=self._get_chat_model(),
+            ),
             toolset=agents_toolset,
             http_client=self._http_client,
             workflow_id=self._workflow_id,

@@ -24,7 +24,7 @@ from duo_workflow_service.entities.state import (
 from duo_workflow_service.interceptors.feature_flag_interceptor import (
     current_feature_flag_context,
 )
-from duo_workflow_service.llm_factory import new_chat_client
+from duo_workflow_service.llm_factory import create_chat_model
 from duo_workflow_service.tracking.errors import log_exception
 from duo_workflow_service.workflows.abstract_workflow import AbstractWorkflow
 
@@ -33,14 +33,6 @@ DEBUG = os.getenv("DEBUG")
 MAX_MESSAGE_LENGTH = 200
 RECURSION_LIMIT = 500
 AGENT_NAME = "Chat Agent"
-
-
-def _get_chat_model() -> str:
-    vertex_project_id = os.environ.get("DUO_WORKFLOW__VERTEX_PROJECT_ID")
-    if vertex_project_id and len(vertex_project_id) > 1:
-        return "claude-3-7-sonnet@20250219"
-
-    return "claude-3-7-sonnet-20250219"
 
 
 class Routes(StrEnum):
@@ -76,7 +68,6 @@ CHAT_READ_ONLY_TOOLS = [
     "get_epic_note",
 ]
 
-
 CHAT_MUTATION_TOOLS = [
     "create_file_with_contents",
     "edit_file",
@@ -86,6 +77,11 @@ CHAT_MUTATION_TOOLS = [
 
 class Workflow(AbstractWorkflow):
     _stream: bool = True
+
+    def _get_chat_model(self) -> str:
+        """Use the default implementation from AbstractWorkflow."""
+        ## TODO: Implement other models than Anthropic for this workflow
+        return super()._get_chat_model()
 
     def _are_tools_called(self, state: ChatWorkflowState) -> Routes:
         if state["status"] in [WorkflowStatusEnum.CANCELLED, WorkflowStatusEnum.ERROR]:
@@ -202,8 +198,9 @@ class Workflow(AbstractWorkflow):
             goal="",
             system_prompt="",
             name=AGENT_NAME,
-            model=new_chat_client(
-                max_tokens=MAX_TOKENS_TO_SAMPLE, model=_get_chat_model()
+            model=create_chat_model(
+                max_tokens=MAX_TOKENS_TO_SAMPLE,
+                model=self._get_chat_model(),
             ),
             toolset=agents_toolset,
             workflow_id=self._workflow_id,

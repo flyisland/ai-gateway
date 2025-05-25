@@ -5,7 +5,6 @@ from typing import Any, Dict, TypedDict
 
 import structlog
 from langchain_core.runnables import RunnableConfig
-
 # pylint disable are going to be fixed via
 # https://gitlab.com/gitlab-org/duo-workflow/duo-workflow-service/-/issues/78
 from langgraph.checkpoint.base import (  # pylint: disable=no-langgraph-langchain-imports
@@ -316,6 +315,27 @@ class AbstractWorkflow(ABC):
             additional_properties=additional_properties,
             category=category.value if category else self.__class__.__name__,
         )
+
+    @abstractmethod
+    def _get_chat_model(self) -> str:
+        """
+        Get the chat model name based on the environment configuration.
+
+        Default implementation:
+        checks for Vertex AI configuration and returns
+        the appropriate Claude model name.Child classes can override this
+        to use different models or selection logic.
+
+        Returns:
+            str: Model name - returns Vertex-formatted model name if
+                 DUO_WORKFLOW__VERTEX_PROJECT_ID is set, otherwise returns
+                 the standard model name.
+        """
+        vertex_project_id = os.environ.get("DUO_WORKFLOW__VERTEX_PROJECT_ID")
+        if vertex_project_id and len(vertex_project_id) > 1:
+            return "claude-3-7-sonnet@20250219"
+
+        return "claude-3-7-sonnet-20250219"
 
 
 TypeWorkflow = type[AbstractWorkflow]

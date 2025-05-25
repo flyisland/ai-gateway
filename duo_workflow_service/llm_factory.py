@@ -46,7 +46,7 @@ class VertexConfig:
         return 6
 
 
-def new_chat_client(
+def create_chat_model(
     config: VertexConfig = VertexConfig(), model=None, **kwargs
 ) -> BaseChatModel:
     vertex_project_id = os.environ.get("DUO_WORKFLOW__VERTEX_PROJECT_ID")
@@ -64,7 +64,9 @@ def new_chat_client(
     anthropic_model_name = model if model else get_anthropic_model_name()
     if anthropic_api_key and len(anthropic_api_key) > 1:
         return ChatAnthropic(
-            model_name=anthropic_model_name, **kwargs, max_retries=config.max_retries
+            model_name=anthropic_model_name,
+            **kwargs,
+            max_retries=config.max_retries,
         )
 
     raise RuntimeError(
@@ -74,7 +76,7 @@ def new_chat_client(
 
 def validate_llm_access(config: VertexConfig = VertexConfig()):
     log = structlog.stdlib.get_logger("server")
-    anthropic_client = new_chat_client(config=config)
+    anthropic_client = create_chat_model(config=config)
 
     with tracing_context(enabled=False):
         anthropic_response = anthropic_client.invoke(
