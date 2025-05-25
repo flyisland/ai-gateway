@@ -1,7 +1,7 @@
 # pylint: disable=direct-environment-variable-reference
 
 import os
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from enum import StrEnum
 from functools import partial
 from typing import Annotated, List, Literal, Union
@@ -240,6 +240,7 @@ class GoalDisambiguationComponent:
             return {"status": WorkflowStatusEnum.INPUT_REQUIRED}
 
         message = event["message"]
+        acknowledgment_message = "Thank you for clarifying! Let me take this into account to propose the best plan possible."
         ui_chat_logs = [
             UiChatLog(
                 correlation_id=(
@@ -250,7 +251,17 @@ class GoalDisambiguationComponent:
                 timestamp=datetime.now(timezone.utc).isoformat(),
                 status=ToolStatus.SUCCESS,
                 tool_info=None,
-            )
+            ),
+            UiChatLog(
+                correlation_id=None,
+                message_type=MessageTypeEnum.AGENT,
+                content=acknowledgment_message,
+                timestamp=(
+                    datetime.now(timezone.utc) + timedelta(seconds=1)
+                ).isoformat(),
+                status=ToolStatus.SUCCESS,
+                tool_info=None,
+            ),
         ]
 
         last_message = state["conversation_history"][_AGENT_NAME][-1]

@@ -1,4 +1,4 @@
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from typing import Any, Dict, List
 
 import structlog
@@ -63,15 +63,27 @@ class HumanApprovalCheckExecutor:
                     )
                 )
             else:
-                ui_chat_logs.append(
-                    UiChatLog(
-                        correlation_id=correlation_id,
-                        message_type=MessageTypeEnum.USER,
-                        content=f"Received message: {message}",
-                        timestamp=datetime.now(timezone.utc).isoformat(),
-                        status=ToolStatus.SUCCESS,
-                        tool_info=None,
-                    )
+                ui_chat_logs.extend(
+                    [
+                        UiChatLog(
+                            correlation_id=correlation_id,
+                            message_type=MessageTypeEnum.USER,
+                            content=message,
+                            timestamp=datetime.now(timezone.utc).isoformat(),
+                            status=ToolStatus.SUCCESS,
+                            tool_info=None,
+                        ),
+                        UiChatLog(
+                            correlation_id=None,
+                            message_type=MessageTypeEnum.AGENT,
+                            content="Thank you for the feedback, I am going to revaluate and adjust the plan.",
+                            timestamp=(
+                                datetime.now(timezone.utc) + timedelta(seconds=1)
+                            ).isoformat(),
+                            status=ToolStatus.SUCCESS,
+                            tool_info=None,
+                        ),
+                    ]
                 )
 
                 # Check if last message was a tool call
@@ -86,4 +98,16 @@ class HumanApprovalCheckExecutor:
 
                 messages.append(HumanMessage(content=message))
                 updates["conversation_history"] = {self._agent_name: messages}
+
+                if event["event_type"] == WorkflowEventType.RESUME:
+                    ui_chat_logs.append(
+                        UiChatLog(
+                            correlation_id=None,
+                            message_type=MessageTypeEnum.AGENT,
+                            content="Sounds good, let’s get started!",
+                            timestamp=(datetime.now(timezone.utc)).isoformat(),
+                            status=ToolStatus.SUCCESS,
+                            tool_info=None,
+                        )
+                    )
         return updates

@@ -47,7 +47,10 @@ class TestHumanApprovalCheckExecutor:
 
         result = await executor.run(workflow_state)
 
-        assert result == {"last_human_input": event, "ui_chat_log": []}
+        assert result["last_human_input"] == event
+        assert len(result["ui_chat_log"]) == 1
+        assert result["ui_chat_log"][0]["message_type"] == MessageTypeEnum.AGENT
+        assert result["ui_chat_log"][0]["content"] == "Sounds good, let’s get started!"
 
     @patch.dict(os.environ, {"WORKFLOW_INTERRUPT": "true"})
     @pytest.mark.asyncio
