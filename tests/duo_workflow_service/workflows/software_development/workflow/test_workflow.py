@@ -1,6 +1,5 @@
 import asyncio
 import os
-from collections import namedtuple
 from unittest.mock import ANY, AsyncMock, MagicMock, call, patch
 from uuid import uuid4
 
@@ -10,16 +9,13 @@ from langgraph.checkpoint.base import CheckpointTuple
 from langgraph.checkpoint.memory import MemorySaver
 
 from contract import contract_pb2
-from duo_workflow_service.components import ToolsRegistry
 from duo_workflow_service.components.tools_registry import (
     _AGENT_PRIVILEGES,
     ToolsRegistry,
 )
 from duo_workflow_service.entities import Plan, WorkflowStatusEnum
-from duo_workflow_service.gitlab.http_client import GitlabHttpClient
 from duo_workflow_service.internal_events.event_enum import CategoryEnum
 from duo_workflow_service.tools.toolset import Toolset
-from duo_workflow_service.workflows.software_development import Workflow
 from duo_workflow_service.workflows.software_development.workflow import (
     CONTEXT_BUILDER_TOOLS,
     EXECUTOR_TOOLS,
@@ -325,7 +321,6 @@ async def test_workflow_run_with_memory_saver(
     mock_tools_registry_cls,
     checkpoint_tuple,
 ):
-
     mock_goal_disambiguator_component.return_value.attach.return_value = "planning"
     mock_tools_registry = MagicMock(spec=ToolsRegistry)
     mock_tools_registry_cls.configure = AsyncMock(return_value=mock_tools_registry)
@@ -1242,3 +1237,17 @@ async def test_workflow_cleanup():
     assert workflow.is_done
     assert workflow._outbox.qsize() == 0
     assert workflow._inbox.qsize() == 0
+
+
+@pytest.mark.asyncio
+@patch.dict(os.environ, {"DUO_WORKFLOW__VERTEX_PROJECT_ID": ""})
+async def test_workflow_get_chat_model_without_vertex():
+    """Test _get_chat_model returns standard model when VERTEX_PROJECT_ID is not set."""
+    workflow = Workflow(
+        "123",
+        {},
+        workflow_type=CategoryEnum.WORKFLOW_SOFTWARE_DEVELOPMENT,
+    )
+
+    model_name = workflow._get_chat_model()
+    assert model_name == "claude-3-7-sonnet-20250219"

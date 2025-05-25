@@ -1,6 +1,7 @@
 """Test module for search and replace workflow components."""
 
-from unittest.mock import AsyncMock, MagicMock, Mock, patch
+import os
+from unittest.mock import Mock, patch
 
 import pytest
 from langchain_core.messages import AIMessage, HumanMessage, SystemMessage
@@ -15,7 +16,6 @@ from duo_workflow_service.entities import (
     WorkflowStatusEnum,
 )
 from duo_workflow_service.entities.state import MAX_CONTEXT_TOKENS, ReplacementRule
-from duo_workflow_service.gitlab.http_client import GitlabHttpClient
 from duo_workflow_service.internal_events.event_enum import CategoryEnum
 from duo_workflow_service.workflows.search_and_replace.prompts import (
     SEARCH_AND_REPLACE_FILE_USER_MESSAGE,
@@ -112,23 +112,23 @@ def test_scan_directory_tree_input_parser_with_multiple_file_types(
 
     # Check patterns for *.py files
     assert {
-        "directory": "N/A",
-        "name_pattern": "/test/repo/*.py",
-    } in result
+               "directory": "N/A",
+               "name_pattern": "/test/repo/*.py",
+           } in result
     assert {
-        "directory": "N/A",
-        "name_pattern": "/test/repo/**/*.py",
-    } in result
+               "directory": "N/A",
+               "name_pattern": "/test/repo/**/*.py",
+           } in result
 
     # Check patterns for *.rb files
     assert {
-        "directory": "N/A",
-        "name_pattern": "/test/repo/*.rb",
-    } in result
+               "directory": "N/A",
+               "name_pattern": "/test/repo/*.rb",
+           } in result
     assert {
-        "directory": "N/A",
-        "name_pattern": "/test/repo/**/*.rb",
-    } in result
+               "directory": "N/A",
+               "name_pattern": "/test/repo/**/*.rb",
+           } in result
 
 
 def test_detect_affected_components_input_parser(mock_state):
@@ -475,3 +475,17 @@ async def test_non_accessibility_tools(
     assert (
         not missing_tools
     ), f"The following tools are missing from the tools registry: {missing_tools}"
+
+
+@pytest.mark.asyncio
+@patch.dict(os.environ, {"DUO_WORKFLOW__VERTEX_PROJECT_ID": ""})
+async def test_workflow_get_chat_model_without_vertex():
+    """Test _get_chat_model returns standard model when VERTEX_PROJECT_ID is not set."""
+    workflow = Workflow(
+        "123",
+        {},
+        workflow_type=CategoryEnum.WORKFLOW_SOFTWARE_DEVELOPMENT,
+    )
+
+    model_name = workflow._get_chat_model()
+    assert model_name == "claude-3-7-sonnet-20250219"

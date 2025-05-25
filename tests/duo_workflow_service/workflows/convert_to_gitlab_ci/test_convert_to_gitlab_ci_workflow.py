@@ -1,8 +1,9 @@
 import asyncio
+import os
 from unittest.mock import AsyncMock, MagicMock, Mock, patch
 
 import pytest
-from langchain_core.messages import AIMessage, HumanMessage, SystemMessage, ToolMessage
+from langchain_core.messages import AIMessage, HumanMessage, SystemMessage
 
 from duo_workflow_service.components.tools_registry import (
     _AGENT_PRIVILEGES,
@@ -456,3 +457,17 @@ async def test_workflow_run_with_exception(
         await workflow.run("test-file-path")
 
     assert workflow.is_done
+
+
+@pytest.mark.asyncio
+@patch.dict(os.environ, {"DUO_WORKFLOW__VERTEX_PROJECT_ID": ""})
+async def test_workflow_get_chat_model_without_vertex():
+    """Test _get_chat_model returns standard model when VERTEX_PROJECT_ID is not set."""
+    workflow = Workflow(
+        "123",
+        {},
+        workflow_type=CategoryEnum.WORKFLOW_SOFTWARE_DEVELOPMENT,
+    )
+
+    model_name = workflow._get_chat_model()
+    assert model_name == "claude-3-7-sonnet-20250219"

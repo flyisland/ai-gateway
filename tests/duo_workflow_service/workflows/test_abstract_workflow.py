@@ -29,6 +29,10 @@ class MockWorkflow(AbstractWorkflow):
     def log_workflow_elements(self, element):
         print(element)
 
+    def _get_chat_model(self) -> str:
+        """Use the default implementation from AbstractWorkflow."""
+        return super()._get_chat_model()
+
 
 @pytest.fixture
 def workflow():
