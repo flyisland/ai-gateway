@@ -4,12 +4,14 @@ from typing import Any, Optional, Type, TypedDict, Union
 from langchain.tools import BaseTool
 from pydantic import BaseModel
 
+from contract import contract_pb2
 from duo_workflow_service import tools
 from duo_workflow_service.gitlab.http_client import GitlabHttpClient
 from duo_workflow_service.interceptors.feature_flag_interceptor import (
     current_feature_flag_context,
 )
 from duo_workflow_service.tools import Toolset, ToolType
+from duo_workflow_service.tools.mcp_tools import convert_mcp_tools_to_langchain_tools
 
 
 class ToolMetadata(TypedDict):
@@ -102,6 +104,7 @@ _AGENT_PRIVILEGES: dict[str, list[Type[BaseTool]]] = {
 class ToolsRegistry:
     _enabled_tools: dict[str, Union[BaseTool, Type[BaseModel]]]
     _preapproved_tool_names: set[str]
+    _mcp_tools: list[contract_pb2.McpTool]
 
     @classmethod
     async def configure(
@@ -112,6 +115,7 @@ class ToolsRegistry:
         inbox: asyncio.Queue,
         *,
         gitlab_host: str,
+        mcp_tools: list[contract_pb2.McpTool],
     ):
         if not workflow_config:
             raise RuntimeError("Failed to find tools configuration for workflow")
@@ -136,6 +140,7 @@ class ToolsRegistry:
             enabled_tools=agent_privileges,
             preapproved_tools=preapproved_tools,
             tool_metadata=tool_metadata,
+            mcp_tools=mcp_tools,
         )
 
     def __init__(
@@ -144,10 +149,12 @@ class ToolsRegistry:
         preapproved_tools: list[str],
         *,
         tool_metadata: ToolMetadata,
+        mcp_tools: list[contract_pb2.McpTool],
     ):
         self._enabled_tools = {
             **{tool_cls.tool_title: tool_cls for tool_cls in NO_OP_TOOLS},  # type: ignore
             **{tool.name: tool for tool in [tool_cls() for tool_cls in _DEFAULT_TOOLS]},
+            **convert_mcp_tools_to_langchain_tools(tool_metadata, mcp_tools),
         }
 
         feature_flags = current_feature_flag_context.get()

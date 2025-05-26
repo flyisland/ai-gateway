@@ -100,6 +100,11 @@ class GrpcServer(contract_pb2_grpc.DuoWorkflowServicer):
 
         invocation_metadata = dict(context.invocation_metadata())
 
+        log.info(
+            "MCP tools in request: ",
+            mcp_tools=start_workflow_request.startRequest.mcpTools,
+        )
+
         workflow: AbstractWorkflow = workflow_class(
             workflow_id=workflow_id,
             workflow_metadata=workflow_metadata,
@@ -109,6 +114,7 @@ class GrpcServer(contract_pb2_grpc.DuoWorkflowServicer):
                 "base_url": invocation_metadata.get("x-gitlab-base-url", ""),
                 "gitlab_token": invocation_metadata.get("x-gitlab-oauth-token", ""),
             },
+            mcp_tools=start_workflow_request.startRequest.mcpTools,
         )
 
         async def send_events():

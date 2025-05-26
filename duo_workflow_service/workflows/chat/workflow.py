@@ -235,6 +235,12 @@ class Workflow(AbstractWorkflow):
         if "duo_workflow_chat_mutation_tools" in feature_flags:
             available_tools = CHAT_READ_ONLY_TOOLS + CHAT_MUTATION_TOOLS
 
+        self.log.info(
+            f"Additional MCP tools: {[tool.name for tool in self._mcp_tools]}"
+        )
+        if self._mcp_tools:
+            available_tools += [tool.name for tool in self._mcp_tools]
+
         return available_tools
 
     async def _handle_workflow_failure(
