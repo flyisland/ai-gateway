@@ -4,6 +4,7 @@ import pytest
 
 from duo_workflow_service.interceptors.internal_events_interceptor import (
     InternalEventsInterceptor,
+    InternalEventsMiddleware,
 )
 from duo_workflow_service.internal_events import current_event_context
 
@@ -128,3 +129,120 @@ async def test_interceptor_with_gitlab_member_false(
     )
     event_context = current_event_context.get()
     assert event_context.is_gitlab_team_member is False
+
+
+@pytest.fixture
+def mock_websocket():
+    """Create a mock for WebSocket."""
+    websocket = AsyncMock()
+    websocket.headers = {}
+    return websocket
+
+
+@pytest.mark.parametrize(
+    "test_case, headers, expected_context",
+    [
+        (
+            "complete_headers",
+            {
+                "x-gitlab-realm": "test-realm",
+                "x-gitlab-instance-id": "test-instance-id",
+                "x-gitlab-global-user-id": "test-global-user-id",
+                "x-gitlab-host-name": "test-gitlab-host",
+                "x-gitlab-feature-enabled-by-namespace-ids": "1,2,3",
+                "x-gitlab-project-id": "1",
+                "x-gitlab-namespace-id": "2",
+                "x-gitlab-is-a-gitlab-member": "true",
+            },
+            {
+                "realm": "test-realm",
+                "instance_id": "test-instance-id",
+                "global_user_id": "test-global-user-id",
+                "host_name": "test-gitlab-host",
+                "feature_enabled_by_namespace_ids": [1, 2, 3],
+                "project_id": 1,
+                "namespace_id": 2,
+                "is_gitlab_team_member": True,
+            },
+        ),
+        (
+            "empty_feature_enabled",
+            {
+                "x-gitlab-realm": "test-realm",
+                "x-gitlab-instance-id": "test-instance-id",
+                "x-gitlab-global-user-id": "test-global-user-id",
+                "x-gitlab-host-name": "test-gitlab-host",
+                "x-gitlab-feature-enabled-by-namespace-ids": "",
+                "x-gitlab-project-id": "1",
+                "x-gitlab-namespace-id": "2",
+                "x-gitlab-is-a-gitlab-member": "true",
+            },
+            {
+                "realm": "test-realm",
+                "instance_id": "test-instance-id",
+                "global_user_id": "test-global-user-id",
+                "host_name": "test-gitlab-host",
+                "feature_enabled_by_namespace_ids": None,
+                "project_id": 1,
+                "namespace_id": 2,
+                "is_gitlab_team_member": True,
+            },
+        ),
+        (
+            "empty_project_and_namespace_ids",
+            {
+                "x-gitlab-realm": "test-realm",
+                "x-gitlab-instance-id": "test-instance-id",
+                "x-gitlab-global-user-id": "test-global-user-id",
+                "x-gitlab-host-name": "test-gitlab-host",
+                "x-gitlab-feature-enabled-by-namespace-ids": "",
+                "x-gitlab-is-a-gitlab-member": "false",
+            },
+            {
+                "realm": "test-realm",
+                "instance_id": "test-instance-id",
+                "global_user_id": "test-global-user-id",
+                "host_name": "test-gitlab-host",
+                "feature_enabled_by_namespace_ids": None,
+                "project_id": None,
+                "namespace_id": None,
+                "is_gitlab_team_member": False,
+            },
+        ),
+        (
+            "minimal_headers",
+            {
+                "x-gitlab-realm": "minimal-realm",
+            },
+            {
+                "realm": "minimal-realm",
+                "instance_id": None,
+                "global_user_id": None,
+                "host_name": None,
+                "feature_enabled_by_namespace_ids": None,
+                "project_id": None,
+                "namespace_id": None,
+                "is_gitlab_team_member": None,
+            },
+        ),
+    ],
+)
+@pytest.mark.asyncio
+async def test_internal_events_middleware(
+    mock_websocket,
+    test_case,
+    headers,
+    expected_context,
+):
+    middleware = InternalEventsMiddleware()
+    mock_websocket.headers = headers
+
+    await middleware(mock_websocket)
+
+    event_context = current_event_context.get()
+
+    for key, expected_value in expected_context.items():
+        actual_value = getattr(event_context, key)
+        assert (
+            actual_value == expected_value
+        ), f"Expected {key}={expected_value}, got {actual_value}"
