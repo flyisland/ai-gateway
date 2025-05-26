@@ -8,7 +8,7 @@ The Duo Workflow Service Tools are a collection of LangGraph-compatible tools th
 
 These tools are **backend services** that power GitLab AI features in the web interface. They do **not** run in IDEs or local development environments. Instead, they operate as part of GitLab infrastructure:
 
-```text
+```plaintext
 GitLab Web UI (Frontend)
         ↓
 GitLab Rails Backend
@@ -28,7 +28,7 @@ When users interact with GitLab AI features, these tools execute automatically i
 
 #### **GitLab Duo Chat Example:**
 
-```text
+```plaintext
 User: "Are there security issues in my latest MR?"
 
 Backend Workflow:
@@ -43,7 +43,7 @@ Result: User sees AI analysis and comments in GitLab web interface
 
 #### **Automated Code Review Example:**
 
-```text
+```plaintext
 User: Creates a merge request in GitLab web interface
 
 Automatic Backend Workflow:
@@ -84,7 +84,7 @@ async def _arun(self, **kwargs) -> str:
 
 ### Core Components
 
-```text
+```plaintext
 duo_workflow_service/tools/
 ├── duo_base_tool.py          # Base class for all tools
 ├── toolset.py               # Tool collection management
@@ -357,7 +357,7 @@ poetry run python -c "import ai_gateway; print('✅ Environment ready')"
 
 ### Testing Architecture
 
-```text
+```plaintext
 tests/duo_workflow_service/tools/
 ├── conftest.py                  # Shared fixtures and test configuration
 ├── test_duo_base_tool.py        # Base class functionality
