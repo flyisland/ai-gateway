@@ -1,12 +1,12 @@
 # Duo Workflow Service Tools
 
-The Duo Workflow Service Tools are a collection of LangGraph-compatible tools that enable AI agents to interact with GitLab resources and perform complex workflows. These tools form the foundation of GitLab's AI-powered automation capabilities.
+The Duo Workflow Service Tools are a collection of LangGraph-compatible tools that enable AI agents to interact with GitLab resources and perform complex workflows. These tools form the foundation of GitLab AI-powered automation capabilities.
 
 ## How These Tools Work in GitLab
 
 ### Backend Service Architecture
 
-These tools are **backend services** that power GitLab's AI features in the web interface. They do **not** run in IDEs or local development environments. Instead, they operate as part of GitLab's infrastructure:
+These tools are **backend services** that power GitLab AI features in the web interface. They do **not** run in IDEs or local development environments. Instead, they operate as part of GitLab infrastructure:
 
 ```
 GitLab Web UI (Frontend)
@@ -24,7 +24,7 @@ GitLab REST APIs & External Services
 
 ### User Interaction Flow
 
-When users interact with GitLab's AI features, these tools execute automatically in the background:
+When users interact with GitLab AI features, these tools execute automatically in the background:
 
 #### **GitLab Duo Chat Example:**
 ```
@@ -37,7 +37,7 @@ Backend Workflow:
 4. (Future) gitlab_security_scanner → Scans for vulnerabilities
 5. create_merge_request_note → Adds review comments via /api/v4/projects/{id}/merge_requests/{iid}/notes
 
-Result: User sees AI analysis and comments in GitLab's web interface
+Result: User sees AI analysis and comments in GitLab web interface
 ```
 
 #### **Automated Code Review Example:**
@@ -65,7 +65,7 @@ Result: Review comments and labels appear automatically in the MR
 
 ### Real GitLab API Integration
 
-Each tool makes direct calls to GitLab's REST API endpoints:
+Each tool makes direct calls to GitLab REST API endpoints:
 
 ```python
 # Example from merge_request.py
@@ -132,7 +132,7 @@ class ExampleTool(DuoBaseTool):
 
 ### 2. **GitLab-Native Operations**
 - **Deep Integration**: Direct access to GitLab APIs with proper authentication
-- **Permission Awareness**: Respects GitLab's role-based access control
+- **Permission Awareness**: Respects GitLab role-based access control
 - **Resource Validation**: Built-in URL parsing and resource validation
 - **Consistent Error Handling**: Standardized error responses across all tools
 
@@ -326,7 +326,7 @@ The tools ecosystem uses a comprehensive testing strategy with multiple layers t
 ### Development Environment Setup
 
 **Prerequisites:**
-```bash
+```shell
 # Install Poetry (if not already installed)
 brew install poetry
 
@@ -339,7 +339,7 @@ poetry install --with test
 ```
 
 **Verify Installation:**
-```bash
+```shell
 # Test that everything works
 poetry run python -c "import ai_gateway; print('✅ Environment ready')"
 ```
@@ -363,7 +363,7 @@ tests/duo_workflow_service/tools/
 ### Running Tests
 
 **Basic Test Execution:**
-```bash
+```shell
 # Run all tool tests (409 tests)
 poetry run pytest tests/duo_workflow_service/tools/ -v
 
@@ -375,7 +375,7 @@ poetry run pytest tests/duo_workflow_service/tools/ --cov=duo_workflow_service.t
 ```
 
 **Test Categories:**
-```bash
+```shell
 # Run security-related tests
 poetry run pytest -k "security" -v
 
