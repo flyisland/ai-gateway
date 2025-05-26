@@ -1,0 +1,6 @@
+{
+  "name": "build_reader",
+  "resource": "builds",
+  "description": "This tool retrieves the content of a specific build, also known as a job\nONLY if the user question fulfills the strict usage conditions below.\n\n**Strict Usage Conditions:**\n* **Condition 1: build ID or job ID Provided:** This tool MUST be used ONLY when the user provides a valid build ID or job ID.\n* **Condition 2: build URL or job URL Context:** This tool MUST be used ONLY when the user is actively viewing\n  a specific build URL/job URL or a specific URL is provided by the user.\n\n**Do NOT** attempt to search for or identify builds or jobs based on descriptions, keywords, or user questions.\n\n**Action Input:**\n* The original question asked by the user.\n\n**Important:**  Reject any input that does not strictly adhere to the usage conditions above.\nReturn a message stating you are unable to search for builds or jobs without a valid identifier.",
+  "example": "Question: Explain the job https://some.host.name/some/long/path/-/jobs/:job_id.\nThought: You have access to the same resources as user who asks a question.\n    The question is about a build or a job, so you need to use \"build_reader\" tool.\n    Based on this information you can present final answer.\nAction: build_reader\nAction Input: Explain the job https://some.host.name/some/long/path/-/jobs/:job_id."
+}
