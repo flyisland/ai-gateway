@@ -4,6 +4,7 @@ from typing import AsyncIterable, AsyncIterator
 from contract import contract_pb2
 from asyncio import Future
 
+
 log = structlog.stdlib.get_logger("server")
 
 
@@ -24,34 +25,36 @@ class ExecutorClient:
         self.outbound_requests = asyncio.Queue()
         self.request_responses_by_id = {}
 
-    def request(self, action: contract_pb2.Action) -> contract_pb2.ClientEvent:
+    async def request(self, action: contract_pb2.Action) -> contract_pb2.ClientEvent:
         """
         Sends request to the Executor and receives response.
         """
 
-        future = asyncio.loop.create_future()
+        loop = asyncio.get_event_loop()
+        future = loop.create_future()
 
         self.request_responses_by_id[action.requestID] = future
 
-        self.outbound_requests.put(action)
+        await self.outbound_requests.put(action)
 
-        return future
+        return await future
 
-    def send(self, action: contract_pb2.Action):
+    async def send(self, action: contract_pb2.Action):
         """
         Sends request to the Executor and does not expect a response.
         """
 
-        self.outbound_requests.put(action)
+        await self.outbound_requests.put(action)
 
     async def process_incoming(self):
         async for event in self.incoming_iterator:
-            future = self.request_responses_by_id.get(event.requestID)
+            requestID = event.actionResponse.requestID
+            future = self.request_responses_by_id.get(requestID)
             if future:
                 future.set_result(event)
-                del self.request_responses_by_id[event.requestID]
+                del self.request_responses_by_id[requestID]
             else:
-                log.info("Received response for unknown requestID: %s. Could be a response to an action sent via 'send' instead of 'request'.", event.requestID)
+                log.info("Received response for unknown requestID: %s. Could be a response to an action sent via 'send' instead of 'request'.", requestID)
 
     async def execute_stream(self) -> AsyncIterator[contract_pb2.Action]:
         """
@@ -59,7 +62,7 @@ class ExecutorClient:
         It provides continuous action sending and waiting for responses.
         """
 
-        self.process_incoming()
+        asyncio.create_task(self.process_incoming())
 
         while True:
-            yield self.outbound_requests.get()
+            yield await self.outbound_requests.get()

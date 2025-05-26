@@ -39,6 +39,7 @@ class UserInterface:
         self.ui_chat_log: list[UiChatLog] = []
         self.status = WorkflowStatusEnum.NOT_STARTED
         self.steps: list[dict] = []
+        self.executor_client = executor_client
 
     async def send_event(
         self,
@@ -78,7 +79,7 @@ class UserInterface:
             ),
         )
 
-        self.executor_client.send(action)
+        await self.executor_client.send(action)
 
     def _append_chunk_to_ui_chat_log(self, message: BaseMessage):
         content = StrOutputParser().invoke(message) or ""
