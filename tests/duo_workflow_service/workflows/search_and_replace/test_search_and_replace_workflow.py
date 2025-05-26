@@ -350,7 +350,7 @@ def mock_checkpointer():
 
 
 @pytest.mark.asyncio
-@patch("duo_workflow_service.workflows.search_and_replace.workflow.new_chat_client")
+@patch("duo_workflow_service.workflows.search_and_replace.workflow.create_chat_model")
 @patch("duo_workflow_service.workflows.search_and_replace.workflow.Agent")
 async def test_workflow_compilation(
     mock_agent, mock_new_chat_client, mock_tools_registry, mock_checkpointer
@@ -413,7 +413,7 @@ async def test_accessibility_tools(
         workflow_metadata={},
         workflow_type=CategoryEnum.WORKFLOW_SEARCH_AND_REPLACE,
     )
-
+    model_name = workflow._get_chat_model()
     captured_tool_names = []
 
     # The accessibility agent is initialized with tools via `tools=tools_registry.get_batch(accessibility_tools),`

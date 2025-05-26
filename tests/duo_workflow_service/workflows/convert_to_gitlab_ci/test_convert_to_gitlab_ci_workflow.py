@@ -102,7 +102,7 @@ def mock_agent_response():
 
 
 @pytest.mark.asyncio
-@patch("duo_workflow_service.workflows.convert_to_gitlab_ci.workflow.new_chat_client")
+@patch("duo_workflow_service.workflows.convert_to_gitlab_ci.workflow.create_chat_model")
 async def test_translation_tools(
     tools_registry_with_all_privileges, mock_checkpointer, mock_workflow
 ):

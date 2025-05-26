@@ -146,7 +146,7 @@ def _agent_responses(status: WorkflowStatusEnum, agent_name: str):
     "duo_workflow_service.workflows.abstract_workflow.fetch_project_data_with_workflow_id"
 )
 @patch("duo_workflow_service.workflows.abstract_workflow.fetch_workflow_config")
-@patch("duo_workflow_service.workflows.software_development.workflow.new_chat_client")
+@patch("duo_workflow_service.workflows.software_development.workflow.create_chat_model")
 @patch("duo_workflow_service.workflows.abstract_workflow.GitLabWorkflow", autospec=True)
 @patch(
     "duo_workflow_service.workflows.software_development.workflow.ToolsApprovalComponent",
@@ -301,7 +301,7 @@ async def test_workflow_run(
     "duo_workflow_service.workflows.abstract_workflow.fetch_project_data_with_workflow_id"
 )
 @patch("duo_workflow_service.workflows.abstract_workflow.fetch_workflow_config")
-@patch("duo_workflow_service.workflows.software_development.workflow.new_chat_client")
+@patch("duo_workflow_service.workflows.software_development.workflow.create_chat_model")
 @patch("duo_workflow_service.workflows.abstract_workflow.GitLabWorkflow", autospec=True)
 @patch(
     "duo_workflow_service.workflows.software_development.workflow.GoalDisambiguationComponent",
@@ -430,7 +430,7 @@ async def test_workflow_run_with_memory_saver(
     "duo_workflow_service.workflows.abstract_workflow.fetch_project_data_with_workflow_id"
 )
 @patch("duo_workflow_service.workflows.abstract_workflow.fetch_workflow_config")
-@patch("duo_workflow_service.workflows.software_development.workflow.new_chat_client")
+@patch("duo_workflow_service.workflows.software_development.workflow.create_chat_model")
 @patch(
     "duo_workflow_service.workflows.software_development.workflow.GoalDisambiguationComponent",
     autospec=True,
@@ -518,7 +518,7 @@ async def test_workflow_run_when_exception(
 )
 @patch("duo_workflow_service.workflows.abstract_workflow.fetch_workflow_config")
 @patch(
-    "duo_workflow_service.workflows.software_development.workflow.new_chat_client",
+    "duo_workflow_service.workflows.software_development.workflow.create_chat_model",
     autospec=True,
 )
 @patch("duo_workflow_service.workflows.abstract_workflow.GitLabWorkflow", autospec=True)
@@ -615,7 +615,7 @@ async def test_workflow_run_with_error_state(
     "duo_workflow_service.workflows.abstract_workflow.fetch_project_data_with_workflow_id"
 )
 @patch("duo_workflow_service.workflows.abstract_workflow.fetch_workflow_config")
-@patch("duo_workflow_service.workflows.software_development.workflow.new_chat_client")
+@patch("duo_workflow_service.workflows.software_development.workflow.create_chat_model")
 @patch("duo_workflow_service.workflows.abstract_workflow.GitLabWorkflow", autospec=True)
 @patch(
     "duo_workflow_service.workflows.software_development.workflow.GoalDisambiguationComponent",
@@ -749,7 +749,7 @@ def assert_tools_in_tools_registry(tools_registry, tools):
 # the registry and match the list in the test.
 
 
-@patch("duo_workflow_service.workflows.software_development.workflow.new_chat_client")
+@patch("duo_workflow_service.workflows.software_development.workflow.create_chat_model")
 def test_executor_tools(tools_registry, software_development_workflow):
     agent_components = software_development_workflow._setup_executor(
         "test goal", tools_registry, MagicMock()
@@ -758,7 +758,7 @@ def test_executor_tools(tools_registry, software_development_workflow):
     assert_tools_in_tools_registry(tools_registry, agent_components["toolset"])
 
 
-@patch("duo_workflow_service.workflows.software_development.workflow.new_chat_client")
+@patch("duo_workflow_service.workflows.software_development.workflow.create_chat_model")
 def test_planner_tools(tools_registry, software_development_workflow):
     agent_components = software_development_workflow._setup_planner(
         "test goal", tools_registry, MagicMock(), MagicMock(spec=Toolset)
@@ -767,7 +767,7 @@ def test_planner_tools(tools_registry, software_development_workflow):
     assert_tools_in_tools_registry(tools_registry, agent_components["toolset"])
 
 
-@patch("duo_workflow_service.workflows.software_development.workflow.new_chat_client")
+@patch("duo_workflow_service.workflows.software_development.workflow.create_chat_model")
 def test_context_builder_tools(tools_registry, software_development_workflow):
     """Test that all tools used by the context builder agent are available in the tools registry."""
     agent_components = software_development_workflow._setup_context_builder(
@@ -942,7 +942,7 @@ async def test_workflow_run_with_invalid_web_url(
     "duo_workflow_service.workflows.abstract_workflow.fetch_project_data_with_workflow_id"
 )
 @patch("duo_workflow_service.workflows.abstract_workflow.fetch_workflow_config")
-@patch("duo_workflow_service.workflows.software_development.workflow.new_chat_client")
+@patch("duo_workflow_service.workflows.software_development.workflow.create_chat_model")
 @patch(
     "duo_workflow_service.workflows.software_development.workflow.GoalDisambiguationComponent",
     autospec=True,
@@ -1072,7 +1072,7 @@ async def test_workflow_run_with_retry(
     "duo_workflow_service.workflows.abstract_workflow.fetch_project_data_with_workflow_id"
 )
 @patch("duo_workflow_service.workflows.abstract_workflow.fetch_workflow_config")
-@patch("duo_workflow_service.workflows.software_development.workflow.new_chat_client")
+@patch("duo_workflow_service.workflows.software_development.workflow.create_chat_model")
 @patch("duo_workflow_service.workflows.abstract_workflow.GitLabWorkflow", autospec=True)
 @patch(
     "duo_workflow_service.workflows.software_development.workflow.ToolsApprovalComponent",
