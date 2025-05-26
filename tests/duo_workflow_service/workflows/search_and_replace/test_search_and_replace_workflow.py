@@ -403,7 +403,7 @@ async def test_workflow_initialization():
 
 
 @pytest.mark.asyncio
-@patch("duo_workflow_service.workflows.search_and_replace.workflow.new_chat_client")
+@patch("duo_workflow_service.workflows.search_and_replace.workflow.create_chat_model")
 async def test_accessibility_tools(
     tools_registry_with_all_privileges, mock_checkpointer
 ):
@@ -439,7 +439,7 @@ async def test_accessibility_tools(
 
 
 @pytest.mark.asyncio
-@patch("duo_workflow_service.workflows.search_and_replace.workflow.new_chat_client")
+@patch("duo_workflow_service.workflows.search_and_replace.workflow.create_chat_model")
 async def test_non_accessibility_tools(
     tools_registry_with_all_privileges, mock_checkpointer
 ):
