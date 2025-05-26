@@ -13,6 +13,7 @@ from duo_workflow_service.entities.state import (
     UiChatLog,
     WorkflowStatusEnum,
 )
+from duo_workflow_service.executor.client import ExecutorClient
 
 WORKFLOW_STATUS_TO_CHECKPOINT_STATUS = {
     WorkflowStatusEnum.EXECUTION: "RUNNING",
@@ -31,10 +32,9 @@ WORKFLOW_STATUS_TO_CHECKPOINT_STATUS = {
 class UserInterface:
     def __init__(
         self,
-        outbox: asyncio.Queue,
+        executor_client: ExecutorClient,
         goal: str,
     ):
-        self.outbox = outbox
         self.goal = goal
         self.ui_chat_log: list[UiChatLog] = []
         self.status = WorkflowStatusEnum.NOT_STARTED
@@ -78,7 +78,7 @@ class UserInterface:
             ),
         )
 
-        return await self.outbox.put(action)
+        self.executor_client.send(action)
 
     def _append_chunk_to_ui_chat_log(self, message: BaseMessage):
         content = StrOutputParser().invoke(message) or ""

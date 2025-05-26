@@ -1,4 +1,3 @@
-import asyncio
 from typing import Any, Optional, Type, TypedDict, Union
 
 from langchain.tools import BaseTool
@@ -10,11 +9,11 @@ from duo_workflow_service.interceptors.feature_flag_interceptor import (
     current_feature_flag_context,
 )
 from duo_workflow_service.tools import Toolset, ToolType
+from duo_workflow_service.executor.client import ExecutorClient
 
 
 class ToolMetadata(TypedDict):
-    outbox: asyncio.Queue
-    inbox: asyncio.Queue
+    executor_client: ExecutorClient
     gitlab_client: GitlabHttpClient
     gitlab_host: str
 
@@ -112,8 +111,7 @@ class ToolsRegistry:
         cls,
         workflow_config: dict[str, Any],
         gl_http_client: GitlabHttpClient,
-        outbox: asyncio.Queue,
-        inbox: asyncio.Queue,
+        executor_client: ExecutorClient,
         gitlab_host: str,
         additional_tools: Optional[list[Type[BaseTool]]] = None,
     ):
@@ -133,8 +131,7 @@ class ToolsRegistry:
             "pre_approved_agent_privileges_names", []
         )
         tool_metadata = ToolMetadata(
-            outbox=outbox,
-            inbox=inbox,
+            executor_client=executor_client,
             gitlab_client=gl_http_client,
             gitlab_host=gitlab_host,
         )

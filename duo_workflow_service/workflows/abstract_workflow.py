@@ -15,7 +15,6 @@ from langgraph.checkpoint.base import (  # pylint: disable=no-langgraph-langchai
 from langgraph.types import Command
 from langsmith import traceable, tracing_context
 
-from contract import contract_pb2
 from duo_workflow_service.checkpointer.gitlab_workflow import (
     GitLabWorkflow,
     WorkflowStatusEventEnum,
@@ -40,6 +39,7 @@ from duo_workflow_service.internal_events.event_enum import CategoryEnum, EventE
 from duo_workflow_service.monitoring import duo_workflow_metrics
 from duo_workflow_service.tools import convert_mcp_tools_to_langchain_tools
 from duo_workflow_service.tracking import log_exception
+from duo_workflow_service.executor.client import ExecutorClient
 
 # Constants
 QUEUE_MAX_SIZE = 1
@@ -56,15 +56,12 @@ class InvocationMetadata(TypedDict):
 
 
 class AbstractWorkflow(ABC):
-    OUTBOX_CHECK_INTERVAL = 0.5
     """Abstract base class for workflow implementations.
 
     Provides a structure for creating workflow classes with common functionality.
     """
 
-    _outbox: asyncio.Queue
-    _inbox: asyncio.Queue
-    _streaming_outbox: asyncio.Queue
+    _executor_client: ExecutorClient
     _workflow_id: str
     _project: Project
     _workflow_config: dict[str, Any]
@@ -81,6 +78,7 @@ class AbstractWorkflow(ABC):
         workflow_id: str,
         workflow_metadata: Dict[str, Any],
         workflow_type: CategoryEnum,
+        executor_client: ExecutorClient,
         context_elements: list = None,  # type: ignore[assignment]
         invocation_metadata: InvocationMetadata = {
             "base_url": "",
@@ -88,16 +86,15 @@ class AbstractWorkflow(ABC):
         },
         mcp_tools: list[contract_pb2.McpTool] = [],
     ):
-        self._outbox = asyncio.Queue(maxsize=QUEUE_MAX_SIZE)
-        self._inbox = asyncio.Queue(maxsize=QUEUE_MAX_SIZE)
-        self._streaming_outbox = asyncio.Queue(maxsize=QUEUE_MAX_SIZE)
         self._workflow_id = workflow_id
         self._workflow_metadata = workflow_metadata
         self._context_elements = context_elements or []
         self.log = structlog.stdlib.get_logger("workflow").bind(workflow_id=workflow_id)
+        self._workflow_type = workflow_type
+        self._executor_client = executor_client
+
         self._http_client = get_http_client(
-            self._outbox,
-            self._inbox,
+            self._executor_client,
             invocation_metadata.get("base_url", ""),
             invocation_metadata.get("gitlab_token", ""),
         )
@@ -142,25 +139,6 @@ class AbstractWorkflow(ABC):
     ) -> Any:
         pass
 
-    def get_from_streaming_outbox(self):
-        try:
-            item = self._streaming_outbox.get_nowait()
-            self._streaming_outbox.task_done()
-            return item
-        except asyncio.QueueEmpty:
-            return None
-
-    def outbox_empty(self):
-        return self._outbox.empty()
-
-    async def get_from_outbox(self):
-        item = await asyncio.wait_for(self._outbox.get(), self.OUTBOX_CHECK_INTERVAL)
-        self._outbox.task_done()
-        return item
-
-    def add_to_inbox(self, event: contract_pb2.ClientEvent):
-        self._inbox.put_nowait(event)
-
     def _recursion_limit(self):
         return RECURSION_LIMIT
 
@@ -197,15 +175,14 @@ class AbstractWorkflow(ABC):
             )
 
             tools_registry = await ToolsRegistry.configure(
-                outbox=self._outbox,
-                inbox=self._inbox,
+                executor_client=self._executor_client,
                 workflow_config=self._workflow_config,
                 gl_http_client=self._http_client,
                 gitlab_host=gitlab_host,
                 additional_tools=self._additional_tools,
             )
             checkpoint_notifier = UserInterface(
-                outbox=self._streaming_outbox, goal=goal
+                executor_client=self._executor_client, goal=goal
             )
 
             async with GitLabWorkflow(
@@ -266,9 +243,7 @@ class AbstractWorkflow(ABC):
         try:
             self.is_done = True
 
-            self._drain_queue(workflow_id, self._outbox, "outbox")
-            self._drain_queue(workflow_id, self._streaming_outbox, "streaming outbox")
-            self._drain_queue(workflow_id, self._inbox, "inbox")
+            # TODO: Is there actually anything to cleanup? The object and it's references can dropped anyway.
 
             self.log.info("Workflow cleanup completed.")
         except BaseException as cleanup_err:
@@ -328,7 +303,7 @@ class AbstractWorkflow(ABC):
         self,
         mcp_tools: list[contract_pb2.McpTool],
     ):
-        metadata = {"inbox": self._inbox, "outbox": self._outbox}
+        metadata = {"executor_client": self._executor_client}
         return convert_mcp_tools_to_langchain_tools(
             metadata=metadata, mcp_tools=mcp_tools
         )

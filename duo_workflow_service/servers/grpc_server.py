@@ -38,6 +38,7 @@ from duo_workflow_service.internal_events.event_enum import CategoryEnum
 from duo_workflow_service.structured_logging import set_workflow_id
 from duo_workflow_service.tracking import MonitoringContext, current_monitoring_context
 from duo_workflow_service.tracking.errors import log_exception
+from duo_workflow_service.executor.client import ExecutorClient
 from duo_workflow_service.workflows.abstract_workflow import (
     AbstractWorkflow,
     TypeWorkflow,
@@ -117,11 +118,16 @@ class GrpcServer(contract_pb2_grpc.DuoWorkflowServicer):
 
         invocation_metadata = dict(context.invocation_metadata())
 
+        executor_client = ExecutorClient(
+            incoming_iterator=request_iterator
+        )
+
         workflow: AbstractWorkflow = workflow_class(
             workflow_id=workflow_id,
             workflow_metadata=workflow_metadata,
             workflow_type=workflow_type,
             mcp_tools=mcp_tools,
+            executor_client=executor_client,
             context_elements=context_elements,
             invocation_metadata={
                 "base_url": invocation_metadata.get("x-gitlab-base-url", ""),
@@ -129,50 +135,10 @@ class GrpcServer(contract_pb2_grpc.DuoWorkflowServicer):
             },
         )
 
-        async def send_events():
-            while not workflow.is_done:
-                try:
-                    streaming_action = workflow.get_from_streaming_outbox()
-                    if isinstance(streaming_action, contract_pb2.Action):
-                        yield streaming_action
-                        _event: contract_pb2.ClientEvent = await anext(  # noqa: F841
-                            aiter(request_iterator)
-                        )
-
-                        if workflow.outbox_empty():
-                            continue
-
-                    action = await workflow.get_from_outbox()
-
-                    if isinstance(action, contract_pb2.Action):
-                        log.info(
-                            "Read action from the egress queue",
-                            requestID=action.requestID,
-                            action_class=action.WhichOneof("action"),
-                        )
-
-                    yield action
-
-                    event: contract_pb2.ClientEvent = await anext(
-                        aiter(request_iterator)
-                    )
-
-                    workflow.add_to_inbox(event)
-                    if (
-                        isinstance(event, contract_pb2.ClientEvent)
-                        and event.actionResponse
-                    ):
-                        log.info(
-                            "Wrote ClientEvent into the ingres queue",
-                            requestID=event.actionResponse.requestID,
-                        )
-                except TimeoutError as err:
-                    log.debug("Timeout on reading from queue, trying again", err=err)
-
         workflow_task = None
         try:
             workflow_task = asyncio.create_task(workflow.run(goal))
-            async for action in send_events():
+            async for action in executor_client.execute_stream():
                 yield action
 
             await workflow_task
