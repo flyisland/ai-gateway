@@ -82,7 +82,7 @@ class Workflow(AbstractWorkflow):
 
     def _get_chat_model(self) -> str:
         """Use the default implementation from AbstractWorkflow."""
-        ## TODO: Implement other models than Anthropic for this workflow
+        # TODO: Implement other models than Anthropic for this workflow
         return super()._get_chat_model()
 
     def _are_tools_called(self, state: ChatWorkflowState) -> Routes:

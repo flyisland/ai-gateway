@@ -195,7 +195,7 @@ def _should_continue(
 class Workflow(AbstractWorkflow):
     def _get_chat_model(self) -> str:
         """Use the default implementation from AbstractWorkflow."""
-        ## TODO: Implement other models than Anthropic for this workflow
+        # TODO: Implement other models than Anthropic for this workflow
         return super()._get_chat_model()
 
     async def _handle_workflow_failure(
