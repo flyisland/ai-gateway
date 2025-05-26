@@ -8,7 +8,7 @@ The Duo Workflow Service Tools are a collection of LangGraph-compatible tools th
 
 These tools are **backend services** that power GitLab AI features in the web interface. They do **not** run in IDEs or local development environments. Instead, they operate as part of GitLab infrastructure:
 
-```
+```text
 GitLab Web UI (Frontend)
         ↓
 GitLab Rails Backend
@@ -27,7 +27,8 @@ GitLab REST APIs & External Services
 When users interact with GitLab AI features, these tools execute automatically in the background:
 
 #### **GitLab Duo Chat Example:**
-```
+
+```text
 User: "Are there security issues in my latest MR?"
 
 Backend Workflow:
@@ -41,7 +42,8 @@ Result: User sees AI analysis and comments in GitLab web interface
 ```
 
 #### **Automated Code Review Example:**
-```
+
+```text
 User: Creates a merge request in GitLab web interface
 
 Automatic Backend Workflow:
@@ -78,13 +80,11 @@ async def _arun(self, **kwargs) -> str:
     return json.dumps({"merge_request": response})
 ```
 
-
-
 ## Architecture Overview
 
 ### Core Components
 
-```
+```text
 duo_workflow_service/tools/
 ├── duo_base_tool.py          # Base class for all tools
 ├── toolset.py               # Tool collection management
@@ -125,24 +125,28 @@ class ExampleTool(DuoBaseTool):
 ## Key Advantages
 
 ### 1. **LangGraph Integration**
+
 - **Native Compatibility**: Built specifically for LangGraph workflows
 - **Agent Orchestration**: Tools can be chained and combined intelligently
 - **State Management**: Maintains context across multi-step operations
 - **Error Recovery**: Graceful handling of failures with retry mechanisms
 
 ### 2. **GitLab-Native Operations**
+
 - **Deep Integration**: Direct access to GitLab APIs with proper authentication
 - **Permission Awareness**: Respects GitLab role-based access control
 - **Resource Validation**: Built-in URL parsing and resource validation
 - **Consistent Error Handling**: Standardized error responses across all tools
 
 ### 3. **Extensible Design**
+
 - **Plugin Architecture**: Easy addition of new tools without core changes
 - **Composable Operations**: Tools can be combined for complex workflows
 - **Configurable Behavior**: Tools adapt to different project/group contexts
 - **Type Safety**: Full Pydantic validation for all inputs and outputs
 
 ### 4. **Developer Experience**
+
 - **Rich Documentation**: Comprehensive descriptions for LLM understanding
 - **Display Messages**: Human-readable execution feedback
 - **Error Context**: Detailed error messages with actionable information
@@ -151,23 +155,27 @@ class ExampleTool(DuoBaseTool):
 ## Tool Categories
 
 ### Search and Discovery
+
 - **`gitlab_*_search`**: Search across issues, MRs, commits, files, users
 - **`search_system`**: Advanced search capabilities
 - **`previous_context`**: Access to workflow history
 
 ### Code and Repository Management
+
 - **`get_repository_file`**: Retrieve file contents
 - **`filesystem`**: File system operations
 - **`git`**: Git operations
 - **`commit`**: Commit analysis and operations
 
 ### Project Management
+
 - **`issue`**: Issue creation, updates, and management
 - **`merge_request`**: MR operations and reviews
 - **`epic`**: Epic management for larger initiatives
 - **`pipeline`**: CI/CD pipeline operations
 
 ### Workflow Orchestration
+
 - **`planner`**: Workflow planning and task breakdown
 - **`handover`**: Agent-to-agent communication
 - **`request_user_clarification`**: Interactive user input
@@ -232,6 +240,7 @@ from .my_tool import *
 ### 3. Tool Best Practices
 
 #### Input Validation
+
 ```python
 class ToolInput(BaseModel):
     # Use descriptive field descriptions for LLM understanding
@@ -252,6 +261,7 @@ class ToolInput(BaseModel):
 ```
 
 #### Error Handling
+
 ```python
 async def _arun(self, **kwargs) -> str:
     try:
@@ -274,6 +284,7 @@ async def _arun(self, **kwargs) -> str:
 ```
 
 #### Display Messages
+
 ```python
 def format_display_message(self, args: ToolInput) -> str:
     # Provide context-aware, human-readable messages
@@ -282,8 +293,6 @@ def format_display_message(self, args: ToolInput) -> str:
     else:
         return f"Executing {self.name} on project {args.project_id}"
 ```
-
-
 
 ## Workflow Integration
 
@@ -326,6 +335,7 @@ The tools ecosystem uses a comprehensive testing strategy with multiple layers t
 ### Development Environment Setup
 
 **Prerequisites:**
+
 ```shell
 # Install Poetry (if not already installed)
 brew install poetry
@@ -339,6 +349,7 @@ poetry install --with test
 ```
 
 **Verify Installation:**
+
 ```shell
 # Test that everything works
 poetry run python -c "import ai_gateway; print('✅ Environment ready')"
@@ -346,7 +357,7 @@ poetry run python -c "import ai_gateway; print('✅ Environment ready')"
 
 ### Testing Architecture
 
-```
+```text
 tests/duo_workflow_service/tools/
 ├── conftest.py                  # Shared fixtures and test configuration
 ├── test_duo_base_tool.py        # Base class functionality
@@ -363,6 +374,7 @@ tests/duo_workflow_service/tools/
 ### Running Tests
 
 **Basic Test Execution:**
+
 ```shell
 # Run all tool tests (409 tests)
 poetry run pytest tests/duo_workflow_service/tools/ -v
@@ -375,6 +387,7 @@ poetry run pytest tests/duo_workflow_service/tools/ --cov=duo_workflow_service.t
 ```
 
 **Test Categories:**
+
 ```shell
 # Run security-related tests
 poetry run pytest -k "security" -v
@@ -389,6 +402,7 @@ poetry run pytest -k "error" -v
 ### 1. Unit Testing
 
 #### Basic Tool Testing Pattern
+
 ```python
 import pytest
 from unittest.mock import AsyncMock
@@ -444,6 +458,7 @@ def test_format_display_message(tool):
 ```
 
 #### Parametrized Testing for Multiple Scenarios
+
 ```python
 @pytest.mark.parametrize(
     "input_params,expected_path,expected_params,mock_response,expected_result",
@@ -483,6 +498,7 @@ async def test_security_scanner_scenarios(
 ```
 
 #### Testing Input Validation
+
 ```python
 @pytest.mark.parametrize(
     "invalid_input,expected_error",
@@ -502,6 +518,7 @@ async def test_input_validation_errors(tool, invalid_input, expected_error):
 ```
 
 #### Testing URL Parsing and Validation
+
 ```python
 @pytest.mark.parametrize(
     "url,project_id,expected_project_id,expected_errors",
@@ -538,6 +555,7 @@ def test_url_validation(tool, url, project_id, expected_project_id, expected_err
 ### 2. Integration Testing
 
 #### Testing with Real GitLab API (Mocked)
+
 ```python
 @pytest.mark.asyncio
 async def test_security_scanner_integration(tool, gitlab_client_mock):
@@ -575,6 +593,7 @@ async def test_security_scanner_integration(tool, gitlab_client_mock):
 ```
 
 #### Testing Tool Composition in Workflows
+
 ```python
 @pytest.mark.asyncio
 async def test_security_review_workflow(
@@ -626,9 +645,8 @@ async def test_security_review_workflow(
 When adding new tools:
 
 1. **Follow the established patterns** in existing tools
-2. **Write comprehensive descriptions** for LLM understanding
-3. **Include proper error handling** and validation
-4. **Add unit and integration tests**
-5. **Update this README** with new tool categories
-6. **Consider security implications** of new capabilities
-
+1. **Write comprehensive descriptions** for LLM understanding
+1. **Include proper error handling** and validation
+1. **Add unit and integration tests**
+1. **Update this README** with new tool categories
+1. **Consider security implications** of new capabilities
