@@ -1,4 +1,5 @@
-from unittest.mock import AsyncMock, MagicMock, Mock, patch
+from datetime import datetime
+from unittest.mock import ANY, AsyncMock, MagicMock, Mock, patch
 
 import pytest
 from langchain_core.messages import AIMessage, SystemMessage
@@ -64,6 +65,7 @@ def workflow_with_project():
 async def test_workflow_initialization(workflow_with_project):
     initial_state = workflow_with_project.get_workflow_state("Test chat goal")
     expected_system_prompt = CHAT_SYSTEM_PROMPT.format(
+        current_date=datetime.now().strftime("%Y-%m-%d"),
         project_id="123",
         project_name="test-project",
         project_url="https://example.com/test-project",

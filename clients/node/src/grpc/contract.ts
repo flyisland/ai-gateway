@@ -5,7 +5,7 @@
 // source: contract.proto
 
 /* eslint-disable */
-import { BinaryReader, BinaryWriter } from "@bufbuild/protobuf/wire";
+import {BinaryReader, BinaryWriter} from "@bufbuild/protobuf/wire";
 import {
   type CallOptions,
   ChannelCredentials,
@@ -93,6 +93,7 @@ export interface StartWorkflowRequest {
   workflowMetadata: string;
   clientCapabilities: string[];
   context: ContextElement[];
+  mcpTools: McpTool[];
 }
 
 export interface ActionResponse {
@@ -131,6 +132,7 @@ export interface Action {
   listDirectory?: ListDirectory | undefined;
   grep?: Grep | undefined;
   findFiles?: FindFiles | undefined;
+  runMCPTool?: RunMCPTool | undefined;
 }
 
 export interface RunCommandAction {
@@ -201,8 +203,19 @@ export interface FindFiles {
   namePattern: string;
 }
 
+export interface McpTool {
+  name: string;
+  description: string;
+  inputSchema: string;
+}
+
+export interface RunMCPTool {
+  name: string;
+  args: string;
+}
+
 function createBaseClientEvent(): ClientEvent {
-  return { startRequest: undefined, actionResponse: undefined };
+  return {startRequest: undefined, actionResponse: undefined};
 }
 
 export const ClientEvent: MessageFns<ClientEvent> = {
@@ -290,6 +303,7 @@ function createBaseStartWorkflowRequest(): StartWorkflowRequest {
     workflowMetadata: "",
     clientCapabilities: [],
     context: [],
+    mcpTools: [],
   };
 }
 
@@ -315,6 +329,9 @@ export const StartWorkflowRequest: MessageFns<StartWorkflowRequest> = {
     }
     for (const v of message.context) {
       ContextElement.encode(v!, writer.uint32(58).fork()).join();
+    }
+    for (const v of message.mcpTools) {
+      McpTool.encode(v!, writer.uint32(66).fork()).join();
     }
     return writer;
   },
@@ -382,6 +399,14 @@ export const StartWorkflowRequest: MessageFns<StartWorkflowRequest> = {
           message.context.push(ContextElement.decode(reader, reader.uint32()));
           continue;
         }
+        case 8: {
+          if (tag !== 66) {
+            break;
+          }
+
+          message.mcpTools.push(McpTool.decode(reader, reader.uint32()));
+          continue;
+        }
       }
       if ((tag & 7) === 4 || tag === 0) {
         break;
@@ -404,6 +429,7 @@ export const StartWorkflowRequest: MessageFns<StartWorkflowRequest> = {
       context: globalThis.Array.isArray(object?.context)
         ? object.context.map((e: any) => ContextElement.fromJSON(e))
         : [],
+      mcpTools: globalThis.Array.isArray(object?.mcpTools) ? object.mcpTools.map((e: any) => McpTool.fromJSON(e)) : [],
     };
   },
 
@@ -430,6 +456,9 @@ export const StartWorkflowRequest: MessageFns<StartWorkflowRequest> = {
     if (message.context?.length) {
       obj.context = message.context.map((e) => ContextElement.toJSON(e));
     }
+    if (message.mcpTools?.length) {
+      obj.mcpTools = message.mcpTools.map((e) => McpTool.toJSON(e));
+    }
     return obj;
   },
 
@@ -445,12 +474,13 @@ export const StartWorkflowRequest: MessageFns<StartWorkflowRequest> = {
     message.workflowMetadata = object.workflowMetadata ?? "";
     message.clientCapabilities = object.clientCapabilities?.map((e) => e) || [];
     message.context = object.context?.map((e) => ContextElement.fromPartial(e)) || [];
+    message.mcpTools = object.mcpTools?.map((e) => McpTool.fromPartial(e)) || [];
     return message;
   },
 };
 
 function createBaseActionResponse(): ActionResponse {
-  return { requestID: "", response: "", plainTextResponse: undefined, httpResponse: undefined };
+  return {requestID: "", response: "", plainTextResponse: undefined, httpResponse: undefined};
 }
 
 export const ActionResponse: MessageFns<ActionResponse> = {
@@ -564,7 +594,7 @@ export const ActionResponse: MessageFns<ActionResponse> = {
 };
 
 function createBasePlainTextResponse(): PlainTextResponse {
-  return { response: "", error: "" };
+  return {response: "", error: ""};
 }
 
 export const PlainTextResponse: MessageFns<PlainTextResponse> = {
@@ -640,13 +670,13 @@ export const PlainTextResponse: MessageFns<PlainTextResponse> = {
 };
 
 function createBaseHttpResponse(): HttpResponse {
-  return { headers: {}, statusCode: 0, body: "", error: "" };
+  return {headers: {}, statusCode: 0, body: "", error: ""};
 }
 
 export const HttpResponse: MessageFns<HttpResponse> = {
   encode(message: HttpResponse, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
     Object.entries(message.headers).forEach(([key, value]) => {
-      HttpResponse_HeadersEntry.encode({ key: key as any, value }, writer.uint32(10).fork()).join();
+      HttpResponse_HeadersEntry.encode({key: key as any, value}, writer.uint32(10).fork()).join();
     });
     if (message.statusCode !== 0) {
       writer.uint32(16).int32(message.statusCode);
@@ -767,7 +797,7 @@ export const HttpResponse: MessageFns<HttpResponse> = {
 };
 
 function createBaseHttpResponse_HeadersEntry(): HttpResponse_HeadersEntry {
-  return { key: "", value: "" };
+  return {key: "", value: ""};
 }
 
 export const HttpResponse_HeadersEntry: MessageFns<HttpResponse_HeadersEntry> = {
@@ -855,6 +885,7 @@ function createBaseAction(): Action {
     listDirectory: undefined,
     grep: undefined,
     findFiles: undefined,
+    runMCPTool: undefined,
   };
 }
 
@@ -892,6 +923,9 @@ export const Action: MessageFns<Action> = {
     }
     if (message.findFiles !== undefined) {
       FindFiles.encode(message.findFiles, writer.uint32(90).fork()).join();
+    }
+    if (message.runMCPTool !== undefined) {
+      RunMCPTool.encode(message.runMCPTool, writer.uint32(98).fork()).join();
     }
     return writer;
   },
@@ -991,6 +1025,14 @@ export const Action: MessageFns<Action> = {
           message.findFiles = FindFiles.decode(reader, reader.uint32());
           continue;
         }
+        case 12: {
+          if (tag !== 98) {
+            break;
+          }
+
+          message.runMCPTool = RunMCPTool.decode(reader, reader.uint32());
+          continue;
+        }
       }
       if ((tag & 7) === 4 || tag === 0) {
         break;
@@ -1013,6 +1055,7 @@ export const Action: MessageFns<Action> = {
       listDirectory: isSet(object.listDirectory) ? ListDirectory.fromJSON(object.listDirectory) : undefined,
       grep: isSet(object.grep) ? Grep.fromJSON(object.grep) : undefined,
       findFiles: isSet(object.findFiles) ? FindFiles.fromJSON(object.findFiles) : undefined,
+      runMCPTool: isSet(object.runMCPTool) ? RunMCPTool.fromJSON(object.runMCPTool) : undefined,
     };
   },
 
@@ -1051,6 +1094,9 @@ export const Action: MessageFns<Action> = {
     if (message.findFiles !== undefined) {
       obj.findFiles = FindFiles.toJSON(message.findFiles);
     }
+    if (message.runMCPTool !== undefined) {
+      obj.runMCPTool = RunMCPTool.toJSON(message.runMCPTool);
+    }
     return obj;
   },
 
@@ -1088,12 +1134,15 @@ export const Action: MessageFns<Action> = {
     message.findFiles = (object.findFiles !== undefined && object.findFiles !== null)
       ? FindFiles.fromPartial(object.findFiles)
       : undefined;
+    message.runMCPTool = (object.runMCPTool !== undefined && object.runMCPTool !== null)
+      ? RunMCPTool.fromPartial(object.runMCPTool)
+      : undefined;
     return message;
   },
 };
 
 function createBaseRunCommandAction(): RunCommandAction {
-  return { program: "", arguments: [], flags: [] };
+  return {program: "", arguments: [], flags: []};
 }
 
 export const RunCommandAction: MessageFns<RunCommandAction> = {
@@ -1187,7 +1236,7 @@ export const RunCommandAction: MessageFns<RunCommandAction> = {
 };
 
 function createBaseReadFile(): ReadFile {
-  return { filepath: "" };
+  return {filepath: ""};
 }
 
 export const ReadFile: MessageFns<ReadFile> = {
@@ -1223,7 +1272,7 @@ export const ReadFile: MessageFns<ReadFile> = {
   },
 
   fromJSON(object: any): ReadFile {
-    return { filepath: isSet(object.filepath) ? globalThis.String(object.filepath) : "" };
+    return {filepath: isSet(object.filepath) ? globalThis.String(object.filepath) : ""};
   },
 
   toJSON(message: ReadFile): unknown {
@@ -1245,7 +1294,7 @@ export const ReadFile: MessageFns<ReadFile> = {
 };
 
 function createBaseWriteFile(): WriteFile {
-  return { filepath: "", contents: "" };
+  return {filepath: "", contents: ""};
 }
 
 export const WriteFile: MessageFns<WriteFile> = {
@@ -1321,7 +1370,7 @@ export const WriteFile: MessageFns<WriteFile> = {
 };
 
 function createBaseEditFile(): EditFile {
-  return { filepath: "", oldString: "", newString: "" };
+  return {filepath: "", oldString: "", newString: ""};
 }
 
 export const EditFile: MessageFns<EditFile> = {
@@ -1413,7 +1462,7 @@ export const EditFile: MessageFns<EditFile> = {
 };
 
 function createBaseRunHTTPRequest(): RunHTTPRequest {
-  return { method: "", path: "", body: undefined };
+  return {method: "", path: "", body: undefined};
 }
 
 export const RunHTTPRequest: MessageFns<RunHTTPRequest> = {
@@ -1505,7 +1554,7 @@ export const RunHTTPRequest: MessageFns<RunHTTPRequest> = {
 };
 
 function createBaseRunGitCommand(): RunGitCommand {
-  return { command: "", arguments: undefined, repositoryUrl: "" };
+  return {command: "", arguments: undefined, repositoryUrl: ""};
 }
 
 export const RunGitCommand: MessageFns<RunGitCommand> = {
@@ -1640,7 +1689,7 @@ export const GenerateTokenRequest: MessageFns<GenerateTokenRequest> = {
 };
 
 function createBaseGenerateTokenResponse(): GenerateTokenResponse {
-  return { token: "", expiresAt: 0 };
+  return {token: "", expiresAt: 0};
 }
 
 export const GenerateTokenResponse: MessageFns<GenerateTokenResponse> = {
@@ -1716,7 +1765,7 @@ export const GenerateTokenResponse: MessageFns<GenerateTokenResponse> = {
 };
 
 function createBaseContextElement(): ContextElement {
-  return { type: 0, name: "", contents: "" };
+  return {type: 0, name: "", contents: ""};
 }
 
 export const ContextElement: MessageFns<ContextElement> = {
@@ -1808,7 +1857,7 @@ export const ContextElement: MessageFns<ContextElement> = {
 };
 
 function createBaseNewCheckpoint(): NewCheckpoint {
-  return { status: "", checkpoint: "", goal: "", errors: [] };
+  return {status: "", checkpoint: "", goal: "", errors: []};
 }
 
 export const NewCheckpoint: MessageFns<NewCheckpoint> = {
@@ -1916,7 +1965,7 @@ export const NewCheckpoint: MessageFns<NewCheckpoint> = {
 };
 
 function createBaseListDirectory(): ListDirectory {
-  return { directory: "" };
+  return {directory: ""};
 }
 
 export const ListDirectory: MessageFns<ListDirectory> = {
@@ -1952,7 +2001,7 @@ export const ListDirectory: MessageFns<ListDirectory> = {
   },
 
   fromJSON(object: any): ListDirectory {
-    return { directory: isSet(object.directory) ? globalThis.String(object.directory) : "" };
+    return {directory: isSet(object.directory) ? globalThis.String(object.directory) : ""};
   },
 
   toJSON(message: ListDirectory): unknown {
@@ -1974,7 +2023,7 @@ export const ListDirectory: MessageFns<ListDirectory> = {
 };
 
 function createBaseGrep(): Grep {
-  return { searchDirectory: "", pattern: "", caseInsensitive: false };
+  return {searchDirectory: "", pattern: "", caseInsensitive: false};
 }
 
 export const Grep: MessageFns<Grep> = {
@@ -2066,7 +2115,7 @@ export const Grep: MessageFns<Grep> = {
 };
 
 function createBaseFindFiles(): FindFiles {
-  return { namePattern: "" };
+  return {namePattern: ""};
 }
 
 export const FindFiles: MessageFns<FindFiles> = {
@@ -2102,7 +2151,7 @@ export const FindFiles: MessageFns<FindFiles> = {
   },
 
   fromJSON(object: any): FindFiles {
-    return { namePattern: isSet(object.namePattern) ? globalThis.String(object.namePattern) : "" };
+    return {namePattern: isSet(object.namePattern) ? globalThis.String(object.namePattern) : ""};
   },
 
   toJSON(message: FindFiles): unknown {
@@ -2119,6 +2168,174 @@ export const FindFiles: MessageFns<FindFiles> = {
   fromPartial<I extends Exact<DeepPartial<FindFiles>, I>>(object: I): FindFiles {
     const message = createBaseFindFiles();
     message.namePattern = object.namePattern ?? "";
+    return message;
+  },
+};
+
+function createBaseMcpTool(): McpTool {
+  return {name: "", description: "", inputSchema: ""};
+}
+
+export const McpTool: MessageFns<McpTool> = {
+  encode(message: McpTool, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
+    if (message.name !== "") {
+      writer.uint32(10).string(message.name);
+    }
+    if (message.description !== "") {
+      writer.uint32(18).string(message.description);
+    }
+    if (message.inputSchema !== "") {
+      writer.uint32(26).string(message.inputSchema);
+    }
+    return writer;
+  },
+
+  decode(input: BinaryReader | Uint8Array, length?: number): McpTool {
+    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+    let end = length === undefined ? reader.len : reader.pos + length;
+    const message = createBaseMcpTool();
+    while (reader.pos < end) {
+      const tag = reader.uint32();
+      switch (tag >>> 3) {
+        case 1: {
+          if (tag !== 10) {
+            break;
+          }
+
+          message.name = reader.string();
+          continue;
+        }
+        case 2: {
+          if (tag !== 18) {
+            break;
+          }
+
+          message.description = reader.string();
+          continue;
+        }
+        case 3: {
+          if (tag !== 26) {
+            break;
+          }
+
+          message.inputSchema = reader.string();
+          continue;
+        }
+      }
+      if ((tag & 7) === 4 || tag === 0) {
+        break;
+      }
+      reader.skip(tag & 7);
+    }
+    return message;
+  },
+
+  fromJSON(object: any): McpTool {
+    return {
+      name: isSet(object.name) ? globalThis.String(object.name) : "",
+      description: isSet(object.description) ? globalThis.String(object.description) : "",
+      inputSchema: isSet(object.inputSchema) ? globalThis.String(object.inputSchema) : "",
+    };
+  },
+
+  toJSON(message: McpTool): unknown {
+    const obj: any = {};
+    if (message.name !== "") {
+      obj.name = message.name;
+    }
+    if (message.description !== "") {
+      obj.description = message.description;
+    }
+    if (message.inputSchema !== "") {
+      obj.inputSchema = message.inputSchema;
+    }
+    return obj;
+  },
+
+  create<I extends Exact<DeepPartial<McpTool>, I>>(base?: I): McpTool {
+    return McpTool.fromPartial(base ?? ({} as any));
+  },
+  fromPartial<I extends Exact<DeepPartial<McpTool>, I>>(object: I): McpTool {
+    const message = createBaseMcpTool();
+    message.name = object.name ?? "";
+    message.description = object.description ?? "";
+    message.inputSchema = object.inputSchema ?? "";
+    return message;
+  },
+};
+
+function createBaseRunMCPTool(): RunMCPTool {
+  return {name: "", args: ""};
+}
+
+export const RunMCPTool: MessageFns<RunMCPTool> = {
+  encode(message: RunMCPTool, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
+    if (message.name !== "") {
+      writer.uint32(10).string(message.name);
+    }
+    if (message.args !== "") {
+      writer.uint32(18).string(message.args);
+    }
+    return writer;
+  },
+
+  decode(input: BinaryReader | Uint8Array, length?: number): RunMCPTool {
+    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+    let end = length === undefined ? reader.len : reader.pos + length;
+    const message = createBaseRunMCPTool();
+    while (reader.pos < end) {
+      const tag = reader.uint32();
+      switch (tag >>> 3) {
+        case 1: {
+          if (tag !== 10) {
+            break;
+          }
+
+          message.name = reader.string();
+          continue;
+        }
+        case 2: {
+          if (tag !== 18) {
+            break;
+          }
+
+          message.args = reader.string();
+          continue;
+        }
+      }
+      if ((tag & 7) === 4 || tag === 0) {
+        break;
+      }
+      reader.skip(tag & 7);
+    }
+    return message;
+  },
+
+  fromJSON(object: any): RunMCPTool {
+    return {
+      name: isSet(object.name) ? globalThis.String(object.name) : "",
+      args: isSet(object.args) ? globalThis.String(object.args) : "",
+    };
+  },
+
+  toJSON(message: RunMCPTool): unknown {
+    const obj: any = {};
+    if (message.name !== "") {
+      obj.name = message.name;
+    }
+    if (message.args !== "") {
+      obj.args = message.args;
+    }
+    return obj;
+  },
+
+  create<I extends Exact<DeepPartial<RunMCPTool>, I>>(base?: I): RunMCPTool {
+    return RunMCPTool.fromPartial(base ?? ({} as any));
+  },
+  fromPartial<I extends Exact<DeepPartial<RunMCPTool>, I>>(object: I): RunMCPTool {
+    const message = createBaseRunMCPTool();
+    message.name = object.name ?? "";
+    message.args = object.args ?? "";
     return message;
   },
 };
@@ -2152,17 +2369,22 @@ export interface DuoWorkflowServer extends UntypedServiceImplementation {
 
 export interface DuoWorkflowClient extends Client {
   executeWorkflow(): ClientDuplexStream<ClientEvent, Action>;
+
   executeWorkflow(options: Partial<CallOptions>): ClientDuplexStream<ClientEvent, Action>;
+
   executeWorkflow(metadata: Metadata, options?: Partial<CallOptions>): ClientDuplexStream<ClientEvent, Action>;
+
   generateToken(
     request: GenerateTokenRequest,
     callback: (error: ServiceError | null, response: GenerateTokenResponse) => void,
   ): ClientUnaryCall;
+
   generateToken(
     request: GenerateTokenRequest,
     metadata: Metadata,
     callback: (error: ServiceError | null, response: GenerateTokenResponse) => void,
   ): ClientUnaryCall;
+
   generateToken(
     request: GenerateTokenRequest,
     metadata: Metadata,
@@ -2172,7 +2394,7 @@ export interface DuoWorkflowClient extends Client {
 }
 
 export const DuoWorkflowClient = makeGenericClientConstructor(DuoWorkflowService, "DuoWorkflow") as unknown as {
-  new (address: string, credentials: ChannelCredentials, options?: Partial<ClientOptions>): DuoWorkflowClient;
+  new(address: string, credentials: ChannelCredentials, options?: Partial<ClientOptions>): DuoWorkflowClient;
   service: typeof DuoWorkflowService;
   serviceName: string;
 };
@@ -2181,9 +2403,9 @@ type Builtin = Date | Function | Uint8Array | string | number | boolean | undefi
 
 export type DeepPartial<T> = T extends Builtin ? T
   : T extends globalThis.Array<infer U> ? globalThis.Array<DeepPartial<U>>
-  : T extends ReadonlyArray<infer U> ? ReadonlyArray<DeepPartial<U>>
-  : T extends {} ? { [K in keyof T]?: DeepPartial<T[K]> }
-  : Partial<T>;
+    : T extends ReadonlyArray<infer U> ? ReadonlyArray<DeepPartial<U>>
+      : T extends {} ? { [K in keyof T]?: DeepPartial<T[K]> }
+        : Partial<T>;
 
 type KeysOfUnion<T> = T extends T ? keyof T : never;
 export type Exact<P, I extends P> = P extends Builtin ? P
@@ -2210,9 +2432,14 @@ function isSet(value: any): boolean {
 
 export interface MessageFns<T> {
   encode(message: T, writer?: BinaryWriter): BinaryWriter;
+
   decode(input: BinaryReader | Uint8Array, length?: number): T;
+
   fromJSON(object: any): T;
+
   toJSON(message: T): unknown;
+
   create<I extends Exact<DeepPartial<T>, I>>(base?: I): T;
+
   fromPartial<I extends Exact<DeepPartial<T>, I>>(object: I): T;
 }

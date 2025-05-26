@@ -66,6 +66,8 @@ CHAT_READ_ONLY_TOOLS = [
     "scan_directory_tree",
     "list_epic_notes",
     "get_epic_note",
+    "get_commit",
+    "list_commits",
 ]
 
 CHAT_MUTATION_TOOLS = [
@@ -134,6 +136,7 @@ class Workflow(AbstractWorkflow):
         )
 
         system_prompt = CHAT_SYSTEM_PROMPT.format(
+            current_date=datetime.now().strftime("%Y-%m-%d"),
             project_id=self._project.get("id", "unknown"),
             project_name=self._project.get("name", "unknown"),
             project_url=self._project.get("web_url", "unknown"),
