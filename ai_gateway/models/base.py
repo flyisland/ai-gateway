@@ -87,7 +87,7 @@ class TokensConsumptionMetadata(BaseModel):
 
 class ModelMetadata(NamedTuple):
     name: str
-    engine: str
+    engine: Optional[str] = None
     endpoint: Optional[str] = None
     api_key: Optional[str] = None
     identifier: Optional[str] = None
