@@ -650,4 +650,3 @@ When adding new tools:
 1. **Add unit and integration tests**
 1. **Update this README** with new tool categories
 1. **Consider security implications** of new capabilities
-
