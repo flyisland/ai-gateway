@@ -1,5 +1,5 @@
 from datetime import datetime, timezone
-from typing import Annotated, List, Union
+from typing import Annotated, List, Optional
 
 from langchain_core.messages import AIMessage, BaseMessage, HumanMessage, SystemMessage
 
@@ -46,7 +46,8 @@ class HandoverAgent:
             )
             last_message = messages[-1]
             summary = self._extract_summary(last_message, ui_chat_logs)
-            handover_messages = [*messages[:-1], summary]
+            if summary is not None and summary.content != "":
+                handover_messages = [summary]
 
         if self._new_status == WorkflowStatusEnum.COMPLETED:
             ui_chat_logs.append(
@@ -80,9 +81,9 @@ class HandoverAgent:
 
     def _extract_summary(
         self, last_message: BaseMessage, ui_chat_logs: List[UiChatLog]
-    ) -> Union[BaseMessage]:
+    ) -> Optional[BaseMessage]:
         if not isinstance(last_message, AIMessage):
-            return last_message
+            return None
 
         handover_calls = [
             tool_call
@@ -107,4 +108,4 @@ class HandoverAgent:
                 )
                 return HumanMessage(content=summary)
 
-        return AIMessage(id=last_message.id, content=last_message.content)
+        return None
