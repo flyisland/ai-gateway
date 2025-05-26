@@ -5,7 +5,7 @@
 // source: contract.proto
 
 /* eslint-disable */
-import {BinaryReader, BinaryWriter} from "@bufbuild/protobuf/wire";
+import { BinaryReader, BinaryWriter } from "@bufbuild/protobuf/wire";
 import {
   type CallOptions,
   ChannelCredentials,
@@ -215,7 +215,7 @@ export interface RunMCPTool {
 }
 
 function createBaseClientEvent(): ClientEvent {
-  return {startRequest: undefined, actionResponse: undefined};
+  return { startRequest: undefined, actionResponse: undefined };
 }
 
 export const ClientEvent: MessageFns<ClientEvent> = {
@@ -480,7 +480,7 @@ export const StartWorkflowRequest: MessageFns<StartWorkflowRequest> = {
 };
 
 function createBaseActionResponse(): ActionResponse {
-  return {requestID: "", response: "", plainTextResponse: undefined, httpResponse: undefined};
+  return { requestID: "", response: "", plainTextResponse: undefined, httpResponse: undefined };
 }
 
 export const ActionResponse: MessageFns<ActionResponse> = {
@@ -594,7 +594,7 @@ export const ActionResponse: MessageFns<ActionResponse> = {
 };
 
 function createBasePlainTextResponse(): PlainTextResponse {
-  return {response: "", error: ""};
+  return { response: "", error: "" };
 }
 
 export const PlainTextResponse: MessageFns<PlainTextResponse> = {
@@ -670,13 +670,13 @@ export const PlainTextResponse: MessageFns<PlainTextResponse> = {
 };
 
 function createBaseHttpResponse(): HttpResponse {
-  return {headers: {}, statusCode: 0, body: "", error: ""};
+  return { headers: {}, statusCode: 0, body: "", error: "" };
 }
 
 export const HttpResponse: MessageFns<HttpResponse> = {
   encode(message: HttpResponse, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
     Object.entries(message.headers).forEach(([key, value]) => {
-      HttpResponse_HeadersEntry.encode({key: key as any, value}, writer.uint32(10).fork()).join();
+      HttpResponse_HeadersEntry.encode({ key: key as any, value }, writer.uint32(10).fork()).join();
     });
     if (message.statusCode !== 0) {
       writer.uint32(16).int32(message.statusCode);
@@ -797,7 +797,7 @@ export const HttpResponse: MessageFns<HttpResponse> = {
 };
 
 function createBaseHttpResponse_HeadersEntry(): HttpResponse_HeadersEntry {
-  return {key: "", value: ""};
+  return { key: "", value: "" };
 }
 
 export const HttpResponse_HeadersEntry: MessageFns<HttpResponse_HeadersEntry> = {
@@ -1142,7 +1142,7 @@ export const Action: MessageFns<Action> = {
 };
 
 function createBaseRunCommandAction(): RunCommandAction {
-  return {program: "", arguments: [], flags: []};
+  return { program: "", arguments: [], flags: [] };
 }
 
 export const RunCommandAction: MessageFns<RunCommandAction> = {
@@ -1236,7 +1236,7 @@ export const RunCommandAction: MessageFns<RunCommandAction> = {
 };
 
 function createBaseReadFile(): ReadFile {
-  return {filepath: ""};
+  return { filepath: "" };
 }
 
 export const ReadFile: MessageFns<ReadFile> = {
@@ -1272,7 +1272,7 @@ export const ReadFile: MessageFns<ReadFile> = {
   },
 
   fromJSON(object: any): ReadFile {
-    return {filepath: isSet(object.filepath) ? globalThis.String(object.filepath) : ""};
+    return { filepath: isSet(object.filepath) ? globalThis.String(object.filepath) : "" };
   },
 
   toJSON(message: ReadFile): unknown {
@@ -1294,7 +1294,7 @@ export const ReadFile: MessageFns<ReadFile> = {
 };
 
 function createBaseWriteFile(): WriteFile {
-  return {filepath: "", contents: ""};
+  return { filepath: "", contents: "" };
 }
 
 export const WriteFile: MessageFns<WriteFile> = {
@@ -1370,7 +1370,7 @@ export const WriteFile: MessageFns<WriteFile> = {
 };
 
 function createBaseEditFile(): EditFile {
-  return {filepath: "", oldString: "", newString: ""};
+  return { filepath: "", oldString: "", newString: "" };
 }
 
 export const EditFile: MessageFns<EditFile> = {
@@ -1462,7 +1462,7 @@ export const EditFile: MessageFns<EditFile> = {
 };
 
 function createBaseRunHTTPRequest(): RunHTTPRequest {
-  return {method: "", path: "", body: undefined};
+  return { method: "", path: "", body: undefined };
 }
 
 export const RunHTTPRequest: MessageFns<RunHTTPRequest> = {
@@ -1554,7 +1554,7 @@ export const RunHTTPRequest: MessageFns<RunHTTPRequest> = {
 };
 
 function createBaseRunGitCommand(): RunGitCommand {
-  return {command: "", arguments: undefined, repositoryUrl: ""};
+  return { command: "", arguments: undefined, repositoryUrl: "" };
 }
 
 export const RunGitCommand: MessageFns<RunGitCommand> = {
@@ -1689,7 +1689,7 @@ export const GenerateTokenRequest: MessageFns<GenerateTokenRequest> = {
 };
 
 function createBaseGenerateTokenResponse(): GenerateTokenResponse {
-  return {token: "", expiresAt: 0};
+  return { token: "", expiresAt: 0 };
 }
 
 export const GenerateTokenResponse: MessageFns<GenerateTokenResponse> = {
@@ -1765,7 +1765,7 @@ export const GenerateTokenResponse: MessageFns<GenerateTokenResponse> = {
 };
 
 function createBaseContextElement(): ContextElement {
-  return {type: 0, name: "", contents: ""};
+  return { type: 0, name: "", contents: "" };
 }
 
 export const ContextElement: MessageFns<ContextElement> = {
@@ -1857,7 +1857,7 @@ export const ContextElement: MessageFns<ContextElement> = {
 };
 
 function createBaseNewCheckpoint(): NewCheckpoint {
-  return {status: "", checkpoint: "", goal: "", errors: []};
+  return { status: "", checkpoint: "", goal: "", errors: [] };
 }
 
 export const NewCheckpoint: MessageFns<NewCheckpoint> = {
@@ -1965,7 +1965,7 @@ export const NewCheckpoint: MessageFns<NewCheckpoint> = {
 };
 
 function createBaseListDirectory(): ListDirectory {
-  return {directory: ""};
+  return { directory: "" };
 }
 
 export const ListDirectory: MessageFns<ListDirectory> = {
@@ -2001,7 +2001,7 @@ export const ListDirectory: MessageFns<ListDirectory> = {
   },
 
   fromJSON(object: any): ListDirectory {
-    return {directory: isSet(object.directory) ? globalThis.String(object.directory) : ""};
+    return { directory: isSet(object.directory) ? globalThis.String(object.directory) : "" };
   },
 
   toJSON(message: ListDirectory): unknown {
@@ -2023,7 +2023,7 @@ export const ListDirectory: MessageFns<ListDirectory> = {
 };
 
 function createBaseGrep(): Grep {
-  return {searchDirectory: "", pattern: "", caseInsensitive: false};
+  return { searchDirectory: "", pattern: "", caseInsensitive: false };
 }
 
 export const Grep: MessageFns<Grep> = {
@@ -2115,7 +2115,7 @@ export const Grep: MessageFns<Grep> = {
 };
 
 function createBaseFindFiles(): FindFiles {
-  return {namePattern: ""};
+  return { namePattern: "" };
 }
 
 export const FindFiles: MessageFns<FindFiles> = {
@@ -2151,7 +2151,7 @@ export const FindFiles: MessageFns<FindFiles> = {
   },
 
   fromJSON(object: any): FindFiles {
-    return {namePattern: isSet(object.namePattern) ? globalThis.String(object.namePattern) : ""};
+    return { namePattern: isSet(object.namePattern) ? globalThis.String(object.namePattern) : "" };
   },
 
   toJSON(message: FindFiles): unknown {
@@ -2173,7 +2173,7 @@ export const FindFiles: MessageFns<FindFiles> = {
 };
 
 function createBaseMcpTool(): McpTool {
-  return {name: "", description: "", inputSchema: ""};
+  return { name: "", description: "", inputSchema: "" };
 }
 
 export const McpTool: MessageFns<McpTool> = {
@@ -2265,7 +2265,7 @@ export const McpTool: MessageFns<McpTool> = {
 };
 
 function createBaseRunMCPTool(): RunMCPTool {
-  return {name: "", args: ""};
+  return { name: "", args: "" };
 }
 
 export const RunMCPTool: MessageFns<RunMCPTool> = {
@@ -2369,22 +2369,17 @@ export interface DuoWorkflowServer extends UntypedServiceImplementation {
 
 export interface DuoWorkflowClient extends Client {
   executeWorkflow(): ClientDuplexStream<ClientEvent, Action>;
-
   executeWorkflow(options: Partial<CallOptions>): ClientDuplexStream<ClientEvent, Action>;
-
   executeWorkflow(metadata: Metadata, options?: Partial<CallOptions>): ClientDuplexStream<ClientEvent, Action>;
-
   generateToken(
     request: GenerateTokenRequest,
     callback: (error: ServiceError | null, response: GenerateTokenResponse) => void,
   ): ClientUnaryCall;
-
   generateToken(
     request: GenerateTokenRequest,
     metadata: Metadata,
     callback: (error: ServiceError | null, response: GenerateTokenResponse) => void,
   ): ClientUnaryCall;
-
   generateToken(
     request: GenerateTokenRequest,
     metadata: Metadata,
@@ -2394,7 +2389,7 @@ export interface DuoWorkflowClient extends Client {
 }
 
 export const DuoWorkflowClient = makeGenericClientConstructor(DuoWorkflowService, "DuoWorkflow") as unknown as {
-  new(address: string, credentials: ChannelCredentials, options?: Partial<ClientOptions>): DuoWorkflowClient;
+  new (address: string, credentials: ChannelCredentials, options?: Partial<ClientOptions>): DuoWorkflowClient;
   service: typeof DuoWorkflowService;
   serviceName: string;
 };
@@ -2403,9 +2398,9 @@ type Builtin = Date | Function | Uint8Array | string | number | boolean | undefi
 
 export type DeepPartial<T> = T extends Builtin ? T
   : T extends globalThis.Array<infer U> ? globalThis.Array<DeepPartial<U>>
-    : T extends ReadonlyArray<infer U> ? ReadonlyArray<DeepPartial<U>>
-      : T extends {} ? { [K in keyof T]?: DeepPartial<T[K]> }
-        : Partial<T>;
+  : T extends ReadonlyArray<infer U> ? ReadonlyArray<DeepPartial<U>>
+  : T extends {} ? { [K in keyof T]?: DeepPartial<T[K]> }
+  : Partial<T>;
 
 type KeysOfUnion<T> = T extends T ? keyof T : never;
 export type Exact<P, I extends P> = P extends Builtin ? P
@@ -2432,14 +2427,9 @@ function isSet(value: any): boolean {
 
 export interface MessageFns<T> {
   encode(message: T, writer?: BinaryWriter): BinaryWriter;
-
   decode(input: BinaryReader | Uint8Array, length?: number): T;
-
   fromJSON(object: any): T;
-
   toJSON(message: T): unknown;
-
   create<I extends Exact<DeepPartial<T>, I>>(base?: I): T;
-
   fromPartial<I extends Exact<DeepPartial<T>, I>>(object: I): T;
 }
