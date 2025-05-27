@@ -73,6 +73,7 @@ class AbstractWorkflow(ABC):
     _workflow_type: CategoryEnum
     _stream: bool = False
     _context_elements: list
+    _mcp_tools: list[contract_pb2.McpTool]
 
     def __init__(
         self,
@@ -84,6 +85,7 @@ class AbstractWorkflow(ABC):
             "base_url": "",
             "gitlab_token": "",
         },
+        mcp_tools: list[contract_pb2.McpTool] = [],
     ):
         self._outbox = asyncio.Queue(maxsize=QUEUE_MAX_SIZE)
         self._inbox = asyncio.Queue(maxsize=QUEUE_MAX_SIZE)
@@ -99,6 +101,7 @@ class AbstractWorkflow(ABC):
             invocation_metadata.get("gitlab_token", ""),
         )
         self._workflow_type = workflow_type
+        self._mcp_tools = mcp_tools
 
     async def run(self, goal: str) -> None:
         with duo_workflow_metrics.time_workflow(
@@ -198,6 +201,7 @@ class AbstractWorkflow(ABC):
                 workflow_config=self._workflow_config,
                 gl_http_client=self._http_client,
                 gitlab_host=gitlab_host,
+                mcp_tools=self._mcp_tools,
             )
             checkpoint_notifier = UserInterface(
                 outbox=self._streaming_outbox, goal=goal
