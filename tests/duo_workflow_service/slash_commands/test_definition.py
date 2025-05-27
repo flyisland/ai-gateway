@@ -118,7 +118,7 @@ class TestSlashCommandDefinition:
     @patch("builtins.open", new_callable=mock_open, read_data="invalid: yaml: :")
     @patch("yaml.safe_load", side_effect=yaml.YAMLError("YAML parsing error"))
     def test_load_slash_command_definition_invalid_yaml(
-        self, mock_yaml, mock_file, mock_exists
+        self, _mock_yaml, _mock_file, mock_exists
     ):
         mock_exists.return_value = True
 
@@ -134,7 +134,7 @@ class TestSlashCommandDefinition:
     @patch("builtins.open", new_callable=mock_open, read_data="")
     @patch("yaml.safe_load", return_value=None)
     def test_load_slash_command_definition_empty_yaml(
-        self, mock_yaml, mock_file, mock_exists
+        self, _mock_yaml, _mock_file, mock_exists
     ):
         mock_exists.return_value = True
 
@@ -153,7 +153,7 @@ class TestSlashCommandDefinition:
     )
     @patch("yaml.safe_load", return_value=["just a list", "not a dictionary"])
     def test_load_slash_command_definition_non_dict_yaml(
-        self, mock_yaml, mock_file, mock_exists
+        self, _mock_yaml, _mock_file, mock_exists
     ):
         mock_exists.return_value = True
 
@@ -166,7 +166,7 @@ class TestSlashCommandDefinition:
 
     @patch("pathlib.Path.exists")
     @patch("builtins.open", side_effect=IOError("File read error"))
-    def test_load_slash_command_definition_io_error(self, mock_file, mock_exists):
+    def test_load_slash_command_definition_io_error(self, _mock_file, mock_exists):
         mock_exists.return_value = True
 
         with pytest.raises(SlashCommandConfigError) as excinfo:
