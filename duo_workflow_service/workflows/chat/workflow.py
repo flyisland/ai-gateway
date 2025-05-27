@@ -80,11 +80,6 @@ CHAT_MUTATION_TOOLS = [
 class Workflow(AbstractWorkflow):
     _stream: bool = True
 
-    def _get_chat_model(self) -> str:
-        """Use the default implementation from AbstractWorkflow."""
-        # TODO: Implement other models than Anthropic for this workflow
-        return super()._get_chat_model()
-
     def _are_tools_called(self, state: ChatWorkflowState) -> Routes:
         if state["status"] in [WorkflowStatusEnum.CANCELLED, WorkflowStatusEnum.ERROR]:
             return Routes.STOP
@@ -203,7 +198,8 @@ class Workflow(AbstractWorkflow):
             name=AGENT_NAME,
             model=create_chat_model(
                 max_tokens=MAX_TOKENS_TO_SAMPLE,
-                model=self._get_chat_model(),
+                model_name=self._get_chat_model_name(),
+                is_vertex=self._is_vertex,
             ),
             toolset=agents_toolset,
             workflow_id=self._workflow_id,

@@ -49,13 +49,14 @@ class VertexConfig:
 
 
 def create_chat_model(
-    config: VertexConfig = VertexConfig(), model=None, **kwargs
+    config: VertexConfig = VertexConfig(),
+    model_name: str = None,
+    is_vertex: bool = False,
+    **kwargs,
 ) -> BaseChatModel:
-    vertex_project_id = os.environ.get("DUO_WORKFLOW__VERTEX_PROJECT_ID")
-
-    if vertex_project_id and len(vertex_project_id) > 1:
+    if is_vertex:
         return ChatAnthropicVertex(
-            model_name=model if model else config.model_name,
+            model_name=model_name if model_name else config.model_name,
             project=config.project_id,
             location=config.location,
             max_retries=config.max_retries,
@@ -63,7 +64,7 @@ def create_chat_model(
         )
 
     anthropic_api_key = os.environ.get("ANTHROPIC_API_KEY")
-    anthropic_model_name = model if model else get_anthropic_model_name()
+    anthropic_model_name = model_name if model_name else get_anthropic_model_name()
     if anthropic_api_key and len(anthropic_api_key) > 1:
         return ChatAnthropic(
             model_name=anthropic_model_name,
@@ -78,7 +79,10 @@ def create_chat_model(
 
 def validate_llm_access(config: VertexConfig = VertexConfig()):
     log = structlog.stdlib.get_logger("server")
-    anthropic_client = create_chat_model(config=config)
+    anthropic_client = create_chat_model(
+        config=config,
+        model_name=get_anthropic_model_name(),
+    )
 
     with tracing_context(enabled=False):
         anthropic_response = anthropic_client.invoke(
@@ -86,7 +90,7 @@ def validate_llm_access(config: VertexConfig = VertexConfig()):
         )
 
     content = anthropic_response.content
-    # feature flags are not yet loaded, so logging the model name here could be misleaeding if the model name depends on feature flags.
+    # feature flags are not yet loaded, so logging the model name here could be misleading if the model name depends on feature flags.
     log.info(str(content))
 
 

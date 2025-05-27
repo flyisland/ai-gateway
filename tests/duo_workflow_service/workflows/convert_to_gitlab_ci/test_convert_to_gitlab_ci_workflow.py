@@ -469,5 +469,5 @@ async def test_workflow_get_chat_model_without_vertex():
         workflow_type=CategoryEnum.WORKFLOW_SOFTWARE_DEVELOPMENT,
     )
 
-    model_name = workflow._get_chat_model()
+    model_name = workflow._get_chat_model_name()
     assert model_name == "claude-3-7-sonnet-20250219"

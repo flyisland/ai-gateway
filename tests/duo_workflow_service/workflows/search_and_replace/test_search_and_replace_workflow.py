@@ -413,7 +413,7 @@ async def test_accessibility_tools(
         workflow_metadata={},
         workflow_type=CategoryEnum.WORKFLOW_SEARCH_AND_REPLACE,
     )
-    model_name = workflow._get_chat_model()
+    model_name = workflow._get_chat_model_name()
     captured_tool_names = []
 
     # The accessibility agent is initialized with tools via `tools=tools_registry.get_batch(accessibility_tools),`
@@ -487,5 +487,5 @@ async def test_workflow_get_chat_model_without_vertex():
         workflow_type=CategoryEnum.WORKFLOW_SOFTWARE_DEVELOPMENT,
     )
 
-    model_name = workflow._get_chat_model()
+    model_name = workflow._get_chat_model_name()
     assert model_name == "claude-3-7-sonnet-20250219"

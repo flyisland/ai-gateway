@@ -11,7 +11,6 @@ from duo_workflow_service.interceptors.correlation_id_interceptor import (
     gitlab_global_user_id,
 )
 
-
 # --------- gRPC Interceptor Tests ---------
 
 

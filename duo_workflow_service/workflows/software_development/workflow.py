@@ -193,11 +193,6 @@ def _should_continue(
 
 
 class Workflow(AbstractWorkflow):
-    def _get_chat_model(self) -> str:
-        """Use the default implementation from AbstractWorkflow."""
-        # TODO: Implement other models than Anthropic for this workflow
-        return super()._get_chat_model()
-
     async def _handle_workflow_failure(
         self, error: BaseException, compiled_graph, graph_config
     ):
@@ -343,7 +338,11 @@ class Workflow(AbstractWorkflow):
         last_node_name = self._add_context_builder_nodes(graph, goal, tools_registry)
         disambiguation_component = GoalDisambiguationComponent(
             goal=goal,
-            model=create_chat_model(max_tokens=MAX_TOKENS_TO_SAMPLE),
+            model=create_chat_model(
+                max_tokens=MAX_TOKENS_TO_SAMPLE,
+                model_name=self._get_chat_model_name(),
+                is_vertex=self._is_vertex,
+            ),
             http_client=self._http_client,
             workflow_id=self._workflow_id,
             tools_registry=tools_registry,
@@ -448,11 +447,13 @@ class Workflow(AbstractWorkflow):
     ):
         base_model_planner = create_chat_model(
             max_tokens=MAX_TOKENS_TO_SAMPLE,
-            model=self._get_chat_model(),
+            model_name=self._get_chat_model_name(),
+            is_vertex=self._is_vertex,
         )
         base_model_executor = create_chat_model(
             max_tokens=MAX_TOKENS_TO_SAMPLE,
-            model=self._get_chat_model(),
+            model=self._get_chat_model_name(),
+            is_vertex=self._is_vertex,
         )
 
         graph = StateGraph(WorkflowState)
@@ -548,7 +549,11 @@ class Workflow(AbstractWorkflow):
         context_builder_toolset = tools_registry.toolset(CONTEXT_BUILDER_TOOLS)
         context_builder = Agent(
             goal=goal,
-            model=create_chat_model(max_tokens=MAX_TOKENS_TO_SAMPLE),  # type: ignore
+            model=create_chat_model(
+                max_tokens=MAX_TOKENS_TO_SAMPLE,
+                model_name=self._get_chat_model_name(),
+                is_vertex=self._is_vertex,
+            ),  # type: ignore
             name="context_builder",
             system_prompt=BUILD_CONTEXT_SYSTEM_MESSAGE.format(
                 handover_tool_name=HANDOVER_TOOL_NAME,

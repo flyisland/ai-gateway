@@ -346,12 +346,6 @@ def _patches_present(state: SearchAndReplaceWorkflowState) -> str:
 
 
 class Workflow(AbstractWorkflow):
-    def _get_chat_model(self) -> str:
-        """Use the default implementation from AbstractWorkflow."""
-        # TODO:
-        # Implement other models than Anthropic
-        return super()._get_chat_model()
-
     async def _handle_workflow_failure(
         self, error: BaseException, compiled_graph: Any, graph_config: Any
     ):
@@ -449,7 +443,8 @@ class Workflow(AbstractWorkflow):
             name=AGENT_NAME,
             model=create_chat_model(
                 max_tokens=MAX_TOKENS_TO_SAMPLE,
-                model=self._get_chat_model(),
+                model_name=self._get_chat_model_name(),
+                is_vertex=self._is_vertex,
             ),
             toolset=agents_toolset,
             http_client=self._http_client,

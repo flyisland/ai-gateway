@@ -14,6 +14,7 @@ from langgraph.checkpoint.base import (  # pylint: disable=no-langgraph-langchai
 from langgraph.types import Command
 from langsmith import traceable, tracing_context
 
+from ai_gateway.models import KindAnthropicModel
 from contract import contract_pb2
 from duo_workflow_service.checkpointer.gitlab_workflow import (
     GitLabWorkflow,
@@ -73,6 +74,7 @@ class AbstractWorkflow(ABC):
     _workflow_type: CategoryEnum
     _stream: bool = False
     _context_elements: list
+    _is_vertex: bool = False
 
     def __init__(
         self,
@@ -99,6 +101,9 @@ class AbstractWorkflow(ABC):
             invocation_metadata.get("gitlab_token", ""),
         )
         self._workflow_type = workflow_type
+
+        _vertex_project_id = os.getenv("DUO_WORKFLOW__VERTEX_PROJECT_ID")
+        self._is_vertex = _vertex_project_id and len(_vertex_project_id) > 1
 
     async def run(self, goal: str) -> None:
         with duo_workflow_metrics.time_workflow(workflow_type=self.__class__.__name__):
@@ -317,26 +322,31 @@ class AbstractWorkflow(ABC):
             category=category.value if category else self.__class__.__name__,
         )
 
-    @abstractmethod
-    def _get_chat_model(self) -> str:
+    def _get_chat_model_name(self) -> str:
         """
-        Get the chat model name based on the environment configuration.
+        Determine the appropriate chat model name based on deployment environment.
 
-        Default implementation:
-        checks for Vertex AI configuration and returns
-        the appropriate Claude model name.Child classes can override this
-        to use different models or selection logic.
+        This method selects between standard and Vertex AI-specific model naming
+        conventions. When deployed on Google Cloud Vertex AI, model names require
+        a different format than standard Anthropic API deployments.
+
+        The method checks the `_is_vertex` property (which should be set based on
+        the presence of DUO_WORKFLOW__VERTEX_PROJECT_ID environment variable) to
+        determine the deployment context.
 
         Returns:
-            str: Model name - returns Vertex-formatted model name if
-                 DUO_WORKFLOW__VERTEX_PROJECT_ID is set, otherwise returns
-                 the standard model name.
-        """
-        vertex_project_id = os.environ.get("DUO_WORKFLOW__VERTEX_PROJECT_ID")
-        if vertex_project_id and len(vertex_project_id) > 1:
-            return "claude-3-7-sonnet@20250219"
+            str: The model identifier string appropriate for the current deployment:
+                - Vertex AI format: Used when running on Google Cloud Vertex AI
+                - Standard format: Used for direct API calls
 
-        return "claude-3-7-sonnet-20250219"
+        Note:
+            Subclasses can override this method to implement custom model selection
+            logic or to use different model versions.
+        """
+        if self._is_vertex:
+            return KindAnthropicModel.CLAUDE_3_7_SONNET_VERTEX.value()
+
+        return KindAnthropicModel.CLAUDE_3_7_SONNET.value()
 
 
 TypeWorkflow = type[AbstractWorkflow]
