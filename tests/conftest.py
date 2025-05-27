@@ -29,7 +29,7 @@ from ai_gateway.code_suggestions.processing.typing import (
     MetadataCodeContent,
     MetadataPromptBuilder,
 )
-from ai_gateway.config import Config, ConfigModelLimits
+from ai_gateway.config import Config, ConfigLogging
 from ai_gateway.container import ContainerApplication
 from ai_gateway.model_metadata import TypeModelMetadata, current_model_metadata_context
 from ai_gateway.models.base import ModelMetadata, TokensConsumptionMetadata
@@ -43,7 +43,7 @@ from ai_gateway.prompts.config.base import ModelConfig, PromptConfig, PromptPara
 from ai_gateway.prompts.config.models import ChatLiteLLMParams, TypeModelParams
 from ai_gateway.prompts.typing import Model, TypeModelFactory
 from ai_gateway.safety_attributes import SafetyAttributes
-from duo_workflow_service.entities.event import WorkflowEvent
+from ai_gateway.structured_logging import setup_logging
 from duo_workflow_service.entities.state import (
     MessageTypeEnum,
     Plan,
@@ -51,13 +51,6 @@ from duo_workflow_service.entities.state import (
     WorkflowState,
     WorkflowStatusEnum,
 )
-from duo_workflow_service.gitlab.gitlab_project import Project
-from duo_workflow_service.server import CONTAINER_APPLICATION_PACKAGES
-from duo_workflow_service.workflows.type_definitions import AdditionalContext
-from lib.feature_flags.context import current_feature_flag_context
-from lib.internal_events.client import InternalEventsClient
-from ai_gateway.structured_logging import setup_logging
-from ai_gateway.config import ConfigLogging
 
 pytest_plugins = ("pytest_asyncio",)
 
@@ -100,6 +93,10 @@ def test_client(fast_api_router, stub_auth_provider, request):
     ]
     app = FastAPI(middleware=middlewares)
     app.include_router(fast_api_router)
+
+    # Add logging setup
+    setup_logging(ConfigLogging(), custom_models_enabled=True)
+
     client = TestClient(app)
 
     return client
