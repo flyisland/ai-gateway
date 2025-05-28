@@ -175,11 +175,11 @@ class ToolsRegistry:
                 if (
                     tool_cls
                     in [
-                    tools.GetCommit,
-                    tools.ListCommits,
-                    tools.GetCommitDiff,
-                    tools.GetCommitComments,
-                ]
+                        tools.GetCommit,
+                        tools.ListCommits,
+                        tools.GetCommitDiff,
+                        tools.GetCommitComments,
+                    ]
                     and "duo_workflow_commit_tools" not in feature_flags
                 ):
                     continue

@@ -339,8 +339,7 @@ class AbstractWorkflow(ABC):
         )
 
     def _get_chat_model_name(self) -> str:
-        """
-        Determine the appropriate chat model name based on deployment environment.
+        """Determine the appropriate chat model name based on deployment environment.
 
         This method selects between standard and Vertex AI-specific model naming
         conventions. When deployed on Google Cloud Vertex AI, model names require

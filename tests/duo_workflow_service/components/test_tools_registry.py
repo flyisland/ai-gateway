@@ -350,8 +350,8 @@ def test_get_batch_tools(tool_metadata, requested_tools, expected_tools, config)
     )
 
     assert [
-               tool.__class__ for tool in registry.get_batch(requested_tools)
-           ] == expected_tools
+        tool.__class__ for tool in registry.get_batch(requested_tools)
+    ] == expected_tools
 
 
 @pytest.mark.parametrize(
@@ -374,8 +374,8 @@ def test_get_handlers(tool_metadata, requested_tools, expected_tools, config):
     )
 
     assert [
-               tool.__class__ for tool in registry.get_handlers(requested_tools)
-           ] == expected_tools
+        tool.__class__ for tool in registry.get_handlers(requested_tools)
+    ] == expected_tools
 
 
 def test_preapproved_tools_initialization(tool_metadata):
@@ -593,5 +593,5 @@ def test_commit_tools_feature_flag(
     assert ("list_commits" in registry._enabled_tools) == should_include_commit_tools
     assert ("get_commit_diff" in registry._enabled_tools) == should_include_commit_tools
     assert (
-               "get_commit_comments" in registry._enabled_tools
-           ) == should_include_commit_tools
+        "get_commit_comments" in registry._enabled_tools
+    ) == should_include_commit_tools
