@@ -2,12 +2,12 @@ from abc import ABC, abstractmethod
 from typing import Any, AsyncIterator, Mapping, Optional, Tuple, TypeVar, cast
 
 from gitlab_cloud_connector import GitLabUnitPrimitive, WrongUnitPrimitives
-from jinja2 import PackageLoader
+from jinja2 import PackageLoader, meta
 from jinja2.sandbox import SandboxedEnvironment
 from langchain_core.callbacks import BaseCallbackHandler, get_usage_metadata_callback
 from langchain_core.messages.ai import UsageMetadata
 from langchain_core.prompt_values import PromptValue
-from langchain_core.prompts import ChatPromptTemplate
+from langchain_core.prompts import ChatPromptTemplate, string
 from langchain_core.prompts.string import DEFAULT_FORMATTER_MAPPING
 from langchain_core.runnables import Runnable, RunnableBinding, RunnableConfig
 
@@ -29,9 +29,26 @@ __all__ = [
 Input = TypeVar("Input")
 Output = TypeVar("Output")
 
-jinja_env = SandboxedEnvironment(
-    loader=PackageLoader("ai_gateway.prompts", "definitions")
-)
+jinja_loader = PackageLoader("ai_gateway.prompts", "definitions")
+jinja_env = SandboxedEnvironment(loader=jinja_loader)
+
+
+def _get_jinja2_variables_from_template(template: str) -> set[str]:
+    ast = jinja_env.parse(template)
+    variables = meta.find_undeclared_variables(ast)
+
+    for template_name in meta.find_referenced_templates(ast):
+        if not template_name:
+            continue
+
+        template_source, _, _ = jinja_loader.get_source(jinja_env, template_name)
+        ast = jinja_env.parse(template_source)
+        variables = variables.union(meta.find_undeclared_variables(ast))
+
+    return variables
+
+
+string._get_jinja2_variables_from_template = _get_jinja2_variables_from_template
 
 
 def jinja2_formatter(template: str, /, **kwargs: Any) -> str:
@@ -43,12 +60,13 @@ DEFAULT_FORMATTER_MAPPING["jinja2"] = jinja2_formatter
 
 
 class PromptLoggingHandler(BaseCallbackHandler):
-    """
-    Logs the full prompt that is sent to the LLM.
-    """
+    """Logs the full prompt that is sent to the LLM."""
 
     def on_llm_start(
-        self, serialized: dict[str, Any], prompts: list[str], **kwargs: Any
+        self,
+        serialized: dict[str, Any],  # pylint: disable=unused-argument
+        prompts: list[str],
+        **_kwargs: Any,
     ) -> Any:
         get_request_logger("prompt").info(
             "Performing LLM request", prompt="\n".join(prompts)
@@ -228,7 +246,9 @@ class Prompt(RunnableBinding[Input, Output]):
 
     @classmethod
     def _build_prompt_template(
-        cls, prompt_template: dict[str, str], model_config: ModelConfig
+        cls,
+        prompt_template: dict[str, str],
+        model_config: ModelConfig,  # pylint: disable=unused-argument
     ) -> Runnable[Input, PromptValue]:
         messages = []
 

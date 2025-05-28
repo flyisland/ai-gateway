@@ -1,9 +1,10 @@
 import asyncio
 import os
 from abc import ABC, abstractmethod
-from typing import Any, Dict, TypedDict
+from typing import Any, Dict, Type, TypedDict
 
 import structlog
+from langchain.tools import BaseTool
 from langchain_core.runnables import RunnableConfig
 
 # pylint disable are going to be fixed via
@@ -38,6 +39,7 @@ from duo_workflow_service.internal_events import (
 )
 from duo_workflow_service.internal_events.event_enum import CategoryEnum, EventEnum
 from duo_workflow_service.monitoring import duo_workflow_metrics
+from duo_workflow_service.tools import convert_mcp_tools_to_langchain_tools
 from duo_workflow_service.tracking import log_exception
 
 # Constants
@@ -56,9 +58,8 @@ class InvocationMetadata(TypedDict):
 
 class AbstractWorkflow(ABC):
     OUTBOX_CHECK_INTERVAL = 0.5
+    """Abstract base class for workflow implementations.
 
-    """
-    Abstract base class for workflow implementations.
     Provides a structure for creating workflow classes with common functionality.
     """
 
@@ -75,6 +76,7 @@ class AbstractWorkflow(ABC):
     _stream: bool = False
     _context_elements: list
     _is_vertex: bool = False
+    _additional_tools: list[Type[BaseTool]]
 
     def __init__(
         self,
@@ -86,6 +88,7 @@ class AbstractWorkflow(ABC):
             "base_url": "",
             "gitlab_token": "",
         },
+        mcp_tools: list[contract_pb2.McpTool] = [],
     ):
         self._outbox = asyncio.Queue(maxsize=QUEUE_MAX_SIZE)
         self._inbox = asyncio.Queue(maxsize=QUEUE_MAX_SIZE)
@@ -101,12 +104,15 @@ class AbstractWorkflow(ABC):
             invocation_metadata.get("gitlab_token", ""),
         )
         self._workflow_type = workflow_type
+        self._additional_tools = self._build_additional_tools(mcp_tools)
 
         _vertex_project_id = os.getenv("DUO_WORKFLOW__VERTEX_PROJECT_ID")
         self._is_vertex = bool(_vertex_project_id and len(_vertex_project_id) > 1)
 
     async def run(self, goal: str) -> None:
-        with duo_workflow_metrics.time_workflow(workflow_type=self.__class__.__name__):
+        with duo_workflow_metrics.time_workflow(
+            workflow_type=self._workflow_type.value
+        ):
             extended_logging = self._workflow_metadata.get("extended_logging", False)
             tracing_metadata = {
                 "git_url": self._workflow_metadata.get("git_url", ""),
@@ -201,6 +207,7 @@ class AbstractWorkflow(ABC):
                 workflow_config=self._workflow_config,
                 gl_http_client=self._http_client,
                 gitlab_host=gitlab_host,
+                additional_tools=self._additional_tools,
             )
             checkpoint_notifier = UserInterface(
                 outbox=self._streaming_outbox, goal=goal
@@ -320,6 +327,15 @@ class AbstractWorkflow(ABC):
             event_name=event_name.value,
             additional_properties=additional_properties,
             category=category.value if category else self.__class__.__name__,
+        )
+
+    def _build_additional_tools(
+        self,
+        mcp_tools: list[contract_pb2.McpTool],
+    ):
+        metadata = {"inbox": self._inbox, "outbox": self._outbox}
+        return convert_mcp_tools_to_langchain_tools(
+            metadata=metadata, mcp_tools=mcp_tools
         )
 
     def _get_chat_model_name(self) -> str:

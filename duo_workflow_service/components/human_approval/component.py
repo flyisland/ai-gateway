@@ -46,10 +46,8 @@ class HumanApprovalComponent(ABC):
     def _build_approval_request(
         self, state: WorkflowState
     ) -> Result[str, RuntimeError]:
-        """Prepares a request for approval,
-        it returns a Result object indicating success or failure
-        of the request preparation.
-        """
+        """Prepares a request for approval, it returns a Result object indicating success or failure of the request
+        preparation."""
 
     def attach(
         self,
@@ -139,6 +137,7 @@ class HumanApprovalComponent(ABC):
                 timestamp=datetime.now(timezone.utc).isoformat(),
                 status=ToolStatus.SUCCESS,
                 tool_info=None,
+                context_elements=None,
             )
         ]
 

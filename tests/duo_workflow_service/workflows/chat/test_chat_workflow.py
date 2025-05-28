@@ -4,6 +4,8 @@ from unittest.mock import ANY, AsyncMock, MagicMock, Mock, patch
 import pytest
 from langchain_core.messages import AIMessage, SystemMessage
 
+from contract import contract_pb2
+from contract.contract_pb2 import ContextElement, ContextElementType
 from duo_workflow_service.agents.prompts import CHAT_SYSTEM_PROMPT
 from duo_workflow_service.components.tools_registry import ToolsRegistry
 from duo_workflow_service.entities import (
@@ -44,11 +46,21 @@ def mock_tools_registry():
 
 
 @pytest.fixture
-def workflow_with_project():
+def context_element():
+    return ContextElement(
+        type=ContextElementType.FILE,
+        name="Test file",
+        contents="Test file contents",
+    )
+
+
+@pytest.fixture
+def workflow_with_project(context_element):
     workflow = Workflow(
         workflow_id="test-id",
         workflow_metadata={},
         workflow_type=CategoryEnum.WORKFLOW_CHAT,
+        context_elements=[context_element],
     )
     workflow._project = {
         "id": 123,
@@ -62,7 +74,7 @@ def workflow_with_project():
 
 
 @pytest.mark.asyncio
-async def test_workflow_initialization(workflow_with_project):
+async def test_workflow_initialization(workflow_with_project, context_element):
     initial_state = workflow_with_project.get_workflow_state("Test chat goal")
     expected_system_prompt = CHAT_SYSTEM_PROMPT.format(
         current_date=datetime.now().strftime("%Y-%m-%d"),
@@ -81,7 +93,7 @@ async def test_workflow_initialization(workflow_with_project):
     assert initial_state["ui_chat_log"][0]["message_type"] == MessageTypeEnum.TOOL
     assert "Starting chat: Test chat goal" in initial_state["ui_chat_log"][0]["content"]
     assert initial_state["ui_chat_log"][0]["status"] == ToolStatus.SUCCESS
-    assert initial_state["context_elements"] == []
+    assert initial_state["context_elements"] == [context_element]
 
 
 @pytest.mark.asyncio
@@ -100,6 +112,7 @@ async def test_execute_agent(workflow_with_project):
 
     workflow_with_project._agent = AsyncMock()
     workflow_with_project._agent.run.return_value = mock_agent_result
+    workflow_with_project._context_elements = []
 
     state = ChatWorkflowState(
         plan={"steps": []},
@@ -115,6 +128,8 @@ async def test_execute_agent(workflow_with_project):
     assert result["status"] == WorkflowStatusEnum.INPUT_REQUIRED
     assert len(result["ui_chat_log"]) == 1
     assert result["ui_chat_log"][0]["content"] == test_message
+    assert "context_elements" in result["ui_chat_log"][0]
+    assert result["ui_chat_log"][0]["context_elements"] == []
     assert result["ui_chat_log"][0]["message_type"] == MessageTypeEnum.AGENT
     assert result["ui_chat_log"][0]["status"] == ToolStatus.SUCCESS
 
@@ -144,6 +159,7 @@ async def test_execute_agent_with_tools(workflow_with_project):
 
     workflow_with_project._agent = AsyncMock()
     workflow_with_project._agent.run.return_value = mock_agent_result
+    workflow_with_project._context_elements = []
 
     state = ChatWorkflowState(
         plan={"steps": []},
@@ -183,6 +199,7 @@ def test_are_tools_called_with_various_content(message_content, expected_result)
         workflow_metadata={},
         workflow_type=CategoryEnum.WORKFLOW_CHAT,
     )
+    workflow._context_elements = []
 
     state: ChatWorkflowState = {
         "conversation_history": {AGENT_NAME: [AIMessage(content=message_content)]},
@@ -209,6 +226,7 @@ def test_are_tools_called_with_tool_use():
         workflow_metadata={},
         workflow_type=CategoryEnum.WORKFLOW_CHAT,
     )
+    workflow._context_elements = []
 
     tool_message = AIMessage(content="Using tools")
     tool_message.tool_calls = [
@@ -314,10 +332,14 @@ async def test_workflow_run(
 
 
 @pytest.mark.parametrize(
-    "feature_flag_value, expected_tools",
+    "feature_flags, expected_tools",
     [
-        ("duo_workflow_chat_mutation_tools", CHAT_MUTATION_TOOLS),
-        ("", CHAT_READ_ONLY_TOOLS),
+        (
+            ["duo_workflow_chat_mutation_tools"],
+            CHAT_READ_ONLY_TOOLS + CHAT_MUTATION_TOOLS,
+        ),
+        ([], CHAT_READ_ONLY_TOOLS),
+        (["duo_workflow_mcp_support"], CHAT_READ_ONLY_TOOLS + ["extra_tool"]),
     ],
 )
 @patch("duo_workflow_service.workflows.chat.workflow.current_feature_flag_context")
@@ -327,12 +349,10 @@ def test_tools_registry_interaction(
     mock_agent,
     mock_toolset,
     mock_feature_flag_context,
-    feature_flag_value,
+    feature_flags,
     expected_tools,
 ):
-    mock_feature_flag_context.get.return_value = (
-        [feature_flag_value] if feature_flag_value else []
-    )
+    mock_feature_flag_context.get.return_value = feature_flags
 
     mock_toolset.return_value = [Mock(name=f"mock_{tool}") for tool in expected_tools]
 
@@ -340,7 +360,9 @@ def test_tools_registry_interaction(
         workflow_id="test-id",
         workflow_metadata={},
         workflow_type=CategoryEnum.WORKFLOW_CHAT,
+        mcp_tools=[contract_pb2.McpTool(name="extra_tool", description="Extra tool")],
     )
+    workflow._context_elements = []
     tools_registry = MagicMock(spec=ToolsRegistry)
     checkpointer = MagicMock()
 

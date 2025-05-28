@@ -8,7 +8,6 @@ from duo_workflow_service import tools
 from duo_workflow_service.components.tools_registry import (
     _DEFAULT_TOOLS,
     NO_OP_TOOLS,
-    ToolMetadata,
     Toolset,
     ToolsRegistry,
 )
@@ -271,6 +270,8 @@ async def test_registry_configuration(gl_http_client):
         "id": "test_workflow",
         "agent_privileges_names": ["run_commands"],
     }
+    extra_tool = MagicMock(spec=BaseTool)
+    extra_tool.name = "extra_tool"
 
     registry = await ToolsRegistry.configure(
         workflow_config=workflow_config,
@@ -278,6 +279,7 @@ async def test_registry_configuration(gl_http_client):
         outbox=_outbox,
         inbox=_inbox,
         gitlab_host="gitlab.example.com",
+        additional_tools=[extra_tool],
     )
 
     # Verify configured tools based on privileges
@@ -291,6 +293,7 @@ async def test_registry_configuration(gl_http_client):
         "run_command",
         "handover_tool",
         "request_user_clarification_tool",
+        "extra_tool",
     }
 
 
@@ -347,8 +350,8 @@ def test_get_batch_tools(tool_metadata, requested_tools, expected_tools, config)
     )
 
     assert [
-        tool.__class__ for tool in registry.get_batch(requested_tools)
-    ] == expected_tools
+               tool.__class__ for tool in registry.get_batch(requested_tools)
+           ] == expected_tools
 
 
 @pytest.mark.parametrize(
@@ -371,8 +374,8 @@ def test_get_handlers(tool_metadata, requested_tools, expected_tools, config):
     )
 
     assert [
-        tool.__class__ for tool in registry.get_handlers(requested_tools)
-    ] == expected_tools
+               tool.__class__ for tool in registry.get_handlers(requested_tools)
+           ] == expected_tools
 
 
 def test_preapproved_tools_initialization(tool_metadata):
@@ -588,3 +591,7 @@ def test_commit_tools_feature_flag(
 
     assert ("get_commit" in registry._enabled_tools) == should_include_commit_tools
     assert ("list_commits" in registry._enabled_tools) == should_include_commit_tools
+    assert ("get_commit_diff" in registry._enabled_tools) == should_include_commit_tools
+    assert (
+               "get_commit_comments" in registry._enabled_tools
+           ) == should_include_commit_tools

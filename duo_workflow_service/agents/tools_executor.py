@@ -84,6 +84,7 @@ def _set_task_status(args: dict, plan: Plan) -> tuple[Plan, str]:
     return plan, f"Task not found: {args['task_id']}"
 
 
+# pylint: disable=unused-argument
 def _create_plan(args: dict, plan: Plan) -> tuple[Plan, str]:
     tasks = args.get("tasks", "")
     steps: List[Task] = []
@@ -207,6 +208,7 @@ class ToolsExecutor:
                     status=ToolStatus.SUCCESS,
                     correlation_id=None,
                     tool_info=None,
+                    context_elements=None,
                 )
             )
 
@@ -410,6 +412,7 @@ class ToolsExecutor:
                 if status != ToolStatus.SUCCESS or tool_name not in _ACTION_HANDLERS
                 else None
             ),
+            context_elements=None,
         )
 
     def get_tool_display_message(

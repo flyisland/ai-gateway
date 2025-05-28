@@ -66,8 +66,8 @@ path_unit_primitive_map = {ci.name: ci.unit_primitive for ci in CHAT_INVOKABLES}
 
 
 def convert_v1_to_v2_inputs(chat_request: ChatRequest) -> AgentRequest:
-    """
-    Adapts a v1 ChatRequest into a v2 AgentRequest.
+    """Adapts a v1 ChatRequest into a v2 AgentRequest.
+
     If the payload content is a string, wrap it in a Message.
     """
     prompt_component = chat_request.prompt_components[0]
@@ -80,9 +80,8 @@ def convert_v1_to_v2_inputs(chat_request: ChatRequest) -> AgentRequest:
         messages = []
 
         for message_data in payload.content:
-            message_data = message_data.model_dump()
-            role = message_data["role"]
-            content = message_data["content"]
+            role = message_data.role
+            content = message_data.content
 
             if role == "system":
                 system_message_buffer.append(content)
@@ -95,7 +94,7 @@ def convert_v1_to_v2_inputs(chat_request: ChatRequest) -> AgentRequest:
                 message = Message(role=Role.USER, content=full_user_content)
                 messages.append(message)
             else:
-                message = Message(message_data)
+                message = Message(**message_data.model_dump())
                 messages.append(message)
 
     return AgentRequest(
@@ -117,13 +116,15 @@ def convert_v1_to_v2_inputs(chat_request: ChatRequest) -> AgentRequest:
 async def chat(
     request: Request,
     chat_request: ChatRequest,
-    chat_invokable: str,
+    chat_invokable: str,  # pylint: disable=unused-argument
     current_user: Annotated[StarletteUser, Depends(get_current_user)],
-    anthropic_claude_factory: Annotated[
+    anthropic_claude_factory: Annotated[  # pylint: disable=unused-argument
         FactoryAggregate, Depends(get_chat_anthropic_claude_factory_provider)
     ],
-    litellm_factory: Annotated[Factory, Depends(get_chat_litellm_factory_provider)],
-    internal_event_client: Annotated[
+    litellm_factory: Annotated[  # pylint: disable=unused-argument
+        Factory, Depends(get_chat_litellm_factory_provider)
+    ],
+    internal_event_client: Annotated[  # pylint: disable=unused-argument
         InternalEventsClient, Depends(get_internal_event_client)
     ],
     prompt_registry: Annotated[BasePromptRegistry, Depends(get_prompt_registry)],

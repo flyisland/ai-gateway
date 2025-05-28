@@ -107,6 +107,8 @@ EXECUTOR_TOOLS = [
     "get_epic_note",
     "get_commit",
     "list_commits",
+    "get_commit_comments",
+    "get_commit_diff",
 ]
 
 CONTEXT_BUILDER_TOOLS = [
@@ -137,6 +139,8 @@ CONTEXT_BUILDER_TOOLS = [
     "get_epic_note",
     "get_commit",
     "list_commits",
+    "get_commit_comments",
+    "get_commit_diff",
 ]
 
 PLANNER_TOOLS = [
@@ -502,6 +506,7 @@ class Workflow(AbstractWorkflow):
             status=ToolStatus.SUCCESS,
             correlation_id=None,
             tool_info=None,
+            context_elements=None,
         )
 
         return WorkflowState(

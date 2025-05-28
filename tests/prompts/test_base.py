@@ -1,5 +1,6 @@
 import os
 from contextlib import contextmanager
+from pathlib import Path
 from typing import Generator, Iterator, Optional, Type
 from unittest import mock
 from unittest.mock import Mock, call
@@ -8,11 +9,14 @@ import pytest
 from anthropic import APITimeoutError, AsyncAnthropic
 from gitlab_cloud_connector import GitLabUnitPrimitive, WrongUnitPrimitives
 from langchain_community.chat_models import ChatLiteLLM
+from langchain_core.messages import HumanMessage, SystemMessage
 from langchain_core.messages.ai import UsageMetadata
+from langchain_core.prompt_values import ChatPromptValue
 from langchain_core.prompts import ChatPromptTemplate
 from langchain_core.runnables import Runnable
 from litellm.exceptions import Timeout
 from pydantic import AnyUrl
+from pyfakefs.fake_filesystem import FakeFilesystem
 
 from ai_gateway.api.auth_utils import StarletteUser
 from ai_gateway.config import ConfigModelLimits
@@ -26,7 +30,7 @@ from ai_gateway.model_metadata import (
 from ai_gateway.models.v2.anthropic_claude import ChatAnthropic
 from ai_gateway.prompts import BasePromptRegistry, Prompt
 from ai_gateway.prompts.config.base import PromptParams
-from ai_gateway.prompts.typing import Model
+from tests.conftest import FakeModel
 
 
 @pytest.fixture
@@ -41,6 +45,24 @@ def mock_watch() -> Generator[mock.MagicMock, None, None]:
 
 
 class TestPrompt:
+    @pytest.fixture(autouse=True)
+    def mock_fs(self, fs: FakeFilesystem):
+        prompts_definitions_dir = (
+            Path(__file__).parent.parent.parent
+            / "ai_gateway"
+            / "prompts"
+            / "definitions"
+        )
+        fs.create_file(
+            prompts_definitions_dir / "system.jinja",
+            contents="Hi, I'm {{name}}",
+        )
+
+    @pytest.fixture
+    def prompt_template(self):
+        # Test inclusion and direct content
+        return {"system": "{% include 'system.jinja' %}", "user": "{{content}}"}
+
     @contextmanager
     def _mock_usage_metadata(
         self, model_name: str, usage_metadata: UsageMetadata
@@ -80,7 +102,7 @@ class TestPrompt:
         prompt_template = Prompt._build_prompt_template(prompt_template, model_config)
 
         assert prompt_template == ChatPromptTemplate.from_messages(
-            [("system", "Hi, I'm {{name}}"), ("user", "{{content}}")],
+            [("system", "{% include 'system.jinja' %}"), ("user", "{{content}}")],
             template_format="jinja2",
         )
 
@@ -191,6 +213,55 @@ class TestPrompt:
             mock_watcher, internal_event_client, prompt, usage_metadata
         )
 
+    @pytest.mark.asyncio
+    async def test_ainvoke_model_input(self, prompt: Prompt):
+        with mock.patch.object(FakeModel, "ainvoke") as mock_ainvoke:
+            await prompt.ainvoke({"name": "Duo", "content": "What's up?"})
+
+        mock_ainvoke.assert_called_once_with(
+            ChatPromptValue(
+                messages=[
+                    SystemMessage(content="Hi, I'm Duo"),
+                    HumanMessage(content="What's up?"),
+                ]
+            ),
+            mock.ANY,
+        )
+
+    @pytest.mark.asyncio
+    async def test_ainvoke_missing_inputs(self, prompt: Prompt):
+        with pytest.raises(
+            KeyError, match="Input to ChatPromptTemplate is missing variables {'name'}"
+        ):
+            await prompt.ainvoke({"content": "What's up?"})
+
+    @pytest.mark.asyncio
+    async def test_astream_model_input(self, prompt: Prompt):
+        response = mock.AsyncMock()
+        response.__aiter__.return_value = iter(["response"])
+
+        with mock.patch.object(
+            FakeModel, "astream", return_value=response
+        ) as mock_astream:
+            await anext(prompt.astream({"name": "Duo", "content": "What's up?"}))
+
+        mock_astream.assert_called_once_with(
+            ChatPromptValue(
+                messages=[
+                    SystemMessage(content="Hi, I'm Duo"),
+                    HumanMessage(content="What's up?"),
+                ]
+            ),
+            mock.ANY,
+        )
+
+    @pytest.mark.asyncio
+    async def test_astream_missing_inputs(self, prompt: Prompt):
+        with pytest.raises(
+            KeyError, match="Input to ChatPromptTemplate is missing variables {'name'}"
+        ):
+            await anext(prompt.astream({"content": "What's up?"}))
+
 
 def _assert_usage_metadata_handling(
     mock_watcher: mock.Mock,
@@ -249,9 +320,7 @@ class TestPromptTimeout:
             ),
         ],
     )
-    async def test_timeout(
-        self, prompt: Prompt, model: Model, expected_exception: Type
-    ):
+    async def test_timeout(self, prompt: Prompt, expected_exception: Type):
         with pytest.raises(expected_exception):
             await prompt.ainvoke(
                 {"name": "Duo", "content": "Print pi with 400 decimals"}
@@ -267,7 +336,7 @@ def registry(
             self.internal_event_client = internal_event_client
             self.model_limits = model_limits
 
-        def get(self, *args, **kwargs):
+        def get(self, *_args, **_kwargs):
             return prompt
 
     return Registry()
@@ -350,8 +419,6 @@ class TestBaseRegistry:
         user: StarletteUser,
         prompt: Prompt,
         model_metadata: Optional[TypeModelMetadata],
-        unit_primitives: list[GitLabUnitPrimitive],
-        scopes: list[str],
         success: bool,
         expected_internal_events,
     ):
@@ -393,9 +460,6 @@ class TestBaseRegistry:
         internal_event_client: Mock,
         registry: BasePromptRegistry,
         user: StarletteUser,
-        prompt: Prompt,
-        unit_primitives: list[GitLabUnitPrimitive],
-        scopes: list[str],
         internal_event_category: str,
         expected_internal_events,
     ):
@@ -425,7 +489,6 @@ class TestBaseRegistry:
         registry: BasePromptRegistry,
         user: StarletteUser,
         prompt: Prompt,
-        unit_primitives: list[GitLabUnitPrimitive],
         model_metadata: TypeModelMetadata,
     ):
         current_model_metadata_context.set(model_metadata)
