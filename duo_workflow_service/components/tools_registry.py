@@ -70,6 +70,7 @@ _READ_ONLY_GITLAB_TOOLS: list[Type[BaseTool]] = [
     tools.ListCommits,
     tools.GetCommitDiff,
     tools.GetCommitComments,
+    tools.ListVulnerabilities,
 ]
 
 _AGENT_PRIVILEGES: dict[str, list[Type[BaseTool]]] = {
