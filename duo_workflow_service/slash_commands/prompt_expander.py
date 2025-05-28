@@ -13,8 +13,7 @@ log = structlog.stdlib.get_logger("slash_commands")
 
 
 class SlashCommandsPromptExpander:
-    """
-    Class for processing slash commands.
+    """Class for processing slash commands.
 
     This class encapsulates the logic for processing slash commands, handling their parameters, and generating
     appropriate responses.

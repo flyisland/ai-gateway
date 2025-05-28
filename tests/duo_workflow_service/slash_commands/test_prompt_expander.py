@@ -70,9 +70,7 @@ class TestSlashCommandsPromptExpander:
 
     @patch(GOAL_PARSER_PATH)
     def test_command_not_found_error(self, mock_parser, processor):
-        """
-        To be implemented after MR for SlashCommandGoalParser and SlashCommandDefinition have been implemented
-        """
+        """To be implemented after MR for SlashCommandGoalParser and SlashCommandDefinition have been implemented."""
         mock_parser.parse().return_value = ("nonexistent", "some text")
 
         error_message = "Slash command configuration file for 'nonexistent' not found"
@@ -87,9 +85,7 @@ class TestSlashCommandsPromptExpander:
     def test_missing_required_parameters(
         self, mock_definition, mock_parser, processor, mock_parser_instance
     ):
-        """
-        To be implemented after MR for SlashCommandGoalParser and SlashCommandDefinition have been implemented
-        """
+        """To be implemented after MR for SlashCommandGoalParser and SlashCommandDefinition have been implemented."""
         mock_parser.return_value = mock_parser_instance
         parsed_command = ("test", "")
         mock_parser_instance.parse.return_value = parsed_command
