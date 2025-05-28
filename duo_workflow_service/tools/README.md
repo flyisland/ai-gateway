@@ -10,18 +10,20 @@ This directory contains the LangGraph-compatible tools that power GitLab AI feat
 
 These tools are **backend services** that power GitLab AI features. They operate as part of GitLab infrastructure and can be triggered from various entry points (web interface, IDE extensions, Remote Execution):
 
-```plaintext
-Workflow Started
-        ↓
-GitLab Rails Backend
-        ↓
-AI Gateway Service
-        ↓
-Duo Workflow Service
-        ↓
-Tools (duo_workflow_service/tools/)
-        ↓
-GitLab REST APIs & Local Operations
+```mermaid
+flowchart TD
+    A[Workflow Started] --> B[GitLab Rails Backend]
+    B --> C[AI Gateway Service]
+    C --> D[Duo Workflow Service]
+    D --> E[Tools<br/>duo_workflow_service/tools/]
+    E --> F[GitLab REST APIs &<br/>Local Operations]
+
+    style A fill:#e1f5fe
+    style B fill:#f3e5f5
+    style C fill:#e8f5e8
+    style D fill:#fff3e0
+    style E fill:#fce4ec
+    style F fill:#f1f8e9
 ```
 
 ### User Interaction Flow
