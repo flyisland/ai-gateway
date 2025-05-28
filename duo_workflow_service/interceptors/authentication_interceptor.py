@@ -2,6 +2,7 @@
 
 import contextvars
 import os
+from enum import Enum
 from typing import Callable, Dict, Optional
 
 import grpc
@@ -21,11 +22,15 @@ from duo_workflow_service.interceptors.websocket_middleware import WebSocketMidd
 
 current_user: contextvars.ContextVar = contextvars.ContextVar("current_user")
 
-AUTH_ENABLED_ENV_VAR = "DUO_WORKFLOW_AUTH__ENABLED"
-AUTH_OIDC_GITLAB_URL_ENV_VAR = "DUO_WORKFLOW_AUTH__OIDC_GITLAB_URL"
-AUTH_OIDC_CUSTOMER_PORTAL_URL_ENV_VAR = "DUO_WORKFLOW_AUTH__OIDC_CUSTOMER_PORTAL_URL"
-AUTH_SIGNING_KEY_ENV_VAR = "DUO_WORKFLOW_SELF_SIGNED_JWT__SIGNING_KEY"
-AUTH_VALIDATION_KEY_ENV_VAR = "DUO_WORKFLOW_SELF_SIGNED_JWT__VALIDATION_KEY"
+
+class AuthEnv(str, Enum):
+    """Environment variables related to authentication."""
+
+    ENABLED = "DUO_WORKFLOW_AUTH__ENABLED"
+    OIDC_GITLAB_URL = "DUO_WORKFLOW_AUTH__OIDC_GITLAB_URL"
+    OIDC_CUSTOMER_PORTAL_URL = "DUO_WORKFLOW_AUTH__OIDC_CUSTOMER_PORTAL_URL"
+    SIGNING_KEY = "DUO_WORKFLOW_SELF_SIGNED_JWT__SIGNING_KEY"
+    VALIDATION_KEY = "DUO_WORKFLOW_SELF_SIGNED_JWT__VALIDATION_KEY"
 
 
 class AuthenticationError(Exception):
@@ -34,7 +39,7 @@ class AuthenticationError(Exception):
 
 def _is_auth_enabled() -> bool:
     """Check if authentication is enabled based on environment variable."""
-    return os.environ.get(AUTH_ENABLED_ENV_VAR, "true").lower() != "false"
+    return os.environ.get(AuthEnv.ENABLED, "true").lower() != "false"
 
 
 def _skip_auth():
@@ -45,13 +50,13 @@ def _skip_auth():
 
 def _oidc_auth_provider() -> AuthProvider:
     """Create and return an OIDC authentication provider."""
-    gitlab_url: str = os.environ.get(AUTH_OIDC_GITLAB_URL_ENV_VAR, "https://gitlab.com")
+    gitlab_url: str = os.environ.get(AuthEnv.OIDC_GITLAB_URL, "https://gitlab.com")
     customer_portal_url: str = os.environ.get(
-        AUTH_OIDC_CUSTOMER_PORTAL_URL_ENV_VAR,
+        AuthEnv.OIDC_CUSTOMER_PORTAL_URL,
         "https://customers.gitlab.com",
     )
-    signing_key: str = os.environ.get(AUTH_SIGNING_KEY_ENV_VAR, "")
-    validation_key: str = os.environ.get(AUTH_VALIDATION_KEY_ENV_VAR, "")
+    signing_key: str = os.environ.get(AuthEnv.SIGNING_KEY, "")
+    validation_key: str = os.environ.get(AuthEnv.VALIDATION_KEY, "")
 
     return CompositeProvider(
         [
@@ -92,9 +97,7 @@ class AuthenticationInterceptor(grpc.aio.ServerInterceptor):
 
         metadata = dict(handler_call_details.invocation_metadata)
 
-        cloud_connector_error = await _authenticate_request(metadata)
-
-        if cloud_connector_error:
+        if cloud_connector_error := await _authenticate_request(metadata):
             return self._abort_handler(
                 grpc.StatusCode.UNAUTHENTICATED, cloud_connector_error.error_message
             )
