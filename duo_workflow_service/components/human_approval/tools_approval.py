@@ -1,26 +1,17 @@
 from typing import Literal
 
 from langchain_core.messages import AIMessage, HumanMessage, ToolCall, ToolMessage
-from pydantic import ValidationError
 
 from duo_workflow_service.components.human_approval.component import (
     HumanApprovalComponent,
 )
 from duo_workflow_service.entities.state import WorkflowState, WorkflowStatusEnum
 from duo_workflow_service.tools import (
+    MalformedToolCallError,
     Toolset,
-    UnknownToolError,
     format_tool_display_message,
 )
 from lib import Result, result
-
-
-class MalformedToolCallError(Exception):
-    tool_call: ToolCall
-
-    def __init__(self, msg: str, tool_call: ToolCall):
-        super().__init__(msg)
-        self.tool_call = tool_call
 
 
 class ToolsApprovalComponent(HumanApprovalComponent):
@@ -93,39 +84,11 @@ class ToolsApprovalComponent(HumanApprovalComponent):
 
         for tool_call in tool_calls:
             try:
-                # Check if the tool exists in the toolset
-                self._toolset.approved(tool_call["name"])
-
-                tool = self._toolset[tool_call["name"]]
-
-                # Validate the tool arguments against the schema
-                tool_input_schema = tool.get_input_schema()
-                tool_input_schema.model_validate(tool_call["args"])
-
-                # If we get here, the tool call is valid
+                self._toolset.validate_tool_call(tool_call)
                 valid_tool_calls.append(tool_call)
-            except KeyError:
-                # tool call referred to NO-OP tool like HandOver tool which does not
-                # require approvals and can be ignored
-                valid_tool_calls.append(tool_call)
-            except UnknownToolError:
-                invalid_tool_calls.append(
-                    MalformedToolCallError(
-                        f"Tool: '{tool_call['name']}' not found. Please provide a valid tool name",
-                        tool_call=tool_call,
-                    )
-                )
-            except ValidationError:
+            except MalformedToolCallError as e:
                 # Add to invalid list if tool doesn't exist or has invalid arguments
-                invalid_tool_calls.append(
-                    MalformedToolCallError(
-                        (
-                            f"Invalid arguments {tool_call['args']} were passed to the tool: '{tool_call['name']}'."
-                            f"Please adhere to the tool schema {tool_input_schema.model_json_schema()}.'"
-                        ),
-                        tool_call=tool_call,
-                    )
-                )
+                invalid_tool_calls.append(e)
         return valid_tool_calls, invalid_tool_calls
 
     def _build_approval_request(
