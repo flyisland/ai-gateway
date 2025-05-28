@@ -344,9 +344,9 @@ class AbstractWorkflow(ABC):
             logic or to use different model versions.
         """
         if self._is_vertex:
-            return KindAnthropicModel.CLAUDE_3_7_SONNET_VERTEX.value()
+            return KindAnthropicModel.CLAUDE_3_7_SONNET_VERTEX.value
 
-        return KindAnthropicModel.CLAUDE_3_7_SONNET.value()
+        return KindAnthropicModel.CLAUDE_3_7_SONNET.value
 
 
 TypeWorkflow = type[AbstractWorkflow]
