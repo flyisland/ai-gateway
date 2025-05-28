@@ -13,8 +13,7 @@ LOGGER = structlog.stdlib.get_logger("slash_commands")
 
 
 class SlashCommandDefinition(BaseModel):
-    """
-    Defines the structure and configuration of a slash command.
+    """Defines the structure and configuration of a slash command.
 
     This class represents the configuration loaded from YAML files and provides
     a structured way to access slash command properties.
@@ -40,8 +39,7 @@ class SlashCommandDefinition(BaseModel):
     def load_slash_command_definition(
         cls, slash_command_name: str
     ) -> "SlashCommandDefinition":
-        """
-        Loads slash command configurations from YAML file.
+        """Loads slash command configurations from YAML file.
 
         Args:
             slash_command_name: The name of the slash command to load
@@ -59,8 +57,7 @@ class SlashCommandDefinition(BaseModel):
 
 
 def _get_config_file_path(slash_command_name: str) -> Path:
-    """
-    Construct the path to the YAML configuration file and validate it exists.
+    """Construct the path to the YAML configuration file and validate it exists.
 
     Args:
         slash_command_name: The name of the slash command
@@ -87,8 +84,7 @@ def _get_config_file_path(slash_command_name: str) -> Path:
 
 
 def _load_yaml_file(config_file_path: Path) -> Dict[str, Any]:
-    """
-    Load and parse YAML file.
+    """Load and parse YAML file.
 
     Args:
         config_file_path: Path to the YAML configuration file
