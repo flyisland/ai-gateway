@@ -18,7 +18,27 @@ from prometheus_client import REGISTRY, Counter
 
 from duo_workflow_service.tracking import MonitoringContext, current_monitoring_context
 
-log = structlog.stdlib.get_logger("grpc")
+import time
+import traceback
+from contextlib import asynccontextmanager
+from datetime import datetime, timezone
+from typing import Dict, Any, Optional
+
+import structlog
+from gitlab_cloud_connector.auth import (
+    AUTH_TYPE_HEADER,
+    X_GITLAB_HOST_NAME_HEADER,
+    X_GITLAB_INSTANCE_ID_HEADER,
+    X_GITLAB_REALM_HEADER,
+)
+from fastapi import WebSocket
+from prometheus_client import REGISTRY, Counter
+
+from duo_workflow_service.tracking import MonitoringContext, current_monitoring_context
+from duo_workflow_service.interceptors.websocket_middleware import WebSocketMiddleware
+
+grpc_log = structlog.stdlib.get_logger("grpc")
+websocket_log = structlog.stdlib.get_logger("websocket")
 
 
 class GRPCMethodType(StrEnum):
@@ -203,7 +223,7 @@ class MonitoringInterceptor(ServerInterceptor):
             context: MonitoringContext = current_monitoring_context.get()
             fields.update(context.model_dump())
 
-            log.info(
+            grpc_log.info(
                 f"""Finished {grpc_method_name} RPC""",
                 **fields,
             )
@@ -242,3 +262,117 @@ class MonitoringInterceptor(ServerInterceptor):
             grpc_method=grpc_method_name,
             grpc_code=grpc_code.name,
         ).inc()
+
+
+
+
+
+class MonitoringMiddleware(WebSocketMiddleware):
+    """Middleware for monitoring WebSocket connections."""
+
+    def __init__(self, registry=REGISTRY):
+        self._connections_counter: Counter = Counter(
+            "websocket_connections_total",
+            "Total number of WebSocket connections handled by the server.",
+            ["websocket_path", "connection_status"],
+            registry=registry,
+        )
+
+    async def __call__(self, websocket: WebSocket):
+        """Monitor WebSocket connection."""
+        headers = dict(websocket.headers)
+        websocket_path = websocket.url.path
+
+        async with self._monitoring_context(websocket_path, headers) as monitor:
+            try:
+                # Connection successful
+                monitor.set_connection_status("connected")
+                self._increase_websocket_connections_counter(websocket_path, "connected")
+
+            except Exception as e:
+                # Connection failed
+                monitor.set_connection_status("failed")
+                monitor.set_exception(e)
+                self._increase_websocket_connections_counter(websocket_path, "failed")
+                raise e
+
+    @asynccontextmanager
+    async def _monitoring_context(self, websocket_path: str, headers: Dict[str, str]):
+        """Context manager for monitoring WebSocket connections."""
+        monitor = WebSocketMonitor(websocket_path, headers)
+
+        start_time_total = time.perf_counter()
+        start_time_cpu = time.process_time()
+        request_arrived_at = datetime.now(timezone.utc)
+        current_monitoring_context.set(MonitoringContext())
+
+        try:
+            yield monitor
+        finally:
+            elapsed_time = time.perf_counter() - start_time_total
+            cpu_time = time.process_time() - start_time_cpu
+
+            monitor.log_completion(
+                elapsed_time=elapsed_time,
+                cpu_time=cpu_time,
+                request_arrived_at=request_arrived_at,
+            )
+
+    def _increase_websocket_connections_counter(
+            self, websocket_path: str, connection_status: str
+    ) -> None:
+        self._connections_counter.labels(
+            websocket_path=websocket_path,
+            connection_status=connection_status,
+        ).inc()
+
+
+class WebSocketMonitor:
+    """Helper class to track WebSocket connection monitoring data."""
+
+    def __init__(self, websocket_path: str, headers: Dict[str, str]):
+        self.websocket_path = websocket_path
+        self.headers = headers
+        self.connection_status: Optional[str] = None
+        self.exception_fields: Dict[str, str] = {}
+
+    def set_connection_status(self, status: str) -> None:
+        """Set the connection status."""
+        self.connection_status = status
+
+    def set_exception(self, exception: Exception) -> None:
+        """Set exception information."""
+        self.exception_fields = {
+            "exception_message": str(exception),
+            "exception_class": type(exception).__name__,
+            "exception_backtrace": traceback.format_exc(),
+        }
+
+    def log_completion(
+            self,
+            elapsed_time: float,
+            cpu_time: float,
+            request_arrived_at: datetime,
+    ) -> None:
+        """Log WebSocket connection completion."""
+        fields = {
+            "duration_s": elapsed_time,
+            "request_arrived_at": request_arrived_at.isoformat(),
+            "cpu_s": cpu_time,
+            "websocket_path": self.websocket_path,
+            "connection_status": self.connection_status or "unknown",
+            "gitlab_host_name": self.headers.get(X_GITLAB_HOST_NAME_HEADER.lower()),
+            "gitlab_realm": self.headers.get(X_GITLAB_REALM_HEADER.lower()),
+            "gitlab_instance_id": self.headers.get(X_GITLAB_INSTANCE_ID_HEADER.lower()),
+            "gitlab_authentication_type": self.headers.get(AUTH_TYPE_HEADER.lower()),
+            "user_agent": self.headers.get("user-agent"),
+        }
+
+        # Add exception information if present
+        fields.update(self.exception_fields)
+
+        # Add monitoring context
+        context: MonitoringContext = current_monitoring_context.get()
+        fields.update(context.model_dump())
+
+        websocket_log.info(f"Finished WebSocket connection to {self.websocket_path}", **fields)
