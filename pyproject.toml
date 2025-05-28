@@ -107,6 +107,11 @@ types-pyyaml = "^6.0.12.20240311"
 types-protobuf = "^4.25.0.20240417"
 types-requests = "^2.31.0.20240406"
 codespell = "^2.4.1"
+vulture = "^2.14"
+
+[tool.vulture]
+exclude = [".venv/", "tests/", "lints/"]
+min_confidence = 60
 
 [tool.codespell]
 skip = """

@@ -162,7 +162,7 @@ format: codespell black isort
 lint: lint-code lint-doc
 
 .PHONY: lint-code
-lint-code: flake8 check-black check-isort check-pylint check-mypy check-codespell
+lint-code: flake8 check-black check-isort check-pylint check-mypy check-codespell check-unused-code
 
 .PHONY: lint-commit
 lint-commit:
@@ -203,6 +203,11 @@ endif
 check-codespell: install-lint-deps
 	@echo "Running codespell check..."
 	@poetry run codespell
+
+.PHONY: check-unused-code
+check-unused-code: install-lint-deps
+	@echo "Running unused-code check..."
+	@poetry run vulture .
 
 .PHONY: install-test-deps
 install-test-deps:
