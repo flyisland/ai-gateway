@@ -103,7 +103,7 @@ class AbstractWorkflow(ABC):
         self._workflow_type = workflow_type
 
         _vertex_project_id = os.getenv("DUO_WORKFLOW__VERTEX_PROJECT_ID")
-        self._is_vertex = _vertex_project_id and len(_vertex_project_id) > 1
+        self._is_vertex = bool(_vertex_project_id and len(_vertex_project_id) > 1)
 
     async def run(self, goal: str) -> None:
         with duo_workflow_metrics.time_workflow(workflow_type=self.__class__.__name__):

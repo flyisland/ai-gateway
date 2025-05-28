@@ -202,6 +202,10 @@ class Workflow(AbstractWorkflow):
         self, goal: str, tools_registry: ToolsRegistry, base_model_executor
     ):
         executors_toolset = tools_registry.toolset(EXECUTOR_TOOLS)
+        get_plan_tool = tools_registry.get("get_plan")
+        if not get_plan_tool:
+            raise RuntimeError("get_plan tool not found in tools registry")
+
         executor = Agent(
             goal=goal,
             model=base_model_executor,
@@ -209,7 +213,7 @@ class Workflow(AbstractWorkflow):
             system_prompt=EXECUTOR_SYSTEM_MESSAGE.format(
                 set_task_status_tool_name=SET_TASK_STATUS_TOOL_NAME,
                 handover_tool_name=HANDOVER_TOOL_NAME,
-                get_plan_tool_name=tools_registry.get("get_plan").name,  # type: ignore
+                get_plan_tool_name=get_plan_tool.name,
                 project_id=self._project["id"],
                 project_name=self._project["name"],
                 project_url=self._project["http_url_to_repo"],
@@ -245,7 +249,28 @@ class Workflow(AbstractWorkflow):
         executor_toolset,
     ):
         available_feature_flags = current_feature_flag_context.get()
+
+        # Get all required tools and check they exist
+        get_plan_tool = tools_registry.get("get_plan")
+        add_new_task_tool = tools_registry.get("add_new_task")
+        remove_task_tool = tools_registry.get("remove_task")
+        update_task_description_tool = tools_registry.get("update_task_description")
+
+        if not all(
+            [
+                get_plan_tool,
+                add_new_task_tool,
+                remove_task_tool,
+                update_task_description_tool,
+            ]
+        ):
+            raise RuntimeError("Required planner tools not found in tools registry")
+
         if "batch_duo_workflow_planner_tasks" in available_feature_flags:
+            create_plan_tool = tools_registry.get("create_plan")
+            if not create_plan_tool:
+                raise RuntimeError("create_plan tool not found in tools registry")
+
             planner_tools = PLANNER_TOOLS + ["create_plan"]
             planner_toolset = tools_registry.toolset(planner_tools)
             planner = Agent(
@@ -259,14 +284,11 @@ class Workflow(AbstractWorkflow):
                         ]
                     ),
                     goal=goal,
-                    create_plan_tool_name=tools_registry.get("create_plan").name,  # type: ignore
-                    get_plan_tool_name=tools_registry.get("get_plan").name,  # type: ignore
-                    add_new_task_tool_name=tools_registry.get("add_new_task").name,  # type: ignore
-                    remove_task_tool_name=tools_registry.get("remove_task").name,  # type: ignore
-                    update_task_description_tool_name=tools_registry.get(
-                        "update_task_description"
-                    ).name,
-                    # type: ignore
+                    create_plan_tool_name=create_plan_tool.name,
+                    get_plan_tool_name=get_plan_tool.name,
+                    add_new_task_tool_name=add_new_task_tool.name,
+                    remove_task_tool_name=remove_task_tool.name,
+                    update_task_description_tool_name=update_task_description_tool.name,
                     planner_instructions=self.planner_instructions(tools_registry),
                 ),
                 model=base_model_planner,
@@ -291,13 +313,10 @@ class Workflow(AbstractWorkflow):
                         ]
                     ),
                     goal=goal,
-                    get_plan_tool_name=tools_registry.get("get_plan").name,  # type: ignore
-                    add_new_task_tool_name=tools_registry.get("add_new_task").name,  # type: ignore
-                    remove_task_tool_name=tools_registry.get("remove_task").name,  # type: ignore
-                    update_task_description_tool_name=tools_registry.get(
-                        "update_task_description"
-                    ).name,
-                    # type: ignore
+                    get_plan_tool_name=get_plan_tool.name,
+                    add_new_task_tool_name=add_new_task_tool.name,
+                    remove_task_tool_name=remove_task_tool.name,
+                    update_task_description_tool_name=update_task_description_tool.name,
                     project_id=self._project["id"],
                     project_name=self._project["name"],
                     project_url=self._project["http_url_to_repo"],
@@ -452,7 +471,7 @@ class Workflow(AbstractWorkflow):
         )
         base_model_executor = create_chat_model(
             max_tokens=MAX_TOKENS_TO_SAMPLE,
-            model=self._get_chat_model_name(),
+            model_name=self._get_chat_model_name(),
             is_vertex=self._is_vertex,
         )
 
@@ -516,14 +535,35 @@ class Workflow(AbstractWorkflow):
 
     def planner_instructions(self, tools_registry):
         available_feature_flags = current_feature_flag_context.get()
+
+        # Get all required tools and check they exist
+        get_plan_tool = tools_registry.get("get_plan")
+        add_new_task_tool = tools_registry.get("add_new_task")
+        remove_task_tool = tools_registry.get("remove_task")
+        update_task_description_tool = tools_registry.get("update_task_description")
+
+        if not all(
+            [
+                get_plan_tool,
+                add_new_task_tool,
+                remove_task_tool,
+                update_task_description_tool,
+            ]
+        ):
+            raise RuntimeError("Required planner tools not found in tools registry")
+
         if "batch_duo_workflow_planner_tasks" in available_feature_flags:
             self.log.info("Using batched planner")
+            create_plan_tool = tools_registry.get("create_plan")
+            if not create_plan_tool:
+                raise RuntimeError("create_plan tool not found in tools registry")
+
             return PLANNER_TASK_BATCH_INSTRUCTIONS.format(
-                create_plan_tool_name=tools_registry.get("create_plan").name,  # type: ignore
-                add_new_task_tool_name=tools_registry.get("add_new_task").name,  # type: ignore
-                remove_task_tool_name=tools_registry.get("remove_task").name,  # type: ignore
-                update_task_description_tool_name=tools_registry.get("update_task_description").name,  # type: ignore
-                get_plan_tool_name=tools_registry.get("get_plan").name,  # type: ignore
+                create_plan_tool_name=create_plan_tool.name,
+                add_new_task_tool_name=add_new_task_tool.name,
+                remove_task_tool_name=remove_task_tool.name,
+                update_task_description_tool_name=update_task_description_tool.name,
+                get_plan_tool_name=get_plan_tool.name,
                 handover_tool_name=HANDOVER_TOOL_NAME,
                 project_id=self._project["id"],
                 project_name=self._project["name"],
@@ -531,10 +571,10 @@ class Workflow(AbstractWorkflow):
             )
 
         return PLANNER_INSTRUCTIONS.format(
-            add_new_task_tool_name=tools_registry.get("add_new_task").name,  # type: ignore
-            remove_task_tool_name=tools_registry.get("remove_task").name,  # type: ignore
-            update_task_description_tool_name=tools_registry.get("update_task_description").name,  # type: ignore
-            get_plan_tool_name=tools_registry.get("get_plan").name,  # type: ignore
+            add_new_task_tool_name=add_new_task_tool.name,
+            remove_task_tool_name=remove_task_tool.name,
+            update_task_description_tool_name=update_task_description_tool.name,
+            get_plan_tool_name=get_plan_tool.name,
             handover_tool_name=HANDOVER_TOOL_NAME,
             project_id=self._project["id"],
             project_name=self._project["name"],

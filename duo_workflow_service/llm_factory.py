@@ -1,6 +1,7 @@
 # pylint: disable=direct-environment-variable-reference
 
 import os
+from typing import Optional
 
 import structlog
 from langchain_anthropic import ChatAnthropic
@@ -51,7 +52,7 @@ class VertexConfig:
 
 def create_chat_model(
     config: VertexConfig = VertexConfig(),
-    model_name: str = None,
+    model_name: Optional[str] = None,
     is_vertex: bool = False,
     **kwargs,
 ) -> BaseChatModel:
