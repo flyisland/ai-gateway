@@ -112,23 +112,23 @@ def test_scan_directory_tree_input_parser_with_multiple_file_types(
 
     # Check patterns for *.py files
     assert {
-               "directory": "N/A",
-               "name_pattern": "/test/repo/*.py",
-           } in result
+        "directory": "N/A",
+        "name_pattern": "/test/repo/*.py",
+    } in result
     assert {
-               "directory": "N/A",
-               "name_pattern": "/test/repo/**/*.py",
-           } in result
+        "directory": "N/A",
+        "name_pattern": "/test/repo/**/*.py",
+    } in result
 
     # Check patterns for *.rb files
     assert {
-               "directory": "N/A",
-               "name_pattern": "/test/repo/*.rb",
-           } in result
+        "directory": "N/A",
+        "name_pattern": "/test/repo/*.rb",
+    } in result
     assert {
-               "directory": "N/A",
-               "name_pattern": "/test/repo/**/*.rb",
-           } in result
+        "directory": "N/A",
+        "name_pattern": "/test/repo/**/*.rb",
+    } in result
 
 
 def test_detect_affected_components_input_parser(mock_state):
