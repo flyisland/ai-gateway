@@ -4,10 +4,6 @@
 
 This directory contains the LangGraph-compatible tools that power GitLab AI features. These tools enable AI agents to interact with GitLab resources and perform complex workflows as part of GitLab backend infrastructure.
 
-## 📖 Quick Reference
-
-For high-level overview and integration patterns, see: **[📋 Tools Documentation](../../docs/tools.md)**
-
 ## Architecture Overview
 
 ### Backend Service Architecture
