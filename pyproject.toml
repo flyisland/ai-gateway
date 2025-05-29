@@ -107,7 +107,6 @@ types-pyyaml = "^6.0.12.20240311"
 types-protobuf = "^4.25.0.20240417"
 types-requests = "^2.31.0.20240406"
 codespell = "^2.4.1"
-docformatter = "^1.7.7"
 
 [tool.codespell]
 skip = """
@@ -155,9 +154,6 @@ load-plugins = [
   "lints.file_naming_for_tests",
 ]
 
-[tool.pylint.format]
-max-line-length = 120
-
 [tool.pylint.messages_control]
 disable = [
   "missing-module-docstring",
@@ -168,6 +164,7 @@ disable = [
   "too-few-public-methods",
   "no-member",
   "fixme",
+  "unused-argument",
   "protected-access",
   "too-many-arguments",
   "no-name-in-module",
@@ -204,7 +201,3 @@ ignore_missing_imports = true
 [[tool.mypy.overrides]]
 module = "tests.*"
 disable_error_code = "annotation-unchecked"
-
-[tool.docformatter]
-wrap-summaries = 120
-wrap-descriptions = 120
