@@ -43,6 +43,8 @@ async def invoke(
     current_user: Annotated[StarletteUser, Depends(get_current_user)],
     prompt_registry: Annotated[BasePromptRegistry, Depends(get_prompt_registry)],
 ):
+    # tgao
+    import pdb;pdb.set_trace()
     try:
         prompt = prompt_registry.get_on_behalf(
             current_user,
@@ -50,6 +52,43 @@ async def invoke(
             prompt_request.prompt_version,
             internal_event_category=__name__,
         )
+        #
+        # prompts_registered[str(prompt_id_with_model_name)] = PromptRegistered(
+        #   klass = klass, versions = versions
+        # )
+        # str(prompt_id_with_model_name)
+        # 'review_merge_request/base'
+        # (Pdb)
+        # versions
+        # {'2.0.0': PromptConfig(
+        #     name='Claude 4.0 Multi File Review Merge Request',
+        #     model=ModelConfig(name='claude-sonnet-4-20250514',
+        #     params=ChatAnthropicParams(temperature=0.0, top_p=None, top_k=None,
+        #     max_tokens=8192, max_retries=1,
+        #     model_class_provider= < ModelClassProvider.ANTHROPIC: 'anthropic' >,
+        #     custom_llm_provider = None,
+        #     default_headers = None)), unit_primitives = [ < GitLabUnitPrimitive.REVIEW_MERGE_REQUEST: 'review_merge_request' >],
+        #     prompt_template = {
+        #     'system': "{% include 'review_merge_request/system/1.0.0.jinja' %}\n",
+        #     'user': "{% include 'review_merge_request/user/1.0.0.jinja' %}\n"
+        #     }, params = None),
+        #
+        # '1.0.0': PromptConfig(
+        #     name='Claude 3.7 Multi File Review Merge Request',
+        #     model=ModelConfig(name='claude-3-7-sonnet-20250219',                                                                max_retries=1,
+        #     model_class_provider= < ModelClassProvider.ANTHROPIC: 'anthropic' >,
+        #     custom_llm_provider = None, default_headers = None)),
+        #     unit_primitives = [ < GitLabUnitPrimitive.REVIEW_MERGE_REQUEST: 'review_merge_request' >],
+        #     prompt_template = {
+        #     'system': "{% include 'review_merge_request/system/1.0.0.jinja' %}\n",
+        #     'user': "{% include 'review_merge_request/user/1.0.0.jinja' %}\n"
+        #     },
+        #     params = None)}
+        # (Pdb)
+        # versions.keys()
+        # dict_keys(['2.0.0', '1.0.0'])
+        # (Pdb)
+        # class 'ai_gateway.prompts.base.Prompt'>
     except ParseConstraintError:
         raise HTTPException(
             status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,

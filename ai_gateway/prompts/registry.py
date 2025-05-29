@@ -90,6 +90,8 @@ class LocalPromptRegistry(BasePromptRegistry):
         model_metadata: Optional[TypeModelMetadata] = None,
         tools: Optional[List[BaseTool]] = None,
     ) -> Prompt:
+        # tgao
+        import pdb;pdb.set_trace()
         prompt_id = self._resolve_id(prompt_id, model_metadata)
 
         log.info("Resolved prompt id", prompt_id=prompt_id)
@@ -142,6 +144,8 @@ class LocalPromptRegistry(BasePromptRegistry):
         used if no matching override is provided in `class_overrides`.
         """
 
+        # tgao
+        import pdb; pdb.set_trace()
         base_path = Path(__file__).parent
         prompts_definitions_dir = base_path / "definitions"
         model_configs_dir = (
@@ -157,6 +161,10 @@ class LocalPromptRegistry(BasePromptRegistry):
 
         # Iterate over each folder
         for path in prompts_definitions_dir.glob("**"):
+            # import pdb;pdb.set_trace()
+            if str(path) == "/Users/tiangao/tgao_gitlab/gitlab-development-kit/gitlab-ai-gateway/ai_gateway/prompts/definitions/review_merge_request/base":
+                import pdb;pdb.set_trace()
+
             # Iterate over each version file
             versions = {
                 version.stem: cls._process_version_file(version, model_configs)

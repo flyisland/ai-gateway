@@ -40,6 +40,7 @@ async def anthropic(
         InternalEventsClient, Depends(get_internal_event_client)
     ],
 ):
+    import pdb;pdb.set_trace()
     unit_primitive = request.headers[X_GITLAB_UNIT_PRIMITIVE]
     internal_event_client.track_event(
         f"request_{unit_primitive}",
