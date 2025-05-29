@@ -541,7 +541,7 @@ async def test_workflow_creates_chat_model_without_vertex(
     mock_create_chat_model.assert_called_with(
         max_tokens=8192,
         model="claude-3-7-sonnet-20250219",
-        is_vertex="",
+        is_vertex=False,
     )
 
 
