@@ -109,18 +109,54 @@ def test_update_task_description_format_display_message():
     assert message == expected_message
 
 
-def test_set_task_status_format_display_message():
+@pytest.mark.parametrize(
+    "task_id, status, description, expected_result",
+    [
+        (
+            "task-1",
+            "In Progress",
+            "This is a test task",
+            "Set task 'This is a test task' to 'In Progress'",
+        ),
+        (
+            "task-2",
+            "In Progress",
+            "Thisisatestwithalongcharacterinputtomakesureitsshortened",
+            "Set task 'Thisisatestwithalongcharacterinputtomakesureitssho...' to 'In Progress'",
+        ),
+        (
+            "task-3",
+            "Not Started",
+            "Supercalifragilisticexpialidocious to test a long first word",
+            "Set task 'Supercalifragilisticexpialidocious to test a long...' to 'Not Started'",
+        ),
+        (
+            "task-4",
+            "Completed",
+            "This is a very long task description that exceeds both the word and character limits significantly",
+            "Set task 'This is a very long...' to 'Completed'",
+        ),
+        (
+            "task-5",
+            "Cancelled",
+            "Supercalifragilisticexpialidocious antidisestablishmentarianism",
+            "Set task 'Supercalifragilisticexpialidocious...' to 'Cancelled'",
+        ),
+    ],
+)
+def test_set_task_status_format_display_message(
+    task_id, status, description, expected_result
+):
     tool = SetTaskStatus(description="Set task status")
 
     input_data = SetTaskStatusInput(
-        task_id="task-1",
-        status="In Progress",
-        description="This is a test task for the purpose of evaluating the quality of the task description formatting",
+        task_id=task_id,
+        status=status,
+        description=description,
     )
 
     message = tool.format_display_message(input_data)
-    expected_message = "Set task 'This is a test task...' to 'In Progress'"
-    assert message == expected_message
+    assert message == expected_result
 
 
 def test_create_plan():

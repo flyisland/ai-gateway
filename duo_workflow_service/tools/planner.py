@@ -22,11 +22,22 @@ def format_task_number(task_id: str) -> str:
         return task_id
 
 
-def format_short_task_description(description: str, n: int = 5) -> str:
-    if len(description.split()) >= n:
-        short_description = " ".join(description.split()[:n])
-        return f"{short_description}..."
-    return description
+def format_short_task_description(
+    description: str, word_limit: int = 5, char_limit: int = 50, suffix: str = "..."
+) -> str:
+
+    words = description.strip().split()
+    shortened_description = " ".join(words[:word_limit])
+
+    if len(shortened_description) > char_limit:
+        shortened_description = shortened_description[:char_limit].rsplit(" ", 1)[0]
+
+    return (
+        f"{shortened_description}{suffix}"
+        if len(words) > word_limit
+        or len(shortened_description) < len(description.strip())
+        else shortened_description
+    )
 
 
 class AddNewTaskInput(BaseModel):
