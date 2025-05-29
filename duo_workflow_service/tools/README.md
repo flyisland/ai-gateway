@@ -28,7 +28,7 @@ flowchart TD
 
 ### User Interaction Flow
 
-When users interact with GitLab AI features, these tools execute automatically in the background:
+When users interact with GitLab AI features, the agents decide whether to execute tools.
 
 #### **GitLab Duo Chat Example:**
 
@@ -57,16 +57,6 @@ Automatic Backend Workflow:
 
 Result: Review comments and labels appear automatically in the MR
 ```
-
-### Integration with GitLab Features
-
-| GitLab Feature | User Experience |
-|----------------|-----------------|
-| **GitLab Duo Chat** | Ask questions, get intelligent responses |
-| **AI Code Reviews** | Automatic review comments on MRs |
-| **Code Suggestions** | AI-powered code completions in Web IDE |
-| **Issue Analysis** | Smart issue recommendations and context |
-| **Pipeline Insights** | AI explanations of CI/CD failures |
 
 ### Real GitLab API Integration
 
@@ -430,40 +420,6 @@ def test_format_display_message(tool):
     assert message == "Executing custom operation on project 123"
 ```
 
-## Workflow Integration
-
-Tools can be combined in sophisticated workflows:
-
-```python
-# Example: Automated Security Review Workflow
-async def security_review_workflow(merge_request_url: str):
-    # 1. Get MR details
-    mr_details = await gitlab_merge_request_get(url=merge_request_url)
-
-    # 2. Get changed files
-    changed_files = await gitlab_merge_request_changes(url=merge_request_url)
-
-    # 3. Run security scan on changed files
-    security_results = await gitlab_security_scanner(
-        project_id=mr_details['project_id'],
-        scan_type='vulnerability',
-        file_patterns=changed_files
-    )
-
-    # 4. If issues found, add review comments
-    if security_results['findings_count'] > 0:
-        await gitlab_merge_request_note_create(
-            url=merge_request_url,
-            body=f"🔒 Security Review: Found {security_results['findings_count']} issues"
-        )
-
-    # 5. Update MR labels
-    await gitlab_merge_request_update(
-        url=merge_request_url,
-        labels=['security-reviewed']
-    )
-```
-
 ## Contributing
 
 When adding new tools:
@@ -472,5 +428,5 @@ When adding new tools:
 1. **Write comprehensive descriptions** for LLM understanding
 1. **Include proper error handling** and validation
 1. **Add unit and integration tests**
-1. **Update this README** with new tool categories
+1. **Update this README** with new tool categories and file lists
 1. **Consider security implications** of new capabilities
