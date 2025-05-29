@@ -8,6 +8,7 @@ from asyncio import Future
 log = structlog.stdlib.get_logger("server")
 
 
+# TODO: Needs unit tests
 class ExecutorClient:
     """
     Manages all communication with the Executor
@@ -33,6 +34,7 @@ class ExecutorClient:
         loop = asyncio.get_event_loop()
         future = loop.create_future()
 
+        # TODO: Should we add a timeout in case we don't get the response in time?
         self.request_responses_by_id[action.requestID] = future
 
         await self.outbound_requests.put(action)
