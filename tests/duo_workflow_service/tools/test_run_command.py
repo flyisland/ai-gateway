@@ -9,17 +9,14 @@ from duo_workflow_service.tools.command import RunCommand, RunCommandInput
 
 @pytest.mark.asyncio
 async def test_run_command_success():
-    mock_outbox = MagicMock()
-    mock_outbox.put = AsyncMock()
-
-    mock_inbox = MagicMock()
-    mock_inbox.get = AsyncMock(
+    mock_executor_client = MagicMock()
+    mock_executor_client.request = AsyncMock(
         return_value=contract_pb2.ClientEvent(
             actionResponse=contract_pb2.ActionResponse(response="done")
         )
     )
 
-    metadata = {"outbox": mock_outbox, "inbox": mock_inbox}
+    metadata = {"executor_client": mock_executor_client}
 
     run_command = RunCommand(name="run_command", description="Run a shell command")
     run_command.metadata = metadata
@@ -33,8 +30,7 @@ async def test_run_command_success():
 
     assert response == expected_response
 
-    mock_outbox.put.assert_called_once()
-    action = mock_outbox.put.call_args[0][0]
+    action = mock_executor_client.request.call_args[0][0]
     assert action.runCommand.program == program
     assert action.runCommand.arguments == args
     assert action.runCommand.flags == flags
@@ -42,17 +38,14 @@ async def test_run_command_success():
 
 @pytest.mark.asyncio
 async def test_run_command_with_flags_success():
-    mock_outbox = MagicMock()
-    mock_outbox.put = AsyncMock()
-
-    mock_inbox = MagicMock()
-    mock_inbox.get = AsyncMock(
+    mock_executor_client = MagicMock()
+    mock_executor_client.request = AsyncMock(
         return_value=contract_pb2.ClientEvent(
             actionResponse=contract_pb2.ActionResponse(response="done")
         )
     )
 
-    metadata = {"outbox": mock_outbox, "inbox": mock_inbox}
+    metadata = {"executor_client": mock_executor_client}
 
     run_command = RunCommand(name="run_command", description="Run a shell command")
     run_command.metadata = metadata
@@ -66,8 +59,7 @@ async def test_run_command_with_flags_success():
 
     assert response == expected_response
 
-    mock_outbox.put.assert_called_once()
-    action = mock_outbox.put.call_args[0][0]
+    action = mock_executor_client.request.call_args[0][0]
     assert action.runCommand.program == program
     assert action.runCommand.arguments == args
     assert action.runCommand.flags == flags
