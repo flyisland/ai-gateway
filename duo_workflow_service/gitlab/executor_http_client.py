@@ -1,4 +1,3 @@
-import asyncio
 import logging
 from typing import Any, Callable, Dict, Optional, Union
 from urllib.parse import urlencode
