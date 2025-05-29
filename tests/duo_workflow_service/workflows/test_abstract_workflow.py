@@ -1,9 +1,9 @@
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
-from langchain.tools import BaseTool
 
 from contract import contract_pb2
+from duo_workflow_service.executor.client import ExecutorClient
 from duo_workflow_service.internal_events import InternalEventAdditionalProperties
 from duo_workflow_service.internal_events.event_enum import CategoryEnum, EventEnum
 from duo_workflow_service.workflows.abstract_workflow import (
@@ -77,59 +77,12 @@ async def test_init():
     assert workflow._workflow_id == workflow_id
     assert workflow._workflow_metadata == metadata
     assert workflow._context_elements == context_elements
-    assert workflow.is_done is False
-    assert workflow._outbox.maxsize == 1
-    assert workflow._inbox.maxsize == 1
     assert len(workflow._additional_tools) == 1
     tool = workflow._additional_tools[0]
     assert tool.name == "get_issue"
     assert tool.description == "Tool to get issue"
-
-
-@pytest.mark.asyncio
-async def test_outbox_empty(workflow):
-    await workflow._outbox.put("test_item")
-    assert not workflow.outbox_empty()
-
-    item = await workflow.get_from_outbox()
-
-    assert item == "test_item"
-    assert workflow.outbox_empty()
-
-
-@pytest.mark.asyncio
-async def test_get_from_outbox(workflow):
-    # Put an item in the outbox
-    await workflow._outbox.put("test_item")
-
-    # Get the item
-    item = await workflow.get_from_outbox()
-
-    assert item == "test_item"
-    assert workflow._outbox.empty()
-
-
-@pytest.mark.asyncio
-async def test_get_from_streaming_outbox(workflow):
-    await workflow._streaming_outbox.put("test_item")
-
-    item = workflow.get_from_streaming_outbox()
-
-    assert item == "test_item"
-    assert workflow._streaming_outbox.empty()
-
-
-@pytest.mark.asyncio
-async def test_add_to_inbox(workflow):
-    # Create a mock event
-    mock_event = MagicMock()
-
-    # Add to inbox
-    workflow.add_to_inbox(mock_event)
-
-    # Check if it was added
-    assert workflow._inbox.qsize() == 1
-    assert await workflow._inbox.get() == mock_event
+    assert workflow.is_done is False
+    assert isinstance(workflow._executor_client, ExecutorClient)
 
 
 @pytest.mark.asyncio
@@ -168,51 +121,12 @@ async def test_compile_and_run_graph(
 @pytest.mark.asyncio
 @patch("duo_workflow_service.workflows.abstract_workflow.log_exception")
 async def test_cleanup(mock_log_exception, workflow):
-    # Add items to queues
-    await workflow._outbox.put("outbox_item")
-    await workflow._inbox.put("inbox_item")
-
     # Run cleanup
     await workflow.cleanup(workflow._workflow_id)
 
     # Check queues are empty
-    assert workflow._outbox.empty()
-    assert workflow._inbox.empty()
     assert workflow.is_done is True
     mock_log_exception.assert_not_called()
-
-
-@pytest.mark.asyncio
-@patch("duo_workflow_service.workflows.abstract_workflow.log_exception")
-async def test_cleanup_with_exception(mock_log_exception, workflow):
-    await workflow._outbox.put("test_item")
-    # Make drain_queue raise an exception
-    with patch.object(
-        workflow._outbox, "get_nowait", side_effect=RuntimeError("Test error")
-    ):
-        # Catch exception raised during cleanup
-        try:
-            await workflow.cleanup(workflow._workflow_id)
-        except RuntimeError:
-            pass
-
-    # Two log_exception calls: one from _drain_queue and one from cleanup
-    assert mock_log_exception.call_count == 2
-
-    # Check the first call (from _drain_queue)
-    first_call = mock_log_exception.call_args_list[0]
-    args, kwargs = first_call
-    assert isinstance(args[0], RuntimeError)
-    assert str(args[0]) == "Test error"
-    assert kwargs["extra"]["workflow_id"] == workflow._workflow_id
-    assert kwargs["extra"]["context"] == "Error draining outbox queue"
-
-    # Check the second call (from cleanup)
-    second_call = mock_log_exception.call_args_list[1]
-    args, kwargs = second_call
-    assert isinstance(args[0], RuntimeError)
-    assert kwargs["extra"]["workflow_id"] == workflow._workflow_id
-    assert kwargs["extra"]["context"] == "Workflow cleanup failed"
 
 
 @patch(
@@ -255,10 +169,9 @@ async def test_compile_and_run_graph_with_exception(
     # Setup mocks to raise an exception
     mock_tools_registry.side_effect = Exception("Test exception")
     mock_fetch_project.return_value = mock_project
-    workflow._inbox.get = AsyncMock(
+    workflow._executor_client.request = AsyncMock(
         return_value=MagicMock(actionResponse=MagicMock(requestID="", response=""))
     )
-    workflow._inbox.task_done = AsyncMock()
 
     with pytest.raises(TraceableException) as exc_info:
         await workflow._compile_and_run_graph("Test goal")

@@ -42,19 +42,15 @@ class TestGrep:
     @pytest.mark.asyncio
     @pytest.mark.parametrize("params,expected_output,expected_args", valid_test_cases)
     async def test_grep_arun(self, params, expected_output, expected_args):
-        # Set up the mock outbox and inbox
-        mock_outbox = MagicMock()
-        mock_outbox.put = AsyncMock()
-
-        # Create a mock inbox that returns the expected_output for each test case
-        mock_inbox = MagicMock()
-        mock_inbox.get = AsyncMock(
+        mock_executor_client = MagicMock()
+        mock_executor_client.request = AsyncMock(
             return_value=contract_pb2.ClientEvent(
                 actionResponse=contract_pb2.ActionResponse(response=expected_output)
             )
         )
 
-        metadata = {"outbox": mock_outbox, "inbox": mock_inbox}
+        metadata = {"executor_client": mock_executor_client}
+
         grep_tool = Grep()
         grep_tool.metadata = metadata
 

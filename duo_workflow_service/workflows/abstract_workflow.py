@@ -22,6 +22,7 @@ from duo_workflow_service.checkpointer.gitlab_workflow import (
 from duo_workflow_service.checkpointer.notifier import UserInterface
 from duo_workflow_service.components import ToolsRegistry
 from duo_workflow_service.entities import DuoWorkflowStateType
+from duo_workflow_service.executor.client import ExecutorClient
 from duo_workflow_service.gitlab.events import get_event
 from duo_workflow_service.gitlab.gitlab_project import (
     Project,
@@ -39,7 +40,6 @@ from duo_workflow_service.internal_events.event_enum import CategoryEnum, EventE
 from duo_workflow_service.monitoring import duo_workflow_metrics
 from duo_workflow_service.tools import convert_mcp_tools_to_langchain_tools
 from duo_workflow_service.tracking import log_exception
-from duo_workflow_service.executor.client import ExecutorClient
 
 # Constants
 QUEUE_MAX_SIZE = 1
@@ -239,6 +239,7 @@ class AbstractWorkflow(ABC):
     def log_workflow_elements(self, element):
         pass
 
+    # TODO: Is this cleanup still necessary? The queues moved to executor_client but also the garbage collector should clean those queues anyway.
     async def cleanup(self, workflow_id: str):
         try:
             self.is_done = True

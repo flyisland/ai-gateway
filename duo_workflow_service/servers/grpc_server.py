@@ -17,6 +17,7 @@ from gitlab_cloud_connector import (
 from grpc_reflection.v1alpha import reflection
 
 from contract import contract_pb2, contract_pb2_grpc
+from duo_workflow_service.executor.client import ExecutorClient
 from duo_workflow_service.gitlab.connection_pool import connection_pool
 from duo_workflow_service.interceptors.authentication_interceptor import (
     AuthenticationInterceptor,
@@ -38,7 +39,6 @@ from duo_workflow_service.internal_events.event_enum import CategoryEnum
 from duo_workflow_service.structured_logging import set_workflow_id
 from duo_workflow_service.tracking import MonitoringContext, current_monitoring_context
 from duo_workflow_service.tracking.errors import log_exception
-from duo_workflow_service.executor.client import ExecutorClient
 from duo_workflow_service.workflows.abstract_workflow import (
     AbstractWorkflow,
     TypeWorkflow,
@@ -118,9 +118,7 @@ class GrpcServer(contract_pb2_grpc.DuoWorkflowServicer):
 
         invocation_metadata = dict(context.invocation_metadata())
 
-        executor_client = ExecutorClient(
-            incoming_iterator=request_iterator
-        )
+        executor_client = ExecutorClient(incoming_iterator=request_iterator)
 
         workflow: AbstractWorkflow = workflow_class(
             workflow_id=workflow_id,

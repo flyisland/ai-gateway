@@ -1,9 +1,10 @@
 import asyncio
-import structlog
-from typing import AsyncIterable, AsyncIterator
-from contract import contract_pb2
 from asyncio import Future
+from typing import AsyncIterable, AsyncIterator
 
+import structlog
+
+from contract import contract_pb2
 
 log = structlog.stdlib.get_logger("server")
 
@@ -19,8 +20,8 @@ class ExecutorClient:
     request_responses_by_id: dict[str, Future[contract_pb2.ClientEvent]] = {}
 
     def __init__(
-            self,
-            incoming_iterator: AsyncIterable[contract_pb2.ClientEvent],
+        self,
+        incoming_iterator: AsyncIterable[contract_pb2.ClientEvent],
     ):
         self.incoming_iterator = incoming_iterator
         self.outbound_requests = asyncio.Queue()
@@ -56,7 +57,10 @@ class ExecutorClient:
                 future.set_result(event)
                 del self.request_responses_by_id[requestID]
             else:
-                log.info("Received response for unknown requestID: %s. Could be a response to an action sent via 'send' instead of 'request'.", requestID)
+                log.info(
+                    "Received response for unknown requestID: %s. Could be a response to an action sent via 'send' instead of 'request'.",
+                    requestID,
+                )
 
     async def execute_stream(self) -> AsyncIterator[contract_pb2.Action]:
         """

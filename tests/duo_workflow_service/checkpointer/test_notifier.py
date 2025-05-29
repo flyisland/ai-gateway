@@ -1,27 +1,25 @@
-import asyncio
-from typing import Any, Dict, List, Optional
-from unittest.mock import Mock, patch
+from unittest.mock import MagicMock, Mock, patch
 
 import pytest
 from langchain.load.dump import dumps
 from langchain_core.messages import HumanMessage
 
-from contract import contract_pb2
 from duo_workflow_service.checkpointer.notifier import (
     WORKFLOW_STATUS_TO_CHECKPOINT_STATUS,
     UserInterface,
 )
 from duo_workflow_service.entities.state import MessageTypeEnum, WorkflowStatusEnum
+from duo_workflow_service.executor.client import ExecutorClient
 
 
 @pytest.fixture
-def outbox():
-    return asyncio.Queue()
+def executor_client():
+    return MagicMock(spec=ExecutorClient)
 
 
 @pytest.fixture
-def checkpoint_notifier(outbox):
-    return UserInterface(outbox=outbox, goal="test_goal")
+def checkpoint_notifier(executor_client):
+    return UserInterface(executor_client=executor_client, goal="test_goal")
 
 
 @pytest.mark.asyncio
@@ -29,7 +27,7 @@ async def test_send_event_with_non_values_type(checkpoint_notifier):
     state = {"not_values_state": "state"}
     result = await checkpoint_notifier.send_event("not_values", state, False)
     assert result is None
-    assert checkpoint_notifier.outbox.empty()
+    assert executor_client.send.call_count == 0
 
 
 @pytest.mark.asyncio
@@ -43,8 +41,8 @@ async def test_send_event_with_values_type(checkpoint_notifier):
     assert checkpoint_notifier.ui_chat_log == ["message1", "message2"]
     assert checkpoint_notifier.status == WorkflowStatusEnum.COMPLETED
     assert checkpoint_notifier.steps == ["step1", "step2"]
-    assert not checkpoint_notifier.outbox.empty()
-    action = await checkpoint_notifier.outbox.get()
+    assert executor_client.request.call_count == 1
+    action = executor_client.request.call_args[0][0]
     assert action.newCheckpoint.goal == "test_goal"
     assert action.newCheckpoint.status == "FINISHED"
     expected_checkpoint = dumps(
@@ -66,7 +64,8 @@ async def test_send_event_with_missing_plan_steps(checkpoint_notifier):
         "plan": {},
     }
     await checkpoint_notifier.send_event("values", state, False)
-    action = await checkpoint_notifier.outbox.get()
+    assert executor_client.request.call_count == 1
+    action = executor_client.request.call_args[0][0]
     expected_checkpoint = dumps(
         {
             "channel_values": {
@@ -101,9 +100,9 @@ def test_workflow_status_mapping():
 
 
 @pytest.mark.asyncio
-async def test_init_sets_attributes(outbox):
-    notifier = UserInterface(outbox=outbox, goal="custom_goal")
-    assert notifier.outbox == outbox
+async def test_init_sets_attributes(executor_client):
+    notifier = UserInterface(executor_client=executor_client, goal="custom_goal")
+    assert notifier.executor_client == executor_client
     assert notifier.goal == "custom_goal"
     assert notifier.ui_chat_log == []
     assert notifier.status == WorkflowStatusEnum.NOT_STARTED
@@ -244,7 +243,7 @@ async def test_send_event_messages_stream(
 
         assert checkpoint_notifier.ui_chat_log == expected_messages
 
-        assert not checkpoint_notifier.outbox.empty()
-        action = await checkpoint_notifier.outbox.get()
+        assert executor_client.request.call_count == 1
+        action = executor_client.request.call_args[0][0]
         assert action.newCheckpoint.goal == "test_goal"
         assert action.newCheckpoint.checkpoint is not None

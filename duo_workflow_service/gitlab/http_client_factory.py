@@ -1,9 +1,9 @@
 import os
 
+from duo_workflow_service.executor.client import ExecutorClient
 from duo_workflow_service.gitlab.direct_http_client import DirectGitLabHttpClient
 from duo_workflow_service.gitlab.executor_http_client import ExecutorGitLabHttpClient
 from duo_workflow_service.gitlab.http_client import GitlabHttpClient
-from duo_workflow_service.executor.client import ExecutorClient
 
 
 def get_http_client(

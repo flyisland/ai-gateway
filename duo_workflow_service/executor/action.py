@@ -5,7 +5,6 @@ import structlog
 from prometheus_client import Histogram
 
 from contract import contract_pb2
-
 from duo_workflow_service.executor.client import ExecutorClient
 
 ACTION_LATENCY = Histogram(

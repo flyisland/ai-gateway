@@ -4,8 +4,8 @@ import pytest
 
 from duo_workflow_service.components.tools_registry import ToolMetadata
 from duo_workflow_service.entities.state import Plan, WorkflowState, WorkflowStatusEnum
-from duo_workflow_service.gitlab.http_client import GitlabHttpClient
 from duo_workflow_service.executor.client import ExecutorClient
+from duo_workflow_service.gitlab.http_client import GitlabHttpClient
 
 
 @pytest.fixture(scope="function")

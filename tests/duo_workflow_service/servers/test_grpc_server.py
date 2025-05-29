@@ -178,8 +178,6 @@ async def test_execute_workflow(mock_resolve_workflow, mock_abstract_workflow_cl
     assert (await anext(result)).WhichOneof("action") == "newCheckpoint"
     assert (await anext(result)).WhichOneof("action") == "newCheckpoint"
 
-    assert mock_workflow_instance.add_to_inbox.call_count == 2
-
 
 @pytest.mark.asyncio
 @patch("duo_workflow_service.servers.grpc_server.TokenAuthority")

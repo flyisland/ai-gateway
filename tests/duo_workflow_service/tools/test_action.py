@@ -1,6 +1,7 @@
+from unittest.mock import AsyncMock, MagicMock
+
 import pytest
 
-from unittest.mock import AsyncMock, MagicMock
 from contract import contract_pb2
 from duo_workflow_service.executor.action import _execute_action
 

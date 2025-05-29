@@ -4,8 +4,8 @@ from urllib.parse import urlencode
 
 from contract import contract_pb2
 from duo_workflow_service.executor.action import _execute_action
-from duo_workflow_service.gitlab.http_client import GitlabHttpClient
 from duo_workflow_service.executor.client import ExecutorClient
+from duo_workflow_service.gitlab.http_client import GitlabHttpClient
 
 logger = logging.getLogger(__name__)
 

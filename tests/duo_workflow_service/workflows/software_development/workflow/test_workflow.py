@@ -76,8 +76,7 @@ async def test_workflow_initialization():
         {},
         workflow_type=CategoryEnum.WORKFLOW_SOFTWARE_DEVELOPMENT,
     )
-    assert isinstance(workflow._outbox, asyncio.Queue)
-    assert isinstance(workflow._inbox, asyncio.Queue)
+    assert isinstance(workflow._executor_client, ExecutorClient)
 
 
 def _agent_responses(status: WorkflowStatusEnum, agent_name: str):
@@ -1196,30 +1195,6 @@ async def test_workflow_run_with_tool_approvals(
 
 
 @pytest.mark.asyncio
-async def test_get_from_outbox():
-    workflow = Workflow(
-        "123",
-        {},
-        workflow_type=CategoryEnum.WORKFLOW_SOFTWARE_DEVELOPMENT,
-    )
-    workflow._outbox.put_nowait("test_item")
-    item = await workflow.get_from_outbox()
-    assert item == "test_item"
-
-
-def test_add_to_inbox():
-    workflow = Workflow(
-        "123",
-        {},
-        workflow_type=CategoryEnum.WORKFLOW_SOFTWARE_DEVELOPMENT,
-    )
-    event = contract_pb2.ClientEvent()
-    workflow.add_to_inbox(event)
-    assert workflow._inbox.qsize() == 1
-    assert workflow._inbox.get_nowait() == event
-
-
-@pytest.mark.asyncio
 async def test_workflow_cleanup():
     workflow = Workflow(
         "123",
@@ -1227,18 +1202,8 @@ async def test_workflow_cleanup():
         workflow_type=CategoryEnum.WORKFLOW_SOFTWARE_DEVELOPMENT,
     )
 
-    assert workflow._outbox.empty()
-    assert workflow._inbox.empty()
-
-    workflow._outbox.put_nowait("test_outbox_item_1")
-    workflow._inbox.put_nowait("test_inbox_item_1")
-
-    assert workflow._outbox.qsize() == 1
-    assert workflow._inbox.qsize() == 1
     assert not workflow.is_done
 
     await workflow.cleanup("123")
 
     assert workflow.is_done
-    assert workflow._outbox.qsize() == 0
-    assert workflow._inbox.qsize() == 0

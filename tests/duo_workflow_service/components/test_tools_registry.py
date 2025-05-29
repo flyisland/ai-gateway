@@ -20,8 +20,7 @@ def gl_http_client():
     return AsyncMock(spec=GitlabHttpClient)
 
 
-_inbox = MagicMock(spec=asyncio.Queue)
-_outbox = MagicMock(spec=asyncio.Queue)
+_executor_client = MagicMock(spec=ExecutorClient)
 
 
 @pytest.mark.parametrize(
@@ -277,8 +276,7 @@ async def test_registry_configuration(gl_http_client):
     registry = await ToolsRegistry.configure(
         workflow_config=workflow_config,
         gl_http_client=gl_http_client,
-        outbox=_outbox,
-        inbox=_inbox,
+        executor_client=_executor_client,
         gitlab_host="gitlab.example.com",
         additional_tools=[extra_tool],
     )
@@ -443,8 +441,7 @@ async def test_registry_configuration_with_preapproved_tools(gl_http_client):
     registry = await ToolsRegistry.configure(
         workflow_config=workflow_config,
         gl_http_client=gl_http_client,
-        outbox=_outbox,
-        inbox=_inbox,
+        executor_client=_executor_client,
         gitlab_host="gitlab.example.com",
     )
 
@@ -480,8 +477,7 @@ async def test_registry_configuration_error(gl_http_client, workflow_config):
         await ToolsRegistry.configure(
             workflow_config=workflow_config,
             gl_http_client=gl_http_client,
-            outbox=_outbox,
-            inbox=_inbox,
+            executor_client=_executor_client,
             gitlab_host="gitlab.example.com",
         )
 

@@ -4,12 +4,12 @@ from langchain.tools import BaseTool
 from pydantic import BaseModel
 
 from duo_workflow_service import tools
+from duo_workflow_service.executor.client import ExecutorClient
 from duo_workflow_service.gitlab.http_client import GitlabHttpClient
 from duo_workflow_service.interceptors.feature_flag_interceptor import (
     current_feature_flag_context,
 )
 from duo_workflow_service.tools import Toolset, ToolType
-from duo_workflow_service.executor.client import ExecutorClient
 
 
 class ToolMetadata(TypedDict):

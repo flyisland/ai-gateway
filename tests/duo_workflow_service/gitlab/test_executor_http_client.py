@@ -1,10 +1,10 @@
 import json
 from unittest.mock import AsyncMock, MagicMock, patch
-from duo_workflow_service.executor.client import ExecutorClient
 
 import pytest
 
 from contract import contract_pb2
+from duo_workflow_service.executor.client import ExecutorClient
 from duo_workflow_service.gitlab.executor_http_client import ExecutorGitLabHttpClient
 
 
