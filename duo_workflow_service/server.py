@@ -1,5 +1,7 @@
 # pylint: disable=direct-environment-variable-reference
 
+# Hello world!
+
 import asyncio
 import os
 
