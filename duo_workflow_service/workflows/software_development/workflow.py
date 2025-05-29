@@ -17,6 +17,7 @@ from langgraph.graph import (  # pylint: disable=no-langgraph-langchain-imports
     StateGraph,
 )
 
+from ai_gateway.models import KindAnthropicModel
 from duo_workflow_service.agents import (
     Agent,
     HandoverAgent,
@@ -197,6 +198,23 @@ def _should_continue(
 
 
 class Workflow(AbstractWorkflow):
+    def _get_chat_model_name(self) -> str:
+        """Select the appropriate chat model based on feature flags and deployment environment."""
+        feature_flags = current_feature_flag_context.get()
+
+        # Check if Claude Sonnet 4 is enabled
+        is_sonnet_4_enabled = KindAnthropicModel.CLAUDE_SONNET_4.value in feature_flags
+
+        # Use default model if Sonnet 4 is not enabled
+        if not is_sonnet_4_enabled:
+            return KindAnthropicModel.CLAUDE_3_7_SONNET.value
+
+        # Select appropriate Sonnet 4 variant based on deployment
+        if self._is_vertex:
+            return KindAnthropicModel.CLAUDE_SONNET_4_VERTEX.value
+        else:
+            return KindAnthropicModel.CLAUDE_SONNET_4.value
+
     async def _handle_workflow_failure(
         self, error: BaseException, compiled_graph, graph_config
     ):
