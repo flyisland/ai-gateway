@@ -67,7 +67,9 @@ def test_get_plan():
 )
 def test_set_task_status(task_id, status, expected_result):
     set_task_status = SetTaskStatus(description="test description")
-    input_data = SetTaskStatusInput(task_id=task_id, status=status)
+    input_data = SetTaskStatusInput(
+        task_id=task_id, status=status, description="test description"
+    )
     result = set_task_status._run(task_id=input_data.task_id, status=input_data.status)
     assert result == expected_result
 
@@ -110,11 +112,14 @@ def test_update_task_description_format_display_message():
 def test_set_task_status_format_display_message():
     tool = SetTaskStatus(description="Set task status")
 
-    input_data = SetTaskStatusInput(task_id="task-1", status="In Progress")
+    input_data = SetTaskStatusInput(
+        task_id="task-1",
+        status="In Progress",
+        description="This is a test task for the purpose of evaluating the quality of the task description formatting",
+    )
 
     message = tool.format_display_message(input_data)
-
-    expected_message = "Set task 2 to 'In Progress'"
+    expected_message = "Set task 'This is a test task...' to 'In Progress'"
     assert message == expected_message
 
 

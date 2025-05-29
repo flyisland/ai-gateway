@@ -22,6 +22,13 @@ def format_task_number(task_id: str) -> str:
         return task_id
 
 
+def format_short_task_description(description: str, n: int = 5) -> str:
+    if len(description.split()) >= n:
+        short_description = " ".join(description.split()[:n])
+        return f"{short_description}..."
+    return description
+
+
 class AddNewTaskInput(BaseModel):
     description: str = Field(description="The description of the new task to add")
 
@@ -96,6 +103,7 @@ class SetTaskStatusInput(BaseModel):
                         The status can be `Not Started`, `In Progress`,
                         `Completed` or `Cancelled`"""
     )
+    description: str = Field(description="A short description of the task for context")
 
 
 class SetTaskStatus(BaseTool):
@@ -107,8 +115,8 @@ class SetTaskStatus(BaseTool):
         return f"Status of task with ID {task_id} set to {status}"
 
     def format_display_message(self, args: SetTaskStatusInput) -> str:
-        task_num = format_task_number(args.task_id)
-        return f"Set task {task_num} to '{args.status}'"
+        task_description = format_short_task_description(args.description)
+        return f"Set task '{task_description}' to '{args.status}'"
 
 
 class CreatePlanInput(BaseModel):

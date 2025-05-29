@@ -34,7 +34,10 @@ from duo_workflow_service.tools import (
     Toolset,
     format_tool_display_message,
 )
-from duo_workflow_service.tools.planner import format_task_number
+from duo_workflow_service.tools.planner import (
+    format_short_task_description,
+    format_task_number,
+)
 
 _HIDDEN_TOOLS = ["get_plan"]
 
@@ -280,10 +283,7 @@ class ToolsExecutor:
             else "The tool does not accept any argument"
         )
 
-        tool_response = (
-            f"Tool {tool_name} execution failed due to wrong arguments. You must adhere to the tool args "
-            f"schema! {schema}"
-        )
+        tool_response = f"Tool {tool_name} execution failed due to wrong arguments. You must adhere to the tool args schema! {schema}"
         self._track_internal_event(
             event_name=EventEnum.WORKFLOW_TOOL_FAILURE,
             tool_name=tool_name,
@@ -429,7 +429,7 @@ class ToolsExecutor:
                 "add_new_task": f"Add new task to the plan: {args.get('description', '')[:100]}...",
                 "remove_task": f"Remove task {task_num}",
                 "update_task_description": f"Update description for task {task_num}",
-                "set_task_status": f"Set task {task_num} to '{args.get('status', '')}'",
+                "set_task_status": f"Set task '{format_short_task_description(args.get('description', ''))}' to '{args.get('status', '')}'",
                 "create_plan": f"Create plan with {len(args.get('tasks', []))} tasks",
             }
             message = action_messages.get(tool_name, "")

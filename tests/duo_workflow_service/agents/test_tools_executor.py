@@ -455,7 +455,9 @@ async def test_adding_ai_context_to_ui_chat_logs(
                     "id": "1",
                     "name": "set_task_status",
                     "args": SetTaskStatusInput(
-                        task_id="1", status=TaskStatus.IN_PROGRESS
+                        task_id="1",
+                        status=TaskStatus.IN_PROGRESS,
+                        description="Test description",
                     ).model_dump(),
                 }
             ],
@@ -474,7 +476,7 @@ async def test_adding_ai_context_to_ui_chat_logs(
                     }
                 ]
             },
-            "expected_log_content": "Set task 2 to 'In Progress'",
+            "expected_log_content": "Set task 'Test description' to 'In Progress'",
         },
     ],
 )
@@ -532,17 +534,13 @@ async def test_run_with_state_manipulating_tools(
 
 @pytest.mark.asyncio
 @pytest.mark.parametrize(
-    "tool_call, tool_side_effect, tool_args_schema, expected_response, expected_error, expected_log_prefix,"
-    "expected_tool_info",
+    "tool_call, tool_side_effect, tool_args_schema, expected_response, expected_error, expected_log_prefix, expected_tool_info",
     [
         (
             {"id": "1", "name": "test_tool", "args": {}},
             TypeError("Wrong arguments"),
             AddNewTaskInput,
-            "Tool test_tool execution failed due to wrong arguments. You must adhere to the tool args schema! The "
-            "schema is: {'properties': {'description': {'description': 'The description of the new task to add', "
-            "'title': 'Description', 'type': 'string'}}, 'required': ['description'], 'title': 'AddNewTaskInput', "
-            "'type': 'object'}",
+            "Tool test_tool execution failed due to wrong arguments. You must adhere to the tool args schema! The schema is: {'properties': {'description': {'description': 'The description of the new task to add', 'title': 'Description', 'type': 'string'}}, 'required': ['description'], 'title': 'AddNewTaskInput', 'type': 'object'}",
             False,
             "Failed: Using test_tool:  - Invalid arguments",
             ToolInfo(name="test_tool", args={}),
@@ -676,8 +674,8 @@ async def test_run_error_handling(
         ),
         (
             "set_task_status",
-            {"task_id": "task-3", "status": "Completed"},
-            "Set task 4 to 'Completed'",
+            {"task_id": "task-3", "status": "Completed", "description": "Test task"},
+            "Set task 'Test task' to 'Completed'",
         ),
         (
             "create_plan",
