@@ -229,7 +229,11 @@ async def test_init_sets_attributes(executor_client):
 )
 @pytest.mark.asyncio
 async def test_send_event_messages_stream(
-    checkpoint_notifier, existing_messages, message_content, expected_messages, executor_client
+    checkpoint_notifier,
+    existing_messages,
+    message_content,
+    expected_messages,
+    executor_client,
 ):
     checkpoint_notifier.ui_chat_log = existing_messages
 

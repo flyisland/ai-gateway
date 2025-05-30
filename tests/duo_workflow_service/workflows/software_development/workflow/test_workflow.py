@@ -9,10 +9,9 @@ from langgraph.checkpoint.base import CheckpointTuple
 from langgraph.checkpoint.memory import MemorySaver
 
 from duo_workflow_service.components import ToolsRegistry
-from duo_workflow_service.components.tools_registry import (
-    _AGENT_PRIVILEGES,
-)
+from duo_workflow_service.components.tools_registry import _AGENT_PRIVILEGES
 from duo_workflow_service.entities import Plan, WorkflowStatusEnum
+from duo_workflow_service.internal_events.event_enum import CategoryEnum
 from duo_workflow_service.tools.toolset import Toolset
 from duo_workflow_service.workflows.software_development import Workflow
 from duo_workflow_service.workflows.software_development.workflow import (
@@ -20,7 +19,6 @@ from duo_workflow_service.workflows.software_development.workflow import (
     EXECUTOR_TOOLS,
     PLANNER_TOOLS,
 )
-from duo_workflow_service.internal_events.event_enum import CategoryEnum
 
 
 class MockComponent:

@@ -9,8 +9,8 @@ from duo_workflow_service.components.tools_registry import (
     Toolset,
     ToolsRegistry,
 )
-from duo_workflow_service.gitlab.http_client import GitlabHttpClient
 from duo_workflow_service.executor.client import ExecutorClient
+from duo_workflow_service.gitlab.http_client import GitlabHttpClient
 
 
 @pytest.fixture

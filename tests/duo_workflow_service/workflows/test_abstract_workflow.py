@@ -43,7 +43,9 @@ def workflow():
     workflow_type = CategoryEnum.WORKFLOW_SOFTWARE_DEVELOPMENT
     context_elements = []
     executor_client = MagicMock(spec=ExecutorClient)
-    return MockWorkflow(workflow_id, metadata, workflow_type, executor_client, context_elements)
+    return MockWorkflow(
+        workflow_id, metadata, workflow_type, executor_client, context_elements
+    )
 
 
 @pytest.fixture

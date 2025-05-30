@@ -68,7 +68,10 @@ async def test_execute_workflow_when_no_events_ends(
 @patch("duo_workflow_service.servers.grpc_server.AbstractWorkflow")
 @patch("duo_workflow_service.servers.grpc_server.resolve_workflow_class")
 async def test_execute_workflow_when_nothing_in_outbox(
-    mock_resolve_workflow, mock_abstract_workflow_class, mock_executor_client_class, mock_sleep
+    mock_resolve_workflow,
+    mock_abstract_workflow_class,
+    mock_executor_client_class,
+    mock_sleep,
 ):
     mock_workflow = mock_abstract_workflow_class.return_value
     mock_workflow.is_done = False
@@ -156,7 +159,9 @@ async def test_workflow_is_cancelled_on_parent_task_cancellation(
 @patch("duo_workflow_service.servers.grpc_server.ExecutorClient")
 @patch("duo_workflow_service.servers.grpc_server.AbstractWorkflow")
 @patch("duo_workflow_service.servers.grpc_server.resolve_workflow_class")
-async def test_execute_workflow(mock_resolve_workflow, mock_abstract_workflow_class, mock_executor_client_class):
+async def test_execute_workflow(
+    mock_resolve_workflow, mock_abstract_workflow_class, mock_executor_client_class
+):
     mock_workflow_instance = mock_abstract_workflow_class.return_value
     mock_workflow_instance.is_done = False
     mock_workflow_instance.run = AsyncMock()
@@ -171,9 +176,9 @@ async def test_execute_workflow(mock_resolve_workflow, mock_abstract_workflow_cl
     async def mock_execute_stream():
         # Simulate the pattern: checkpoint, regular, checkpoint, regular, checkpoint, checkpoint
         yield checkpoint_action  # streaming action
-        yield regular_action     # from outbox
+        yield regular_action  # from outbox
         yield checkpoint_action  # streaming action
-        yield regular_action     # from outbox
+        yield regular_action  # from outbox
         yield checkpoint_action  # streaming action
         yield checkpoint_action  # streaming action
 
@@ -201,7 +206,7 @@ async def test_execute_workflow(mock_resolve_workflow, mock_abstract_workflow_cl
     # Verify ExecutorClient was instantiated with the request iterator
     mock_executor_client_class.assert_called_once()
     args, kwargs = mock_executor_client_class.call_args
-    assert 'incoming_iterator' in kwargs or len(args) >= 1
+    assert "incoming_iterator" in kwargs or len(args) >= 1
 
 
 @pytest.mark.asyncio
