@@ -23,7 +23,7 @@ def checkpoint_notifier(executor_client):
 
 
 @pytest.mark.asyncio
-async def test_send_event_with_non_values_type(checkpoint_notifier):
+async def test_send_event_with_non_values_type(checkpoint_notifier, executor_client):
     state = {"not_values_state": "state"}
     result = await checkpoint_notifier.send_event("not_values", state, False)
     assert result is None
@@ -31,7 +31,7 @@ async def test_send_event_with_non_values_type(checkpoint_notifier):
 
 
 @pytest.mark.asyncio
-async def test_send_event_with_values_type(checkpoint_notifier):
+async def test_send_event_with_values_type(checkpoint_notifier, executor_client):
     state = {
         "status": WorkflowStatusEnum.COMPLETED,
         "ui_chat_log": ["message1", "message2"],
@@ -41,8 +41,8 @@ async def test_send_event_with_values_type(checkpoint_notifier):
     assert checkpoint_notifier.ui_chat_log == ["message1", "message2"]
     assert checkpoint_notifier.status == WorkflowStatusEnum.COMPLETED
     assert checkpoint_notifier.steps == ["step1", "step2"]
-    assert executor_client.request.call_count == 1
-    action = executor_client.request.call_args[0][0]
+    assert executor_client.send.call_count == 1
+    action = executor_client.send.call_args[0][0]
     assert action.newCheckpoint.goal == "test_goal"
     assert action.newCheckpoint.status == "FINISHED"
     expected_checkpoint = dumps(
@@ -57,15 +57,15 @@ async def test_send_event_with_values_type(checkpoint_notifier):
 
 
 @pytest.mark.asyncio
-async def test_send_event_with_missing_plan_steps(checkpoint_notifier):
+async def test_send_event_with_missing_plan_steps(checkpoint_notifier, executor_client):
     state = {
         "status": WorkflowStatusEnum.EXECUTION,
         "ui_chat_log": ["message"],
         "plan": {},
     }
     await checkpoint_notifier.send_event("values", state, False)
-    assert executor_client.request.call_count == 1
-    action = executor_client.request.call_args[0][0]
+    assert executor_client.send.call_count == 1
+    action = executor_client.send.call_args[0][0]
     expected_checkpoint = dumps(
         {
             "channel_values": {
@@ -229,7 +229,7 @@ async def test_init_sets_attributes(executor_client):
 )
 @pytest.mark.asyncio
 async def test_send_event_messages_stream(
-    checkpoint_notifier, existing_messages, message_content, expected_messages
+    checkpoint_notifier, existing_messages, message_content, expected_messages, executor_client
 ):
     checkpoint_notifier.ui_chat_log = existing_messages
 
@@ -243,7 +243,7 @@ async def test_send_event_messages_stream(
 
         assert checkpoint_notifier.ui_chat_log == expected_messages
 
-        assert executor_client.request.call_count == 1
-        action = executor_client.request.call_args[0][0]
+        assert executor_client.send.call_count == 1
+        action = executor_client.send.call_args[0][0]
         assert action.newCheckpoint.goal == "test_goal"
         assert action.newCheckpoint.checkpoint is not None

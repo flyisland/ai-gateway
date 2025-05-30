@@ -6,7 +6,7 @@ from duo_workflow_service.gitlab.executor_http_client import ExecutorGitLabHttpC
 from duo_workflow_service.gitlab.http_client_factory import get_http_client
 
 
-def test_get_http_client_custom_gitlab(queues):
+def test_get_http_client_custom_gitlab():
     """Test that get_http_client returns ExecutorGitLabHttpClient for custom GitLab instances."""
     executor_client = MagicMock(spec=ExecutorClient)
     base_url = "https://custom.gitlab.example.com"
@@ -18,7 +18,7 @@ def test_get_http_client_custom_gitlab(queues):
     assert client.executor_client == executor_client
 
 
-def test_get_http_client_with_env_var(queues):
+def test_get_http_client_with_env_var():
     """Test that the factory respects the DUO_WORKFLOW_DIRECT_CONNECTION_BASE_URL environment variable."""
     executor_client = MagicMock(spec=ExecutorClient)
     custom_base_url = "https://custom.direct.gitlab"

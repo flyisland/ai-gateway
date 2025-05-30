@@ -123,7 +123,7 @@ async def test_executor_gitlab_http_client(
     call_args = monkeypatch_execute_action.call_args[0]
 
     assert "executor_client" in call_args[0]
-    assert call_args[0]["executor_client"] == client.executor_clien
+    assert call_args[0]["executor_client"] == client.executor_client
 
     assert isinstance(call_args[1], contract_pb2.Action)
     assert call_args[1].runHTTPRequest.path == expected_path

@@ -60,6 +60,7 @@ def workflow_with_project(context_element):
         workflow_id="test-id",
         workflow_metadata={},
         workflow_type=CategoryEnum.WORKFLOW_CHAT,
+        executor_client=AsyncMock(),
         context_elements=[context_element],
     )
     workflow._project = {
@@ -198,6 +199,7 @@ def test_are_tools_called_with_various_content(message_content, expected_result)
         workflow_id="test-id",
         workflow_metadata={},
         workflow_type=CategoryEnum.WORKFLOW_CHAT,
+        executor_client=AsyncMock(),
     )
     workflow._context_elements = []
 
@@ -225,6 +227,7 @@ def test_are_tools_called_with_tool_use():
         workflow_id="test-id",
         workflow_metadata={},
         workflow_type=CategoryEnum.WORKFLOW_CHAT,
+        executor_client=AsyncMock(),
     )
     workflow._context_elements = []
 
@@ -319,6 +322,7 @@ async def test_workflow_run(
             workflow_id="test-id",
             workflow_metadata={},
             workflow_type=CategoryEnum.WORKFLOW_CHAT,
+            executor_client=AsyncMock(),
         )
 
         await workflow.run("Test chat goal")
@@ -360,6 +364,7 @@ def test_tools_registry_interaction(
         workflow_id="test-id",
         workflow_metadata={},
         workflow_type=CategoryEnum.WORKFLOW_CHAT,
+        executor_client=AsyncMock(),
         mcp_tools=[contract_pb2.McpTool(name="extra_tool", description="Extra tool")],
     )
     workflow._context_elements = []

@@ -1,6 +1,6 @@
 """Test module for search and replace workflow components."""
 
-from unittest.mock import Mock, patch
+from unittest.mock import Mock, patch, AsyncMock
 
 import pytest
 from langchain_core.messages import AIMessage, HumanMessage, SystemMessage
@@ -359,6 +359,7 @@ async def test_workflow_compilation(
         workflow_id="test_id",
         workflow_metadata={},
         workflow_type=CategoryEnum.WORKFLOW_SEARCH_AND_REPLACE,
+        executor_client=AsyncMock(),
     )
 
     # Compile the workflow graph
@@ -390,6 +391,7 @@ async def test_workflow_initialization():
         workflow_id="test_id",
         workflow_metadata={},
         workflow_type=CategoryEnum.WORKFLOW_SEARCH_AND_REPLACE,
+        executor_client=AsyncMock(),
     )
     initial_state = workflow.get_workflow_state("/test/path")
 
@@ -411,6 +413,7 @@ async def test_accessibility_tools(
         workflow_id="test_id",
         workflow_metadata={},
         workflow_type=CategoryEnum.WORKFLOW_SEARCH_AND_REPLACE,
+        executor_client=AsyncMock(),
     )
 
     captured_tool_names = []
@@ -447,6 +450,7 @@ async def test_non_accessibility_tools(
         workflow_id="test_id",
         workflow_metadata={},
         workflow_type=CategoryEnum.WORKFLOW_SEARCH_AND_REPLACE,
+        executor_client=AsyncMock(),
     )
 
     captured_tool_names = []
