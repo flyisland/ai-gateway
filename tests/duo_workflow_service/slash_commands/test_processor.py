@@ -6,9 +6,7 @@ import pytest
 
 from duo_workflow_service.slash_commands.error_handler import SlashCommandError
 from duo_workflow_service.slash_commands.goal_parser import parse
-from duo_workflow_service.slash_commands.prompt_expander import (
-    SlashCommandsPromptExpander,
-)
+from duo_workflow_service.slash_commands.processor import SlashCommandsProcessor
 from lib.result import Error, Ok
 
 # Constants for patch paths
@@ -16,15 +14,15 @@ MODULE_PATH = "duo_workflow_service.slash_commands"
 GOAL_PARSER_PATH = f"{MODULE_PATH}.goal_parser.parse"
 DEFINITION_PATH = f"{MODULE_PATH}.definition.SlashCommandDefinition"
 LOAD_DEFINITION_PATH = f"{DEFINITION_PATH}.load_slash_command_definition"
-PROMPT_EXPANDER_PARSER_PATH = f"{MODULE_PATH}.prompt_expander.parse"
-LOG_COMMAND_ERROR_PATH = f"{MODULE_PATH}.prompt_expander.log_command_error"
-LOG_PATH = f"{MODULE_PATH}.prompt_expander.log"
+PROMPT_EXPANDER_PARSER_PATH = f"{MODULE_PATH}.processor.parse"
+LOG_COMMAND_ERROR_PATH = f"{MODULE_PATH}.processor.log_command_error"
+LOG_PATH = f"{MODULE_PATH}.processor.log"
 
 
-class TestSlashCommandsPromptExpander:
+class TestSlashCommandsGoalExpander:
     @pytest.fixture
     def processor(self):
-        return SlashCommandsPromptExpander()
+        return SlashCommandsProcessor()
 
     @pytest.fixture
     def mock_parser_instance(self):
@@ -33,12 +31,14 @@ class TestSlashCommandsPromptExpander:
     @patch(GOAL_PARSER_PATH)
     def test_not_slash_command(self, mock_parser, processor):
 
-        mock_parser.parse().return_value = (None, "This is not a slash command")
+        mock_parser.parse().return_value = (None, "/")
 
-        result = processor.process("This is not a slash command", "code")
+        result = processor.process("/")
+        error_message = "The message does not contain a command after the slash."
 
-        assert isinstance(result, Ok)
+        assert isinstance(result, Error)
         assert result.value is None
+        assert str(result.error) == error_message
 
     @patch(GOAL_PARSER_PATH)
     @patch(LOAD_DEFINITION_PATH)
@@ -58,24 +58,22 @@ class TestSlashCommandsPromptExpander:
 
         mock_parser.parse().return_value = ("explain", "def add(a, b): return a + b")
 
-        result = processor.process("/explain def add(a, b): return a + b", "code")
+        result = processor.process("/explain def add(a, b): return a + b")
 
         assert isinstance(result, Ok)
         assert result.value["success"] is True
         assert result.value["command_name"] == "explain"
-        assert result.value["system_prompt"] == "You are an expert at explaining code"
         assert result.value["goal"] == "Explain this code: {code}"
         assert result.value["message_context"] == "def add(a, b): return a + b"
         mock_definition_load.assert_called_once_with("explain")
 
     @patch(GOAL_PARSER_PATH)
     def test_command_not_found_error(self, mock_parser, processor):
-        """To be implemented after MR for SlashCommandGoalParser and SlashCommandDefinition have been implemented."""
         mock_parser.parse().return_value = ("nonexistent", "some text")
 
         error_message = "Slash command configuration file for 'nonexistent' not found"
 
-        result = processor.process("/nonexistent some text", "code")
+        result = processor.process("/nonexistent some text")
 
         assert isinstance(result, Error)
         assert str(result.error) == error_message
@@ -85,14 +83,12 @@ class TestSlashCommandsPromptExpander:
     def test_missing_required_parameters(
         self, mock_definition, mock_parser, processor, mock_parser_instance
     ):
-        """To be implemented after MR for SlashCommandGoalParser and SlashCommandDefinition have been implemented."""
         mock_parser.return_value = mock_parser_instance
         parsed_command = ("test", "")
         mock_parser_instance.parse.return_value = parsed_command
 
         mock_definition_instance = MagicMock(
             name="test",
-            system_prompt="Test system prompt",
             goal="Test goal with required params",
             parameters={"required_param": {"type": "string", "required": True}},
         )
@@ -100,7 +96,7 @@ class TestSlashCommandsPromptExpander:
             mock_definition_instance
         )
 
-        result = processor.process("/test", "code")
+        result = processor.process("/test")
 
         assert isinstance(result, Error)
 
@@ -114,7 +110,7 @@ class TestSlashCommandsPromptExpander:
 
         mock_parse.side_effect = test_error
 
-        result = processor.process("/test_command remaining text", "test_context")
+        result = processor.process("/test_command remaining text")
 
         assert isinstance(result, Error)
         assert result.error == test_error
@@ -129,7 +125,7 @@ class TestSlashCommandsPromptExpander:
         test_error = ValueError("Test general exception")
         mock_parse.side_effect = test_error
 
-        result = processor.process("/test_command remaining text", "test_context")
+        result = processor.process("/test_command remaining text")
 
         assert isinstance(result, Error)
         assert result.error == test_error

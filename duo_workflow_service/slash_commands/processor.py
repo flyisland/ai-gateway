@@ -12,14 +12,14 @@ from lib.result import Error, Ok, Result
 log = structlog.stdlib.get_logger("slash_commands")
 
 
-class SlashCommandsPromptExpander:
+class SlashCommandsProcessor:
     """Class for processing slash commands.
 
     This class encapsulates the logic for processing slash commands, handling their parameters, and generating
     appropriate responses.
     """
 
-    def process(self, message: str, context_element_type: str) -> Result:
+    def process(self, message: str) -> Result:
         """Process a slash command.
 
         Args:
@@ -34,7 +34,7 @@ class SlashCommandsPromptExpander:
             command_name, remaining_text = parse(message)
 
             if not command_name or not message.strip().startswith("/"):
-                return Ok(None)
+                return Error("The message does not contain a command after the slash.")
 
             try:
                 command_definition = (
@@ -45,18 +45,11 @@ class SlashCommandsPromptExpander:
                 return Error(e)
 
             # Replace the <ContextElementType> with the actual context element type variable
-            system_prompt = command_definition.system_prompt
             goal = command_definition.goal
-
-            if context_element_type:
-                system_prompt = system_prompt.replace(
-                    "<ContextElementType>", context_element_type
-                )
 
             # Build the result dictionary
             slash_command_result = {
                 "success": True,
-                "system_prompt": system_prompt,
                 "goal": goal,
                 "parameters": command_definition.parameters,
                 "message_context": remaining_text,
