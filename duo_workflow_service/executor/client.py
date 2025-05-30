@@ -1,4 +1,5 @@
 import asyncio
+from uuid import uuid4
 from asyncio import Future
 from typing import AsyncIterable, AsyncIterator
 
@@ -34,6 +35,8 @@ class ExecutorClient:
 
         loop = asyncio.get_event_loop()
         future = loop.create_future()
+
+        action.requestID = str(uuid4())
 
         # TODO: Should we add a timeout in case we don't get the response in time?
         self.request_responses_by_id[action.requestID] = future
