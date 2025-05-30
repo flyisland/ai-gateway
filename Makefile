@@ -276,4 +276,4 @@ eval: install-eval-deps
 .PHONY: duo-workflow-docs
 duo-workflow-docs:
 	@echo "Generating Duo Workflow Service graph documentation..."
-	@LOG_LEVEL=CRITICAL ANTHROPIC_API_KEY=temporary_key poetry run python scripts/generate_graph_docs.py ${DOC_DIR}/duo_workflow_service_graphs.md
+	@ANTHROPIC_API_KEY=temporary_key poetry run python scripts/generate_graph_docs.py ${DOC_DIR}/duo_workflow_service_graphs.md
