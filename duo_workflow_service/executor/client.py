@@ -1,7 +1,7 @@
 import asyncio
-from uuid import uuid4
 from asyncio import Future
 from typing import AsyncIterable, AsyncIterator
+from uuid import uuid4
 
 import structlog
 
@@ -12,9 +12,7 @@ log = structlog.stdlib.get_logger("server")
 
 # TODO: Needs unit tests
 class ExecutorClient:
-    """
-    Manages all communication with the Executor
-    """
+    """Manages all communication with the Executor."""
 
     incoming_iterator: AsyncIterable[contract_pb2.ClientEvent]
     outbound_requests: asyncio.Queue[contract_pb2.Action]
@@ -29,9 +27,7 @@ class ExecutorClient:
         self.request_responses_by_id = {}
 
     async def request(self, action: contract_pb2.Action) -> contract_pb2.ClientEvent:
-        """
-        Sends request to the Executor and receives response.
-        """
+        """Sends request to the Executor and receives response."""
 
         loop = asyncio.get_event_loop()
         future = loop.create_future()
@@ -46,9 +42,7 @@ class ExecutorClient:
         return await future
 
     async def send(self, action: contract_pb2.Action):
-        """
-        Sends request to the Executor and does not expect a response.
-        """
+        """Sends request to the Executor and does not expect a response."""
 
         action.requestID = str(uuid4())
         await self.outbound_requests.put(action)
@@ -67,8 +61,8 @@ class ExecutorClient:
                 )
 
     async def execute_stream(self) -> AsyncIterator[contract_pb2.Action]:
-        """
-        Handles the interaction between outgoing and incoming iterators.
+        """Handles the interaction between outgoing and incoming iterators.
+
         It provides continuous action sending and waiting for responses.
         """
 

@@ -3,8 +3,6 @@ import os
 from abc import ABC, abstractmethod
 from typing import Any, Dict, Type, TypedDict
 
-from contract import contract_pb2
-
 import structlog
 from langchain.tools import BaseTool
 from langchain_core.runnables import RunnableConfig
@@ -17,6 +15,7 @@ from langgraph.checkpoint.base import (  # pylint: disable=no-langgraph-langchai
 from langgraph.types import Command
 from langsmith import traceable, tracing_context
 
+from contract import contract_pb2
 from duo_workflow_service.checkpointer.gitlab_workflow import (
     GitLabWorkflow,
     WorkflowStatusEventEnum,
