@@ -2,6 +2,8 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
+from langchain.tools import BaseTool
+
 from duo_workflow_service import tools
 from duo_workflow_service.components.tools_registry import (
     _DEFAULT_TOOLS,

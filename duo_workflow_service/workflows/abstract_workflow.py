@@ -3,6 +3,8 @@ import os
 from abc import ABC, abstractmethod
 from typing import Any, Dict, Type, TypedDict
 
+from contract import contract_pb2
+
 import structlog
 from langchain.tools import BaseTool
 from langchain_core.runnables import RunnableConfig
