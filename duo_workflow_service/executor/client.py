@@ -50,6 +50,7 @@ class ExecutorClient:
         Sends request to the Executor and does not expect a response.
         """
 
+        action.requestID = str(uuid4())
         await self.outbound_requests.put(action)
 
     async def process_incoming(self):
