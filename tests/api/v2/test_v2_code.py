@@ -570,6 +570,59 @@ class TestCodeCompletions:
             ),
             (
                 2,
+                "foo",
+                [],
+                "fireworks_ai",
+                "codestral-2501",
+                "https://fireworks.endpoint",
+                "api-key",
+                None,
+                True,
+                False,
+                False,
+                200,
+                [
+                    {
+                        "text": "test completion",
+                        "index": 0,
+                        "finish_reason": "length",
+                    }
+                ],
+            ),
+            (
+                2,
+                "foo",
+                [
+                    {
+                        "type": "file",
+                        "name": "other.py",
+                        "content": "import numpy as np",
+                    },
+                    {
+                        "type": "file",
+                        "name": "bar.py",
+                        "content": "from typing import Any",
+                    },
+                ],
+                "fireworks_ai",
+                "codestral-2501",
+                "https://fireworks.endpoint",
+                "api-key",
+                None,
+                True,
+                False,
+                False,
+                200,
+                [
+                    {
+                        "text": "test completion",
+                        "index": 0,
+                        "finish_reason": "length",
+                    }
+                ],
+            ),
+            (
+                2,
                 None,
                 [],
                 "amazon_q",
@@ -702,6 +755,10 @@ class TestCodeCompletions:
                 False,
                 snowplow_event_context=ANY,
                 max_output_tokens=48,
+            )
+
+            mock_track_internal_event.assert_called_once_with(
+                "request_complete_code", category="ai_gateway.api.v2.code.completions"
             )
 
         if model_provider == "amazon_q":

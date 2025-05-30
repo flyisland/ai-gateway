@@ -664,7 +664,10 @@ async def _execute_code_completion(
         return [output]
     return output
 
-def _track_code_suggestions_event(tracking_event: str, internal_event_client: InternalEventsClient):
+
+def _track_code_suggestions_event(
+    tracking_event: str, internal_event_client: InternalEventsClient
+):
     internal_event_client.track_event(
         tracking_event,
         category=__name__,
