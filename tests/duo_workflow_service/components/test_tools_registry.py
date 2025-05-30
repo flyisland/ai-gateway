@@ -1,18 +1,16 @@
-import asyncio
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
-from langchain.tools import BaseTool
 
 from duo_workflow_service import tools
 from duo_workflow_service.components.tools_registry import (
     _DEFAULT_TOOLS,
     NO_OP_TOOLS,
-    ToolMetadata,
     Toolset,
     ToolsRegistry,
 )
 from duo_workflow_service.gitlab.http_client import GitlabHttpClient
+from duo_workflow_service.executor.client import ExecutorClient
 
 
 @pytest.fixture

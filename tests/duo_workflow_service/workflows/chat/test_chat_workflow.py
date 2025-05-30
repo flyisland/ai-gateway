@@ -1,8 +1,8 @@
 from datetime import datetime
-from unittest.mock import ANY, AsyncMock, MagicMock, Mock, patch
+from unittest.mock import AsyncMock, MagicMock, Mock, patch
 
 import pytest
-from langchain_core.messages import AIMessage, HumanMessage, SystemMessage
+from langchain_core.messages import AIMessage, SystemMessage
 
 from contract import contract_pb2
 from contract.contract_pb2 import ContextElement, ContextElementType

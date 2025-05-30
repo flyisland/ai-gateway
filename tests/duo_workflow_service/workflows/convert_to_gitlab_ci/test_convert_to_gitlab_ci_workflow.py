@@ -2,7 +2,7 @@ import asyncio
 from unittest.mock import AsyncMock, MagicMock, Mock, patch
 
 import pytest
-from langchain_core.messages import AIMessage, HumanMessage, SystemMessage, ToolMessage
+from langchain_core.messages import AIMessage, HumanMessage, SystemMessage
 
 from duo_workflow_service.components.tools_registry import (
     _AGENT_PRIVILEGES,

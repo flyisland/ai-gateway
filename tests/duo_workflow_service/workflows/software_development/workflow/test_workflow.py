@@ -1,6 +1,5 @@
 import asyncio
 import os
-from collections import namedtuple
 from unittest.mock import ANY, AsyncMock, MagicMock, call, patch
 from uuid import uuid4
 
@@ -9,23 +8,20 @@ from langchain_core.messages import AIMessage, HumanMessage, SystemMessage
 from langgraph.checkpoint.base import CheckpointTuple
 from langgraph.checkpoint.memory import MemorySaver
 
-from contract import contract_pb2
 from duo_workflow_service.components import ToolsRegistry
 from duo_workflow_service.components.tools_registry import (
     _AGENT_PRIVILEGES,
-    ToolsRegistry,
 )
 from duo_workflow_service.entities import Plan, WorkflowStatusEnum
-from duo_workflow_service.gitlab.http_client import GitlabHttpClient
-from duo_workflow_service.internal_events.event_enum import CategoryEnum
 from duo_workflow_service.tools.toolset import Toolset
 from duo_workflow_service.workflows.software_development import Workflow
 from duo_workflow_service.workflows.software_development.workflow import (
     CONTEXT_BUILDER_TOOLS,
     EXECUTOR_TOOLS,
     PLANNER_TOOLS,
-    Workflow,
 )
+from duo_workflow_service.internal_events.event_enum import CategoryEnum
+from duo_workflow_service.executor.client import ExecutorClient
 
 
 class MockComponent:
