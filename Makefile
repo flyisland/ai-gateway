@@ -277,4 +277,4 @@ eval: install-eval-deps
 duo-workflow-docs:
 	@echo "Generating Duo Workflow Service graph documentation..."
 	@poetry install
-	@ANTHROPIC_API_KEY=temporary_key poetry run python scripts/generate_graph_docs.py ${DOC_DIR}/duo_workflow_service_graphs.md
+	@poetry run python scripts/generate_graph_docs.py ${DOC_DIR}/duo_workflow_service_graphs.md
