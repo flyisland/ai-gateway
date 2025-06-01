@@ -95,4 +95,4 @@ def get_anthropic_model_name() -> str:
     if "duo_workflow_claude_3_7" in feature_flags:
         return "claude-3-7-sonnet-20250219"
 
-    return "claude-3-5-sonnet-20241022"
+    return os.environ.get("DUO_WORKFLOW_MODEL__NAME", "claude-3-5-sonnet-20241022")
