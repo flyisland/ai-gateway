@@ -197,7 +197,8 @@ class LocalPromptRegistry(BasePromptRegistry):
 
         Args:
             version_file: Path to the version YAML file
-            model_configs: Dictionary of model configurations
+            unit_primitive_configuration: unit primitive configuration for specific model selection
+            llm_configurations: LLM definitions as a mapping of identifier to LLMDefinition
 
         Returns:
             PromptConfig: Processed prompt configuration
@@ -207,25 +208,31 @@ class LocalPromptRegistry(BasePromptRegistry):
         with open(version_file, "r") as fp:
             prompt_config_params = yaml.safe_load(fp)
 
-            # Model metadata not associated with the following unit primitive 
-            if not prompt_config_params['model']['name']:
+            model_family = prompt_config_params.get('model', {}).get('name')
+
+            # Model metadata not associated with the following unit primitive
+            if not model_family:
                 unit_primitives = prompt_config_params['unit_primitives']
                 unit_primitive_config = cls.get_config_for_unit_primitive(unit_primitive_configuration, unit_primitives)
 
-                gitlab_identifier = unit_primitive_config.default_model
+                if unit_primitive_config is None:
+                    log.info(f"Model selection for unit primitives {unit_primitives} is not defined in config")
+                else:
+                    gitlab_identifier = unit_primitive_config.default_model
 
-                model_selection_prompt_config_params = llm_configurations[gitlab_identifier].params
-                model_selection_prompt_config_params['model_class_provider'] = llm_configurations[gitlab_identifier].provider
-                model_selection_prompt_config_params["name"] = unit_primitive_config.default_model
+                    model_selection_prompt_config_params = llm_configurations[gitlab_identifier].params
+                    model_selection_prompt_config_params['model_class_provider'] = llm_configurations[gitlab_identifier].provider
+                    model_selection_prompt_config_params["name"] = llm_configurations[gitlab_identifier].provider_identifier
 
-                log.info("Model selection params", model_selection_prompt_config_params=model_selection_prompt_config_params, version_file=version_file)
+                    log.info("Model selection params", model_selection_prompt_config_params=model_selection_prompt_config_params, version_file=version_file)
 
-            prompt_config_params = cls._patch_model_configuration(
-                model_selection_prompt_config_params or {}, prompt_config_params
-            )
+                    prompt_config_params = cls._patch_model_configuration(
+                        model_selection_prompt_config_params or {}, prompt_config_params
+                    )
 
-            import pdb; pdb.set_trace()
-            log.info("Prompt final config", prompt_config_params=prompt_config_params, version_file=version_file)
+
+            log.info("Final prompt config", prompt_config_params=prompt_config_params)
+
             return PromptConfig(**prompt_config_params)
 
     @classmethod
