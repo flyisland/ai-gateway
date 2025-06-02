@@ -103,17 +103,25 @@ class GrpcServer(contract_pb2_grpc.DuoWorkflowServicer):
     ) -> AsyncIterator[contract_pb2.Action]:
         user: CloudConnectorUser = current_user.get()
 
-        if not user.can(GitLabUnitPrimitive.DUO_WORKFLOW_EXECUTE_WORKFLOW):
-            await context.abort(
-                grpc.StatusCode.PERMISSION_DENIED, "Unauthorized to execute workflow"
-            )
-
-        monitoring_context: MonitoringContext = current_monitoring_context.get()
-
         # Fetch the start workflow call
         start_workflow_request: contract_pb2.ClientEvent = await anext(
             aiter(request_iterator)
         )
+        workflow_definition = start_workflow_request.startRequest.workflowDefinition
+
+        required_permission = (
+            GitLabUnitPrimitive.DUO_CHAT
+            if workflow_definition == "chat"
+            else GitLabUnitPrimitive.DUO_WORKFLOW_EXECUTE_WORKFLOW
+        )
+
+        if not user.can(required_permission):
+            await context.abort(
+                grpc.StatusCode.PERMISSION_DENIED,
+                f"Unauthorized to execute {workflow_definition or 'workflow'}",
+            )
+
+        monitoring_context: MonitoringContext = current_monitoring_context.get()
 
         await self.authorize_additional_context(
             current_user=user,
@@ -141,7 +149,6 @@ class GrpcServer(contract_pb2_grpc.DuoWorkflowServicer):
             additional_context = None
 
         workflow_metadata = {}
-        workflow_definition = start_workflow_request.startRequest.workflowDefinition
         monitoring_context.workflow_id = workflow_id
         monitoring_context.workflow_definition = workflow_definition
         if start_workflow_request.startRequest.workflowMetadata:
@@ -249,12 +256,32 @@ class GrpcServer(contract_pb2_grpc.DuoWorkflowServicer):
     ) -> contract_pb2.GenerateTokenResponse:
         user: CloudConnectorUser = current_user.get()
 
-        if not user.can(
-            GitLabUnitPrimitive.DUO_WORKFLOW_EXECUTE_WORKFLOW,
-            disallowed_issuers=[CloudConnectorConfig().service_name],
-        ):
+        # Check workflow_definition and determine the required permission
+        workflow_definition = request.workflowDefinition
+        if not workflow_definition:
+            required_scopes = [
+                GitLabUnitPrimitive.DUO_CHAT,
+                GitLabUnitPrimitive.DUO_WORKFLOW_EXECUTE_WORKFLOW,
+            ]
+        elif workflow_definition == "chat":
+            required_scopes = [GitLabUnitPrimitive.DUO_CHAT]
+        else:
+            required_scopes = [GitLabUnitPrimitive.DUO_WORKFLOW_EXECUTE_WORKFLOW]
+
+        # Check if user has at least one of the required permissions
+        has_permission = False
+        for permission in required_scopes:
+            if user.can(
+                permission,
+                disallowed_issuers=[CloudConnectorConfig().service_name],
+            ):
+                has_permission = True
+                break
+
+        if not has_permission:
             await context.abort(
-                grpc.StatusCode.PERMISSION_DENIED, "Unauthorized to generate token"
+                grpc.StatusCode.PERMISSION_DENIED,
+                f"Unauthorized to generate token for {workflow_definition or 'workflow'}",
             )
 
         metadata = dict(context.invocation_metadata())
@@ -270,7 +297,7 @@ class GrpcServer(contract_pb2_grpc.DuoWorkflowServicer):
             gitlab_realm,
             user,
             gitlab_instance_id,
-            [GitLabUnitPrimitive.DUO_WORKFLOW_EXECUTE_WORKFLOW],
+            required_scopes,
         )
 
         return contract_pb2.GenerateTokenResponse(token=token, expiresAt=expires_at)

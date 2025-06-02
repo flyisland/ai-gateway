@@ -170,6 +170,7 @@ export interface RunGitCommand {
 }
 
 export interface GenerateTokenRequest {
+  workflowDefinition: string;
 }
 
 export interface GenerateTokenResponse {
@@ -1673,11 +1674,14 @@ export const RunGitCommand: MessageFns<RunGitCommand> = {
 };
 
 function createBaseGenerateTokenRequest(): GenerateTokenRequest {
-  return {};
+  return { workflowDefinition: "" };
 }
 
 export const GenerateTokenRequest: MessageFns<GenerateTokenRequest> = {
-  encode(_: GenerateTokenRequest, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
+  encode(message: GenerateTokenRequest, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
+    if (message.workflowDefinition !== "") {
+      writer.uint32(10).string(message.workflowDefinition);
+    }
     return writer;
   },
 
@@ -1688,6 +1692,14 @@ export const GenerateTokenRequest: MessageFns<GenerateTokenRequest> = {
     while (reader.pos < end) {
       const tag = reader.uint32();
       switch (tag >>> 3) {
+        case 1: {
+          if (tag !== 10) {
+            break;
+          }
+
+          message.workflowDefinition = reader.string();
+          continue;
+        }
       }
       if ((tag & 7) === 4 || tag === 0) {
         break;
@@ -1697,20 +1709,24 @@ export const GenerateTokenRequest: MessageFns<GenerateTokenRequest> = {
     return message;
   },
 
-  fromJSON(_: any): GenerateTokenRequest {
-    return {};
+  fromJSON(object: any): GenerateTokenRequest {
+    return { workflowDefinition: isSet(object.workflowDefinition) ? globalThis.String(object.workflowDefinition) : "" };
   },
 
-  toJSON(_: GenerateTokenRequest): unknown {
+  toJSON(message: GenerateTokenRequest): unknown {
     const obj: any = {};
+    if (message.workflowDefinition !== "") {
+      obj.workflowDefinition = message.workflowDefinition;
+    }
     return obj;
   },
 
   create<I extends Exact<DeepPartial<GenerateTokenRequest>, I>>(base?: I): GenerateTokenRequest {
     return GenerateTokenRequest.fromPartial(base ?? ({} as any));
   },
-  fromPartial<I extends Exact<DeepPartial<GenerateTokenRequest>, I>>(_: I): GenerateTokenRequest {
+  fromPartial<I extends Exact<DeepPartial<GenerateTokenRequest>, I>>(object: I): GenerateTokenRequest {
     const message = createBaseGenerateTokenRequest();
+    message.workflowDefinition = object.workflowDefinition ?? "";
     return message;
   },
 };
