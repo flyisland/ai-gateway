@@ -25,9 +25,7 @@ from duo_workflow_service.interceptors.feature_flag_interceptor import (
     current_feature_flag_context,
 )
 from duo_workflow_service.llm_factory import create_chat_model
-from duo_workflow_service.slash_commands.prompt_expander import (
-    SlashCommandsPromptExpander,
-)
+from duo_workflow_service.slash_commands.processor import SlashCommandsProcessor
 from duo_workflow_service.tracking.errors import log_exception
 from duo_workflow_service.workflows.abstract_workflow import AbstractWorkflow
 
@@ -85,7 +83,7 @@ CHAT_MUTATION_TOOLS = [
 
 class Workflow(AbstractWorkflow):
     _stream: bool = True
-    slash_command_expander = SlashCommandsPromptExpander()
+    slash_command_expander = SlashCommandsProcessor()
 
     def _are_tools_called(self, state: ChatWorkflowState) -> Routes:
         if state["status"] in [WorkflowStatusEnum.CANCELLED, WorkflowStatusEnum.ERROR]:
@@ -171,8 +169,7 @@ class Workflow(AbstractWorkflow):
     async def get_graph_input(self, goal: str, status_event: str) -> Any:
 
         if goal.strip().startswith("/"):
-            context_element_type = self._get_context_element_type()
-            result = self.slash_command_expander.process(goal, context_element_type)
+            result = self.slash_command_expander.process(goal)
             if result.is_ok():
                 slash_command_result = result.value
                 if slash_command_result is not None:

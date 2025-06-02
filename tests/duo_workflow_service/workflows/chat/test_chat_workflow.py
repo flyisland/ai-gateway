@@ -426,9 +426,7 @@ async def test_get_graph_input_slash_command(workflow_with_project):
     )
 
     assert result["conversation_history"][AGENT_NAME][1].content == "Expanded command"
-    workflow_with_project.slash_command_expander.process.assert_called_with(
-        "/command", "file"
-    )
+    workflow_with_project.slash_command_expander.process.assert_called_with("/command")
 
 
 def test_get_context_element_type(workflow_with_project, context_element):
