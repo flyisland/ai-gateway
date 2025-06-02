@@ -147,7 +147,7 @@ class LocalPromptRegistry(BasePromptRegistry):
         prompts_definitions_dir = base_path / "definitions"
         prompts_registered = {}
 
-        llm_configurations = model_selection.get_llm_definitions()
+        model_definitions = model_selection.get_llm_definitions()
         unit_primitive_configuration = model_selection.get_unit_primitive_config()
 
 
@@ -155,7 +155,7 @@ class LocalPromptRegistry(BasePromptRegistry):
         for path in prompts_definitions_dir.glob("**"):
             # Iterate over each version file
             versions = {
-                version.stem: cls._process_version_file(version, llm_configurations, unit_primitive_configuration)
+                version.stem: cls._process_version_file(version, model_definitions, unit_primitive_configuration)
                 for version in path.glob("*.yml")
             }
 
@@ -190,7 +190,7 @@ class LocalPromptRegistry(BasePromptRegistry):
     @classmethod
     def _process_version_file(
         cls, version_file: Path,
-        llm_configurations:dict[str,LLMDefinition], 
+        model_definitions:dict[str,LLMDefinition], 
         unit_primitive_configuration: list[UnitPrimitiveConfig]
     ) -> PromptConfig:
         """Processes a single version YAML file and returns a PromptConfig.
@@ -198,7 +198,7 @@ class LocalPromptRegistry(BasePromptRegistry):
         Args:
             version_file: Path to the version YAML file
             unit_primitive_configuration: unit primitive configuration for specific model selection
-            llm_configurations: LLM definitions as a mapping of identifier to LLMDefinition
+            model_definitions: LLM definitions as a mapping of identifier to LLMDefinition
 
         Returns:
             PromptConfig: Processed prompt configuration
@@ -217,12 +217,13 @@ class LocalPromptRegistry(BasePromptRegistry):
 
                 if unit_primitive_config is None:
                     log.info(f"Model selection for unit primitives {unit_primitives} is not defined in config")
+                    # Need to assign a default provider for Pydantic Validation
                 else:
                     gitlab_identifier = unit_primitive_config.default_model
 
-                    model_selection_prompt_config_params = llm_configurations[gitlab_identifier].params
-                    model_selection_prompt_config_params['model_class_provider'] = llm_configurations[gitlab_identifier].provider
-                    model_selection_prompt_config_params["name"] = llm_configurations[gitlab_identifier].provider_identifier
+                    model_selection_prompt_config_params = model_definitions[gitlab_identifier].params
+                    model_selection_prompt_config_params['model_class_provider'] = model_definitions[gitlab_identifier].provider
+                    model_selection_prompt_config_params["name"] = model_definitions[gitlab_identifier].provider_identifier
 
                     log.info("Model selection params", model_selection_prompt_config_params=model_selection_prompt_config_params, version_file=version_file)
 
