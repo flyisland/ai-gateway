@@ -15,6 +15,7 @@ from structlog.testing import capture_logs
 
 from ai_gateway.api.error_utils import capture_validation_errors
 from ai_gateway.api.v2 import api_router
+from ai_gateway.api.v2.code.completions import _track_code_suggestions_event
 from ai_gateway.feature_flags.context import current_feature_flag_context
 from ai_gateway.model_selection import LLMDefinition
 from ai_gateway.models.base_chat import Message, Role
@@ -684,6 +685,48 @@ class TestCodeCompletions:
                     }
                 ],
             ),
+            (
+                1,
+                "foo",
+                [],
+                "codestral",
+                "codestral-2501",
+                "http://localhost:4000/",
+                "api-key",
+                None,
+                True,
+                False,
+                False,
+                200,
+                [
+                    {
+                        "text": "test completion",
+                        "index": 0,
+                        "finish_reason": "length",
+                    }
+                ],
+            ),
+            (
+                2,
+                "foo",
+                [],
+                "codestral",
+                "codestral-2501",
+                "http://localhost:4000/",
+                "api-key",
+                None,
+                True,
+                False,
+                False,
+                200,
+                [
+                    {
+                        "text": "test completion",
+                        "index": 0,
+                        "finish_reason": "length",
+                    }
+                ],
+            ),
         ],
     )
     def test_non_stream_response(
@@ -758,6 +801,11 @@ class TestCodeCompletions:
             )
 
             mock_track_internal_event.assert_called_once_with(
+                "request_complete_code", category="ai_gateway.api.v2.code.completions"
+            )
+
+        if model_provider in ("codestral", "litellm"):
+            mock_track_internal_event.assert_called_with(
                 "request_complete_code", category="ai_gateway.api.v2.code.completions"
             )
 
@@ -1379,7 +1427,7 @@ class TestCodeCompletions:
             json=params,
         )
 
-    def test_gitlab_model_provider(self, mock_client):
+    def test_gitlab_model_provider(self, mock_client, mock_track_internal_event: Mock):
         """Test that v2/completions works with 'gitlab' as the model_provider."""
 
         test_model = LLMDefinition(
@@ -1403,12 +1451,23 @@ class TestCodeCompletions:
         mock_suggestion.lang = "python"
         mock_suggestion.metadata = None
 
+        def _mock_build_side_effect(*args, **kwargs):
+            internal_event_client = args[11]
+
+            _track_code_suggestions_event(
+                "request_complete_code", internal_event_client
+            )
+
+            mock_completions = Mock()
+            return (mock_completions, {})
+
         with patch(
             "ai_gateway.model_selection.ModelSelectionConfig.get_gitlab_model"
         ) as mock_get_gitlab_model, patch(
             "ai_gateway.api.v2.code.completions._execute_code_completion"
         ) as mock_execute, patch(
-            "ai_gateway.api.v2.code.completions._build_code_completions"
+            "ai_gateway.api.v2.code.completions._build_code_completions",
+            side_effect=_mock_build_side_effect,
         ) as mock_build:
 
             mock_get_gitlab_model.return_value = test_model
@@ -1444,6 +1503,11 @@ class TestCodeCompletions:
             build_args, build_kwargs = mock_build.call_args
             assert build_args[1].model_provider == "gitlab"
             assert build_args[1].model_identifier == "test-model-id"
+
+            mock_track_internal_event.assert_called_once_with(
+                "request_complete_code",
+                category="ai_gateway.api.v2.code.completions",
+            )
 
         # Test error case when model_identifier is missing
         response = mock_client.post(
