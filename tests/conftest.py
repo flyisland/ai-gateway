@@ -84,7 +84,7 @@ def stub_auth_provider():
 
 @pytest.fixture(scope="class")
 def test_client(fast_api_router, stub_auth_provider, request):
-    setup_logging(ConfigLogging())
+    setup_logging(ConfigLogging(), custom_models_enabled=True)
     middlewares = [
         Middleware(RawContextMiddleware),
         Middleware(AccessLogMiddleware, skip_endpoints=[]),
@@ -93,9 +93,6 @@ def test_client(fast_api_router, stub_auth_provider, request):
     ]
     app = FastAPI(middleware=middlewares)
     app.include_router(fast_api_router)
-
-    # Add logging setup
-    setup_logging(ConfigLogging(), custom_models_enabled=True)
 
     client = TestClient(app)
 
