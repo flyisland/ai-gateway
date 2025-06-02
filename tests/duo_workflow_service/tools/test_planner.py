@@ -20,7 +20,12 @@ from duo_workflow_service.tools.planner import (
     "tool_class, input_class, input_data, expected_result",
     [
         (AddNewTask, AddNewTaskInput, {"description": "New task"}, "New task added"),
-        (RemoveTask, RemoveTaskInput, {"task_id": "1"}, "Task with ID 1 removed"),
+        (
+            RemoveTask,
+            RemoveTaskInput,
+            {"task_id": "1", "description": "Task 1"},
+            "Task with ID 1 removed",
+        ),
         (
             UpdateTaskDescription,
             UpdateTaskDescriptionInput,
@@ -81,18 +86,18 @@ def test_add_new_task_format_display_message():
 
     message = tool.format_display_message(input_data)
 
-    expected_message = "Add new task to the plan: Create new feature..."
+    expected_message = "Add new task to the plan: Create new feature"
     assert message == expected_message
 
 
 def test_remove_task_format_display_message():
     tool = RemoveTask(description="Remove task")
 
-    input_data = RemoveTaskInput(task_id="task-1")
+    input_data = RemoveTaskInput(task_id="task-1", description="Task 1")
 
     message = tool.format_display_message(input_data)
 
-    expected_message = "Remove task 2"
+    expected_message = "Remove task 'Task 1'"
     assert message == expected_message
 
 
@@ -105,7 +110,7 @@ def test_update_task_description_format_display_message():
 
     message = tool.format_display_message(input_data)
 
-    expected_message = "Update description for task 2"
+    expected_message = "Update description for task 'Update project documentation'"
     assert message == expected_message
 
 

@@ -383,7 +383,7 @@ async def test_adding_ai_context_to_ui_chat_logs(
                 ToolMessage(content="Task not found: 1", tool_call_id="1")
             ],
             "expected_plan": {"steps": []},
-            "expected_log_content": "Update description for task 2",
+            "expected_log_content": "Update description for task 'step1'",
         },
         {
             "plan": {"steps": [{"id": "1", "description": "old step1"}]},
@@ -400,7 +400,7 @@ async def test_adding_ai_context_to_ui_chat_logs(
                 ToolMessage(content="Task updated: 1", tool_call_id="1")
             ],
             "expected_plan": {"steps": [{"id": "1", "description": "new step1"}]},
-            "expected_log_content": "Update description for task 2",
+            "expected_log_content": "Update description for task 'new step1'",
         },
         {
             "plan": {"steps": []},
@@ -423,7 +423,7 @@ async def test_adding_ai_context_to_ui_chat_logs(
                     }
                 ]
             },
-            "expected_log_content": "Add new task to the plan: New task...",
+            "expected_log_content": "Add new task to the plan: New task",
         },
         {
             "plan": {"steps": [{"id": "1", "description": "Task to remove"}]},
@@ -431,14 +431,16 @@ async def test_adding_ai_context_to_ui_chat_logs(
                 {
                     "id": "1",
                     "name": "remove_task",
-                    "args": RemoveTaskInput(task_id="1").model_dump(),
+                    "args": RemoveTaskInput(
+                        task_id="1", description="Test description 1"
+                    ).model_dump(),
                 }
             ],
             "tools_response": [
                 ToolMessage(content="Task removed: 1", tool_call_id="1")
             ],
             "expected_plan": {"steps": []},
-            "expected_log_content": "Remove task 2",
+            "expected_log_content": "Remove task 'Test description 1'",
         },
         {
             "plan": {
@@ -668,13 +670,17 @@ async def test_run_error_handling(
         (
             "add_new_task",
             {"description": "Create a new feature"},
-            "Add new task to the plan: Create a new feature...",
+            "Add new task to the plan: Create a new feature",
         ),
-        ("remove_task", {"task_id": "task-1"}, "Remove task 2"),
+        (
+            "remove_task",
+            {"task_id": "task-1", "description": "Test task 2"},
+            "Remove task 'Test task 2'",
+        ),
         (
             "update_task_description",
             {"task_id": "task-2", "new_description": "Updated description"},
-            "Update description for task 3",
+            "Update description for task 'Updated description'",
         ),
         (
             "set_task_status",
