@@ -1509,29 +1509,64 @@ class TestCodeCompletions:
                 category="ai_gateway.api.v2.code.completions",
             )
 
-        # Test error case when model_identifier is missing
-        response = mock_client.post(
-            "/code/completions",
-            headers={
-                "Authorization": "Bearer 12345",
-                "X-Gitlab-Authentication-Type": "oidc",
-                "X-GitLab-Instance-Id": "1234",
-                "X-GitLab-Realm": "self-managed",
-            },
-            json={
-                "prompt_version": 2,
-                "current_file": {
-                    "file_name": "main.py",
-                    "content_above_cursor": "def test():",
-                    "content_below_cursor": "\n",
-                },
-                "model_provider": "gitlab",
-                # model_identifier deliberately left out
-            },
+    def test_gitlab_model_provider_without_identifier(self, mock_client):
+        """Test that v2/completions works with 'gitlab' as the model_provider when no model identifier is provided."""
+
+        test_model = LLMDefinition(
+            name="Test Model",
+            gitlab_identifier="test-model-id",
+            provider="custom_openai",
+            provider_identifier="test-provider-id",
+            family="codestral",
+            params={"temperature": 0.0, "max_tokens": 4096},
         )
 
-        assert response.status_code == 400
-        assert "model_identifier is required" in response.json()["detail"]
+        mock_suggestion = Mock()
+        mock_suggestion.text = "test completion"
+        mock_suggestion.score = 1.0
+
+        mock_model = Mock()
+        mock_model.engine = "test-engine"
+        mock_model.name = "test-model"
+        mock_suggestion.model = mock_model
+
+        mock_suggestion.lang = "python"
+        mock_suggestion.metadata = None
+
+        with patch(
+            "ai_gateway.model_selection.ModelSelectionConfig.get_gitlab_model_for_feature"
+        ) as mock_get_gitlab_model, patch(
+            "ai_gateway.api.v2.code.completions._execute_code_completion"
+        ) as mock_execute:
+            mock_get_gitlab_model.return_value = test_model
+            mock_execute.return_value = [mock_suggestion]
+
+            # Test case when model_identifier is empty
+            response = mock_client.post(
+                "/code/completions",
+                headers={
+                    "Authorization": "Bearer 12345",
+                    "X-Gitlab-Authentication-Type": "oidc",
+                    "X-GitLab-Instance-Id": "1234",
+                    "X-GitLab-Realm": "self-managed",
+                },
+                json={
+                    "prompt_version": 2,
+                    "current_file": {
+                        "file_name": "main.py",
+                        "content_above_cursor": "def test():",
+                        "content_below_cursor": "\n",
+                    },
+                    "model_provider": "gitlab",
+                    "model_identifier": "",
+                },
+            )
+
+            assert response.status_code == 200
+            assert mock_get_gitlab_model.called
+
+            build_args, build_kwargs = mock_get_gitlab_model.call_args
+            assert build_args[0] == "code_completions"
 
 
 class TestCodeGenerations:
