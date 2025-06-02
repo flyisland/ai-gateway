@@ -1,6 +1,6 @@
 """Test module for search and replace workflow components."""
 
-from unittest.mock import AsyncMock, MagicMock, Mock, patch
+from unittest.mock import AsyncMock, Mock, patch
 
 import pytest
 from langchain_core.messages import AIMessage, HumanMessage, SystemMessage
@@ -15,7 +15,6 @@ from duo_workflow_service.entities import (
     WorkflowStatusEnum,
 )
 from duo_workflow_service.entities.state import MAX_CONTEXT_TOKENS, ReplacementRule
-from duo_workflow_service.gitlab.http_client import GitlabHttpClient
 from duo_workflow_service.internal_events.event_enum import CategoryEnum
 from duo_workflow_service.workflows.search_and_replace.prompts import (
     SEARCH_AND_REPLACE_FILE_USER_MESSAGE,
@@ -360,6 +359,7 @@ async def test_workflow_compilation(
         workflow_id="test_id",
         workflow_metadata={},
         workflow_type=CategoryEnum.WORKFLOW_SEARCH_AND_REPLACE,
+        executor_client=AsyncMock(),
     )
 
     # Compile the workflow graph
@@ -391,6 +391,7 @@ async def test_workflow_initialization():
         workflow_id="test_id",
         workflow_metadata={},
         workflow_type=CategoryEnum.WORKFLOW_SEARCH_AND_REPLACE,
+        executor_client=AsyncMock(),
     )
     initial_state = workflow.get_workflow_state("/test/path")
 
@@ -412,6 +413,7 @@ async def test_accessibility_tools(
         workflow_id="test_id",
         workflow_metadata={},
         workflow_type=CategoryEnum.WORKFLOW_SEARCH_AND_REPLACE,
+        executor_client=AsyncMock(),
     )
 
     captured_tool_names = []
@@ -448,6 +450,7 @@ async def test_non_accessibility_tools(
         workflow_id="test_id",
         workflow_metadata={},
         workflow_type=CategoryEnum.WORKFLOW_SEARCH_AND_REPLACE,
+        executor_client=AsyncMock(),
     )
 
     captured_tool_names = []

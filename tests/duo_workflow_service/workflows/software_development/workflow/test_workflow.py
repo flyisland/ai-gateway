@@ -1,6 +1,5 @@
 import asyncio
 import os
-from collections import namedtuple
 from unittest.mock import ANY, AsyncMock, MagicMock, call, patch
 from uuid import uuid4
 
@@ -9,14 +8,9 @@ from langchain_core.messages import AIMessage, HumanMessage, SystemMessage
 from langgraph.checkpoint.base import CheckpointTuple
 from langgraph.checkpoint.memory import MemorySaver
 
-from contract import contract_pb2
 from duo_workflow_service.components import ToolsRegistry
-from duo_workflow_service.components.tools_registry import (
-    _AGENT_PRIVILEGES,
-    ToolsRegistry,
-)
+from duo_workflow_service.components.tools_registry import _AGENT_PRIVILEGES
 from duo_workflow_service.entities import Plan, WorkflowStatusEnum
-from duo_workflow_service.gitlab.http_client import GitlabHttpClient
 from duo_workflow_service.internal_events.event_enum import CategoryEnum
 from duo_workflow_service.tools.toolset import Toolset
 from duo_workflow_service.workflows.software_development import Workflow
@@ -24,7 +18,6 @@ from duo_workflow_service.workflows.software_development.workflow import (
     CONTEXT_BUILDER_TOOLS,
     EXECUTOR_TOOLS,
     PLANNER_TOOLS,
-    Workflow,
 )
 
 
@@ -67,17 +60,6 @@ def checkpoint_tuple():
         metadata={"step": 0},
         parent_config={"configurable": {"thread_id": "123", "checkpoint_id": None}},
     )
-
-
-@pytest.mark.asyncio
-async def test_workflow_initialization():
-    workflow = Workflow(
-        "123",
-        {},
-        workflow_type=CategoryEnum.WORKFLOW_SOFTWARE_DEVELOPMENT,
-    )
-    assert isinstance(workflow._outbox, asyncio.Queue)
-    assert isinstance(workflow._inbox, asyncio.Queue)
 
 
 def _agent_responses(status: WorkflowStatusEnum, agent_name: str):
@@ -262,6 +244,7 @@ async def test_workflow_run(
         "123",
         {},
         workflow_type=CategoryEnum.WORKFLOW_SOFTWARE_DEVELOPMENT,
+        executor_client=AsyncMock(),
     )
     await workflow.run("test_goal")
 
@@ -401,6 +384,7 @@ async def test_workflow_run_with_memory_saver(
         "123",
         {},
         workflow_type=CategoryEnum.WORKFLOW_SOFTWARE_DEVELOPMENT,
+        executor_client=AsyncMock(),
     )
     await workflow.run("test_goal")
 
@@ -495,6 +479,7 @@ async def test_workflow_run_when_exception(
         "123",
         {},
         workflow_type=CategoryEnum.WORKFLOW_SOFTWARE_DEVELOPMENT,
+        executor_client=AsyncMock(),
     )
     with patch(
         "duo_workflow_service.workflows.software_development.workflow.StateGraph"
@@ -595,6 +580,7 @@ async def test_workflow_run_with_error_state(
         "123",
         {},
         workflow_type=CategoryEnum.WORKFLOW_SOFTWARE_DEVELOPMENT,
+        executor_client=AsyncMock(),
     )
 
     await workflow.run("test_goal")
@@ -681,6 +667,7 @@ async def test_workflow_run_with_tools_registry(
         "123",
         {},
         workflow_type=CategoryEnum.WORKFLOW_SOFTWARE_DEVELOPMENT,
+        executor_client=AsyncMock(),
     )
     with patch(
         "duo_workflow_service.workflows.software_development.workflow.StateGraph"
@@ -729,6 +716,7 @@ def software_development_workflow():
         "test",
         {},
         workflow_type=CategoryEnum.WORKFLOW_SOFTWARE_DEVELOPMENT,
+        executor_client=AsyncMock(),
     )
     workflow._project = {"id": 1, "name": "test", "http_url_to_repo": "http://test"}  # type: ignore
     workflow._http_client = MagicMock()
@@ -833,6 +821,7 @@ async def test_workflow_run_with_setup_error(
         "123",
         {},
         workflow_type=CategoryEnum.WORKFLOW_SOFTWARE_DEVELOPMENT,
+        executor_client=AsyncMock(),
     )
     await workflow.run("test_goal")
 
@@ -877,6 +866,7 @@ async def test_workflow_run_with_missing_web_url(
         "123",
         {},
         workflow_type=CategoryEnum.WORKFLOW_SOFTWARE_DEVELOPMENT,
+        executor_client=AsyncMock(),
     )
 
     await workflow.run("test_goal")
@@ -928,6 +918,7 @@ async def test_workflow_run_with_invalid_web_url(
         "123",
         {},
         workflow_type=CategoryEnum.WORKFLOW_SOFTWARE_DEVELOPMENT,
+        executor_client=AsyncMock(),
     )
 
     await workflow.run("test_goal")
@@ -1013,6 +1004,7 @@ async def test_workflow_run_with_retry(
         "123",
         {},
         workflow_type=CategoryEnum.WORKFLOW_SOFTWARE_DEVELOPMENT,
+        executor_client=AsyncMock(),
     )
     async_iterator = AsyncIterator()
 
@@ -1186,6 +1178,7 @@ async def test_workflow_run_with_tool_approvals(
         "123",
         {},
         workflow_type=CategoryEnum.WORKFLOW_SOFTWARE_DEVELOPMENT,
+        executor_client=AsyncMock(),
     )
     await workflow.run("test_goal")
 
@@ -1196,49 +1189,16 @@ async def test_workflow_run_with_tool_approvals(
 
 
 @pytest.mark.asyncio
-async def test_get_from_outbox():
-    workflow = Workflow(
-        "123",
-        {},
-        workflow_type=CategoryEnum.WORKFLOW_SOFTWARE_DEVELOPMENT,
-    )
-    workflow._outbox.put_nowait("test_item")
-    item = await workflow.get_from_outbox()
-    assert item == "test_item"
-
-
-def test_add_to_inbox():
-    workflow = Workflow(
-        "123",
-        {},
-        workflow_type=CategoryEnum.WORKFLOW_SOFTWARE_DEVELOPMENT,
-    )
-    event = contract_pb2.ClientEvent()
-    workflow.add_to_inbox(event)
-    assert workflow._inbox.qsize() == 1
-    assert workflow._inbox.get_nowait() == event
-
-
-@pytest.mark.asyncio
 async def test_workflow_cleanup():
     workflow = Workflow(
         "123",
         {},
         workflow_type=CategoryEnum.WORKFLOW_SOFTWARE_DEVELOPMENT,
+        executor_client=AsyncMock(),
     )
 
-    assert workflow._outbox.empty()
-    assert workflow._inbox.empty()
-
-    workflow._outbox.put_nowait("test_outbox_item_1")
-    workflow._inbox.put_nowait("test_inbox_item_1")
-
-    assert workflow._outbox.qsize() == 1
-    assert workflow._inbox.qsize() == 1
     assert not workflow.is_done
 
     await workflow.cleanup("123")
 
     assert workflow.is_done
-    assert workflow._outbox.qsize() == 0
-    assert workflow._inbox.qsize() == 0

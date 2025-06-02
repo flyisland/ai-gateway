@@ -2,7 +2,7 @@ import asyncio
 from unittest.mock import AsyncMock, MagicMock, Mock, patch
 
 import pytest
-from langchain_core.messages import AIMessage, HumanMessage, SystemMessage, ToolMessage
+from langchain_core.messages import AIMessage, HumanMessage, SystemMessage
 
 from duo_workflow_service.components.tools_registry import (
     _AGENT_PRIVILEGES,
@@ -70,6 +70,7 @@ def mock_workflow():
         workflow_id="test_id",
         workflow_metadata={},
         workflow_type=CategoryEnum.WORKFLOW_CONVERT_TO_GITLAB_CI,
+        executor_client=AsyncMock(),
     )
 
 
@@ -163,6 +164,7 @@ async def test_workflow_initialization():
         workflow_id="test_id",
         workflow_metadata={},
         workflow_type=CategoryEnum.WORKFLOW_CONVERT_TO_GITLAB_CI,
+        executor_client=AsyncMock(),
     )
     initial_state = workflow.get_workflow_state("/test/path")
     assert initial_state["status"] == WorkflowStatusEnum.NOT_STARTED
@@ -181,6 +183,7 @@ async def test_workflow_compilation(
         workflow_id="test_id",
         workflow_metadata={},
         workflow_type=CategoryEnum.WORKFLOW_CONVERT_TO_GITLAB_CI,
+        executor_client=AsyncMock(),
     )
 
     # Compile the workflow graph
@@ -290,6 +293,7 @@ async def test_workflow_run(
         "123",
         {},
         workflow_type=CategoryEnum.WORKFLOW_CONVERT_TO_GITLAB_CI,
+        executor_client=AsyncMock(),
     )
     await workflow.run("test-file-path")
 
@@ -374,6 +378,7 @@ async def test_workflow_run_with_file_not_found(
         "123",
         {},
         workflow_type=CategoryEnum.WORKFLOW_CONVERT_TO_GITLAB_CI,
+        executor_client=AsyncMock(),
     )
     await workflow.run("test-file-path")
 
@@ -444,6 +449,7 @@ async def test_workflow_run_with_exception(
         "123",
         {},
         workflow_type=CategoryEnum.WORKFLOW_CONVERT_TO_GITLAB_CI,
+        executor_client=AsyncMock(),
     )
     with patch(
         "duo_workflow_service.workflows.convert_to_gitlab_ci.workflow.StateGraph"

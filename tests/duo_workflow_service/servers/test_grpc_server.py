@@ -3,7 +3,7 @@ import json
 import os
 from datetime import datetime, timedelta, timezone
 from typing import AsyncIterable
-from unittest.mock import ANY, AsyncMock, MagicMock, patch
+from unittest.mock import AsyncMock, MagicMock, patch
 
 import grpc
 import pytest
@@ -26,17 +26,27 @@ from duo_workflow_service.servers.grpc_server import (
 
 
 @pytest.mark.asyncio
+@patch("duo_workflow_service.servers.grpc_server.ExecutorClient")
 @patch("duo_workflow_service.servers.grpc_server.AbstractWorkflow")
 @patch("duo_workflow_service.servers.grpc_server.resolve_workflow_class")
 async def test_execute_workflow_when_no_events_ends(
     mock_resolve_workflow,
     mock_abstract_workflow_class,
+    mock_executor_client_class,
 ):
     mock_resolve_workflow.return_value = mock_abstract_workflow_class
     mock_workflow = mock_abstract_workflow_class.return_value
     mock_workflow.is_done = True
     mock_workflow.run = AsyncMock()
     mock_workflow.cleanup = AsyncMock()
+
+    mock_executor_client = mock_executor_client_class.return_value
+
+    async def empty_stream():
+        return
+        yield  # This line will never be reached, making it an empty async generator
+
+    mock_executor_client.execute_stream.return_value = empty_stream()
 
     async def mock_request_iterator() -> AsyncIterable[contract_pb2.ClientEvent]:
         yield contract_pb2.ClientEvent(
@@ -54,10 +64,14 @@ async def test_execute_workflow_when_no_events_ends(
 
 @pytest.mark.asyncio
 @patch("asyncio.sleep")
+@patch("duo_workflow_service.servers.grpc_server.ExecutorClient")
 @patch("duo_workflow_service.servers.grpc_server.AbstractWorkflow")
 @patch("duo_workflow_service.servers.grpc_server.resolve_workflow_class")
 async def test_execute_workflow_when_nothing_in_outbox(
-    mock_resolve_workflow, mock_abstract_workflow_class, mock_sleep
+    mock_resolve_workflow,
+    mock_abstract_workflow_class,
+    mock_executor_client_class,
+    mock_sleep,
 ):
     mock_workflow = mock_abstract_workflow_class.return_value
     mock_workflow.is_done = False
@@ -65,11 +79,14 @@ async def test_execute_workflow_when_nothing_in_outbox(
     mock_workflow.cleanup = AsyncMock()
     mock_resolve_workflow.return_value = mock_abstract_workflow_class
 
-    def side_effect():
-        mock_workflow.is_done = True
-        raise TimeoutError
+    mock_executor_client = mock_executor_client_class.return_value
 
-    mock_workflow.get_from_outbox = AsyncMock(side_effect=side_effect)
+    async def empty_stream():
+        mock_workflow.is_done = True
+        return
+        yield  # This line will never be reached, making it an empty async generator
+
+    mock_executor_client.execute_stream.return_value = empty_stream()
 
     async def mock_request_iterator() -> AsyncIterable[contract_pb2.ClientEvent]:
         yield contract_pb2.ClientEvent(
@@ -86,10 +103,11 @@ async def test_execute_workflow_when_nothing_in_outbox(
 
 
 @pytest.mark.asyncio
+@patch("duo_workflow_service.servers.grpc_server.ExecutorClient")
 @patch("duo_workflow_service.servers.grpc_server.AbstractWorkflow")
 @patch("duo_workflow_service.servers.grpc_server.resolve_workflow_class")
 async def test_workflow_is_cancelled_on_parent_task_cancellation(
-    mock_resolve_workflow, mock_abstract_workflow_class
+    mock_resolve_workflow, mock_abstract_workflow_class, mock_executor_client_class
 ):
     mock_workflow = mock_abstract_workflow_class.return_value
     mock_workflow.is_done = False
@@ -97,9 +115,13 @@ async def test_workflow_is_cancelled_on_parent_task_cancellation(
     mock_workflow.cleanup = AsyncMock()
     mock_resolve_workflow.return_value = mock_abstract_workflow_class
 
-    mock_workflow.get_from_outbox = AsyncMock(
-        side_effect=asyncio.CancelledError("Task cancelled")
-    )
+    mock_executor_client = mock_executor_client_class.return_value
+
+    async def failing_stream():
+        raise asyncio.CancelledError("Task cancelled")
+        yield  # This line will never be reached
+
+    mock_executor_client.execute_stream.return_value = failing_stream()
 
     async def mock_request_iterator() -> AsyncIterable[contract_pb2.ClientEvent]:
         yield contract_pb2.ClientEvent(
@@ -134,30 +156,33 @@ async def test_workflow_is_cancelled_on_parent_task_cancellation(
 
 
 @pytest.mark.asyncio
+@patch("duo_workflow_service.servers.grpc_server.ExecutorClient")
 @patch("duo_workflow_service.servers.grpc_server.AbstractWorkflow")
 @patch("duo_workflow_service.servers.grpc_server.resolve_workflow_class")
-async def test_execute_workflow(mock_resolve_workflow, mock_abstract_workflow_class):
+async def test_execute_workflow(
+    mock_resolve_workflow, mock_abstract_workflow_class, mock_executor_client_class
+):
     mock_workflow_instance = mock_abstract_workflow_class.return_value
     mock_workflow_instance.is_done = False
     mock_workflow_instance.run = AsyncMock()
     mock_workflow_instance.cleanup = AsyncMock()
 
     checkpoint_action = contract_pb2.Action(newCheckpoint=contract_pb2.NewCheckpoint())
+    regular_action = contract_pb2.Action()
 
-    mock_workflow_instance.get_from_streaming_outbox = MagicMock(
-        side_effect=[
-            checkpoint_action,
-            checkpoint_action,
-            checkpoint_action,
-            checkpoint_action,
-        ]
-    )
-    mock_workflow_instance.outbox_empty = MagicMock(
-        side_effect=[False, False, True, True]
-    )
-    mock_workflow_instance.get_from_outbox = AsyncMock(
-        side_effect=[contract_pb2.Action(), contract_pb2.Action()]
-    )
+    mock_executor_client = mock_executor_client_class.return_value
+
+    # Mock the execute_stream to return the same pattern as the original send_events logic
+    async def mock_execute_stream():
+        # Simulate the pattern: checkpoint, regular, checkpoint, regular, checkpoint, checkpoint
+        yield checkpoint_action  # streaming action
+        yield regular_action  # from outbox
+        yield checkpoint_action  # streaming action
+        yield regular_action  # from outbox
+        yield checkpoint_action  # streaming action
+        yield checkpoint_action  # streaming action
+
+    mock_executor_client.execute_stream.return_value = mock_execute_stream()
     mock_resolve_workflow.return_value = mock_abstract_workflow_class
 
     async def mock_request_iterator() -> AsyncIterable[contract_pb2.ClientEvent]:
@@ -178,7 +203,10 @@ async def test_execute_workflow(mock_resolve_workflow, mock_abstract_workflow_cl
     assert (await anext(result)).WhichOneof("action") == "newCheckpoint"
     assert (await anext(result)).WhichOneof("action") == "newCheckpoint"
 
-    assert mock_workflow_instance.add_to_inbox.call_count == 2
+    # Verify ExecutorClient was instantiated with the request iterator
+    mock_executor_client_class.assert_called_once()
+    args, kwargs = mock_executor_client_class.call_args
+    assert "incoming_iterator" in kwargs or len(args) >= 1
 
 
 @pytest.mark.asyncio
@@ -261,16 +289,25 @@ async def test_grpc_serve():
 
 
 @pytest.mark.asyncio
+@patch("duo_workflow_service.servers.grpc_server.ExecutorClient")
 @patch("duo_workflow_service.servers.grpc_server.AbstractWorkflow")
 @patch("duo_workflow_service.servers.grpc_server.resolve_workflow_class")
 async def test_execute_workflow_missing_workflow_metadata(
-    mock_resolve_workflow, mock_abstract_workflow_class
+    mock_resolve_workflow, mock_abstract_workflow_class, mock_executor_client_class
 ):
     mock_workflow = mock_abstract_workflow_class.return_value
     mock_workflow.is_done = True
     mock_workflow.run = AsyncMock()
     mock_workflow.cleanup = AsyncMock()
     mock_resolve_workflow.return_value = mock_abstract_workflow_class
+
+    mock_executor_client = mock_executor_client_class.return_value
+
+    async def empty_stream():
+        return
+        yield  # This line will never be reached, making it an empty async generator
+
+    mock_executor_client.execute_stream.return_value = empty_stream()
 
     async def mock_request_iterator() -> AsyncIterable[contract_pb2.ClientEvent]:
         yield contract_pb2.ClientEvent(
@@ -288,6 +325,7 @@ async def test_execute_workflow_missing_workflow_metadata(
         workflow_id="123",
         workflow_metadata={},
         workflow_type=CategoryEnum.WORKFLOW_SOFTWARE_DEVELOPMENT,
+        executor_client=mock_executor_client,
         context_elements=[],
         invocation_metadata={"base_url": "", "gitlab_token": ""},
         mcp_tools=[],
@@ -295,10 +333,11 @@ async def test_execute_workflow_missing_workflow_metadata(
 
 
 @pytest.mark.asyncio
+@patch("duo_workflow_service.servers.grpc_server.ExecutorClient")
 @patch("duo_workflow_service.servers.grpc_server.AbstractWorkflow")
 @patch("duo_workflow_service.servers.grpc_server.resolve_workflow_class")
 async def test_execute_workflow_valid_workflow_metadata(
-    mock_resolve_workflow, mock_abstract_workflow_class
+    mock_resolve_workflow, mock_abstract_workflow_class, mock_executor_client_class
 ):
     mock_workflow = mock_abstract_workflow_class.return_value
     mock_workflow.is_done = True
@@ -308,6 +347,14 @@ async def test_execute_workflow_valid_workflow_metadata(
     mcp_tools = [
         contract_pb2.McpTool(name="get_issue", description="Tool to get issue")
     ]
+
+    mock_executor_client = mock_executor_client_class.return_value
+
+    async def empty_stream():
+        return
+        yield  # This line will never be reached, making it an empty async generator
+
+    mock_executor_client.execute_stream.return_value = empty_stream()
 
     async def mock_request_iterator() -> AsyncIterable[contract_pb2.ClientEvent]:
         yield contract_pb2.ClientEvent(
@@ -334,6 +381,7 @@ async def test_execute_workflow_valid_workflow_metadata(
         workflow_id="123",
         workflow_metadata={"key": "value"},
         workflow_type=CategoryEnum.WORKFLOW_SOFTWARE_DEVELOPMENT,
+        executor_client=mock_executor_client,
         context_elements=[],
         invocation_metadata={"base_url": "http://test.url", "gitlab_token": "123"},
         mcp_tools=mcp_tools,

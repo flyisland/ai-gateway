@@ -1,10 +1,9 @@
-import asyncio
-import json
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
 from contract import contract_pb2
+from duo_workflow_service.executor.client import ExecutorClient
 from duo_workflow_service.gitlab.executor_http_client import ExecutorGitLabHttpClient
 
 
@@ -15,9 +14,8 @@ def mock_execute_action():
 
 @pytest.fixture
 def client():
-    outbox = asyncio.Queue()
-    inbox = asyncio.Queue()
-    return ExecutorGitLabHttpClient(outbox, inbox)
+    executor_client = MagicMock(spec=ExecutorClient)
+    return ExecutorGitLabHttpClient(executor_client)
 
 
 @pytest.fixture
@@ -124,10 +122,8 @@ async def test_executor_gitlab_http_client(
     monkeypatch_execute_action.assert_called_once()
     call_args = monkeypatch_execute_action.call_args[0]
 
-    assert "outbox" in call_args[0]
-    assert "inbox" in call_args[0]
-    assert call_args[0]["outbox"] == client.outbox
-    assert call_args[0]["inbox"] == client.inbox
+    assert "executor_client" in call_args[0]
+    assert call_args[0]["executor_client"] == client.executor_client
 
     assert isinstance(call_args[1], contract_pb2.Action)
     assert call_args[1].runHTTPRequest.path == expected_path

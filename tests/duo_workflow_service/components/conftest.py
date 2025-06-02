@@ -1,10 +1,10 @@
-import asyncio
 from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
 from duo_workflow_service.components.tools_registry import ToolMetadata
 from duo_workflow_service.entities.state import Plan, WorkflowState, WorkflowStatusEnum
+from duo_workflow_service.executor.client import ExecutorClient
 from duo_workflow_service.gitlab.http_client import GitlabHttpClient
 
 
@@ -16,8 +16,7 @@ def gl_http_client():
 @pytest.fixture(scope="function")
 def tool_metadata(gl_http_client):
     return ToolMetadata(
-        outbox=MagicMock(spec=asyncio.Queue),
-        inbox=MagicMock(spec=asyncio.Queue),
+        executor_client=MagicMock(spec=ExecutorClient),
         gitlab_client=gl_http_client,
         gitlab_host="gitlab.example.com",
     )

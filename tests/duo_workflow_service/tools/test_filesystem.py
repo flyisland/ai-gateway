@@ -21,17 +21,14 @@ from duo_workflow_service.tools.filesystem import (
 
 @pytest.mark.asyncio
 async def test_read_file():
-    mock_outbox = MagicMock()
-    mock_outbox.put = AsyncMock()
-
-    mock_inbox = MagicMock()
-    mock_inbox.get = AsyncMock(
+    mock_executor_client = MagicMock()
+    mock_executor_client.request = AsyncMock(
         return_value=contract_pb2.ClientEvent(
             actionResponse=contract_pb2.ActionResponse(response="test contents")
         )
     )
 
-    metadata = {"outbox": mock_outbox, "inbox": mock_inbox}
+    metadata = {"executor_client": mock_executor_client}
 
     tool = ReadFile(description="Read file content")
     tool.metadata = metadata
@@ -41,8 +38,8 @@ async def test_read_file():
 
     assert response == "test contents"
 
-    mock_outbox.put.assert_called_once()
-    action = mock_outbox.put.call_args[0][0]
+    mock_executor_client.request.assert_called_once()
+    action = mock_executor_client.request.call_args[0][0]
     assert action.runReadFile.filepath == path
 
 
@@ -56,17 +53,14 @@ async def test_read_file_not_implemented_error():
 
 @pytest.mark.asyncio
 async def test_write_file():
-    mock_outbox = MagicMock()
-    mock_outbox.put = AsyncMock()
-
-    mock_inbox = MagicMock()
-    mock_inbox.get = AsyncMock(
+    mock_executor_client = MagicMock()
+    mock_executor_client.request = AsyncMock(
         return_value=contract_pb2.ClientEvent(
             actionResponse=contract_pb2.ActionResponse(response="done")
         )
     )
 
-    metadata = {"outbox": mock_outbox, "inbox": mock_inbox}
+    metadata = {"executor_client": mock_executor_client}
 
     tool = WriteFile(description="Write file content")
     tool.metadata = metadata
@@ -77,8 +71,8 @@ async def test_write_file():
 
     assert response == "done"
 
-    mock_outbox.put.assert_called_once()
-    action = mock_outbox.put.call_args[0][0]
+    mock_executor_client.request.assert_called_once()
+    action = mock_executor_client.request.call_args[0][0]
     assert action.runWriteFile.filepath == path
     assert action.runWriteFile.contents == contents
 
@@ -94,11 +88,8 @@ async def test_write_file_not_implemented_error():
 class TestFindFiles:
     @pytest.mark.asyncio
     async def test_find_files_arun_method(self):
-        mock_outbox = MagicMock()
-        mock_outbox.put = AsyncMock()
-
-        mock_inbox = MagicMock()
-        mock_inbox.get = AsyncMock(
+        mock_executor_client = MagicMock()
+        mock_executor_client.request = AsyncMock(
             return_value=contract_pb2.ClientEvent(
                 actionResponse=contract_pb2.ActionResponse(
                     response="file1.py\nfile2.py"
@@ -106,7 +97,8 @@ class TestFindFiles:
             )
         )
 
-        metadata = {"outbox": mock_outbox, "inbox": mock_inbox}
+        metadata = {"executor_client": mock_executor_client}
+
         tool = FindFiles()
         tool.metadata = metadata
         name_pattern = "*.py"
@@ -141,12 +133,8 @@ class TestFindFiles:
 class TestLsDir:
     @pytest.mark.asyncio
     async def test_list_dir_success(self):
-        # Set up the mock outbox and inbox
-        mock_outbox = MagicMock()
-        mock_outbox.put = AsyncMock()
-
-        mock_inbox = MagicMock()
-        mock_inbox.get = AsyncMock(
+        mock_executor_client = MagicMock()
+        mock_executor_client.request = AsyncMock(
             return_value=contract_pb2.ClientEvent(
                 actionResponse=contract_pb2.ActionResponse(
                     response="file1.txt file2.txt dir1 dir2"
@@ -154,7 +142,7 @@ class TestLsDir:
             )
         )
 
-        metadata = {"outbox": mock_outbox, "inbox": mock_inbox}
+        metadata = {"executor_client": mock_executor_client}
 
         # Create the tool and set its metadata
         list_dir_tool = ListDir()
@@ -166,11 +154,9 @@ class TestLsDir:
         # Assert the result
         assert result == "file1.txt file2.txt dir1 dir2"
 
-        # Verify the outbox was used as expected
-        mock_outbox.put.assert_called_once()
+        mock_executor_client.request.assert_called_once()
 
-        # You can add additional assertions to verify the details of what was put on the outbox
-        action = mock_outbox.put.call_args[0][0]
+        action = mock_executor_client.request.call_args[0][0]
         assert action.listDirectory.directory == "."
 
     @pytest.mark.asyncio
@@ -232,17 +218,14 @@ class TestMkdir:
 class TestEditFile:
     @pytest.mark.asyncio
     async def test_basic(self):
-        mock_outbox = MagicMock()
-        mock_outbox.put = AsyncMock()
-
-        mock_inbox = MagicMock()
-        mock_inbox.get = AsyncMock(
+        mock_executor_client = MagicMock()
+        mock_executor_client.request = AsyncMock(
             return_value=contract_pb2.ClientEvent(
                 actionResponse=contract_pb2.ActionResponse(response="success")
             )
         )
 
-        metadata = {"outbox": mock_outbox, "inbox": mock_inbox}
+        metadata = {"executor_client": mock_executor_client}
 
         tool = EditFile(metadata=metadata)
         path = "./somefile.txt"
@@ -253,8 +236,9 @@ class TestEditFile:
 
         assert response == "success"
 
-        mock_outbox.put.assert_called_once()
-        action = mock_outbox.put.call_args[0][0]
+        mock_executor_client.request.assert_called_once()
+
+        action = mock_executor_client.request.call_args[0][0]
         assert action.runEditFile.filepath == path
         assert action.runEditFile.oldString == old_str
         assert action.runEditFile.newString == new_str
