@@ -8,6 +8,7 @@ from duo_workflow_service import tools
 from duo_workflow_service.components.tools_registry import (
     _DEFAULT_TOOLS,
     NO_OP_TOOLS,
+    ToolMetadata,
     Toolset,
     ToolsRegistry,
 )
