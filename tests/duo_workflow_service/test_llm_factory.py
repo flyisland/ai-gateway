@@ -28,9 +28,7 @@ from duo_workflow_service.llm_factory import (
             {
                 "ANTHROPIC_API_KEY": "test-key",
             },
-            pytest.raises(
-                RuntimeError, match="DUO_WORKFLOW__VERTEX_PROJECT_ID needs to be set"
-            ),
+            does_not_raise(),
             None,
         ),
         (

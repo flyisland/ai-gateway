@@ -113,7 +113,10 @@ def create_chat_model(
 
 def validate_llm_access(config: Optional[Union[AnthropicConfig, VertexConfig]] = None):
     if config is None:
-        config = VertexConfig()
+        try:
+            config = VertexConfig()
+        except RuntimeError:
+            config = AnthropicConfig(model_name=KindAnthropicModel.CLAUDE_3_7_SONNET.value) 
 
     log = structlog.stdlib.get_logger("server")
     anthropic_client = create_chat_model(config=config)
