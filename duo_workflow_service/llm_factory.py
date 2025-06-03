@@ -94,11 +94,9 @@ def create_chat_model(
                 **kwargs,
                 max_retries=config.max_retries,
             )
-        else:
-            raise RuntimeError(
-                "ANTHROPIC_API_KEY needs to be set for Anthropic provider"
-            )
-    elif isinstance(config, VertexConfig):
+        raise RuntimeError("ANTHROPIC_API_KEY needs to be set for Anthropic provider")
+
+    if isinstance(config, VertexConfig):
         return ChatAnthropicVertex(
             model_name=config.model_name,
             project=config.project_id,
@@ -106,29 +104,16 @@ def create_chat_model(
             max_retries=config.max_retries,
             **kwargs,
         )
-    else:
-        raise ValueError(
-            f"Unsupported config type: {type(config).__name__}. "
-            "Must be either AnthropicConfig or VertexConfig"
-        )
+
+    raise ValueError(
+        f"Unsupported config type: {type(config).__name__}. "
+        "Must be either AnthropicConfig or VertexConfig"
+    )
 
 
 def validate_llm_access(config: Optional[Union[AnthropicConfig, VertexConfig]] = None):
     if config is None:
-        # Try to determine which config to use based on environment
-        if os.environ.get("DUO_WORKFLOW__VERTEX_PROJECT_ID"):
-            config = VertexConfig()
-        elif os.environ.get("ANTHROPIC_API_KEY"):
-            # You'd need to provide a valid model name here
-            raise ValueError(
-                "AnthropicConfig requires an explicit model_name. "
-                "Please provide a config object."
-            )
-        else:
-            raise RuntimeError(
-                "Either Vertex needs to be configured (DUO_WORKFLOW__VERTEX_PROJECT_ID), "
-                "or an ANTHROPIC_API_KEY needs to be set"
-            )
+        config = VertexConfig()
 
     log = structlog.stdlib.get_logger("server")
     anthropic_client = create_chat_model(config=config)
