@@ -86,14 +86,6 @@ def create_chat_model(
     **kwargs,
 ) -> BaseChatModel:
 
-    if isinstance(config, VertexConfig):
-        return ChatAnthropicVertex(
-            model_name=config.model_name,
-            project=config.project_id,
-            location=config.location,
-            max_retries=config.max_retries,
-            **kwargs,
-        )
     if isinstance(config, AnthropicConfig):
         anthropic_api_key = os.environ.get("ANTHROPIC_API_KEY")
         if anthropic_api_key and len(anthropic_api_key) > 1:
@@ -106,6 +98,14 @@ def create_chat_model(
             raise RuntimeError(
                 "ANTHROPIC_API_KEY needs to be set for Anthropic provider"
             )
+    elif isinstance(config, VertexConfig):
+        return ChatAnthropicVertex(
+            model_name=config.model_name,
+            project=config.project_id,
+            location=config.location,
+            max_retries=config.max_retries,
+            **kwargs,
+        )
     else:
         raise ValueError(
             f"Unsupported config type: {type(config).__name__}. "
@@ -113,9 +113,22 @@ def create_chat_model(
         )
 
 
-def validate_llm_access(config: Optional[VertexConfig] = None):
+def validate_llm_access(config: Optional[Union[AnthropicConfig, VertexConfig]] = None):
     if config is None:
-        config = VertexConfig()
+        # Try to determine which config to use based on environment
+        if os.environ.get("DUO_WORKFLOW__VERTEX_PROJECT_ID"):
+            config = VertexConfig()
+        elif os.environ.get("ANTHROPIC_API_KEY"):
+            # You'd need to provide a valid model name here
+            raise ValueError(
+                "AnthropicConfig requires an explicit model_name. "
+                "Please provide a config object."
+            )
+        else:
+            raise RuntimeError(
+                "Either Vertex needs to be configured (DUO_WORKFLOW__VERTEX_PROJECT_ID), "
+                "or an ANTHROPIC_API_KEY needs to be set"
+            )
 
     log = structlog.stdlib.get_logger("server")
     anthropic_client = create_chat_model(config=config)
@@ -129,14 +142,3 @@ def validate_llm_access(config: Optional[VertexConfig] = None):
     # feature flags are not yet loaded, so logging the model name here could be misleading if the model name depends on
     # feature flags.
     log.info(str(content))
-
-
-def _get_anthropic_model_name() -> str:
-    feature_flags = current_feature_flag_context.get()
-
-    if KindAnthropicModel.CLAUDE_SONNET_4 in feature_flags:
-        return KindAnthropicModel.CLAUDE_SONNET_4.value
-    if KindAnthropicModel.CLAUDE_3_7_SONNET in feature_flags:
-        return KindAnthropicModel.CLAUDE_3_7_SONNET.value
-
-    return KindAnthropicModel.CLAUDE_3_5_SONNET_V2.value

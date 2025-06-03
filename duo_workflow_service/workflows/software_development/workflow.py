@@ -442,17 +442,13 @@ class Workflow(AbstractWorkflow):
         tools_registry: ToolsRegistry,
         checkpointer: BaseCheckpointSaver,
     ):
-        base_model_planner = (
-            create_chat_model(
-                max_tokens=MAX_TOKENS_TO_SAMPLE,
-                config=self._model_config,
-            ),
+        base_model_planner = create_chat_model(
+            max_tokens=MAX_TOKENS_TO_SAMPLE,
+            config=self._model_config,
         )
-        base_model_executor = (
-            create_chat_model(
-                max_tokens=MAX_TOKENS_TO_SAMPLE,
-                config=self._model_config,
-            ),
+        base_model_executor = create_chat_model(
+            max_tokens=MAX_TOKENS_TO_SAMPLE,
+            config=self._model_config,
         )
 
         graph = StateGraph(WorkflowState)
