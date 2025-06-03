@@ -39,17 +39,17 @@ class AnthropicConfig(ModelConfig):
 
 class VertexConfig(ModelConfig):
     provider: Literal["vertex"] = "vertex"
-    location: Optional[str] = None
-    project_id: Optional[str] = None
-    model_name: Optional[str] = None  # Make it optional since we'll compute it
+    location: str = ""
+    project_id: str = ""
+    model_name: str = ""
 
     def __init__(self, **data):
         # Set defaults before calling parent init
-        if "model_name" not in data or data["model_name"] is None:
+        if "model_name" not in data:
             data["model_name"] = self._get_model_name()
-        if "project_id" not in data or data["project_id"] is None:
+        if "project_id" not in data:
             data["project_id"] = self._get_project_id()
-        if "location" not in data or data["location"] is None:
+        if "location" not in data:
             data["location"] = self._get_location()
         super().__init__(**data)
 

@@ -1,12 +1,11 @@
 import asyncio
 import os
 from abc import ABC, abstractmethod
-from typing import Any, Dict, Optional, Type, TypedDict
+from typing import Any, Dict, Optional, Type, TypedDict, Union
 
 import structlog
 from langchain.tools import BaseTool
 from langchain_core.runnables import RunnableConfig
-
 # pylint disable are going to be fixed via
 # https://gitlab.com/gitlab-org/duo-workflow/duo-workflow-service/-/issues/78
 from langgraph.checkpoint.base import (  # pylint: disable=no-langgraph-langchain-imports
@@ -38,7 +37,7 @@ from duo_workflow_service.internal_events import (
     InternalEventAdditionalProperties,
 )
 from duo_workflow_service.internal_events.event_enum import CategoryEnum, EventEnum
-from duo_workflow_service.llm_factory import AnthropicConfig, ModelConfig, VertexConfig
+from duo_workflow_service.llm_factory import AnthropicConfig, VertexConfig
 from duo_workflow_service.monitoring import duo_workflow_metrics
 from duo_workflow_service.tools import convert_mcp_tools_to_langchain_tools
 from duo_workflow_service.tracking import log_exception
@@ -341,7 +340,7 @@ class AbstractWorkflow(ABC):
             metadata=metadata, mcp_tools=mcp_tools
         )
 
-    def _get_model_config(self) -> ModelConfig:
+    def _get_model_config(self) -> Union[AnthropicConfig, VertexConfig]:
         """Determine the appropriate chat model name based on deployment environment.
 
         This method selects between standard and Vertex AI-specific model naming
