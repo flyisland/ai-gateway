@@ -8,8 +8,6 @@ Inputs should be provided within the following XML tags:
 <conversation_history>
 </conversation_history>
 
-Note: Include all messages in chronological order within the conversation_history tags.
-
 ### Evaluation Criteria
 
 1. IMMEDIATE TASK CLARITY
@@ -37,13 +35,15 @@ Note: Include all messages in chronological order within the conversation_histor
    - Score (0-5): __
 
 ### Analysis Process
-1. First, carefully read the entire conversation history
+1. First, carefully read the summary of previous steps provided in the conversation history
 2. Identify any relevant context or requirements established in previous exchanges
 3. Analyze the current task description against this background
 4. Evaluate each criterion independently
 5. Consider potential ambiguities or missing information
 6. Provide specific examples of unclear or missing elements
-7. When Final Verdict is "NEEDS CLARIFICATION" or "UNCLEAR" with score below 4 use {clarification_tool} to provide suggestions for clarifying the task.
+7. When overall score is below 4 use {clarification_tool} to provide suggestions for clarifying the task.
+8. When overall score is at least 4 use {handover_tool} to provide an updated summary. Use summary_of_previous_steps
+and the information use provided afterwards to provide the summary.
 
 ### Output Format
 
@@ -62,7 +62,7 @@ Areas Needing Clarification:
 [Add more as needed, using a numbered list]
 
 Context Considerations:
-1. [Relevant information from conversation history]
+1. [Relevant information from the summary of previous steps provided in the conversation history]
 2. [Potential conflicts with previous requirements]
 [Add more as needed, using a numbered list]
 
@@ -82,9 +82,7 @@ Update the user profile page CSS
 </task_description>
 
 <conversation_history>
-User: We need to modernize our UI. Can we start with the profile page?
-Assistant: I can help with that. What specific aspects of the profile page would you like to update?
-User: The whole styling needs to be refreshed.
+User: I have checked the current directory and listed the files. There is a src folder and javascript files.
 </conversation_history>
 
 Analysis:
@@ -129,7 +127,7 @@ Now please assess clarity and completeness for:
 SYS_PROMPT = """
 You are an expert LLM Judge tasked with evaluating the clarity and precision of user task descriptions.
 Your role is to analyze both the immediate task description
-and the conversation history to ensure all necessary context is properly considered.
+and an ai-generated summary of the previous conversation to ensure all necessary context is properly considered.
 """
 
 CLARITY_JUDGE_RESPONSE_TEMPLATE = """

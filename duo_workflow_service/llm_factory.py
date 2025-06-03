@@ -16,13 +16,14 @@ from duo_workflow_service.interceptors.feature_flag_interceptor import (
 class VertexConfig:
     @property
     def model_name(self) -> str:
-        feature_flags = current_feature_flag_context.get()
-        if "duo_workflow_claude_sonnet_4" in feature_flags:
-            return "claude-sonnet-4@20250514"
-        if "duo_workflow_claude_3_7" in feature_flags:
-            return "claude-3-7-sonnet@20250219"
-
-        return "claude-3-5-sonnet-v2@20241022"
+        # feature_flags = current_feature_flag_context.get()
+        # if "duo_workflow_claude_sonnet_4" in feature_flags:
+        #     return "claude-sonnet-4@20250514"
+        # if "duo_workflow_claude_3_7" in feature_flags:
+        #     return "claude-3-7-sonnet@20250219"
+        #
+        # return "claude-3-5-sonnet-v2@20241022"
+        return "claude-sonnet-4@20250514"
 
     @property
     def project_id(self) -> str:
@@ -50,7 +51,6 @@ class VertexConfig:
 
 def new_chat_client(config: VertexConfig = VertexConfig(), **kwargs) -> BaseChatModel:
     vertex_project_id = os.environ.get("DUO_WORKFLOW__VERTEX_PROJECT_ID")
-
     if vertex_project_id and len(vertex_project_id) > 1:
         return ChatAnthropicVertex(
             model_name=config.model_name,
@@ -88,11 +88,12 @@ def validate_llm_access(config: VertexConfig = VertexConfig()):
 
 
 def get_anthropic_model_name() -> str:
-    feature_flags = current_feature_flag_context.get()
-
-    if "duo_workflow_claude_sonnet_4" in feature_flags:
-        return "claude-sonnet-4-20250514"
-    if "duo_workflow_claude_3_7" in feature_flags:
-        return "claude-3-7-sonnet-20250219"
-
-    return "claude-3-5-sonnet-20241022"
+    # feature_flags = current_feature_flag_context.get()
+    #
+    # if "duo_workflow_claude_sonnet_4" in feature_flags:
+    #     return "claude-sonnet-4-20250514"
+    # if "duo_workflow_claude_3_7" in feature_flags:
+    #     return "claude-3-7-sonnet-20250219"
+    #
+    # return "claude-3-5-sonnet-20241022"
+    return "claude-sonnet-4-20250514"

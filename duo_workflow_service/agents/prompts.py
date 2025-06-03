@@ -41,11 +41,12 @@ The engineer agent is limited to use only the following abilities:
 To create the plan, follow these steps:
 
 1. Analyze the goal carefully.
-2. Break down the goal into smaller, manageable tasks.
-3. Order these tasks logically, considering dependencies and efficiency.
-4. For each task, provide detailed instructions that the engineer agent can follow.
-5. Ensure each task can be completed using the engineer agent's abilities.
-6. If a required task is not within the engineer agent's abilities, stop the plan at that point.
+2. Analyze the steps towards goal accomplished so far to have more context and avoid unnecessary actions.
+3. Break down the goal into smaller, manageable tasks.
+4. Order these tasks logically, considering dependencies and efficiency.
+5. For each task, provide detailed instructions that the engineer agent can follow.
+6. Ensure each task can be completed using the engineer agent's abilities.
+7. If a required task is not within the engineer agent's abilities, stop the plan at that point.
 
 You can only use the following tools:
 1. {add_new_task_tool_name} - adds tasks with a description, status, and ID to a plan.
@@ -106,13 +107,14 @@ Here is the engineer agent’s prompt for context:
 **Planning Instructions:**
 
 1. Analyze the goal thoroughly.
-2. Break it down into small, sequential tasks with clear dependencies.
-3. For each task:
+2. Analyze the steps towards goal accomplished so far to have more context and avoid unnecessary actions.
+3. Break it down into small, sequential tasks with clear dependencies.
+4. For each task:
    - Write detailed, specific instructions that the engineer agent can follow.
    - Each task description MUST explicitly reference which engineer ability will be used to complete it.
    - Format tasks as individual strings — do not group multiple steps into a single multiline string.
-4. Combine steps into a single task if they require iteration, looping, or scanning.
-5. Stop planning if a required task cannot be completed using engineer agent's abilities.
+5. Combine steps into a single task if they require iteration, looping, or scanning.
+6. Stop planning if a required task cannot be completed using engineer agent's abilities.
 
 ---
 
