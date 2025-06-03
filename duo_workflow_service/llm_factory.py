@@ -8,7 +8,7 @@ from langchain_anthropic import ChatAnthropic
 from langchain_core.language_models.chat_models import BaseChatModel
 from langchain_google_vertexai.model_garden import ChatAnthropicVertex
 from langsmith import tracing_context
-from pydantic import BaseModel, field_validator
+from pydantic import BaseModel, Field, field_validator
 
 from ai_gateway.models import KindAnthropicModel
 from duo_workflow_service.interceptors.feature_flag_interceptor import (
@@ -39,19 +39,6 @@ class AnthropicConfig(ModelConfig):
 
 class VertexConfig(ModelConfig):
     provider: Literal["vertex"] = "vertex"
-    location: str = ""
-    project_id: str = ""
-    model_name: str = ""
-
-    def __init__(self, **data):
-        # Set defaults before calling parent init
-        if "model_name" not in data:
-            data["model_name"] = self._get_model_name()
-        if "project_id" not in data:
-            data["project_id"] = self._get_project_id()
-        if "location" not in data:
-            data["location"] = self._get_location()
-        super().__init__(**data)
 
     @staticmethod
     def _get_model_name() -> str:
@@ -79,6 +66,10 @@ class VertexConfig(ModelConfig):
         if not location or len(location) < 1:
             raise RuntimeError("DUO_WORKFLOW__VERTEX_LOCATION needs to be set")
         return location
+
+    model_name: str = Field(default_factory=_get_model_name)
+    project_id: str = Field(default_factory=_get_project_id)
+    location: str = Field(default_factory=_get_location)
 
 
 def create_chat_model(
@@ -113,12 +104,7 @@ def create_chat_model(
 
 def validate_llm_access(config: Optional[Union[AnthropicConfig, VertexConfig]] = None):
     if config is None:
-        try:
-            config = VertexConfig()
-        except RuntimeError:
-            config = AnthropicConfig(
-                model_name=KindAnthropicModel.CLAUDE_3_7_SONNET.value
-            )
+        config = VertexConfig()
 
     log = structlog.stdlib.get_logger("server")
     anthropic_client = create_chat_model(config=config)
