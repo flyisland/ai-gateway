@@ -15,6 +15,7 @@ from langgraph.checkpoint.base import (  # pylint: disable=no-langgraph-langchai
 from langgraph.types import Command
 from langsmith import traceable, tracing_context
 
+from ai_gateway.models import KindAnthropicModel
 from contract import contract_pb2
 from duo_workflow_service.checkpointer.gitlab_workflow import (
     GitLabWorkflow,
@@ -76,6 +77,7 @@ class AbstractWorkflow(ABC):
     _stream: bool = False
     _additional_context: list[AdditionalContext] | None
     _context_elements: list
+    _is_vertex: bool = False
     _additional_tools: list[Type[BaseTool]]
 
     def __init__(
@@ -108,6 +110,9 @@ class AbstractWorkflow(ABC):
         self._additional_context = additional_context
         self._additional_tools = self._build_additional_tools(mcp_tools)
         self._workflow_config = {}
+
+        _vertex_project_id = os.getenv("DUO_WORKFLOW__VERTEX_PROJECT_ID")
+        self._is_vertex = bool(_vertex_project_id and len(_vertex_project_id) > 1)
 
     async def run(self, goal: str) -> None:
         with duo_workflow_metrics.time_workflow(
@@ -337,6 +342,31 @@ class AbstractWorkflow(ABC):
         return convert_mcp_tools_to_langchain_tools(
             metadata=metadata, mcp_tools=mcp_tools
         )
+
+    def _get_chat_model_name(self) -> str:
+        """Determine the appropriate chat model name based on deployment environment.
+
+        This method selects between standard and Vertex AI-specific model naming
+        conventions. When deployed on Google Cloud Vertex AI, model names require
+        a different format than standard Anthropic API deployments.
+
+        The method checks the `_is_vertex` property (which should be set based on
+        the presence of DUO_WORKFLOW__VERTEX_PROJECT_ID environment variable) to
+        determine the deployment context.
+
+        Returns:
+            str: The model identifier string appropriate for the current deployment:
+                - Vertex AI format: Used when running on Google Cloud Vertex AI
+                - Standard format: Used for direct API calls
+
+        Note:
+            Subclasses can override this method to implement custom model selection
+            logic or to use different model versions.
+        """
+        if self._is_vertex:
+            return KindAnthropicModel.CLAUDE_3_7_SONNET_VERTEX.value
+
+        return KindAnthropicModel.CLAUDE_3_7_SONNET.value
 
 
 TypeWorkflow = type[AbstractWorkflow]

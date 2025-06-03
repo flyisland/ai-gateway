@@ -12,7 +12,6 @@ from duo_workflow_service.agents import HumanApprovalCheckExecutor
 from duo_workflow_service.components.human_approval.tools_approval import (
     ToolsApprovalComponent,
 )
-from duo_workflow_service.components.tools_registry import ToolsRegistry
 from duo_workflow_service.entities.event import WorkflowEventType
 from duo_workflow_service.entities.state import (
     MessageTypeEnum,
@@ -112,7 +111,6 @@ class TestToolsApprovalComponent:
         graph_input: WorkflowState,
         mock_check_executor,
     ):
-
         with patch(
             "duo_workflow_service.components.human_approval.component.HumanApprovalCheckExecutor",
             return_value=mock_check_executor,
@@ -507,7 +505,6 @@ class TestToolsApprovalComponent:
         graph_input: WorkflowState,
         mock_check_executor,
     ):
-
         with patch(
             "duo_workflow_service.components.human_approval.component.HumanApprovalCheckExecutor",
             return_value=mock_check_executor,

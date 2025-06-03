@@ -1,15 +1,17 @@
+import os
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
-from langchain.tools import BaseTool
 
 from contract import contract_pb2
+from duo_workflow_service.components import ToolsRegistry
 from duo_workflow_service.internal_events import InternalEventAdditionalProperties
 from duo_workflow_service.internal_events.event_enum import CategoryEnum, EventEnum
 from duo_workflow_service.workflows.abstract_workflow import (
     AbstractWorkflow,
     TraceableException,
 )
+from duo_workflow_service.workflows.chat import Workflow
 
 
 # Concrete implementation for testing
@@ -30,6 +32,10 @@ class MockWorkflow(AbstractWorkflow):
 
     def log_workflow_elements(self, element):
         print(element)
+
+    def _get_chat_model_name(self) -> str:
+        """Use the default implementation from AbstractWorkflow."""
+        return super()._get_chat_model_name()
 
 
 @pytest.fixture
@@ -285,3 +291,189 @@ async def test_run_passes_correct_metadata_to_langsmith_extra(
     assert metadata["git_url"] == "https://example.com"
     assert metadata["git_sha"] == "abc123"
     assert metadata["workflow_type"] == CategoryEnum.WORKFLOW_SOFTWARE_DEVELOPMENT.value
+
+
+@pytest.mark.asyncio
+@patch.dict(os.environ, {"DUO_WORKFLOW__VERTEX_PROJECT_ID": ""})
+@patch("duo_workflow_service.workflows.abstract_workflow.ToolsRegistry", autospec=True)
+@patch(
+    "duo_workflow_service.workflows.abstract_workflow.fetch_project_data_with_workflow_id"
+)
+@patch("duo_workflow_service.workflows.abstract_workflow.fetch_workflow_config")
+@patch("duo_workflow_service.workflows.convert_to_gitlab_ci.workflow.create_chat_model")
+@patch("duo_workflow_service.workflows.abstract_workflow.GitLabWorkflow", autospec=True)
+@patch("duo_workflow_service.workflows.abstract_workflow.UserInterface", autospec=True)
+async def test_workflow_creates_chat_model_without_vertex(
+    mock_checkpoint_notifier,
+    mock_gitlab_workflow,
+    mock_create_chat_model,
+    mock_fetch_workflow_config,
+    mock_fetch_project_data_with_workflow_id,
+    mock_tools_registry_cls,
+):
+    """Test workflow creates chat model with standard model name when VERTEX_PROJECT_ID is not set."""
+    # Set up the mocks based on the existing test pattern
+    mock_checkpoint_notifier_instance = mock_checkpoint_notifier.return_value
+    mock_tools_registry = MagicMock(spec=ToolsRegistry)
+    mock_tools_registry_cls.configure = AsyncMock(return_value=mock_tools_registry)
+
+    mock_fetch_project_data_with_workflow_id.return_value = {
+        "id": 1,
+        "name": "test-project",
+        "description": "This is a test project",
+        "http_url_to_repo": "https://example.com/project",
+        "web_url": "https://example.com/project",
+    }
+
+    mock_git_lab_workflow_instance = mock_gitlab_workflow.return_value
+    mock_git_lab_workflow_instance.__aenter__.return_value = (
+        mock_git_lab_workflow_instance
+    )
+    mock_git_lab_workflow_instance.__aexit__.return_value = None
+    mock_git_lab_workflow_instance._offline_mode = False
+    mock_git_lab_workflow_instance.aget_tuple = AsyncMock(return_value=None)
+    mock_git_lab_workflow_instance.alist = AsyncMock(return_value=[])
+    mock_git_lab_workflow_instance.aput = AsyncMock(
+        return_value={
+            "configurable": {"thread_id": "123", "checkpoint_id": "checkpoint1"}
+        }
+    )
+    mock_git_lab_workflow_instance.get_next_version = MagicMock(return_value=1)
+
+    # Create a mock that will cause the run to exit early
+    class AsyncIterator:
+        def __init__(self):
+            self.called = False
+
+        def __aiter__(self):
+            return self
+
+        async def __anext__(self):
+            if not self.called:
+                self.called = True
+                raise StopAsyncIteration
+            raise StopAsyncIteration
+
+    workflow = Workflow(
+        "123",
+        {},
+        workflow_type=CategoryEnum.WORKFLOW_SOFTWARE_DEVELOPMENT,
+    )
+
+    with patch(
+        "duo_workflow_service.workflows.convert_to_gitlab_ci.workflow.StateGraph"
+    ) as graph:
+        compiled_graph = MagicMock()
+        compiled_graph.aget_state = AsyncMock(return_value=None)
+        compiled_graph.astream.return_value = AsyncIterator()
+        instance = graph.return_value
+        instance.compile.return_value = compiled_graph
+
+        await workflow.run("Test goal")
+
+    # Assert that create_chat_model was called without vertex configuration
+    mock_create_chat_model.assert_called_with(
+        max_tokens=8192,
+        model="claude-3-7-sonnet-20250219",
+        is_vertex=False,
+    )
+
+
+@pytest.mark.asyncio
+@patch.dict(
+    os.environ,
+    {
+        "DUO_WORKFLOW__VERTEX_PROJECT_ID": "test-project-id",
+        "DUO_WORKFLOW__VERTEX_LOCATION": "us-central1",
+    },
+)
+@pytest.mark.asyncio
+@patch.dict(
+    os.environ,
+    {
+        "DUO_WORKFLOW__VERTEX_PROJECT_ID": "test-project-id",
+        "DUO_WORKFLOW__VERTEX_LOCATION": "us-central1",
+    },
+)
+@patch("duo_workflow_service.workflows.abstract_workflow.ToolsRegistry", autospec=True)
+@patch(
+    "duo_workflow_service.workflows.abstract_workflow.fetch_project_data_with_workflow_id"
+)
+@patch("duo_workflow_service.workflows.abstract_workflow.fetch_workflow_config")
+@patch("duo_workflow_service.workflows.convert_to_gitlab_ci.workflow.create_chat_model")
+@patch("duo_workflow_service.workflows.abstract_workflow.GitLabWorkflow", autospec=True)
+@patch("duo_workflow_service.workflows.abstract_workflow.UserInterface", autospec=True)
+async def test_workflow_creates_chat_model_with_vertex(
+    mock_checkpoint_notifier,
+    mock_gitlab_workflow,
+    mock_create_chat_model,
+    mock_fetch_workflow_config,
+    mock_fetch_project_data_with_workflow_id,
+    mock_tools_registry_cls,
+):
+    """Test workflow creates chat model with vertex configuration when VERTEX_PROJECT_ID is set."""
+    # Set up the mocks based on the existing test pattern
+    mock_checkpoint_notifier_instance = mock_checkpoint_notifier.return_value
+    mock_tools_registry = MagicMock(spec=ToolsRegistry)
+    mock_tools_registry_cls.configure = AsyncMock(return_value=mock_tools_registry)
+
+    mock_fetch_project_data_with_workflow_id.return_value = {
+        "id": 1,
+        "name": "test-project",
+        "description": "This is a test project",
+        "http_url_to_repo": "https://example.com/project",
+        "web_url": "https://example.com/project",
+    }
+
+    mock_git_lab_workflow_instance = mock_gitlab_workflow.return_value
+    mock_git_lab_workflow_instance.__aenter__.return_value = (
+        mock_git_lab_workflow_instance
+    )
+    mock_git_lab_workflow_instance.__aexit__.return_value = None
+    mock_git_lab_workflow_instance._offline_mode = False
+    mock_git_lab_workflow_instance.aget_tuple = AsyncMock(return_value=None)
+    mock_git_lab_workflow_instance.alist = AsyncMock(return_value=[])
+    mock_git_lab_workflow_instance.aput = AsyncMock(
+        return_value={
+            "configurable": {"thread_id": "123", "checkpoint_id": "checkpoint1"}
+        }
+    )
+    mock_git_lab_workflow_instance.get_next_version = MagicMock(return_value=1)
+
+    # Create a mock that will cause the run to exit early
+    class AsyncIterator:
+        def __init__(self):
+            self.called = False
+
+        def __aiter__(self):
+            return self
+
+        async def __anext__(self):
+            if not self.called:
+                self.called = True
+                raise StopAsyncIteration
+            raise StopAsyncIteration
+
+    workflow = Workflow(
+        "123",
+        {},
+        workflow_type=CategoryEnum.WORKFLOW_SOFTWARE_DEVELOPMENT,
+    )
+
+    with patch(
+        "duo_workflow_service.workflows.convert_to_gitlab_ci.workflow.StateGraph"
+    ) as graph:
+        compiled_graph = MagicMock()
+        compiled_graph.aget_state = AsyncMock(return_value=None)
+        compiled_graph.astream.return_value = AsyncIterator()
+        instance = graph.return_value
+        instance.compile.return_value = compiled_graph
+
+        await workflow.run("Test goal")
+
+    # Assert that create_chat_model was called with vertex configuration
+    mock_create_chat_model.assert_called_with(
+        max_tokens=8192,
+        model="claude-3-7-sonnet@20250219",
+        is_vertex=True,
+    )

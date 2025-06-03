@@ -24,7 +24,7 @@ from duo_workflow_service.entities.state import (
 from duo_workflow_service.interceptors.feature_flag_interceptor import (
     current_feature_flag_context,
 )
-from duo_workflow_service.llm_factory import new_chat_client
+from duo_workflow_service.llm_factory import create_chat_model
 from duo_workflow_service.tracking.errors import log_exception
 from duo_workflow_service.workflows.abstract_workflow import AbstractWorkflow
 
@@ -71,7 +71,6 @@ CHAT_READ_ONLY_TOOLS = [
     "get_commit_comments",
     "get_commit_diff",
 ]
-
 
 CHAT_MUTATION_TOOLS = [
     "create_file_with_contents",
@@ -216,7 +215,11 @@ class Workflow(AbstractWorkflow):
             goal="",
             system_prompt="",
             name=AGENT_NAME,
-            model=new_chat_client(max_tokens=MAX_TOKENS_TO_SAMPLE),
+            model=create_chat_model(
+                max_tokens=MAX_TOKENS_TO_SAMPLE,
+                model_name=self._get_chat_model_name(),
+                is_vertex=self._is_vertex,
+            ),
             toolset=agents_toolset,
             workflow_id=self._workflow_id,
             http_client=self._http_client,

@@ -5,7 +5,6 @@ from unittest.mock import MagicMock, patch
 import pytest
 
 from duo_workflow_service.slash_commands.error_handler import SlashCommandError
-from duo_workflow_service.slash_commands.goal_parser import parse
 from duo_workflow_service.slash_commands.processor import SlashCommandsProcessor
 from lib.result import Error, Ok
 
@@ -30,7 +29,6 @@ class TestSlashCommandsGoalExpander:
 
     @patch(GOAL_PARSER_PATH)
     def test_not_slash_command(self, mock_parser, processor):
-
         mock_parser.parse().return_value = (None, "/")
 
         result = processor.process("/")

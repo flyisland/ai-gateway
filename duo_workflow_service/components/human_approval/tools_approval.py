@@ -59,19 +59,19 @@ class ToolsApprovalComponent(HumanApprovalComponent):
                 "status": state["status"],
                 "conversation_history": {
                     self._approved_agent_name: [
-                        ToolMessage(
-                            tool_call_id=tool_call["id"],
-                            content="Tool call has been rejected due to other tool call in the last AIMessage being malformed",
-                        )
-                        for tool_call in valid_tool_calls
-                    ]
-                    + [
-                        ToolMessage(
-                            tool_call_id=tool_call_error.tool_call["id"],
-                            content=str(tool_call_error),
-                        )
-                        for tool_call_error in invalid_tool_calls
-                    ]
+                                                   ToolMessage(
+                                                       tool_call_id=tool_call["id"],
+                                                       content="Tool call has been rejected due to other tool call in the last AIMessage being malformed",
+                                                   )
+                                                   for tool_call in valid_tool_calls
+                                               ]
+                                               + [
+                                                   ToolMessage(
+                                                       tool_call_id=tool_call_error.tool_call["id"],
+                                                       content=str(tool_call_error),
+                                                   )
+                                                   for tool_call_error in invalid_tool_calls
+                                               ]
                 },
             }
         return super()._request_approval(state)

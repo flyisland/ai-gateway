@@ -4,133 +4,133 @@ option go_package = "gitlab.com/gitlab-org/modelops/applied-ml/code-suggestions/
 option ruby_package = "DuoWorkflowService";
 
 service DuoWorkflow {
-    rpc ExecuteWorkflow(stream ClientEvent) returns (stream Action);
-    rpc GenerateToken(GenerateTokenRequest) returns (GenerateTokenResponse);
+  rpc ExecuteWorkflow (stream ClientEvent) returns (stream Action);
+  rpc GenerateToken (GenerateTokenRequest) returns (GenerateTokenResponse);
 }
 
 message ClientEvent {
-    oneof response {
-        StartWorkflowRequest startRequest = 1;
-        ActionResponse actionResponse = 2;
-    }
+  oneof response {
+    StartWorkflowRequest startRequest = 1;
+    ActionResponse actionResponse = 2;
+  }
 }
 
 message StartWorkflowRequest {
-    string clientVersion = 1;
-    string workflowID = 2;
-    string workflowDefinition = 3;
-    string goal = 4;
-    string workflowMetadata = 5;
-    repeated string clientCapabilities = 6;
-    repeated ContextElement context = 7;
-    repeated McpTool mcpTools = 8;
-    repeated AdditionalContext additional_context = 9;
+  string clientVersion = 1;
+  string workflowID = 2;
+  string workflowDefinition = 3;
+  string goal = 4;
+  string workflowMetadata = 5;
+  repeated string clientCapabilities = 6;
+  repeated ContextElement context = 7;
+  repeated McpTool mcpTools = 8;
+  repeated AdditionalContext additional_context = 9;
 }
 
 message ActionResponse {
-    string requestID = 1;
-    string response = 2;
-    oneof response_type {
-      PlainTextResponse plainTextResponse = 3;
-      HttpResponse httpResponse = 4;
-    }
+  string requestID = 1;
+  string response = 2;
+  oneof response_type {
+    PlainTextResponse plainTextResponse = 3;
+    HttpResponse httpResponse = 4;
+  }
 }
 
 message PlainTextResponse {
-    string response = 1;
-    string error = 2;
+  string response = 1;
+  string error = 2;
 }
 
 message HttpResponse {
-    map<string, string> headers = 1;
-    int32 statusCode = 2;
-    string body = 3;
-    string error = 4;
+  map<string, string> headers = 1;
+  int32 statusCode = 2;
+  string body = 3;
+  string error = 4;
 }
 
 message Action {
-    string requestID = 1;
-    oneof action {
-        RunCommandAction runCommand = 2;
-        RunHTTPRequest runHTTPRequest = 3;
-        ReadFile runReadFile = 4;
-        WriteFile runWriteFile = 5;
-        RunGitCommand runGitCommand = 6;
-        EditFile runEditFile = 7;
-        NewCheckpoint newCheckpoint = 8;
-        ListDirectory listDirectory = 9;
-        Grep grep = 10;
-        FindFiles findFiles = 11;
-        RunMCPTool runMCPTool = 12;
-    };
+  string requestID = 1;
+  oneof action {
+    RunCommandAction runCommand = 2;
+    RunHTTPRequest runHTTPRequest = 3;
+    ReadFile runReadFile = 4;
+    WriteFile runWriteFile = 5;
+    RunGitCommand runGitCommand = 6;
+    EditFile runEditFile = 7;
+    NewCheckpoint newCheckpoint = 8;
+    ListDirectory listDirectory = 9;
+    Grep grep = 10;
+    FindFiles findFiles = 11;
+    RunMCPTool runMCPTool = 12;
+  };
 }
 
 message RunCommandAction {
-    reserved 1, 2;
-    reserved "command", "withGitCredentials";
-    string program = 3;
-    repeated string arguments = 4;
-    repeated string flags = 5;
+  reserved 1, 2;
+  reserved "command", "withGitCredentials";
+  string program = 3;
+  repeated string arguments = 4;
+  repeated string flags = 5;
 }
 
 message ReadFile {
-    string filepath = 1;
+  string filepath = 1;
 }
 
 message WriteFile {
-    string filepath = 1;
-    string contents = 2;
+  string filepath = 1;
+  string contents = 2;
 }
 
 message EditFile {
-    string filepath = 1;
-    string oldString = 2;
-    string newString = 3;
+  string filepath = 1;
+  string oldString = 2;
+  string newString = 3;
 }
 
 message RunHTTPRequest {
-    string method = 1;
-    string path = 2;
-    optional string body = 3;
+  string method = 1;
+  string path = 2;
+  optional string body = 3;
 }
 
 message RunGitCommand {
-    string command = 1;
-    optional string arguments = 2;
-    string repository_url = 3;
+  string command = 1;
+  optional string arguments = 2;
+  string repository_url = 3;
 }
 
 message GenerateTokenRequest {}
 
 message GenerateTokenResponse {
-    string token = 1;
-    int64 expiresAt = 2;
+  string token = 1;
+  int64 expiresAt = 2;
 }
 
 enum ContextElementType {
-    USER_PREFERENCE = 0;
-    SELECTED_TEXT = 1;
-    FILE = 2;
-    ISSUE = 3;
-    MERGE_REQUEST = 4;
-    PREVIOUS_WORKFLOW = 5;
+  USER_PREFERENCE = 0;
+  SELECTED_TEXT = 1;
+  FILE = 2;
+  ISSUE = 3;
+  MERGE_REQUEST = 4;
+  PREVIOUS_WORKFLOW = 5;
 }
 
 message ContextElement {
-    ContextElementType type = 1;
-    string name = 2;
-    string contents = 3;
+  ContextElementType type = 1;
+  string name = 2;
+  string contents = 3;
 }
 
 message NewCheckpoint {
-    string status = 1;
-    string checkpoint = 2;
-    string goal = 3;
-    repeated string errors = 4;
+  string status = 1;
+  string checkpoint = 2;
+  string goal = 3;
+  repeated string errors = 4;
 }
 
 message ListDirectory {
-    string directory = 1;
+  string directory = 1;
 }
 
 message Grep {
@@ -144,19 +144,19 @@ message FindFiles {
 }
 
 message McpTool {
-    string name = 1;
-    string description = 2;
-    string inputSchema = 3;
+  string name = 1;
+  string description = 2;
+  string inputSchema = 3;
 }
 
 message RunMCPTool {
-    string name = 1;
-    string args = 2;
+  string name = 1;
+  string args = 2;
 }
 
 message AdditionalContext {
-    string category = 1;
-    optional string id = 2;
-    optional string content = 3;
-    optional string metadata = 4;
+  string category = 1;
+  optional string id = 2;
+  optional string content = 3;
+  optional string metadata = 4;
 }

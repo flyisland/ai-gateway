@@ -1,6 +1,7 @@
 # pylint: disable=direct-environment-variable-reference
 
 import os
+from typing import Optional
 
 import structlog
 from langchain_anthropic import ChatAnthropic
@@ -8,6 +9,7 @@ from langchain_core.language_models.chat_models import BaseChatModel
 from langchain_google_vertexai.model_garden import ChatAnthropicVertex
 from langsmith import tracing_context
 
+from ai_gateway.models import KindAnthropicModel
 from duo_workflow_service.interceptors.feature_flag_interceptor import (
     current_feature_flag_context,
 )
@@ -48,12 +50,15 @@ class VertexConfig:
         return 6
 
 
-def new_chat_client(config: VertexConfig = VertexConfig(), **kwargs) -> BaseChatModel:
-    vertex_project_id = os.environ.get("DUO_WORKFLOW__VERTEX_PROJECT_ID")
-
-    if vertex_project_id and len(vertex_project_id) > 1:
+def create_chat_model(
+    config: VertexConfig = VertexConfig(),
+    model_name: Optional[str] = None,
+    is_vertex: bool = False,
+    **kwargs,
+) -> BaseChatModel:
+    if is_vertex:
         return ChatAnthropicVertex(
-            model_name=config.model_name,
+            model_name=model_name if model_name else config.model_name,
             project=config.project_id,
             location=config.location,
             max_retries=config.max_retries,
@@ -61,10 +66,12 @@ def new_chat_client(config: VertexConfig = VertexConfig(), **kwargs) -> BaseChat
         )
 
     anthropic_api_key = os.environ.get("ANTHROPIC_API_KEY")
-    anthropic_model_name = get_anthropic_model_name()
+    anthropic_model_name = model_name if model_name else get_anthropic_model_name()
     if anthropic_api_key and len(anthropic_api_key) > 1:
         return ChatAnthropic(
-            model_name=anthropic_model_name, **kwargs, max_retries=config.max_retries
+            model_name=anthropic_model_name,
+            **kwargs,
+            max_retries=config.max_retries,
         )
 
     raise RuntimeError(
@@ -74,7 +81,10 @@ def new_chat_client(config: VertexConfig = VertexConfig(), **kwargs) -> BaseChat
 
 def validate_llm_access(config: VertexConfig = VertexConfig()):
     log = structlog.stdlib.get_logger("server")
-    anthropic_client = new_chat_client(config=config)
+    anthropic_client = create_chat_model(
+        config=config,
+        model_name=get_anthropic_model_name(),
+    )
 
     with tracing_context(enabled=False):
         anthropic_response = anthropic_client.invoke(
@@ -90,9 +100,10 @@ def validate_llm_access(config: VertexConfig = VertexConfig()):
 def get_anthropic_model_name() -> str:
     feature_flags = current_feature_flag_context.get()
 
-    if "duo_workflow_claude_sonnet_4" in feature_flags:
-        return "claude-sonnet-4-20250514"
-    if "duo_workflow_claude_3_7" in feature_flags:
-        return "claude-3-7-sonnet-20250219"
+    if KindAnthropicModel.CLAUDE_SONNET_4 in feature_flags:
+        return KindAnthropicModel.CLAUDE_SONNET_4.value
 
-    return "claude-3-5-sonnet-20241022"
+    if KindAnthropicModel.CLAUDE_3_7_SONNET in feature_flags:
+        return KindAnthropicModel.CLAUDE_3_7_SONNET.value
+
+    return KindAnthropicModel.CLAUDE_3_5_SONNET_V2.value
