@@ -342,20 +342,21 @@ class AbstractWorkflow(ABC):
         )
 
     def _get_model_config(self) -> Union[AnthropicConfig, VertexConfig]:
-        """Determine the appropriate chat model name based on deployment environment.
+        """Determine the appropriate model configuration based on deployment environment.
 
-        This method selects between standard and Vertex AI-specific model naming
-        conventions. When deployed on Google Cloud Vertex AI, model names require
-        a different format than standard Anthropic API deployments.
+        This method creates the appropriate configuration object for either
+        Vertex AI or standard Anthropic API deployments. It automatically
+        detects the deployment environment and returns the corresponding
+        configuration with the appropriate model.
 
-        The method checks the `_is_vertex` property (which should be set based on
-        the presence of DUO_WORKFLOW__VERTEX_PROJECT_ID environment variable) to
-        determine the deployment context.
+        The method checks for the presence of DUO_WORKFLOW__VERTEX_PROJECT_ID
+        environment variable to determine if running on Google Cloud Vertex AI.
 
         Returns:
-            str: The model identifier string appropriate for the current deployment:
-                - Vertex AI format: Used when running on Google Cloud Vertex AI
-                - Standard format: Used for direct API calls
+            Union[AnthropicConfig, VertexConfig]: The configuration object for
+                the current deployment environment:
+                - VertexConfig: When running on Google Cloud Vertex AI
+                - AnthropicConfig: When using Anthropic API directly
 
         Note:
             Subclasses can override this method to implement custom model selection
