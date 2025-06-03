@@ -43,11 +43,13 @@ class VertexConfig(ModelConfig):
     @staticmethod
     def _get_model_name() -> str:
         feature_flags = current_feature_flag_context.get()
-        if "duo_workflow_claude_sonnet_4" in feature_flags:
-            return "claude-sonnet-4@20250514"
-        if "duo_workflow_claude_3_7" in feature_flags:
-            return "claude-3-7-sonnet@20250219"
-        return "claude-3-5-sonnet-v2@20241022"
+        if KindAnthropicModel.CLAUDE_SONNET_4.value in feature_flags:
+            return KindAnthropicModel.CLAUDE_SONNET_4.value
+
+        if KindAnthropicModel.CLAUDE_3_7_SONNET_VERTEX.value in feature_flags:
+            return KindAnthropicModel.CLAUDE_3_7_SONNET_VERTEX.value
+
+        return KindAnthropicModel.CLAUDE_3_5_SONNET_V2_VERTEX.value
 
     @staticmethod
     def _get_project_id() -> str:
@@ -104,7 +106,12 @@ def create_chat_model(
 
 def validate_llm_access(config: Optional[Union[AnthropicConfig, VertexConfig]] = None):
     if config is None:
-        config = VertexConfig()
+        try:
+            config = VertexConfig()
+        except RuntimeError:
+            config = AnthropicConfig(
+                model_name=KindAnthropicModel.CLAUDE_3_7_SONNET.value
+            )
 
     log = structlog.stdlib.get_logger("server")
     anthropic_client = create_chat_model(config=config)

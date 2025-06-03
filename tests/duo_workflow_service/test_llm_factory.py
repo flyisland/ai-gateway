@@ -5,6 +5,7 @@ from unittest.mock import Mock, patch
 
 import pytest
 
+from ai_gateway.models import KindAnthropicModel
 from duo_workflow_service.llm_factory import (
     AnthropicConfig,
     VertexConfig,
@@ -29,22 +30,24 @@ from duo_workflow_service.llm_factory import (
                 "ANTHROPIC_API_KEY": "test-key",
             },
             does_not_raise(),
-            None,
+            "anthropic",  # Falls back to Anthropic and succeeds
         ),
         (
             {
                 "DUO_WORKFLOW__VERTEX_PROJECT_ID": "test-proj",
             },
             pytest.raises(
-                RuntimeError, match="DUO_WORKFLOW__VERTEX_LOCATION needs to be set"
+                RuntimeError,
+                match="ANTHROPIC_API_KEY needs to be set for Anthropic provider",
             ),
             None,
         ),
         (
             {},
             pytest.raises(
-                RuntimeError, match="DUO_WORKFLOW__VERTEX_PROJECT_ID needs to be set"
-            ),
+                RuntimeError,
+                match="ANTHROPIC_API_KEY needs to be set for Anthropic provider",
+            ),  # Falls back to Anthropic but no API key
             None,
         ),
     ],
@@ -75,14 +78,22 @@ def test_validate_anthropic_variables(
         if calls_llm == "vertex":
             mock_anthropic_client.assert_not_called()
             mock_vertex_client.assert_called_once()
-            # Verify it was called with correct parameters
+
             call_kwargs = mock_vertex_client.call_args.kwargs
-            assert call_kwargs["model_name"] == "claude-3-5-sonnet-v2@20241022"
+            assert (
+                call_kwargs["model_name"]
+                == KindAnthropicModel.CLAUDE_3_5_SONNET_V2_VERTEX.value
+            )
             assert call_kwargs["project"] == "test-proj"
             assert call_kwargs["location"] == "test-loc"
         elif calls_llm == "anthropic":
             mock_vertex_client.assert_not_called()
             mock_anthropic_client.assert_called_once()
+
+            call_kwargs = mock_anthropic_client.call_args.kwargs
+            assert (
+                call_kwargs["model_name"] == KindAnthropicModel.CLAUDE_3_7_SONNET.value
+            )
         else:
             mock_vertex_client.assert_not_called()
             mock_anthropic_client.assert_not_called()
