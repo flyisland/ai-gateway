@@ -20,6 +20,7 @@ configurable_unit_primitives:
       - "complete_code"
     default_model: "codestral_2501_fireworks"
     selectable_models:
+      - "codestral_2501_fireworks"
       - "codestral_2501_vertex"
       - "claude_sonnet_3_7_20250219"
       - "claude_3_5_sonnet_20240620"
@@ -117,7 +118,13 @@ configurable_unit_primitives:
     default_model: "claude_sonnet_3_7_20250219"
     selectable_models:
       - "claude_sonnet_3_7_20250219"
+  - feature_setting: "duo_generate_issue_description"
+    unit_primitives:
+      - "generate_issue_description"
+    default_model: "claude_3_5_sonnet_20240620"
+    selectable_models:
       - "claude_3_5_sonnet_20240620"
+      - "claude_sonnet_4_20250514"
   - feature_setting: "duo_chat_summarize_comments"
     unit_primitives:
       - "summarize_comments"

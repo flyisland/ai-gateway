@@ -3,7 +3,7 @@ from contextlib import contextmanager
 from pathlib import Path
 from typing import Generator, Iterator, Optional, Type
 from unittest import mock
-from unittest.mock import Mock, call
+from unittest.mock import ANY, MagicMock, Mock, call
 
 import pytest
 from anthropic import APITimeoutError, AsyncAnthropic
@@ -20,6 +20,7 @@ from pyfakefs.fake_filesystem import FakeFilesystem
 
 from ai_gateway.api.auth_utils import StarletteUser
 from ai_gateway.config import ConfigModelLimits
+from ai_gateway.feature_flags.context import current_feature_flag_context
 from ai_gateway.instrumentators.model_requests import ModelRequestInstrumentator
 from ai_gateway.model_metadata import (
     AmazonQModelMetadata,
@@ -29,7 +30,7 @@ from ai_gateway.model_metadata import (
 )
 from ai_gateway.models.v2.anthropic_claude import ChatAnthropic
 from ai_gateway.prompts import BasePromptRegistry, Prompt
-from ai_gateway.prompts.config.base import PromptParams
+from ai_gateway.prompts.config.base import PromptConfig, PromptParams
 from tests.conftest import FakeModel
 
 
@@ -80,8 +81,8 @@ class TestPrompt:
         [
             ({"model_class_provider": "litellm"}, "litellm"),
             (
-                {"model_class_provider": "litellm", "custom_llm_provider": "my_engine"},
-                "my_engine",
+                    {"model_class_provider": "litellm", "custom_llm_provider": "my_engine"},
+                    "my_engine",
             ),
         ],
     )
@@ -97,6 +98,40 @@ class TestPrompt:
         assert prompt.model_provider == model_params["model_class_provider"]
         assert prompt.model_engine == expected_model_engine
         assert isinstance(prompt.bound, Runnable)
+
+    @pytest.mark.parametrize(
+        ("prompt_config_name", "enabled_feature_flags", "expected_model_name"),
+        [
+            ("test_prompt", {}, "test_model"),
+            (
+                    "Default configuration for the Duo Chat ReAct Agent",
+                    {"duo_chat_react_agent_claude_4_0"},
+                    "claude-sonnet-4-20250514",
+            ),
+            (
+                    "Default configuration for the Duo Chat ReAct Agent",
+                    {},
+                    "test_model",
+            ),
+        ],
+    )
+    def test_model_override(
+        self,
+        prompt_config: PromptConfig,
+        model,
+        prompt_config_name,
+        enabled_feature_flags,
+        expected_model_name,
+    ):
+        prompt_config.name = prompt_config_name
+        current_feature_flag_context.set(enabled_feature_flags)
+
+        mock_model_factory = MagicMock(return_value=model)
+        Prompt(mock_model_factory, prompt_config)
+
+        mock_model_factory.assert_called_once_with(
+            model=expected_model_name, disable_streaming=ANY, max_retries=ANY
+        )
 
     def test_build_prompt_template(self, prompt_template, model_config):
         prompt_template = Prompt._build_prompt_template(prompt_template, model_config)
@@ -301,22 +336,22 @@ class TestPromptTimeout:
         ("model", "expected_exception"),
         [
             (
-                ChatAnthropic(
-                    async_client=AsyncAnthropic(), model="claude-3-sonnet-20240229"  # type: ignore[call-arg]
-                ),
-                APITimeoutError,
+                    ChatAnthropic(
+                        async_client=AsyncAnthropic(), model="claude-3-sonnet-20240229"  # type: ignore[call-arg]
+                    ),
+                    APITimeoutError,
             ),
             (
-                ChatLiteLLM(
-                    model="claude-3-sonnet@20240229", custom_llm_provider="vertex_ai"  # type: ignore[call-arg]
-                ),
-                Timeout,
+                    ChatLiteLLM(
+                        model="claude-3-sonnet@20240229", custom_llm_provider="vertex_ai"  # type: ignore[call-arg]
+                    ),
+                    Timeout,
             ),
             (
-                ChatLiteLLM(
-                    model="claude-3-5-sonnet-v2@20241022", custom_llm_provider="vertex_ai"  # type: ignore[call-arg]
-                ),
-                Timeout,
+                    ChatLiteLLM(
+                        model="claude-3-5-sonnet-v2@20241022", custom_llm_provider="vertex_ai"  # type: ignore[call-arg]
+                    ),
+                    Timeout,
             ),
         ],
     )
@@ -345,70 +380,70 @@ def registry(
 class TestBaseRegistry:
     @pytest.mark.parametrize(
         (
-            "unit_primitives",
-            "scopes",
-            "model_metadata",
-            "success",
-            "expected_internal_events",
+                "unit_primitives",
+                "scopes",
+                "model_metadata",
+                "success",
+                "expected_internal_events",
         ),
         [
             (
-                [GitLabUnitPrimitive.COMPLETE_CODE],
-                ["complete_code"],
-                None,
-                True,
-                [call("request_complete_code", category="ai_gateway.prompts.base")],
+                    [GitLabUnitPrimitive.COMPLETE_CODE],
+                    ["complete_code"],
+                    None,
+                    True,
+                    [call("request_complete_code", category="ai_gateway.prompts.base")],
             ),
             (
-                [GitLabUnitPrimitive.COMPLETE_CODE, GitLabUnitPrimitive.ASK_BUILD],
-                ["complete_code", "ask_build"],
-                None,
-                True,
-                [
-                    call("request_complete_code", category="ai_gateway.prompts.base"),
-                    call("request_ask_build", category="ai_gateway.prompts.base"),
-                ],
+                    [GitLabUnitPrimitive.COMPLETE_CODE, GitLabUnitPrimitive.ASK_BUILD],
+                    ["complete_code", "ask_build"],
+                    None,
+                    True,
+                    [
+                        call("request_complete_code", category="ai_gateway.prompts.base"),
+                        call("request_ask_build", category="ai_gateway.prompts.base"),
+                    ],
             ),
             (
-                [GitLabUnitPrimitive.COMPLETE_CODE],
-                ["complete_code"],
-                ModelMetadata(
-                    name="mistral",
-                    provider="litellm",
-                    endpoint=AnyUrl("http://localhost:4000"),
-                    api_key="token",
-                ),
-                True,
-                [
-                    call("request_complete_code", category="ai_gateway.prompts.base"),
-                ],
-            ),
-            (
-                [GitLabUnitPrimitive.AMAZON_Q_INTEGRATION],
-                ["amazon_q_integration"],
-                AmazonQModelMetadata(
-                    name="amazon_q",
-                    provider="amazon_q",
-                    role_arn="role-arn",
-                ),
-                True,
-                [
-                    call(
-                        "request_amazon_q_integration",
-                        category="ai_gateway.prompts.base",
+                    [GitLabUnitPrimitive.COMPLETE_CODE],
+                    ["complete_code"],
+                    ModelMetadata(
+                        name="mistral",
+                        provider="litellm",
+                        endpoint=AnyUrl("http://localhost:4000"),
+                        api_key="token",
                     ),
-                ],
+                    True,
+                    [
+                        call("request_complete_code", category="ai_gateway.prompts.base"),
+                    ],
+            ),
+            (
+                    [GitLabUnitPrimitive.AMAZON_Q_INTEGRATION],
+                    ["amazon_q_integration"],
+                    AmazonQModelMetadata(
+                        name="amazon_q",
+                        provider="amazon_q",
+                        role_arn="role-arn",
+                    ),
+                    True,
+                    [
+                        call(
+                            "request_amazon_q_integration",
+                            category="ai_gateway.prompts.base",
+                        ),
+                    ],
             ),
             ([GitLabUnitPrimitive.COMPLETE_CODE], [], None, False, []),
             (
-                [
-                    GitLabUnitPrimitive.COMPLETE_CODE,
-                    GitLabUnitPrimitive.ASK_BUILD,
-                ],
-                ["complete_code"],
-                None,
-                False,
-                [],
+                    [
+                        GitLabUnitPrimitive.COMPLETE_CODE,
+                        GitLabUnitPrimitive.ASK_BUILD,
+                    ],
+                    ["complete_code"],
+                    None,
+                    False,
+                    [],
             ),
         ],
     )
@@ -438,20 +473,20 @@ class TestBaseRegistry:
 
     @pytest.mark.parametrize(
         (
-            "unit_primitives",
-            "scopes",
-            "internal_event_category",
-            "expected_internal_events",
+                "unit_primitives",
+                "scopes",
+                "internal_event_category",
+                "expected_internal_events",
         ),
         [
             (
-                [GitLabUnitPrimitive.COMPLETE_CODE, GitLabUnitPrimitive.ASK_BUILD],
-                ["complete_code", "ask_build"],
-                "my_category",
-                [
-                    call("request_complete_code", category="my_category"),
-                    call("request_ask_build", category="my_category"),
-                ],
+                    [GitLabUnitPrimitive.COMPLETE_CODE, GitLabUnitPrimitive.ASK_BUILD],
+                    ["complete_code", "ask_build"],
+                    "my_category",
+                    [
+                        call("request_complete_code", category="my_category"),
+                        call("request_ask_build", category="my_category"),
+                    ],
             ),
         ],
     )
@@ -473,14 +508,14 @@ class TestBaseRegistry:
         ("model_metadata", "unit_primitives", "scopes"),
         [
             (
-                ModelMetadata(
-                    name="mistral",
-                    provider="litellm",
-                    endpoint=AnyUrl("http://localhost:4000"),
-                    api_key="token",
-                ),
-                [GitLabUnitPrimitive.COMPLETE_CODE],
-                ["complete_code"],
+                    ModelMetadata(
+                        name="mistral",
+                        provider="litellm",
+                        endpoint=AnyUrl("http://localhost:4000"),
+                        api_key="token",
+                    ),
+                    [GitLabUnitPrimitive.COMPLETE_CODE],
+                    ["complete_code"],
             )
         ],
     )
