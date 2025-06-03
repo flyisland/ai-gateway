@@ -50,7 +50,6 @@ class VertexConfig:
 
 def new_chat_client(config: VertexConfig = VertexConfig(), **kwargs) -> BaseChatModel:
     vertex_project_id = os.environ.get("DUO_WORKFLOW__VERTEX_PROJECT_ID")
-
     if vertex_project_id and len(vertex_project_id) > 1:
         return ChatAnthropicVertex(
             model_name=config.model_name,
