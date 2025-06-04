@@ -7,20 +7,6 @@ from typing import Optional
 import structlog
 from asgi_correlation_id.context import correlation_id
 from fastapi import status
-from fastapi.encoders import jsonable_encoder
-from gitlab_cloud_connector import (
-    X_GITLAB_DUO_SEAT_COUNT_HEADER,
-    AuthProvider,
-    CloudConnectorAuthError,
-    CloudConnectorUser,
-)
-from gitlab_cloud_connector import authenticate as cloud_connector_authenticate
-from gitlab_cloud_connector.auth import AUTH_HEADER
-from starlette.authentication import (
-    AuthCredentials,
-    AuthenticationError,
-    HTTPConnection,
-)
 from starlette.datastructures import CommaSeparatedStrings, MutableHeaders
 from starlette.middleware.base import Request
 from starlette_context import context as starlette_context
