@@ -1,7 +1,7 @@
 import os
 from datetime import datetime, timezone
 from enum import StrEnum
-from typing import Any, Dict, List
+from typing import Any, Dict, List, Union
 
 from langchain_core.messages import AIMessage, BaseMessage, HumanMessage, SystemMessage
 from langchain_core.output_parsers.string import StrOutputParser
@@ -24,9 +24,16 @@ from duo_workflow_service.entities.state import (
 from duo_workflow_service.interceptors.feature_flag_interceptor import (
     current_feature_flag_context,
 )
-from duo_workflow_service.llm_factory import create_chat_model
+from duo_workflow_service.llm_factory import (
+    AnthropicConfig,
+    VertexConfig,
+    create_chat_model,
+)
 from duo_workflow_service.tracking.errors import log_exception
 from duo_workflow_service.workflows.abstract_workflow import AbstractWorkflow
+from duo_workflow_service.workflows.model_selection_utils import (
+    get_sonnet_4_config_with_feature_flag,
+)
 
 MAX_TOKENS_TO_SAMPLE = 8192
 DEBUG = os.getenv("DEBUG")
@@ -82,6 +89,10 @@ CHAT_MUTATION_TOOLS = [
 
 class Workflow(AbstractWorkflow):
     _stream: bool = True
+
+    def _get_model_config(self) -> Union[AnthropicConfig, VertexConfig]:
+        """Override to use Sonnet 4 model for software development tasks."""
+        return get_sonnet_4_config_with_feature_flag(super()._get_model_config)
 
     def _are_tools_called(self, state: ChatWorkflowState) -> Routes:
         if state["status"] in [WorkflowStatusEnum.CANCELLED, WorkflowStatusEnum.ERROR]:

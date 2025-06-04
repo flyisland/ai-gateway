@@ -1,9 +1,11 @@
+import os
 from datetime import datetime
 from unittest.mock import AsyncMock, MagicMock, Mock, patch
 
 import pytest
 from langchain_core.messages import AIMessage, SystemMessage
 
+from ai_gateway.models import KindAnthropicModel
 from contract import contract_pb2
 from contract.contract_pb2 import ContextElement, ContextElementType
 from duo_workflow_service.agents.prompts import CHAT_SYSTEM_PROMPT
@@ -15,6 +17,7 @@ from duo_workflow_service.entities import (
 )
 from duo_workflow_service.entities.state import ChatWorkflowState
 from duo_workflow_service.internal_events.event_enum import CategoryEnum
+from duo_workflow_service.llm_factory import AnthropicConfig, VertexConfig
 from duo_workflow_service.workflows.chat.workflow import (
     AGENT_NAME,
     CHAT_MUTATION_TOOLS,
@@ -381,3 +384,74 @@ def test_tools_registry_interaction(
     mock_agent.assert_called_once()
     _, kwargs = mock_agent.call_args
     assert kwargs.get("check_events") is False
+
+
+@pytest.mark.parametrize(
+    "feature_flags,env_vars,expected_config_type,expected_model",
+    [
+        # Feature flag enabled + Vertex
+        (
+            {"duo_workflow_claude_sonnet_4"},
+            {
+                "DUO_WORKFLOW__VERTEX_PROJECT_ID": "test-project",
+                "DUO_WORKFLOW__VERTEX_LOCATION": "us-central1",
+            },
+            VertexConfig,
+            KindAnthropicModel.CLAUDE_SONNET_4_VERTEX.value,
+        ),
+        # Feature flag enabled + Anthropic API
+        (
+            {"duo_workflow_claude_sonnet_4"},
+            {"ANTHROPIC_API_KEY": "test-key"},
+            AnthropicConfig,
+            KindAnthropicModel.CLAUDE_SONNET_4.value,
+        ),
+        # No feature flag + Vertex (falls back to parent's hardcoded model)
+        (
+            set(),
+            {
+                "DUO_WORKFLOW__VERTEX_PROJECT_ID": "test-project",
+                "DUO_WORKFLOW__VERTEX_LOCATION": "us-central1",
+            },
+            VertexConfig,
+            KindAnthropicModel.CLAUDE_3_7_SONNET_VERTEX.value,
+        ),
+        # No feature flag + Anthropic API (falls back to parent's hardcoded model)
+        (
+            set(),
+            {"ANTHROPIC_API_KEY": "test-key"},
+            AnthropicConfig,
+            KindAnthropicModel.CLAUDE_3_7_SONNET.value,
+        ),
+    ],
+)
+def test_chat_workflow_model_config(
+    feature_flags,
+    env_vars,
+    expected_config_type,
+    expected_model,
+):
+    """Test that chat workflow uses correct model based on feature flags."""
+    from duo_workflow_service.interceptors.feature_flag_interceptor import (
+        current_feature_flag_context,
+    )
+
+    # Set up feature flag context
+    token = current_feature_flag_context.set(feature_flags)
+
+    try:
+        with patch.dict(os.environ, env_vars, clear=True):
+            workflow = Workflow(
+                "123",
+                {},
+                workflow_type=CategoryEnum.WORKFLOW_CHAT,
+            )
+
+            config = workflow._get_model_config()
+
+            assert isinstance(config, expected_config_type)
+            assert config.model_name == expected_model
+
+    finally:
+        # Clean up feature flag context
+        current_feature_flag_context.reset(token)

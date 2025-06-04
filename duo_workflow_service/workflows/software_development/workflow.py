@@ -17,7 +17,6 @@ from langgraph.graph import (  # pylint: disable=no-langgraph-langchain-imports
     StateGraph,
 )
 
-from ai_gateway.models import KindAnthropicModel
 from duo_workflow_service.agents import (
     Agent,
     HandoverAgent,
@@ -60,6 +59,9 @@ from duo_workflow_service.llm_factory import (
 )
 from duo_workflow_service.tracking.errors import log_exception
 from duo_workflow_service.workflows.abstract_workflow import AbstractWorkflow
+from duo_workflow_service.workflows.model_selection_utils import (
+    get_sonnet_4_config_with_feature_flag,
+)
 
 # Constants
 QUEUE_MAX_SIZE = 1
@@ -204,28 +206,7 @@ def _should_continue(
 class Workflow(AbstractWorkflow):
     def _get_model_config(self) -> Union[AnthropicConfig, VertexConfig]:
         """Override to use Sonnet 4 model for software development tasks."""
-        from duo_workflow_service.interceptors.feature_flag_interceptor import (
-            current_feature_flag_context,
-        )
-
-        feature_flags = current_feature_flag_context.get()
-        _vertex_project_id = os.getenv("DUO_WORKFLOW__VERTEX_PROJECT_ID")
-
-        # Check if Sonnet 4 is enabled for software development graph
-        if "duo_workflow_claude_sonnet_4" in feature_flags:
-            if bool(_vertex_project_id and len(_vertex_project_id) > 1):
-                # Use Sonnet 4 on Vertex
-                return VertexConfig(
-                    model_name=KindAnthropicModel.CLAUDE_SONNET_4_VERTEX.value
-                )
-            else:
-                # Use Sonnet 4 on Anthropic API
-                return AnthropicConfig(
-                    model_name=KindAnthropicModel.CLAUDE_SONNET_4.value
-                )
-
-        # Fall back to parent implementation if a flag not set
-        return super()._get_model_config()
+        return get_sonnet_4_config_with_feature_flag(super()._get_model_config)
 
     async def _handle_workflow_failure(
         self, error: BaseException, compiled_graph, graph_config
