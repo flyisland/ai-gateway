@@ -128,6 +128,7 @@ CONTEXT_BUILDER_TOOLS = [
     "gitlab_merge_request_search",
     "read_file",
     "find_files",
+    "list_dir",
     "grep",
     "handover_tool",
     "get_epic",
