@@ -82,7 +82,7 @@ def test_validate_anthropic_variables(
             call_kwargs = mock_vertex_client.call_args.kwargs
             assert (
                 call_kwargs["model_name"]
-                == KindAnthropicModel.CLAUDE_3_5_SONNET_V2_VERTEX.value
+                == KindAnthropicModel.CLAUDE_3_7_SONNET_VERTEX.value
             )
             assert call_kwargs["project"] == "test-proj"
             assert call_kwargs["location"] == "test-loc"
@@ -116,7 +116,7 @@ def test_validate_anthropic_variables(
                 "ANTHROPIC_API_KEY": "test-key",
             },
             AnthropicConfig,
-            "claude-3-5-sonnet-20241022",  # Required for AnthropicConfig
+            "claude-3-7-sonnet-20250219",  # Required for AnthropicConfig
             "anthropic",
         ),
     ],
@@ -189,7 +189,7 @@ def test_clients_receive_max_retries_from_config(
             },
             "vertex",
             None,
-            "claude-3-5-sonnet-v2@20241022",  # Default when no feature flags
+            "claude-3-7-sonnet@20250219",  # Default when no feature flags
             "vertex",
         ),
         (
@@ -197,8 +197,8 @@ def test_clients_receive_max_retries_from_config(
                 "ANTHROPIC_API_KEY": "test-key",
             },
             "anthropic",
-            "claude-3-5-sonnet-20241022",
-            "claude-3-5-sonnet-20241022",
+            "claude-3-7-sonnet-20250219",
+            "claude-3-7-sonnet-20250219",
             "anthropic",
         ),
         (

@@ -46,10 +46,7 @@ class VertexConfig(ModelConfig):
         if KindAnthropicModel.CLAUDE_SONNET_4.value in feature_flags:
             return KindAnthropicModel.CLAUDE_SONNET_4.value
 
-        if KindAnthropicModel.CLAUDE_3_7_SONNET_VERTEX.value in feature_flags:
-            return KindAnthropicModel.CLAUDE_3_7_SONNET_VERTEX.value
-
-        return KindAnthropicModel.CLAUDE_3_5_SONNET_V2_VERTEX.value
+        return KindAnthropicModel.CLAUDE_3_7_SONNET_VERTEX.value
 
     @staticmethod
     def _get_project_id() -> str:
