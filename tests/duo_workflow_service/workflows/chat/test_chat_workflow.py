@@ -416,7 +416,6 @@ async def test_get_graph_input_resume(workflow_with_project):
 
 @pytest.mark.asyncio
 async def test_get_graph_input_slash_command(workflow_with_project):
-    workflow_with_project._get_context_element_type = Mock(return_value="file")
     workflow_with_project.slash_command_expander.process.return_value = Mock(
         is_ok=lambda: True, value={"goal": "Expanded command"}
     )
@@ -427,20 +426,6 @@ async def test_get_graph_input_slash_command(workflow_with_project):
 
     assert result["conversation_history"][AGENT_NAME][1].content == "Expanded command"
     workflow_with_project.slash_command_expander.process.assert_called_with("/command")
-
-
-def test_get_context_element_type(workflow_with_project, context_element):
-    # Test with context elements
-    workflow_with_project._context_elements = [{"type": "file", "name": "test.py"}]
-    assert workflow_with_project._get_context_element_type() == "file"
-
-    # Test with empty context elements
-    workflow_with_project._context_elements = []
-    assert workflow_with_project._get_context_element_type() == ""
-
-    # Test with None context elements
-    workflow_with_project._context_elements = None
-    assert workflow_with_project._get_context_element_type() == ""
 
 
 @pytest.mark.asyncio
@@ -466,7 +451,7 @@ def test_log_workflow_elements(mock_logger_info, workflow_with_project):
             {
                 "message_type": MessageTypeEnum.AGENT,
                 "content": "Test message content",
-                "timestamp": datetime.now(timezone.utc).isoformat(),
+                "timestamp": datetime.now().isoformat(),
                 "status": ToolStatus.SUCCESS,
             }
         ]
@@ -486,7 +471,6 @@ def test_log_workflow_elements(mock_logger_info, workflow_with_project):
 
 @pytest.mark.asyncio
 async def test_get_graph_input_slash_command_error(workflow_with_project):
-    workflow_with_project._get_context_element_type = Mock(return_value="file")
     mock_result = Mock(is_ok=lambda: False, error="Invalid command")
     workflow_with_project.slash_command_expander.process.return_value = mock_result
 

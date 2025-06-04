@@ -203,12 +203,6 @@ class Workflow(AbstractWorkflow):
             case _:
                 return None
 
-    def _get_context_element_type(self) -> str:
-        """Helper method to get context element type."""
-        if self._context_elements and len(self._context_elements) > 0:
-            return self._context_elements[0].get("type", "")
-        return ""
-
     def _compile(
         self,
         goal: str,
