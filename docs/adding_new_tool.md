@@ -1,12 +1,19 @@
 # Adding a New Tool to Duo Workflow Service
 
-This guide provides step-by-step instructions for implementing and integrating a new tool into the GitLab Duo Workflow Service.
+This guide provides step-by-step instructions for implementing and integrating a new tool into the GitLab Duo Workflow
+Service.
 
 ## Introduction
 
-Tools are fundamental components in the GitLab Duo Workflow Service that enable AI agents to interact with GitLab resources, manipulate files, execute commands, and perform various other actions. These tools serve as the interface between AI agents and the GitLab ecosystem, allowing them to retrieve information, make changes, and respond to user requests effectively.
+Tools are fundamental components in the GitLab Duo Workflow Service that enable AI agents to interact with GitLab
+resources, manipulate files, execute commands, and perform various other actions. These tools serve as the interface
+between AI agents and the GitLab ecosystem, allowing them to retrieve information, make changes, and respond to user
+requests effectively.
 
-Each tool is designed with a specific purpose, taking defined inputs and producing predictable outputs. The modular nature of the tool system allows for easy extension of agent capabilities without modifying the core agent logic. This document will guide you through the process of creating and integrating a new tool into the Duo Workflow Service, covering everything from design considerations to implementation details and best practices.
+Each tool is designed with a specific purpose, taking defined inputs and producing predictable outputs. The modular
+nature of the tool system allows for easy extension of agent capabilities without modifying the core agent logic. This
+document will guide you through the process of creating and integrating a new tool into the Duo Workflow Service,
+covering everything from design considerations to implementation details and best practices.
 
 ## Prerequisites
 
@@ -38,7 +45,7 @@ Before writing any code, clearly define:
 
    ```python
    from pydantic import BaseModel, Field
-   
+
    class YourToolInput(BaseModel):
        param1: str = Field(description="Description of the first parameter")
        param2: int = Field(description="Description of the second parameter")
@@ -50,11 +57,11 @@ Before writing any code, clearly define:
 
    ```python
    from typing import Type
-   
+
    from duo_workflow_service.tools.duo_base_tool import DuoBaseTool
    from contract import contract_pb2
    from duo_workflow_service.executor.action import _execute_action
-   
+
    class YourTool(DuoBaseTool):
        name: str = "your_tool_name"
        description: str = """
@@ -62,10 +69,10 @@ Before writing any code, clearly define:
        Include usage examples and any important notes.
        """
        args_schema: Type[BaseModel] = YourToolInput  # type: ignore
-       
+
        async def _arun(self, param1: str, param2: int, optional_param: str = None) -> str:
            # Implement the tool logic here
-           
+
            # If interacting with the executor:
            return await _execute_action(
                self.metadata,  # type: ignore
@@ -77,11 +84,11 @@ Before writing any code, clearly define:
                    )
                ),
            )
-           
+
            # If interacting with GitLab API:
            # result = await self.gitlab_client.make_request(...)
            # return result
-           
+
        def format_display_message(self, args: YourToolInput) -> str:
            # Format a user-friendly message for the UI
            return f"Performing action with {args.param1}"
@@ -89,7 +96,8 @@ Before writing any code, clearly define:
 
 ### 3. Update Protocol Buffers (if needed)
 
-If your tool requires communication with the Duo Workflow Executor, you'll need to update the protocol buffer definitions:
+If your tool requires communication with the Duo Workflow Executor, you'll need to update the protocol buffer
+definitions:
 
 1. **Edit Contract Definition**:
    Modify `contract/contract.proto` to add your new action:
@@ -100,7 +108,7 @@ If your tool requires communication with the Duo Workflow Executor, you'll need 
      int32 param2 = 2;
      string optional_param = 3;
    }
-   
+
    message Action {
      // Existing actions...
      oneof action {
@@ -111,7 +119,7 @@ If your tool requires communication with the Duo Workflow Executor, you'll need 
    ```
 
 2. **Generate Protobuf Files**:
-   ```bash
+   ```shell
    make gen-proto
    ```
 
@@ -153,6 +161,7 @@ _AGENT_PRIVILEGES: dict[str, list[Type[BaseTool]]] = {
 ### 5. Add the Tool to Workflows
 
 Add your tool to the appropriate workflow tool lists in:
+
 - `duo_workflow_service/workflows/software_development/workflow.py` (for executor tools)
 - `duo_workflow_service/workflows/chat/workflow.py` (for chat tools)
 
