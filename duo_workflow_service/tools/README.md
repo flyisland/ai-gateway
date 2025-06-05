@@ -277,8 +277,6 @@ def format_display_message(self, args: ToolInput) -> str:
 
 The tools ecosystem uses a comprehensive testing strategy with multiple layers to ensure reliability and maintainability. The framework demonstrates robust coverage across all tool categories.
 
-### Testing Architecture
-
 
 ### Running Tests
 
