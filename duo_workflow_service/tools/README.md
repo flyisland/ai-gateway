@@ -75,29 +75,6 @@ async def _arun(self, **kwargs) -> str:
 
 ## Core Components
 
-```plaintext
-duo_workflow_service/tools/
-├── duo_base_tool.py          # Base class for all tools
-├── toolset.py               # Tool collection management
-├── gitlab_resource_input.py  # Common input schemas
-├── search.py                # GitLab search capabilities
-├── search_system.py         # Advanced search system
-├── repository_files.py      # File operations
-├── issue.py                 # Issue management
-├── merge_request.py         # Merge request operations
-├── pipeline.py              # CI/CD pipeline tools
-├── job.py                   # CI/CD job operations
-├── commit.py                # Git commit operations
-├── git.py                   # Git operations
-├── filesystem.py            # File system operations
-├── command.py               # Command execution
-├── epic.py                  # Epic management
-├── project.py               # Project data retrieval
-├── planner.py               # Workflow planning
-├── handover.py              # Agent handover
-├── previous_context.py      # Workflow history access
-└── request_user_clarification.py  # User interaction
-```
 
 ### Tool Architecture Pattern
 
@@ -179,12 +156,8 @@ class ExampleTool(DuoBaseTool):
 
 ## Development
 
-### Setup Development Environment
 
 ```shell
-# Setup development environment
-poetry install --with test
-
 # Run all tool tests
 poetry run pytest tests/duo_workflow_service/tools/ -v
 
@@ -312,27 +285,6 @@ The tools ecosystem uses a comprehensive testing strategy with multiple layers t
 
 ### Testing Architecture
 
-```plaintext
-tests/duo_workflow_service/tools/
-├── test_duo_base_tool.py        # Base class functionality
-├── test_toolset.py              # Tool collection management
-├── test_search.py               # Search tools (parametrized tests)
-├── test_search_system.py        # Advanced search system
-├── test_repository_files.py     # File operations
-├── test_issue.py                # Issue management
-├── test_merge_request.py        # MR operations
-├── test_pipeline.py             # CI/CD pipeline tools
-├── test_job.py                  # CI/CD job operations
-├── test_commit.py               # Git operations
-├── test_git.py                  # Git operations
-├── test_filesystem.py           # File system operations
-├── test_run_command.py          # Command execution
-├── test_epic.py                 # Epic management
-├── test_project.py              # Project data retrieval
-├── test_planner.py              # Workflow planning
-├── test_previous_context.py     # Workflow history access
-└── test_action.py               # Action handling
-```
 
 ### Running Tests
 
