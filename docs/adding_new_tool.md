@@ -2,9 +2,11 @@
 
 This guide provides step-by-step instructions for implementing and integrating a new tool into the GitLab Duo Workflow Service.
 
-## Overview
+## Introduction
 
-The Duo Workflow Service uses a modular tool system to provide AI agents with the ability to perform various operations. Tools are implemented as Python classes and are organized by functionality.
+Tools are fundamental components in the GitLab Duo Workflow Service that enable AI agents to interact with GitLab resources, manipulate files, execute commands, and perform various other actions. These tools serve as the interface between AI agents and the GitLab ecosystem, allowing them to retrieve information, make changes, and respond to user requests effectively.
+
+Each tool is designed with a specific purpose, taking defined inputs and producing predictable outputs. The modular nature of the tool system allows for easy extension of agent capabilities without modifying the core agent logic. This document will guide you through the process of creating and integrating a new tool into the Duo Workflow Service, covering everything from design considerations to implementation details and best practices.
 
 ## Prerequisites
 
@@ -167,40 +169,6 @@ CONTEXT_BUILDER_TOOLS = [
 ]
 ```
 
-### 6. Write Tests
-
-Create unit tests for your tool in the `tests/duo_workflow_service/tools/` directory:
-
-```python
-# tests/duo_workflow_service/tools/test_your_tool.py
-import pytest
-from unittest.mock import AsyncMock, patch
-
-from duo_workflow_service.tools.your_tool_file import YourTool, YourToolInput
-
-@pytest.fixture
-def tool():
-    return YourTool(
-        metadata={
-            "gitlab_client": AsyncMock(),
-            "gitlab_host": "gitlab.com",
-        }
-    )
-
-@patch("duo_workflow_service.executor.action._execute_action")
-async def test_your_tool(mock_execute_action, tool):
-    # Setup
-    mock_execute_action.return_value = "Success!"
-    
-    # Execute
-    result = await tool._arun(param1="test", param2=123)
-    
-    # Assert
-    assert result == "Success!"
-    mock_execute_action.assert_called_once()
-    # Add more assertions based on your tool's behavior
-```
-
 ## Best Practices
 
 1. **Follow Naming Conventions**:
@@ -228,70 +196,6 @@ async def test_your_tool(mock_execute_action, tool):
    - Optimize for minimal API calls when possible
    - Use async properly to avoid blocking operations
 
-## Example Implementation
-
-Here's a complete example of a simple tool that retrieves repository statistics:
-
-```python
-from typing import Type
-
-from pydantic import BaseModel, Field
-
-from duo_workflow_service.tools.duo_base_tool import DuoBaseTool, ProjectURLValidationResult
-
-
-class RepoStatsInput(BaseModel):
-    project_id: int = None
-    url: str = None
-
-
-class GetRepositoryStats(DuoBaseTool):
-    name: str = "get_repository_stats"
-    description: str = """
-    Get statistics about a repository like number of commits, branches, etc.
-    
-    To identify a repository you must provide either:
-    - project_id parameter, or
-    - A GitLab URL like:
-      - https://gitlab.com/namespace/project
-      - https://gitlab.com/group/subgroup/project
-    """
-    args_schema: Type[BaseModel] = RepoStatsInput  # type: ignore
-    
-    async def _arun(self, project_id: int = None, url: str = None) -> str:
-        # Validate inputs
-        validation_result: ProjectURLValidationResult = self._validate_project_url(url, project_id)
-        if validation_result.errors:
-            return "\n".join(validation_result.errors)
-        
-        project_id = validation_result.project_id
-        
-        # Make GitLab API request
-        result = await self.gitlab_client.make_request(
-            "GET", f"/api/v4/projects/{project_id}"
-        )
-        
-        if result.status_code != 200:
-            return f"Error fetching repository stats: {result.status_code} {result.reason}"
-        
-        data = result.json()
-        
-        # Format the response
-        return f"""
-        Repository Statistics for {data['name']}:
-        - Stars: {data['star_count']}
-        - Forks: {data['forks_count']}
-        - Open Issues: {data['open_issues_count']}
-        - Last Activity: {data['last_activity_at']}
-        - Default Branch: {data['default_branch']}
-        """
-    
-    def format_display_message(self, args: RepoStatsInput) -> str:
-        if args.url:
-            return f"Getting repository stats for {args.url}"
-        return f"Getting repository stats for project ID {args.project_id}"
-```
-
 ## Troubleshooting
 
 ### Common Issues
@@ -311,8 +215,3 @@ class GetRepositoryStats(DuoBaseTool):
    - Check that your action is properly defined in the proto file
    - Verify field numbers don't conflict with existing ones
 
-## Conclusion
-
-Adding a new tool to the Duo Workflow Service involves implementing the tool class, potentially updating protocol buffers, registering the tool, and updating workflow configurations. By following this guide, you should be able to successfully integrate your new tool into the system.
-
-Remember to thoroughly test your tool before deploying it to production, as tools are a critical part of the AI agent's capabilities and directly impact user experience.

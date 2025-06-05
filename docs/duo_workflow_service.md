@@ -253,134 +253,14 @@ improvements in Duo Workflow's problem-solving capabilities.
 
 # Adding a New Tool to the System
 
-This guide walks you through the process of integrating a new tool into our AI assist system.
+For comprehensive instructions on adding a new tool to the Duo Workflow Service, see the [Adding New Tool](adding_new_tool.md) guide.
 
-## 📋 Prerequisites
+This guide provides detailed steps for:
+- Designing and implementing a new tool
+- Registering it in the tools registry
+- Adding it to workflows
+- Testing and troubleshooting
 
-Before adding a new tool, ensure you have:
-
-- Access to the `duo_workflow_service` codebase
-- Understanding of the tool's purpose and functionality
-- Necessary permissions to modify the workflow configurations
-
-## 🔧 Step-by-Step Implementation
-
-### Step 1: Implement the Tool
-
-Create your tool implementation in the appropriate directory:
-
-```bash
-duo/workflow_service/tools/your_tool_name.py
-```
-
-Your tool should follow the existing patterns and interfaces used by other tools in the system.
-
-### Step 2: Register the Tool
-
-Add your new tool to the tools registry:
-
-```python
-# File: duo/workflow_service/components/tools_registry.py
-
-from .tools.your_tool_name import YourToolClass
-
-TOOLS_REGISTRY = {
-    # ... existing tools ...
-    'your_tool_name': YourToolClass,
-}
-```
-
-### Step 3: Configure Tool Access in Workflows
-
-Depending on your tool's functionality, you'll need to add it to the appropriate workflow configuration:
-
-#### Option A: For Read-Only Tools
-
-If your tool performs **read-only operations** (queries, searches, data retrieval), add it to the `CHAT_READ_ONLY_TOOLS`
-list:
-
-```python
-# File: ai-assist/duo_workflow_service/workflows/chat/workflow.py
-
-CHAT_READ_ONLY_TOOLS = [
-    'search_tool',
-    'query_tool',
-    'your_new_tool_name',  # ← Add your tool here
-]
-```
-
-#### Option B: For Executor Tools
-
-If your tool performs **actions or modifications**, add it to the `EXECUTOR_TOOLS` list:
-
-```python
-# File: ai-assist/duo_workflow_service/workflows/software_development/workflow.py
-
-EXECUTOR_TOOLS = [
-    'file_editor',
-    'code_runner',
-    'your_new_tool_name',  # ← Add your tool here
-]
-```
-
-## 🚨 Troubleshooting
-
-### Tool Not Being Triggered
-
-If your tool appears to be ignored during execution:
-
-1. **Verify Registration**: Ensure your tool is properly registered in `tools_registry.py`
-   ```python
-   # Check that your tool is in the registry
-   print(TOOLS_REGISTRY.keys())  # Should include 'your_tool_name'
-   ```
-
-2. **Check Workflow Configuration**: Confirm you've added the tool to the appropriate tools list
-    - For chat operations → `CHAT_READ_ONLY_TOOLS`
-    - For code modifications → `EXECUTOR_TOOLS`
-
-3. **Tool Name Consistency**: Verify the tool name matches exactly across:
-    - `tools_registry.py` (registration)
-    - Workflow configuration files
-    - Your tool class definition
-
-4. **Restart Services**: Changes require restarting the workflow service:
-   ```bash
-   # Restart the service
-   systemctl restart duo-workflow-service
-   ```
-
-## 📚 Reference Implementation
-
-For a complete example of adding a new tool, refer to this merge request: **[MR #XXX]**
-
-## ✅ Best Practices
-
-- **Naming Convention**: Use `snake_case` for tool names (e.g., `code_analyzer`, `file_search`)
-- **Tool Categories**: Choose the appropriate tool list based on functionality:
-    - Read operations → `CHAT_READ_ONLY_TOOLS`
-    - Write/Execute operations → `EXECUTOR_TOOLS`
-- **Testing**: Test your tool in isolation before integration
-- **Documentation**: Include docstrings and usage examples
-- **Error Handling**: Implement proper error handling and logging
-
-## 🎯 Quick Checklist
-
-Before considering your tool integration complete:
-
-- [ ] Tool implemented in `duo/workflow_service/tools/`
-- [ ] Tool registered in `tools_registry.py`
-- [ ] Tool added to appropriate workflow list (`CHAT_READ_ONLY_TOOLS` or `EXECUTOR_TOOLS`)
-- [ ] Service restarted
-- [ ] Tool tested and working
-- [ ] Documentation updated
-- [ ] Team notified
-
-## 💡 Common Pitfalls
-
-- **Forgetting to restart the service** after making changes
-- **Misspelling the tool name** in different configuration files
-- **Adding to wrong tool list** (read-only vs executor)
-- **Missing imports** in the registry file
+The document includes code examples, best practices, and a complete sample implementation to help you successfully integrate new tools into the system.
 
 
