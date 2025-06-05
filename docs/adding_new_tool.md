@@ -119,6 +119,7 @@ definitions:
    ```
 
 2. **Generate Protobuf Files**:
+
    ```shell
    make gen-proto
    ```
@@ -223,4 +224,3 @@ CONTEXT_BUILDER_TOOLS = [
    - Make sure you've regenerated the protocol buffers with `make gen-proto`
    - Check that your action is properly defined in the proto file
    - Verify field numbers don't conflict with existing ones
-
