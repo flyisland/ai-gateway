@@ -8,6 +8,7 @@ from langchain_core.messages import AIMessage, HumanMessage, SystemMessage
 from langgraph.checkpoint.base import CheckpointTuple
 from langgraph.checkpoint.memory import MemorySaver
 
+from ai_gateway.models import KindAnthropicModel
 from contract import contract_pb2
 from duo_workflow_service.components.tools_registry import (
     _AGENT_PRIVILEGES,
@@ -1235,12 +1236,59 @@ async def test_workflow_cleanup():
 @pytest.mark.asyncio
 @patch.dict(os.environ, {"DUO_WORKFLOW__VERTEX_PROJECT_ID": ""})
 async def test_workflow_get_chat_model_without_vertex():
-    """Test _get_chat_model returns standard model when VERTEX_PROJECT_ID is not set."""
+    """Test _get_chat_model returns correct model based on feature flags when VERTEX_PROJECT_ID is not set."""
     workflow = Workflow(
         "123",
         {},
         workflow_type=CategoryEnum.WORKFLOW_SOFTWARE_DEVELOPMENT,
     )
 
-    model_name = workflow._get_chat_model_name()
-    assert model_name == "claude-3-7-sonnet-20250219"
+    from duo_workflow_service.interceptors.feature_flag_interceptor import (
+        current_feature_flag_context,
+    )
+
+    # Test 1: Without feature flag - should return default model
+    token = current_feature_flag_context.set(set())  # Empty set, no feature flags
+    try:
+        model_name = workflow._get_chat_model_name()
+        assert model_name == KindAnthropicModel.CLAUDE_3_7_SONNET.value
+    finally:
+        current_feature_flag_context.reset(token)
+
+    # Test 2: With Claude Sonnet 4 feature flag - should return standard Sonnet 4
+    token = current_feature_flag_context.set({KindAnthropicModel.CLAUDE_SONNET_4.value})
+    try:
+        model_name = workflow._get_chat_model_name()
+        assert model_name == KindAnthropicModel.CLAUDE_SONNET_4.value
+    finally:
+        current_feature_flag_context.reset(token)
+
+
+@pytest.mark.asyncio
+@patch.dict(os.environ, {"DUO_WORKFLOW__VERTEX_PROJECT_ID": "test-project-123"})
+async def test_workflow_get_chat_model_with_vertex():
+    workflow = Workflow(
+        "123",
+        {},
+        workflow_type=CategoryEnum.WORKFLOW_SOFTWARE_DEVELOPMENT,
+    )
+
+    from duo_workflow_service.interceptors.feature_flag_interceptor import (
+        current_feature_flag_context,
+    )
+
+    # Test 1: Without feature flag - should return default model even on Vertex
+    token = current_feature_flag_context.set(set())  # Empty set, no feature flags
+    try:
+        model_name = workflow._get_chat_model_name()
+        assert model_name == KindAnthropicModel.CLAUDE_3_7_SONNET.value
+    finally:
+        current_feature_flag_context.reset(token)
+
+    # Test 2: With Claude Sonnet 4 feature flag - should return Vertex variant
+    token = current_feature_flag_context.set({KindAnthropicModel.CLAUDE_SONNET_4.value})
+    try:
+        model_name = workflow._get_chat_model_name()
+        assert model_name == KindAnthropicModel.CLAUDE_SONNET_4_VERTEX.value
+    finally:
+        current_feature_flag_context.reset(token)
