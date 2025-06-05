@@ -19,7 +19,7 @@ should [set up GitLab Duo Workflow with the GitLab Development Kit (GDK)](https:
 The GDK setup documentation also explains how ensure that all feature flags and
 settings enabled so that Duo Workflow works.
 
-## Local developmment without GDK
+## Local development without GDK
 
 If for some reason you
 cannot [set up Duo Workflow Service directly with GDK](https://gitlab.com/gitlab-org/gitlab-development-kit/-/blob/main/doc/howto/duo_workflow.md),
@@ -31,42 +31,42 @@ you can manually set it up following these steps:
      enabled
    - Feature flag enabled: `Feature.enable(:duo_workflow)`
 
-2. Install dependencies with [poetry](https://python-poetry.org/docs/#installing-with-pipx).
+1. Install dependencies with [poetry](https://python-poetry.org/docs/#installing-with-pipx).
 
    ```shell
    poetry install
    ```
 
-3. Copy the example env file in the Service repo.
+1. Copy the example env file in the Service repo.
 
    ```shell
    cp .env.example .env
    ```
 
-4. Install [`gcloud`](https://cloud.google.com/sdk/docs/install)
-5. Login using your GitLab Google account by running:
+1. Install [`gcloud`](https://cloud.google.com/sdk/docs/install)
+1. Login using your GitLab Google account by running:
 
    ```shell
    gcloud auth login
    ```
 
-6. Set the `ai-enablement-dev-69497ba7` as active project by running:
+1. Set the `ai-enablement-dev-69497ba7` as active project by running:
 
    ```shell
    gcloud config set project ai-enablement-dev-69497ba7
    ```
 
-7. Create the credentials for the application.
+1. Create the credentials for the application.
 
    ```shell
    gcloud auth application-default login --disable-quota-project
    ```
 
-8. Optional: The `ai-enablement-dev-69497ba7` Google Cloud project should by available to all engineers at GitLab. If
+1. Optional: The `ai-enablement-dev-69497ba7` Google Cloud project should by available to all engineers at GitLab. If
    you do not have access to this project, unset `DUO_WORKFLOW__VERTEX_PROJECT_ID` in `.env` and instead set
    `ANTHROPIC_API_KEY` to a valid Anthropic API key.
 
-9. Optional: You can disable auth for local development in the `.env` file. This
+1. Optional: You can disable auth for local development in the `.env` file. This
    disables authentication or the gRPC connection between the Duo Workflow Service
    and Duo Workflow Executor but a token is still required for requests to
    your local GitLab instance.
@@ -75,18 +75,18 @@ you can manually set it up following these steps:
    DUO_WORKFLOW_AUTH__ENABLED=false
    ```
 
-10. Run the Duo Workflow Service server.
+1. Run the Duo Workflow Service server.
 
-    ```shell
-    poetry run python -m duo_workflow_service.server
+   ```shell
+   poetry run python -m duo_workflow_service.server
     ```
 
-11. If you can correctly connect to Claude, you should see something
-    like this in the output.
+1. If you can correctly connect to Claude, you should see something
+   like this in the output.
 
-    ```shell
-    {"event": "I'm Claude, an AI assistant created by Anthropic."...
-    ```
+   ```shell
+   {"event": "I'm Claude, an AI assistant created by Anthropic."...
+   ```
 
 ## Debugging and troubleshooting
 
@@ -166,14 +166,14 @@ future extensibility.
    - External to GitLab repository and accessed via LangGraph package imports.
    - Provides low-level functionality for building workflow graphs.
 
-2. **Components Layer**
+1. **Components Layer**
 
    - First layer implemented directly in the Duo Workflow Service repository.
    - Uses LangGraph APIs to build modular graph components.
    - Creates reusable templates for workflow configurations.
    - Serves as a facade between low-level LangGraph APIs and high-level workflows.
 
-3. **Workflows Layer**
+1. **Workflows Layer**
    - Houses ready-to-use workflow configurations.
    - Built by combining components from the Components layer.
    - Configured with prompts and agent configurations from `AgentRegistry`.
@@ -251,7 +251,7 @@ coding tasks such as SWE bench, run the manual SWE bench job to confirm the beha
 Running SWE bench tests before submitting your changes for review can help identify potential regressions and validate
 improvements in Duo Workflow's problem-solving capabilities.
 
-# Adding a New Tool to the System
+## Adding a New Tool to the System
 
 For comprehensive instructions on adding a new tool to the Duo Workflow Service, refer to the dedicated
 guide: [Adding New Tool](adding_new_tool.md).

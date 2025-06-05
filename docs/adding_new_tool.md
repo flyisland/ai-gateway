@@ -40,7 +40,7 @@ Before writing any code, clearly define:
    - Create a new file in `duo_workflow_service/tools/` for a new category of tools
    - Or add to an existing file for related functionality
 
-2. **Define Input Schema**:
+1. **Define Input Schema**:
    Create a Pydantic model for your tool's input parameters:
 
    ```python
@@ -52,7 +52,7 @@ Before writing any code, clearly define:
        optional_param: str = Field(None, description="Description of an optional parameter")
    ```
 
-3. **Implement the Tool Class**:
+1. **Implement the Tool Class**:
    Extend the `DuoBaseTool` class:
 
    ```python
@@ -118,7 +118,7 @@ definitions:
    }
    ```
 
-2. **Generate Protobuf Files**:
+1. **Generate Protobuf Files**:
 
    ```shell
    make gen-proto
@@ -186,22 +186,22 @@ CONTEXT_BUILDER_TOOLS = [
    - Use snake_case for tool names (e.g., `get_file_content`, `update_issue`)
    - Use PascalCase for classes (e.g., `GetFileContent`, `UpdateIssue`)
 
-2. **Write Clear Documentation**:
+1. **Write Clear Documentation**:
    - Provide detailed descriptions for your tool
    - Document parameters thoroughly with examples
    - Explain any side effects or permissions required
 
-3. **Error Handling**:
+1. **Error Handling**:
    - Handle errors gracefully and provide useful error messages
    - Validate inputs before executing operations
    - Return clear error information to the agent
 
-4. **Security Considerations**:
+1. **Security Considerations**:
    - Add the tool to the appropriate privilege group based on what it does
    - Consider whether the tool should require human approval before execution
    - Sanitize and validate all inputs to prevent injection attacks
 
-5. **Performance**:
+1. **Performance**:
    - Keep tools focused on a single responsibility
    - Optimize for minimal API calls when possible
    - Use async properly to avoid blocking operations
@@ -215,12 +215,16 @@ CONTEXT_BUILDER_TOOLS = [
    - Check that the tool name is included in the appropriate workflow tool list
    - Ensure the workflow is using the right agent privileges
 
-2. **Tool Failing to Execute**:
+1. **Tool Failing to Execute**:
    - Check for missing parameters in the tool call
    - Verify the GitLab client is properly configured
    - Look for API permission issues
 
-3. **Protocol Buffer Errors**:
+1. **Protocol Buffer Errors**:
    - Make sure you've regenerated the protocol buffers with `make gen-proto`
    - Check that your action is properly defined in the proto file
    - Verify field numbers don't conflict with existing ones
+
+1. **GitLab API permissions**:
+   - When making calls to GitLab API, a 403 error indicates insufficient permissions.
+   - To resolve this, ensure the endpoint allows the `ai_workflows` scope. See [MR](https://gitlab.com/gitlab-org/gitlab/-/merge_requests/193297) for more details.
