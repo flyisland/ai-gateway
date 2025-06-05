@@ -71,7 +71,7 @@ class WorkflowStatusEventEnum(StrEnum):
     RETRY = "retry"
     REQUIRE_INPUT = "require_input"
     REQUIRE_PLAN_APPROVAL = "require_plan_approval"
-    REQUIRE_TOOL_CALL_APPROVAL = "require_tool_call_approval"
+    TOOL_CALL_APPROVAL_REQUIRED = "require_tool_call_approval"
 
 
 WorkflowStatusToStatusEvent = {
@@ -81,7 +81,7 @@ WorkflowStatusToStatusEvent = {
     WorkflowStatusEnum.PAUSED: WorkflowStatusEventEnum.PAUSE,
     WorkflowStatusEnum.INPUT_REQUIRED: WorkflowStatusEventEnum.REQUIRE_INPUT,
     WorkflowStatusEnum.PLAN_APPROVAL_REQUIRED: WorkflowStatusEventEnum.REQUIRE_PLAN_APPROVAL,
-    WorkflowStatusEnum.TOOL_CALL_APPROVAL_REQUIRED: WorkflowStatusEventEnum.REQUIRE_TOOL_CALL_APPROVAL,
+    WorkflowStatusEnum.TOOL_CALL_APPROVAL_REQUIRED: WorkflowStatusEventEnum.TOOL_CALL_APPROVAL_REQUIRED,
 }
 
 
