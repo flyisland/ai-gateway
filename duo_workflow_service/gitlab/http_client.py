@@ -5,8 +5,6 @@ from typing import Any, Callable, Dict, Optional, Union
 
 from langchain_core.messages import AIMessage, HumanMessage, SystemMessage, ToolMessage
 
-from contract.contract_pb2 import ActionResponse
-
 # Setup logger
 logger = logging.getLogger(__name__)
 
@@ -16,14 +14,6 @@ class GitLabHttpResponse:
         self.status_code = status_code
         self.body = body
         self.headers = headers
-
-    @classmethod
-    def from_action_response(cls, action_response: ActionResponse):
-        return cls(
-            status_code=action_response.httpResponse.statusCode,
-            body=action_response.httpResponse.body,
-            headers=action_response.httpResponse.headers,
-        )
 
 
 def checkpoint_decoder(json_object: dict):
