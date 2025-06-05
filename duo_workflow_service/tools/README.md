@@ -372,5 +372,4 @@ When adding new tools:
 1. **Write comprehensive descriptions** for LLM understanding
 1. **Include proper error handling** and validation
 1. **Add unit and integration tests**
-1. **Update this README** with new tool categories and file lists
 1. **Consider security implications** of new capabilities
