@@ -62,4 +62,11 @@ class DirectGitLabHttpClient(GitlabHttpClient):
 
         async with session.request(method, url, headers=headers, **kwargs) as response:  # type: ignore
             raw_response = await response.text()
+
+            print("---------------------------------------")
+            print(url)
+            print(kwargs)
+            print(raw_response)
+            print("---------------------------------------")
+
             return self._parse_response(raw_response, parse_json, object_hook)

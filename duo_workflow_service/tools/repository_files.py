@@ -167,3 +167,194 @@ class GetRepositoryFile(RepositoryFileBaseTool):
         except UnicodeError:
             # If we can't encode to UTF-8, it's likely binary
             return True
+
+
+class CreateRepositoryFileInput(ProjectResourceInput):
+    branch: str = Field(
+        description="Name of the branch to create the file in. The commit is added to this branch. If the branch does not exist it will be automatically created based on start_branch."
+    )
+    start_branch: str = Field(
+        description="Name of the branch to start the new branch from. Required if the branch in which the file is being created does not exist."
+    )
+    content: str = Field(
+        description="The content of the file to be created."
+    )
+    commit_message: str = Field(
+        description="The commit message."
+    )
+    file_path: str = Field(
+        description="URL encoded full path to file, such as lib%2Fclass%2Erb.",
+    )
+    encoding: Optional[str] = Field(
+        default="text",
+        description="The encoding of the content. Options are 'text' or 'base64'. Default is 'text'."
+    )
+    author_email: Optional[str] = Field(
+        default=None,
+        description="The email of the author. If not provided, the authenticated user's email will be used."
+    )
+    author_name: Optional[str] = Field(
+        default=None,
+        description="The name of the author. If not provided, the authenticated user's name will be used."
+    )
+    execute_filemode: Optional[bool] = Field(
+        default=None,
+        description="Set the execute permission flag on the file. Can be true or false."
+    )
+
+
+class CreateRepositoryFile(RepositoryFileBaseTool):
+    name: str = "create_repository_file"
+    description: str = """Create a new file in a repository.
+
+    To identify where to create the file, you must provide either:
+    - project_id and file_path parameters, or
+    - A GitLab URL like:
+      - https://gitlab.com/namespace/project/-/blob/master/path/to/file.md
+
+    You must also provide:
+    - branch: The branch to create the file in
+    - content: The content of the file
+    - commit_message: The commit message
+    """
+    args_schema: Type[BaseModel] = CreateRepositoryFileInput  # type: ignore
+
+    async def _arun(self, **kwargs) -> str:
+        url = kwargs.get("url")
+        project_id = kwargs.get("project_id")
+        file_path = kwargs.get("file_path")
+        branch = kwargs.get("branch")
+        content = kwargs.get("content")
+        commit_message = kwargs.get("commit_message")
+        encoding = kwargs.get("encoding", "text")
+        author_email = kwargs.get("author_email")
+        author_name = kwargs.get("author_name")
+        execute_filemode = kwargs.get("execute_filemode")
+        start_branch = kwargs.get("start_branch")
+
+        if not branch:
+            return json.dumps({"error": "Branch name is required"})
+
+        if not content:
+            return json.dumps({"error": "File content is required"})
+
+        if not commit_message:
+            return json.dumps({"error": "Commit message is required"})
+
+        # Prepare request payload
+        payload = {
+            "branch": branch,
+            "content": content,
+            "commit_message": commit_message,
+            "encoding": encoding,
+            "start_branch": "main",
+        }
+
+        # Add optional parameters if provided
+        if author_email:
+            payload["author_email"] = author_email
+        if author_name:
+            payload["author_name"] = author_name
+        if execute_filemode is not None:
+            payload["execute_filemode"] = execute_filemode
+        if start_branch:
+            payload["start_branch"] = start_branch
+
+        try:
+            response = await self.gitlab_client.apost(
+                path=f"/api/v4/projects/{project_id}/repository/files/{file_path}",
+                body=json.dumps(payload)
+            )
+
+
+            return json.dumps(response)
+        except Exception as e:
+            return json.dumps({"error": str(e)})
+
+    def format_display_message(self, args: CreateRepositoryFileInput) -> str:
+        if args.url:
+            return f"Create repository file at {args.url} in branch {args.branch}"
+        return f"Create repository file {args.file_path} in project {args.project_id} on branch {args.branch}"
+
+
+class UpdateRepositoryFileInput(CreateRepositoryFileInput):
+    last_commit_id: Optional[str] = Field(
+        default=None,
+        description="Last known commit ID for this file. Used to ensure file wasn't changed since it was last read."
+    )
+
+
+class UpdateRepositoryFile(RepositoryFileBaseTool):
+    name: str = "update_repository_file"
+    description: str = """Update an existing file in a repository.
+
+    To identify the file to update, you must provide either:
+    - project_id and file_path parameters, or
+    - A GitLab URL like:
+      - https://gitlab.com/namespace/project/-/blob/master/path/to/file.md
+
+    You must also provide:
+    - branch: The branch to update the file in
+    - content: The new content of the file
+    - commit_message: The commit message
+    """
+    args_schema: Type[BaseModel] = UpdateRepositoryFileInput  # type: ignore
+
+    async def _arun(self, **kwargs) -> str:
+        url = kwargs.get("url")
+        project_id = kwargs.get("project_id")
+        ref = kwargs.get("ref")  # Not used for update, but needed for URL validation
+        file_path = kwargs.get("file_path")
+        branch = kwargs.get("branch")
+        content = kwargs.get("content")
+        commit_message = kwargs.get("commit_message")
+        encoding = kwargs.get("encoding", "text")
+        author_email = kwargs.get("author_email")
+        author_name = kwargs.get("author_name")
+        execute_filemode = kwargs.get("execute_filemode")
+        start_branch = kwargs.get("start_branch")
+        last_commit_id = kwargs.get("last_commit_id")
+
+        if not branch:
+            return json.dumps({"error": "Branch name is required"})
+
+        if not content:
+            return json.dumps({"error": "File content is required"})
+
+        if not commit_message:
+            return json.dumps({"error": "Commit message is required"})
+
+        # Prepare request payload
+        payload = {
+            "branch": branch,
+            "content": content,
+            "commit_message": commit_message,
+            "encoding": encoding
+        }
+
+        # Add optional parameters if provided
+        if author_email:
+            payload["author_email"] = author_email
+        if author_name:
+            payload["author_name"] = author_name
+        if execute_filemode is not None:
+            payload["execute_filemode"] = execute_filemode
+        if start_branch:
+            payload["start_branch"] = start_branch
+        if last_commit_id:
+            payload["last_commit_id"] = last_commit_id
+
+        try:
+            response = await self.gitlab_client.aput(
+                path=f"/api/v4/projects/{project_id}/repository/files/{file_path}",
+                body=json.dumps(payload)
+            )
+
+            return json.dumps(response)
+        except Exception as e:
+            return json.dumps({"error": str(e)})
+
+    def format_display_message(self, args: UpdateRepositoryFileInput) -> str:
+        if args.url:
+            return f"Update repository file at {args.url} in branch {args.branch}"
+        return f"Update repository file {args.file_path} in project {args.project_id} on branch {args.branch}"

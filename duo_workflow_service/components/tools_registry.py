@@ -70,6 +70,16 @@ _READ_ONLY_GITLAB_TOOLS: list[Type[BaseTool]] = [
     tools.ListCommits,
     tools.GetCommitDiff,
     tools.GetCommitComments,
+    tools.CreateIssue,
+    tools.UpdateIssue,
+    tools.CreateIssueNote,
+    tools.CreateMergeRequest,
+    tools.CreateMergeRequestNote,
+    tools.UpdateMergeRequest,
+    tools.CreateEpic,
+    tools.UpdateEpic,
+    tools.CreateRepositoryFile,
+    tools.UpdateRepositoryFile,
 ]
 
 _AGENT_PRIVILEGES: dict[str, list[Type[BaseTool]]] = {

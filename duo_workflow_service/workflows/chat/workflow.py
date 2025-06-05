@@ -57,10 +57,6 @@ CHAT_READ_ONLY_TOOLS = [
     "list_merge_request_diffs",
     "gitlab_issue_search",
     "gitlab_merge_request_search",
-    "read_file",
-    "list_dir",
-    "find_files",
-    "grep",
     "get_epic",
     "list_epics",
     "scan_directory_tree",
@@ -70,13 +66,14 @@ CHAT_READ_ONLY_TOOLS = [
     "list_commits",
     "get_commit_comments",
     "get_commit_diff",
+    "create_merge_request_note",
+    "create_merge_request",
+    "create_repository_file",
+    "update_repository_file",
 ]
 
 
 CHAT_MUTATION_TOOLS = [
-    "create_file_with_contents",
-    "edit_file",
-    "mkdir",
 ]
 
 
