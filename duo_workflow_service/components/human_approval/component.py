@@ -38,9 +38,11 @@ class HumanApprovalComponent(ABC):
         self,
         workflow_id: str,
         approved_agent_name: str,
+        approved_agent_state: str,
     ):
         self._workflow_id = workflow_id
         self._approved_agent_name = approved_agent_name
+        self._approved_agent_state = approved_agent_state
 
     @abstractmethod
     def _build_approval_request(
@@ -80,7 +82,8 @@ class HumanApprovalComponent(ABC):
         graph.add_node(
             f"{self._node_prefix}_check_{self._approved_agent_name}",
             HumanApprovalCheckExecutor(
-                agent_name=self._approved_agent_name, workflow_id=self._workflow_id
+                agent_name=self._approved_agent_name, workflow_id=self._workflow_id,
+                approved_agent_state=self._approved_agent_state,
             ).run,
         )
 
@@ -119,15 +122,15 @@ class HumanApprovalComponent(ABC):
     def _approval_request_router(
         self, state: WorkflowState
     ) -> Literal[Routes.CONTINUE, Routes.BACK]:
-        if state["status"] == self._approval_req_workflow_state:
+        if state["status"] == WorkflowStatusEnum.APPROVAL_ERROR:
             return Routes.CONTINUE
-        return Routes.BACK
+        return Routes.SKIP
 
     def _request_approval(self, state: WorkflowState):
         approval_request = self._build_approval_request(state)
 
         if not result.ok(approval_request):
-            return {"status": state["status"]}
+            return {"status": WorkflowStatusEnum.APPROVAL_ERROR}
 
         ui_chat_logs = [
             UiChatLog(

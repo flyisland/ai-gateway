@@ -61,6 +61,9 @@ def not_implemented_sync_method(func: T) -> T:
     return wrapper  # type: ignore
 
 
+NOOP_WORKFLOW_STATUSES=[
+    WorkflowStatusEnum.APPROVAL_ERROR
+]
 class WorkflowStatusEventEnum(StrEnum):
     START = "start"
     FINISH = "finish"
@@ -84,6 +87,21 @@ WorkflowStatusToStatusEvent = {
     WorkflowStatusEnum.TOOL_CALL_APPROVAL_REQUIRED: WorkflowStatusEventEnum.REQUIRE_TOOL_CALL_APPROVAL,
 }
 
+WORKFLOW_STATUS_TO_CHECKPOINT_STATUS = {
+    **{
+        WorkflowStatusEnum.EXECUTION: "RUNNING",
+        WorkflowStatusEnum.ERROR: "FAILED",
+        WorkflowStatusEnum.INPUT_REQUIRED: "INPUT_REQUIRED",
+        WorkflowStatusEnum.PLANNING: "RUNNING",
+        WorkflowStatusEnum.PAUSED: "PAUSED",
+        WorkflowStatusEnum.PLAN_APPROVAL_REQUIRED: "PLAN_APPROVAL_REQUIRED",
+        WorkflowStatusEnum.NOT_STARTED: "CREATED",
+        WorkflowStatusEnum.COMPLETED: "FINISHED",
+        WorkflowStatusEnum.CANCELLED: "STOPPED",
+        WorkflowStatusEnum.TOOL_CALL_APPROVAL_REQUIRED: "REQUIRE_TOOL_CALL_APPROVAL",
+    },
+    **{status: "RUNNING" for status in NOOP_WORKFLOW_STATUSES}
+}
 
 def _attribute_dirty(attribute: str, metadata: CheckpointMetadata) -> bool:
     writes = metadata.get("writes")
@@ -557,19 +575,10 @@ class GitLabWorkflow(BaseCheckpointSaver[Any], AbstractAsyncContextManager[Any])
         status_event = None
         if _attribute_dirty("status", metadata):
             workflow_status = checkpoint["channel_values"].get("status")
-            if workflow_status:
-                status_event = WorkflowStatusToStatusEvent.get(workflow_status)
-
-            if status_event:
+            if workflow_status in NOOP_WORKFLOW_STATUSES:
                 return status_event
+            return WORKFLOW_STATUS_TO_CHECKPOINT_STATUS.get(workflow_status)
 
-        # there is no resume status
-        # when event_type is resume, status can be planning or execution
-        # thus, we check the last human input event type to get a status event
-        if _attribute_dirty("last_human_input", metadata):
-            return self._get_status_event_from_human_input(checkpoint)
-        else:
-            return None
 
     def _get_status_event_from_human_input(
         self,
