@@ -193,7 +193,7 @@ class CodeCompletions:
             try:
                 watch_container.register_lang(lang_id, editor_lang)
 
-                if isinstance(self.model, AgentModel):      
+                if isinstance(self.model, AgentModel):
                     params = {
                         "prefix": prompt.prefix,
                         "suffix": prompt.suffix,
