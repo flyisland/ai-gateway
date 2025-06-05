@@ -44,15 +44,15 @@ class ExecutorGitLabHttpClient(GitlabHttpClient):
                 ),
             )
 
-            action_response.httpResponse.body = self._parse_response(
+            body = self._parse_response(
                 action_response.httpResponse.body,
                 parse_json=parse_json,
                 object_hook=object_hook,
             )
 
             return GitLabHttpResponse(
-                status_code=action_response.httpResponse.status_code,
-                body=action_response.httpResponse.body,
+                status_code=action_response.httpResponse.statusCode,
+                body=body,
                 headers=action_response.httpResponse.headers,
             )
 
