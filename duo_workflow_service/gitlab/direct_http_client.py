@@ -63,9 +63,15 @@ class DirectGitLabHttpClient(GitlabHttpClient):
 
         async with session.request(method, url, headers=headers, **kwargs) as response:  # type: ignore
             raw_response = await response.text()
-            parsed_response = self._parse_response(raw_response, parse_json=parse_json, object_hook=object_hook)
+            parsed_response = self._parse_response(
+                raw_response, parse_json=parse_json, object_hook=object_hook
+            )
 
             if use_http_response:
-                return GitLabHttpResponse(status_code=response.status, body=parsed_response, headers=response.headers)
+                return GitLabHttpResponse(
+                    status_code=response.status,
+                    body=parsed_response,
+                    headers=response.headers,
+                )
             else:
                 return parsed_response

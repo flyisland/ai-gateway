@@ -2,15 +2,17 @@ import json
 import logging
 from abc import ABC, abstractmethod
 from typing import Any, Callable, Dict, Optional, Union
-from contract.contract_pb2 import ActionResponse
 
 from langchain_core.messages import AIMessage, HumanMessage, SystemMessage, ToolMessage
+
+from contract.contract_pb2 import ActionResponse
 
 # Setup logger
 logger = logging.getLogger(__name__)
 
+
 class GitLabHttpResponse:
-    def __init__(self, status_code, body, headers):
+    def __init__(self, status_code, body, headers=[]):
         self.status_code = status_code
         self.body = body
         self.headers = headers
@@ -18,9 +20,9 @@ class GitLabHttpResponse:
     @classmethod
     def from_action_response(cls, action_response: ActionResponse):
         return cls(
-            status_code= action_response.httpResponse.statusCode,
+            status_code=action_response.httpResponse.statusCode,
             body=action_response.httpResponse.body,
-            headers=action_response.httpResponse.headers
+            headers=action_response.httpResponse.headers,
         )
 
 
@@ -54,17 +56,58 @@ class GitlabHttpClient(ABC):
         object_hook: Union[Callable, None] = None,
     ) -> Any:
         return await self._call(
-            path, "GET", parse_json=parse_json, use_http_response=use_http_response, params=params, object_hook=object_hook
+            path,
+            "GET",
+            parse_json=parse_json,
+            use_http_response=use_http_response,
+            params=params,
+            object_hook=object_hook,
         )
 
-    async def apost(self, path: str, body: str, parse_json: bool = True, use_http_response: bool = False) -> Any:
-        return await self._call(path, "POST", parse_json=parse_json, use_http_response=use_http_response, data=body)
+    async def apost(
+        self,
+        path: str,
+        body: str,
+        parse_json: bool = True,
+        use_http_response: bool = False,
+    ) -> Any:
+        return await self._call(
+            path,
+            "POST",
+            parse_json=parse_json,
+            use_http_response=use_http_response,
+            data=body,
+        )
 
-    async def aput(self, path: str, body: str, parse_json: bool = True, use_http_response: bool = False) -> Any:
-        return await self._call(path, "PUT", parse_json=parse_json, use_http_response=use_http_response, data=body)
+    async def aput(
+        self,
+        path: str,
+        body: str,
+        parse_json: bool = True,
+        use_http_response: bool = False,
+    ) -> Any:
+        return await self._call(
+            path,
+            "PUT",
+            parse_json=parse_json,
+            use_http_response=use_http_response,
+            data=body,
+        )
 
-    async def apatch(self, path: str, body: str, parse_json: bool = True, use_http_response: bool = False) -> Any:
-        return await self._call(path, "PATCH", parse_json=parse_json, use_http_response=use_http_response, data=body)
+    async def apatch(
+        self,
+        path: str,
+        body: str,
+        parse_json: bool = True,
+        use_http_response: bool = False,
+    ) -> Any:
+        return await self._call(
+            path,
+            "PATCH",
+            parse_json=parse_json,
+            use_http_response=use_http_response,
+            data=body,
+        )
 
     def _parse_response(
         self,

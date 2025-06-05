@@ -3,9 +3,11 @@ import logging
 from typing import Any, Callable, Dict, Optional, Union
 from urllib.parse import urlencode
 
-
 from contract import contract_pb2
-from duo_workflow_service.executor.action import _execute_action, _execute_action_and_get_action_response
+from duo_workflow_service.executor.action import (
+    _execute_action,
+    _execute_action_and_get_action_response,
+)
 from duo_workflow_service.gitlab.http_client import GitlabHttpClient, GitLabHttpResponse
 
 logger = logging.getLogger(__name__)
@@ -33,16 +35,26 @@ class ExecutorGitLabHttpClient(GitlabHttpClient):
             path = f"{path}?{query_string}"
 
         if use_http_response:
-            action_response = await _execute_action_and_get_action_response({"outbox": self.outbox, "inbox": self.inbox},
-            contract_pb2.Action(
-                runHTTPRequest=contract_pb2.RunHTTPRequest(
-                    path=path, method=method, body=data
-                )
-            ))
+            action_response = await _execute_action_and_get_action_response(
+                {"outbox": self.outbox, "inbox": self.inbox},
+                contract_pb2.Action(
+                    runHTTPRequest=contract_pb2.RunHTTPRequest(
+                        path=path, method=method, body=data
+                    )
+                ),
+            )
 
-            action_response.httpResponse.body = self._parse_response(action_response.httpResponse.body, parse_json=parse_json, object_hook=object_hook)
+            action_response.httpResponse.body = self._parse_response(
+                action_response.httpResponse.body,
+                parse_json=parse_json,
+                object_hook=object_hook,
+            )
 
-            return GitLabHttpResponse(status_code=action_response.httpResponse.status_code, body=action_response.httpResponse.body, headers=action_response.httpResponse.headers)
+            return GitLabHttpResponse(
+                status_code=action_response.httpResponse.status_code,
+                body=action_response.httpResponse.body,
+                headers=action_response.httpResponse.headers,
+            )
 
         # The following code will be removed once all tools use the new http response
         response = await _execute_action(
@@ -51,7 +63,9 @@ class ExecutorGitLabHttpClient(GitlabHttpClient):
                 runHTTPRequest=contract_pb2.RunHTTPRequest(
                     path=path, method=method, body=data
                 )
-            )
+            ),
         )
 
-        return self._parse_response(response, parse_json=parse_json, object_hook=object_hook)
+        return self._parse_response(
+            response, parse_json=parse_json, object_hook=object_hook
+        )
