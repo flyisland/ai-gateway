@@ -157,13 +157,7 @@ class ExampleTool(DuoBaseTool):
 ## Development
 
 
-```shell
-# Run all tool tests
-poetry run pytest tests/duo_workflow_service/tools/ -v
 
-# Run specific tool tests
-poetry run pytest tests/duo_workflow_service/tools/test_repository_files.py -v
-```
 
 ### Adding New Tools
 
