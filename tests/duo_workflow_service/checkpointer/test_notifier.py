@@ -89,7 +89,7 @@ def test_workflow_status_mapping():
         WorkflowStatusEnum.NOT_STARTED: "CREATED",
         WorkflowStatusEnum.COMPLETED: "FINISHED",
         WorkflowStatusEnum.CANCELLED: "STOPPED",
-        WorkflowStatusEnum.TOOL_CALL_APPROVAL_REQUIRED: "REQUIRE_TOOL_CALL_APPROVAL",
+        WorkflowStatusEnum.TOOL_CALL_APPROVAL_REQUIRED: "TOOL_CALL_APPROVAL_REQUIRED",
     }
 
     for workflow_status, checkpoint_status in expected_mapping.items():
