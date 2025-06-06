@@ -9,7 +9,9 @@ from pydantic import HttpUrl
 from ai_gateway.model_metadata import (
     AmazonQModelMetadata,
     ModelMetadata,
+    auth_parameters_for_gitlab_model,
     create_model_metadata,
+    parameters_for_gitlab_provider,
 )
 from ai_gateway.model_selection import (
     LLMDefinition,
@@ -253,3 +255,95 @@ def test_create_model_metadata_with_none_data():
 def test_create_model_metadata_without_provider():
     result = create_model_metadata({"name": "test"})
     assert result is None
+
+
+class TestFireworksAuthentication:
+    @pytest.fixture
+    def mock_config_class(self):
+        from ai_gateway.config import ConfigModelEndpoints, ConfigModelKeys
+
+        mock_endpoints = ConfigModelEndpoints(
+            fireworks_current_region_endpoint={
+                "codestral-2501": {
+                    "endpoint": "https://api.fireworks.ai/inference",
+                    "identifier": "fireworks-model-id",
+                }
+            }
+        )
+        mock_keys = ConfigModelKeys(fireworks_api_key="test-fireworks-key")
+
+        mock_config = mock.Mock()
+        mock_config.model_endpoints = mock_endpoints
+        mock_config.model_keys = mock_keys
+        return mock_config
+
+    @pytest.fixture
+    def fireworks_model(self):
+        return LLMDefinition(
+            gitlab_identifier="codestral_2501_fireworks",
+            name="fireworks_model",
+            provider="fireworks_ai",
+            provider_identifier="original-identifier",
+            family="codestral",
+        )
+
+    @pytest.fixture
+    def regular_model(self):
+        return LLMDefinition(
+            gitlab_identifier="regular_model",
+            name="regular_model",
+            provider="custom_openai",
+            provider_identifier="original-identifier",
+            family="base",
+        )
+
+    def test_fireworks_auth_parameters(self, mock_config_class, fireworks_model):
+        with patch("ai_gateway.config.Config", return_value=mock_config_class):
+            auth_params = auth_parameters_for_gitlab_model(fireworks_model)
+
+            assert auth_params == {
+                "endpoint": "https://api.fireworks.ai/inference",
+                "api_key": "test-fireworks-key",
+                "identifier": "text-completion-openai/fireworks-model-id",
+            }
+
+    def test_regular_model_auth_parameters(self, regular_model):
+        auth_params = auth_parameters_for_gitlab_model(regular_model)
+
+        assert not auth_params
+
+    def test_fireworks_identifier_override(self, mock_config_class, fireworks_model):
+        with patch("ai_gateway.config.Config", return_value=mock_config_class):
+            params = parameters_for_gitlab_provider(
+                {"identifier": fireworks_model.gitlab_identifier}
+            )
+
+            assert params["identifier"] == "text-completion-openai/fireworks-model-id"
+            assert params["provider"] == "fireworks_ai"
+            assert params["name"] == "codestral"
+            assert params["endpoint"] == "https://api.fireworks.ai/inference"
+            assert params["api_key"] == "test-fireworks-key"
+
+    def test_regular_model_no_override(self, regular_model):
+        params = parameters_for_gitlab_provider(
+            {"identifier": regular_model.gitlab_identifier}
+        )
+
+        assert params["identifier"] == "original-identifier"
+        assert params["provider"] == "custom_openai"
+        assert params["name"] == "base"
+        assert "endpoint" not in params
+        assert "api_key" not in params
+
+    @pytest.fixture(autouse=True)
+    def mock_model_selection(self, fireworks_model, regular_model):
+        mock_models = {
+            fireworks_model.gitlab_identifier: fireworks_model,
+            regular_model.gitlab_identifier: regular_model,
+        }
+
+        with patch.multiple(
+            ModelSelectionConfig,
+            get_llm_definitions=mock.Mock(return_value=mock_models),
+        ):
+            yield

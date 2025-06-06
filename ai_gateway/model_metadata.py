@@ -76,6 +76,31 @@ class ModelMetadata(BaseModelMetadata):
 TypeModelMetadata = AmazonQModelMetadata | ModelMetadata
 
 
+def auth_parameters_for_gitlab_model(gitlab_model) -> dict[str, Any]:
+    auth_params: dict[str, Any] = {}
+
+    if gitlab_model.provider == "fireworks_ai":
+        from ai_gateway.config import Config
+
+        config = Config()
+
+        if config.model_endpoints.fireworks_current_region_endpoint:
+            if gitlab_model.gitlab_identifier == "codestral_2501_fireworks":
+                model_config = (
+                    config.model_endpoints.fireworks_current_region_endpoint.get(
+                        "codestral-2501", {}
+                    )
+                )
+                if model_config:
+                    auth_params["endpoint"] = model_config.get("endpoint")
+                    auth_params["api_key"] = config.model_keys.fireworks_api_key
+                    auth_params["identifier"] = (
+                        f"text-completion-openai/{model_config.get('identifier')}"
+                    )
+
+    return auth_params
+
+
 def parameters_for_gitlab_provider(parameters) -> dict[str, Any]:
     """Retrieve model parameters for a given GitLab identifier.
 
@@ -97,6 +122,7 @@ def parameters_for_gitlab_provider(parameters) -> dict[str, Any]:
         "provider": gitlab_model.provider,
         "identifier": gitlab_model.provider_identifier,
         "name": gitlab_model.family or "base",
+        **auth_parameters_for_gitlab_model(gitlab_model),
     }
 
 
