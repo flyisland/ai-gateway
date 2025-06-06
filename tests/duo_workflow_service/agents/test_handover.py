@@ -138,6 +138,7 @@ class TestHandoverAgent:
                         "status": ToolStatus.SUCCESS,
                         "timestamp": "2025-01-01T12:00:00+00:00",
                         "tool_info": None,
+                        "context_elements": None,
                     },
                     {
                         "content": "Workflow completed successfully",
