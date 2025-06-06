@@ -11,6 +11,9 @@ from duo_workflow_service.entities.state import (
     UiChatLog,
     WorkflowStatusEnum,
 )
+from duo_workflow_service.interceptors.feature_flag_interceptor import (
+    current_feature_flag_context,
+)
 
 __all__ = ["HandoverAgent"]
 
@@ -46,8 +49,17 @@ class HandoverAgent:
             )
             last_message = messages[-1]
             summary = self._extract_summary(last_message, ui_chat_logs)
-            if summary is not None and summary.content != "":
-                handover_messages = [summary]
+
+            feature_flags = current_feature_flag_context.get()
+            if "duo_workflow_use_handover_summary" in feature_flags:
+                handover_messages = self._get_summary_to_handover(summary)
+            else:
+                handover_messages = [
+                    *messages[:-1],
+                    self._get_last_message_or_summary_to_handover(
+                        summary, last_message
+                    ),
+                ]
 
         if self._new_status == WorkflowStatusEnum.COMPLETED:
             ui_chat_logs.append(
@@ -82,7 +94,7 @@ class HandoverAgent:
 
     def _extract_summary(
         self, last_message: BaseMessage, ui_chat_logs: List[UiChatLog]
-    ) -> Optional[BaseMessage]:
+    ) -> Optional[BaseMessage | None]:
         if not isinstance(last_message, AIMessage):
             return None
 
@@ -111,3 +123,22 @@ class HandoverAgent:
                 return HumanMessage(content=summary)
 
         return None
+
+    def _get_summary_to_handover(
+        self, summary: Optional[BaseMessage]
+    ) -> List[BaseMessage]:
+        if summary is not None and summary.content != "":
+            return [summary]
+
+        return []
+
+    def _get_last_message_or_summary_to_handover(
+        self, summary: Optional[BaseMessage], last_message: BaseMessage
+    ):
+        if summary is not None and summary.content != "":
+            return summary
+
+        if not isinstance(last_message, AIMessage):
+            return last_message
+
+        return AIMessage(id=last_message.id, content=last_message.content)
