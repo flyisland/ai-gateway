@@ -61,6 +61,14 @@ def stub_feature_flags():
     yield
 
 
+@pytest.fixture(autouse=True)
+def enable_request_logging():
+    original_value = ENABLE_REQUEST_LOGGING
+    ENABLE_REQUEST_LOGGING = True
+    yield
+    ENABLE_REQUEST_LOGGING = original_value
+
+
 class TestReActPlainTextParser:
     @pytest.mark.parametrize(
         ("text", "expected"),
