@@ -1494,7 +1494,7 @@ class TestCodeCompletions:
                         "language_identifier": "python",
                     },
                     "model_provider": "gitlab",
-                    "model_identifier": "test-model-id",
+                    "model_name": "codestral_2501_fireworks",
                 },
             )
 
@@ -1502,7 +1502,7 @@ class TestCodeCompletions:
             assert mock_build.called
             build_args, build_kwargs = mock_build.call_args
             assert build_args[1].model_provider == "gitlab"
-            assert build_args[1].model_identifier == "test-model-id"
+            assert build_args[1].model_name == "codestral_2501_fireworks"
 
             mock_track_internal_event.assert_called_once_with(
                 "request_complete_code",
@@ -1558,7 +1558,7 @@ class TestCodeCompletions:
                         "content_below_cursor": "\n",
                     },
                     "model_provider": "gitlab",
-                    "model_identifier": "",
+                    "model_name": "",
                 },
             )
 
