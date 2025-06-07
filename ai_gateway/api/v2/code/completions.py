@@ -417,7 +417,7 @@ def _resolve_code_completions_litellm(
             model_metadata = create_model_metadata(
                 {
                     "provider": KindModelProvider.GITLAB,
-                    "identifier": payload.model_identifier,
+                    "identifier": payload.model_name,
                     "feature_setting": "code_completions",
                 }
             )
