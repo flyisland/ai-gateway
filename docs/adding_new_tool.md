@@ -5,23 +5,11 @@ Service.
 
 ## Introduction
 
-Tools are fundamental components in the GitLab Duo Workflow Service that enable AI agents to interact with GitLab
-resources, manipulate files, execute commands, and perform various other actions. These tools serve as the interface
-between AI agents and the GitLab ecosystem, allowing them to retrieve information, make changes, and respond to user
-requests effectively.
+Tools enable AI agents in the GitLab Duo Workflow Service to interact with GitLab resources, manipulate files, execute
+commands, and perform various actions. Each tool has a specific purpose with defined inputs and outputs.
 
-Each tool is designed with a specific purpose, taking defined inputs and producing predictable outputs. The modular
-nature of the tool system allows for easy extension of agent capabilities without modifying the core agent logic. This
-document will guide you through the process of creating and integrating a new tool into the Duo Workflow Service,
-covering everything from design considerations to implementation details and best practices.
-
-## Prerequisites
-
-Before adding a new tool, ensure you have:
-
-- Understanding of the tool's purpose and required functionality
-- Familiarity with GitLab Duo Workflow Service architecture
-- Development environment set up for the project
+This guide covers how to create and integrate new tools into the Duo Workflow Service, including design considerations,
+implementation details, and best practices.
 
 ## Implementation Steps
 
@@ -227,4 +215,11 @@ CONTEXT_BUILDER_TOOLS = [
 
 1. **GitLab API permissions**:
    - When making calls to GitLab API, a 403 error indicates insufficient permissions.
-   - To resolve this, ensure the endpoint allows the `ai_workflows` scope. See [MR](https://gitlab.com/gitlab-org/gitlab/-/merge_requests/193297) for more details.
+   - To resolve this, ensure the endpoint allows the `ai_workflows` scope.
+     See [MR](https://gitlab.com/gitlab-org/gitlab/-/merge_requests/193297) for more details.
+
+### Tool Implementation Examples
+
+* [Epic API Tool](https://gitlab.com/gitlab-org/gitlab/-/merge_requests/178085/diffs#2128623ff30bc6500f22d7daf419c3c604327984).
+
+* [File System Tool refactoring](https://gitlab.com/gitlab-org/modelops/applied-ml/code-suggestions/ai-assist/-/merge_requests/2555).
