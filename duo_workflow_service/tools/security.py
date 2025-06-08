@@ -1,10 +1,9 @@
 import json
-from typing import Any, List, NamedTuple, Optional, Type
+from typing import Any, Optional, Type
 from urllib.parse import unquote
 
 from pydantic import BaseModel, Field
 
-from duo_workflow_service.gitlab.url_parser import GitLabUrlParseError, GitLabUrlParser
 from duo_workflow_service.tools.duo_base_tool import DuoBaseTool
 from duo_workflow_service.tools.gitlab_resource_input import ProjectResourceInput
 
@@ -14,6 +13,7 @@ PROJECT_IDENTIFICATION_DESCRIPTION = """To identify the project you must provide
   - https://gitlab.com/namespace/project
   - https://gitlab.com/group/subgroup/project
 """
+
 
 class ListVulnerabilitiesInput(ProjectResourceInput):
     severity: Optional[str] = Field(
@@ -26,7 +26,10 @@ class ListVulnerabilitiesInput(ProjectResourceInput):
     )
     report_type: Optional[str] = Field(
         default=None,
-        description="Filter vulnerabilities by report type. Possible values: sast, dependency_scanning, container_scanning, dast, secret_detection, coverage_fuzzing, api_fuzzing.",
+        description=(
+            "Filter vulnerabilities by report type. Possible values: sast, dependency_scanning, "
+            "container_scanning, dast, secret_detection, coverage_fuzzing, api_fuzzing."
+        ),
     )
     state: Optional[str] = Field(
         default=None,
@@ -52,6 +55,7 @@ class ListVulnerabilitiesInput(ProjectResourceInput):
         default=None,
         description="Include false positives in the results.",
     )
+
 
 class ListVulnerabilities(DuoBaseTool):
     name: str = "list_vulnerabilities"
