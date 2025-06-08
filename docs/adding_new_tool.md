@@ -220,6 +220,6 @@ CONTEXT_BUILDER_TOOLS = [
 
 ### Tool Implementation Examples
 
-* [Epic API Tool](https://gitlab.com/gitlab-org/gitlab/-/merge_requests/178085/diffs#2128623ff30bc6500f22d7daf419c3c604327984).
+- [Epic API Tool](https://gitlab.com/gitlab-org/gitlab/-/merge_requests/178085/diffs#2128623ff30bc6500f22d7daf419c3c604327984).
 
-* [File System Tool refactoring](https://gitlab.com/gitlab-org/modelops/applied-ml/code-suggestions/ai-assist/-/merge_requests/2555).
+- [File System Tool refactoring](https://gitlab.com/gitlab-org/modelops/applied-ml/code-suggestions/ai-assist/-/merge_requests/2555).
