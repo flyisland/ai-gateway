@@ -391,7 +391,7 @@ def test_tools_registry_interaction(
     [
         # Feature flag enabled + Vertex
         (
-            {"duo_workflow_claude_sonnet_4"},
+            {"duo_workflow_chat_workflow_claude_sonnet_4"},
             {
                 "DUO_WORKFLOW__VERTEX_PROJECT_ID": "test-project",
                 "DUO_WORKFLOW__VERTEX_LOCATION": "us-central1",
@@ -401,7 +401,7 @@ def test_tools_registry_interaction(
         ),
         # Feature flag enabled + Anthropic API
         (
-            {"duo_workflow_claude_sonnet_4"},
+            {"duo_workflow_chat_workflow_claude_sonnet_4"},
             {"ANTHROPIC_API_KEY": "test-key"},
             AnthropicConfig,
             KindAnthropicModel.CLAUDE_SONNET_4.value,

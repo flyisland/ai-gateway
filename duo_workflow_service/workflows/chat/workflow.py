@@ -92,7 +92,10 @@ class Workflow(AbstractWorkflow):
 
     def _get_model_config(self) -> Union[AnthropicConfig, VertexConfig]:
         """Override to use Sonnet 4 model for software development tasks."""
-        return get_sonnet_4_config_with_feature_flag(super()._get_model_config)
+        return get_sonnet_4_config_with_feature_flag(
+            self._workflow_type,
+            super()._get_model_config,
+        )
 
     def _are_tools_called(self, state: ChatWorkflowState) -> Routes:
         if state["status"] in [WorkflowStatusEnum.CANCELLED, WorkflowStatusEnum.ERROR]:
