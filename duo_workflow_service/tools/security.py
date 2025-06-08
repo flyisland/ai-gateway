@@ -276,10 +276,13 @@ class ListVulnerabilities(DuoBaseTool):
             return json.dumps({"error": "No valid project path found"})
 
         # Remove None values and prepare filters
-        filters = {k: v for k, v in kwargs.items() if v is not None}
-        graphql_filters = self._convert_rest_filters_to_graphql(filters)
+    if "has_issues" in filters and filters["has_issues"] is not None:
+        graphql_filters["hasIssues"] = filters["has_issues"]
+        
+    if "include_false_positives" in filters and filters["include_false_positives"] is not None:
+        graphql_filters["includeFalsePositives"] = filters["include_false_positives"]
 
-        try:
+    return graphql_filters
             # Build GraphQL query
             query = self._build_graphql_query(project_path, graphql_filters)
 
