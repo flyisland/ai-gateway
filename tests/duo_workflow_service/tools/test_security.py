@@ -4,10 +4,8 @@ from unittest.mock import AsyncMock, Mock
 import pytest
 
 from duo_workflow_service.tools.security import (
-    GetProjectVulnerabilities,
-    GetProjectVulnerabilitiesInput,
-    GetProjectSecurityConfiguration,
-    GetProjectSecurityConfigurationInput,
+    ListVulnerabilities,
+    ListVulnerabilitiesInput,
 )
 
 # Common URL test parameters
@@ -50,27 +48,6 @@ def vulnerability_data():
         "title": "Test Vulnerability",
         "severity": "high",
         "state": "detected",
-    }
-
-
-@pytest.fixture
-def security_config_data():
-    """Fixture for common security configuration data."""
-    return {
-        "auto_fix_enabled": True,
-        "auto_fix_enabled_for_containers": True,
-        "auto_fix_enabled_for_dependencies": True,
-        "auto_fix_enabled_for_vulnerabilities": True,
-        "scanners": [
-            {
-                "name": "sast",
-                "enabled": True,
-            },
-            {
-                "name": "dependency_scanning",
-                "enabled": True,
-            },
-        ],
     }
 
 
@@ -124,10 +101,10 @@ async def assert_tool_url_error(
 
 
 @pytest.mark.asyncio
-async def test_get_project_vulnerabilities(gitlab_client_mock, metadata, vulnerability_data):
+async def test_list_vulnerabilities(gitlab_client_mock, metadata, vulnerability_data):
     gitlab_client_mock.aget = AsyncMock(return_value=vulnerability_data)
 
-    tool = GetProjectVulnerabilities(metadata=metadata)
+    tool = ListVulnerabilities(metadata=metadata)
 
     input_data = {
         "project_id": 1,
@@ -149,7 +126,7 @@ async def test_get_project_vulnerabilities(gitlab_client_mock, metadata, vulnera
     "url,project_id,expected_path",
     URL_SUCCESS_CASES,
 )
-async def test_get_project_vulnerabilities_with_url_success(
+async def test_list_vulnerabilities_with_url_success(
     url,
     project_id,
     expected_path,
@@ -157,7 +134,7 @@ async def test_get_project_vulnerabilities_with_url_success(
     metadata,
     vulnerability_data,
 ):
-    tool = GetProjectVulnerabilities(metadata=metadata)
+    tool = ListVulnerabilities(metadata=metadata)
 
     response = await tool_url_success_response(
         tool=tool,
@@ -181,10 +158,10 @@ async def test_get_project_vulnerabilities_with_url_success(
     "url,project_id,error_contains",
     URL_ERROR_CASES,
 )
-async def test_get_project_vulnerabilities_with_url_error(
+async def test_list_vulnerabilities_with_url_error(
     url, project_id, error_contains, gitlab_client_mock, metadata
 ):
-    tool = GetProjectVulnerabilities(metadata=metadata)
+    tool = ListVulnerabilities(metadata=metadata)
 
     await assert_tool_url_error(
         tool=tool,
@@ -196,109 +173,45 @@ async def test_get_project_vulnerabilities_with_url_error(
 
 
 @pytest.mark.asyncio
-async def test_get_project_security_configuration(
-    gitlab_client_mock, metadata, security_config_data
-):
-    gitlab_client_mock.aget = AsyncMock(return_value=security_config_data)
+async def test_list_vulnerabilities_with_filters(gitlab_client_mock, metadata, vulnerability_data):
+    gitlab_client_mock.aget = AsyncMock(return_value=vulnerability_data)
 
-    tool = GetProjectSecurityConfiguration(metadata=metadata)
+    tool = ListVulnerabilities(metadata=metadata)
 
     input_data = {
         "project_id": 1,
+        "severity": "high",
+        "state": "detected",
+        "report_type": "sast",
+        "scanner": "bandit",
+        "has_resolution": True,
+        "include_false_positives": False,
     }
 
     response = await tool.arun(input_data)
 
-    expected_response = json.dumps({"security_configuration": security_config_data})
+    expected_response = json.dumps({"vulnerabilities": vulnerability_data})
     assert response == expected_response
 
     gitlab_client_mock.aget.assert_called_once_with(
-        path="/api/v4/projects/1/security_configuration",
+        path="/api/v4/projects/1/vulnerabilities",
+        params={
+            "severity": "high",
+            "state": "detected",
+            "report_type": "sast",
+            "scanner": "bandit",
+            "has_resolution": True,
+            "include_false_positives": False,
+        },
         parse_json=False,
     )
 
 
 @pytest.mark.asyncio
-@pytest.mark.parametrize(
-    "url,project_id,expected_path",
-    [
-        # Modify paths for security configuration endpoint
-        (
-            "https://gitlab.com/namespace/project",
-            None,
-            "/api/v4/projects/namespace%2Fproject/security_configuration",
-        ),
-        (
-            "https://gitlab.com/namespace/project",
-            "namespace%2Fproject",
-            "/api/v4/projects/namespace%2Fproject/security_configuration",
-        ),
-    ],
-)
-async def test_get_project_security_configuration_with_url_success(
-    url,
-    project_id,
-    expected_path,
-    gitlab_client_mock,
-    metadata,
-    security_config_data,
-):
-    tool = GetProjectSecurityConfiguration(metadata=metadata)
-
-    response = await tool_url_success_response(
-        tool=tool,
-        url=url,
-        project_id=project_id,
-        gitlab_client_mock=gitlab_client_mock,
-        response_data=security_config_data,
-    )
-
-    expected_response = json.dumps({"security_configuration": security_config_data})
-    assert response == expected_response
-
-    gitlab_client_mock.aget.assert_called_once_with(
-        path=expected_path,
-        parse_json=False,
-    )
-
-
-@pytest.mark.asyncio
-@pytest.mark.parametrize(
-    "url,project_id,error_contains",
-    URL_ERROR_CASES,
-)
-async def test_get_project_security_configuration_with_url_error(
-    url, project_id, error_contains, gitlab_client_mock, metadata
-):
-    tool = GetProjectSecurityConfiguration(metadata=metadata)
-
-    await assert_tool_url_error(
-        tool=tool,
-        url=url,
-        project_id=project_id,
-        error_contains=error_contains,
-        gitlab_client_mock=gitlab_client_mock,
-    )
-
-
-@pytest.mark.asyncio
-async def test_get_project_vulnerabilities_exception(gitlab_client_mock, metadata):
+async def test_list_vulnerabilities_exception(gitlab_client_mock, metadata):
     gitlab_client_mock.aget = AsyncMock(side_effect=Exception("API Error"))
 
-    tool = GetProjectVulnerabilities(metadata=metadata)
-
-    response = await tool.arun({"project_id": 1})
-
-    error_response = json.loads(response)
-    assert "error" in error_response
-    assert "API Error" in error_response["error"]
-
-
-@pytest.mark.asyncio
-async def test_get_project_security_configuration_exception(gitlab_client_mock, metadata):
-    gitlab_client_mock.aget = AsyncMock(side_effect=Exception("API Error"))
-
-    tool = GetProjectSecurityConfiguration(metadata=metadata)
+    tool = ListVulnerabilities(metadata=metadata)
 
     response = await tool.arun({"project_id": 1})
 
@@ -311,33 +224,15 @@ async def test_get_project_security_configuration_exception(gitlab_client_mock, 
     "input_data,expected_message",
     [
         (
-            GetProjectVulnerabilitiesInput(project_id=42),
-            "Get vulnerabilities for project 42",
+            ListVulnerabilitiesInput(project_id=42),
+            "List vulnerabilities in project 42",
         ),
         (
-            GetProjectVulnerabilitiesInput(url="https://gitlab.com/namespace/project"),
-            "Get vulnerabilities for project https://gitlab.com/namespace/project",
+            ListVulnerabilitiesInput(url="https://gitlab.com/namespace/project"),
+            "List vulnerabilities in https://gitlab.com/namespace/project",
         ),
     ],
 )
-def test_get_project_vulnerabilities_format_display_message(input_data, expected_message):
-    tool = GetProjectVulnerabilities(metadata={})
-    assert tool.format_display_message(input_data) == expected_message
-
-
-@pytest.mark.parametrize(
-    "input_data,expected_message",
-    [
-        (
-            GetProjectSecurityConfigurationInput(project_id=42),
-            "Get security configuration for project 42",
-        ),
-        (
-            GetProjectSecurityConfigurationInput(url="https://gitlab.com/namespace/project"),
-            "Get security configuration for project https://gitlab.com/namespace/project",
-        ),
-    ],
-)
-def test_get_project_security_configuration_format_display_message(input_data, expected_message):
-    tool = GetProjectSecurityConfiguration(metadata={})
+def test_list_vulnerabilities_format_display_message(input_data, expected_message):
+    tool = ListVulnerabilities(metadata={})
     assert tool.format_display_message(input_data) == expected_message 
