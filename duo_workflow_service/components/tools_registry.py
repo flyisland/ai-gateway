@@ -159,10 +159,19 @@ class ToolsRegistry:
         if not additional_tools:
             additional_tools = []
 
-        self._enabled_tools = {
+        # Create a dictionary of default and NO_OP tools
+        default_tools = {
             **{tool_cls.tool_title: tool_cls for tool_cls in NO_OP_TOOLS},  # type: ignore
             **{tool.name: tool for tool in [tool_cls() for tool_cls in _DEFAULT_TOOLS]},
-            **{tool.name: tool for tool in additional_tools},
+        }
+        
+        # Add additional tools separately
+        additional_tool_dict = {tool.name: tool for tool in additional_tools}
+        
+        # Combine all tools
+        self._enabled_tools = {
+            **default_tools,
+            **additional_tool_dict,
         }
 
         self._preapproved_tool_names = set(self._enabled_tools.keys())
