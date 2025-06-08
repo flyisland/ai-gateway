@@ -61,7 +61,7 @@ def graphql_vulnerability_response():
                             "scanner": {
                                 "name": "Bandit",
                                 "vendor": "GitLab",
-                                "externalId": "bandit"
+                                "externalId": "bandit",
                             },
                             "identifiers": [
                                 {
@@ -70,18 +70,18 @@ def graphql_vulnerability_response():
                                     "type": "CVE",
                                     "externalType": "cve",
                                     "externalId": "CVE-2021-1234",
-                                    "url": "https://cve.mitre.org/cgi-bin/cvename.cgi?name=CVE-2021-1234"
+                                    "url": "https://cve.mitre.org/cgi-bin/cvename.cgi?name=CVE-2021-1234",
                                 }
                             ],
                             "location": {
                                 "file": "app.py",
                                 "startLine": 10,
-                                "endLine": 12
+                                "endLine": 12,
                             },
                             "project": {
                                 "id": "gid://gitlab/Project/1",
                                 "name": "test-project",
-                                "fullPath": "namespace/project"
+                                "fullPath": "namespace/project",
                             },
                             "detectedAt": "2023-01-01T00:00:00Z",
                             "createdAt": "2023-01-01T00:00:00Z",
@@ -101,19 +101,19 @@ def graphql_vulnerability_response():
                             "links": [
                                 {
                                     "name": "CVE Details",
-                                    "url": "https://cve.mitre.org/cgi-bin/cvename.cgi?name=CVE-2021-1234"
+                                    "url": "https://cve.mitre.org/cgi-bin/cvename.cgi?name=CVE-2021-1234",
                                 }
-                            ]
+                            ],
                         }
                     ],
                     "pageInfo": {
                         "hasNextPage": False,
                         "hasPreviousPage": False,
                         "startCursor": "cursor1",
-                        "endCursor": "cursor1"
+                        "endCursor": "cursor1",
                     },
-                    "count": 1
-                }
+                    "count": 1,
+                },
             }
         }
     }
@@ -134,10 +134,10 @@ def empty_graphql_response():
                         "hasNextPage": False,
                         "hasPreviousPage": False,
                         "startCursor": None,
-                        "endCursor": None
+                        "endCursor": None,
                     },
-                    "count": 0
-                }
+                    "count": 0,
+                },
             }
         }
     }
@@ -166,9 +166,7 @@ async def tool_url_success_response(
 ):
     gitlab_client_mock.apost = AsyncMock(return_value=response_data)
 
-    response = await tool._arun(
-        url=url, project_id=project_id, **kwargs
-    )
+    response = await tool._arun(url=url, project_id=project_id, **kwargs)
 
     return response
 
@@ -181,9 +179,7 @@ async def assert_tool_url_error(
     gitlab_client_mock,
     **kwargs,
 ):
-    response = await tool._arun(
-        url=url, project_id=project_id, **kwargs
-    )
+    response = await tool._arun(url=url, project_id=project_id, **kwargs)
 
     error_response = json.loads(response)
     assert "error" in error_response
@@ -193,7 +189,9 @@ async def assert_tool_url_error(
 
 
 @pytest.mark.asyncio
-async def test_list_vulnerabilities(gitlab_client_mock, metadata, graphql_vulnerability_response):
+async def test_list_vulnerabilities(
+    gitlab_client_mock, metadata, graphql_vulnerability_response
+):
     gitlab_client_mock.apost = AsyncMock(return_value=graphql_vulnerability_response)
 
     tool = ListVulnerabilities(metadata=metadata)
@@ -275,7 +273,9 @@ async def test_list_vulnerabilities_with_url_error(
 
 
 @pytest.mark.asyncio
-async def test_list_vulnerabilities_with_filters(gitlab_client_mock, metadata, graphql_vulnerability_response):
+async def test_list_vulnerabilities_with_filters(
+    gitlab_client_mock, metadata, graphql_vulnerability_response
+):
     gitlab_client_mock.apost = AsyncMock(return_value=graphql_vulnerability_response)
 
     tool = ListVulnerabilities(metadata=metadata)
@@ -310,11 +310,14 @@ async def test_list_vulnerabilities_with_filters(gitlab_client_mock, metadata, g
     assert 'state: ["DETECTED"]' in query
     assert 'reportType: ["SAST"]' in query
     assert 'scanner: ["bandit"]' in query
-    assert 'hasResolution: true' in query
-    assert 'includeFalsePositives: false' in query
+    assert "hasResolution: true" in query
+    assert "includeFalsePositives: false" in query
+
 
 @pytest.mark.asyncio
-async def test_list_vulnerabilities_empty_response(gitlab_client_mock, metadata, empty_graphql_response):
+async def test_list_vulnerabilities_empty_response(
+    gitlab_client_mock, metadata, empty_graphql_response
+):
     gitlab_client_mock.apost = AsyncMock(return_value=empty_graphql_response)
 
     tool = ListVulnerabilities(metadata=metadata)
@@ -339,7 +342,7 @@ async def test_list_vulnerabilities_graphql_error(gitlab_client_mock, metadata):
             {
                 "message": "Project not found",
                 "locations": [{"line": 2, "column": 3}],
-                "path": ["project"]
+                "path": ["project"],
             }
         ]
     }

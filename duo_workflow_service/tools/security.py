@@ -85,7 +85,7 @@ class ListVulnerabilities(DuoBaseTool):
                 "detected": "DETECTED",
                 "confirmed": "CONFIRMED",
                 "dismissed": "DISMISSED",
-                "resolved": "RESOLVED"
+                "resolved": "RESOLVED",
             }
             rest_state = filters["state"].lower()
             if rest_state in state_mapping:
@@ -100,7 +100,7 @@ class ListVulnerabilities(DuoBaseTool):
                 "dast": "DAST",
                 "secret_detection": "SECRET_DETECTION",
                 "coverage_fuzzing": "COVERAGE_FUZZING",
-                "api_fuzzing": "API_FUZZING"
+                "api_fuzzing": "API_FUZZING",
             }
             rest_type = filters["report_type"].lower()
             if rest_type in report_type_mapping:
@@ -115,8 +115,13 @@ class ListVulnerabilities(DuoBaseTool):
         if "has_issues" in filters and filters["has_issues"] is not None:
             graphql_filters["hasIssues"] = filters["has_issues"]
 
-        if "include_false_positives" in filters and filters["include_false_positives"] is not None:
-            graphql_filters["includeFalsePositives"] = filters["include_false_positives"]
+        if (
+            "include_false_positives" in filters
+            and filters["include_false_positives"] is not None
+        ):
+            graphql_filters["includeFalsePositives"] = filters[
+                "include_false_positives"
+            ]
 
         return graphql_filters
 
@@ -142,13 +147,17 @@ class ListVulnerabilities(DuoBaseTool):
             filter_args.append(f"scanner: [{scanner_list}]")
 
         if "hasResolution" in filters:
-            filter_args.append(f"hasResolution: {str(filters['hasResolution']).lower()}")
+            filter_args.append(
+                f"hasResolution: {str(filters['hasResolution']).lower()}"
+            )
 
         if "hasIssues" in filters:
             filter_args.append(f"hasIssues: {str(filters['hasIssues']).lower()}")
 
         if "includeFalsePositives" in filters:
-            filter_args.append(f"includeFalsePositives: {str(filters['includeFalsePositives']).lower()}")
+            filter_args.append(
+                f"includeFalsePositives: {str(filters['includeFalsePositives']).lower()}"
+            )
 
         # Always add pagination
         filter_args.append("first: 100")
@@ -296,9 +305,7 @@ class ListVulnerabilities(DuoBaseTool):
             query = self._build_graphql_query(project_path, graphql_filters)
 
             # Execute GraphQL query using the existing HTTP client
-            graphql_body = {
-                "query": query
-            }
+            graphql_body = {"query": query}
 
             response = await self.gitlab_client.apost(
                 path="/api/graphql",
@@ -307,25 +314,33 @@ class ListVulnerabilities(DuoBaseTool):
             )
 
             # Extract vulnerabilities from GraphQL response
-            if "data" in response and response["data"] and "project" in response["data"]:
+            if (
+                "data" in response
+                and response["data"]
+                and "project" in response["data"]
+            ):
                 project_data = response["data"]["project"]
                 if project_data and "vulnerabilities" in project_data:
                     vulnerabilities = project_data["vulnerabilities"]["nodes"]
-                    return json.dumps({
-                        "vulnerabilities": vulnerabilities,
-                        "project": {
-                            "id": project_data.get("id"),
-                            "name": project_data.get("name"),
-                            "fullPath": project_data.get("fullPath")
-                        },
-                        "pagination": project_data["vulnerabilities"]["pageInfo"],
-                        "total_count": project_data["vulnerabilities"]["count"]
-                    })
+                    return json.dumps(
+                        {
+                            "vulnerabilities": vulnerabilities,
+                            "project": {
+                                "id": project_data.get("id"),
+                                "name": project_data.get("name"),
+                                "fullPath": project_data.get("fullPath"),
+                            },
+                            "pagination": project_data["vulnerabilities"]["pageInfo"],
+                            "total_count": project_data["vulnerabilities"]["count"],
+                        }
+                    )
                 else:
-                    return json.dumps({
-                        "vulnerabilities": [],
-                        "error": "Project not found or no vulnerabilities available"
-                    })
+                    return json.dumps(
+                        {
+                            "vulnerabilities": [],
+                            "error": "Project not found or no vulnerabilities available",
+                        }
+                    )
             elif "errors" in response:
                 return json.dumps({"error": f"GraphQL errors: {response['errors']}"})
             else:
