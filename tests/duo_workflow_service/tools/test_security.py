@@ -305,12 +305,13 @@ async def test_list_vulnerabilities_with_filters(gitlab_client_mock, metadata, g
     query = query_body["query"]
 
     # Check that GraphQL filters are included
+    # Check that GraphQL filters are included
     assert 'severity: ["HIGH"]' in query
     assert 'state: ["DETECTED"]' in query
     assert 'reportType: ["SAST"]' in query
     assert 'scanner: ["bandit"]' in query
     assert 'hasResolution: true' in query
-
+    assert 'includeFalsePositives: false' in query
 
 @pytest.mark.asyncio
 async def test_list_vulnerabilities_empty_response(gitlab_client_mock, metadata, empty_graphql_response):
