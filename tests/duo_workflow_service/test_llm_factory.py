@@ -80,7 +80,7 @@ def test_validate_anthropic_variables(
             call_kwargs = mock_vertex_client.call_args.kwargs
             assert (
                 call_kwargs["model_name"]
-                == KindAnthropicModel.CLAUDE_3_5_SONNET_V2_VERTEX.value
+                == KindAnthropicModel.CLAUDE_3_7_SONNET_VERTEX.value
             )
             assert call_kwargs["project"] == "test-proj"
             assert call_kwargs["location"] == "test-loc"
@@ -187,7 +187,7 @@ def test_clients_receive_max_retries_from_config(
             },
             "vertex",
             None,
-            "claude-3-5-sonnet-v2@20241022",  # Default when no feature flags
+            "claude-3-7-sonnet@20250219",  # Default when no feature flags
             "vertex",
         ),
         (
