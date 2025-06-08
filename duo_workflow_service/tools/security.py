@@ -111,6 +111,9 @@ class ListVulnerabilities(DuoBaseTool):
         if "has_issues" in filters and filters["has_issues"] is not None:
             graphql_filters["hasIssues"] = filters["has_issues"]
 
+        if "include_false_positives" in filters and filters["include_false_positives"] is not None:
+            graphql_filters["includeFalsePositives"] = filters["include_false_positives"]
+
         return graphql_filters
 
     def _build_graphql_query(self, project_path: str, filters: dict) -> str:
@@ -139,6 +142,9 @@ class ListVulnerabilities(DuoBaseTool):
 
         if "hasIssues" in filters:
             filter_args.append(f"hasIssues: {str(filters['hasIssues']).lower()}")
+
+        if "includeFalsePositives" in filters:
+            filter_args.append(f"includeFalsePositives: {str(filters['includeFalsePositives']).lower()}")
 
         # Always add pagination
         filter_args.append("first: 100")
@@ -276,13 +282,12 @@ class ListVulnerabilities(DuoBaseTool):
             return json.dumps({"error": "No valid project path found"})
 
         # Remove None values and prepare filters
-    if "has_issues" in filters and filters["has_issues"] is not None:
-        graphql_filters["hasIssues"] = filters["has_issues"]
-        
-    if "include_false_positives" in filters and filters["include_false_positives"] is not None:
-        graphql_filters["includeFalsePositives"] = filters["include_false_positives"]
+        filters = {k: v for k, v in kwargs.items() if v is not None}
 
-    return graphql_filters
+        # Convert REST-style filters to GraphQL format
+        graphql_filters = self._convert_rest_filters_to_graphql(filters)
+
+        try:
             # Build GraphQL query
             query = self._build_graphql_query(project_path, graphql_filters)
 
