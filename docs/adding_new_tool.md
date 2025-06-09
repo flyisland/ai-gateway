@@ -1,6 +1,8 @@
 # Adding a New Tool to Duo Workflow Service
 
-For a quick reference you can use [this merge request](https://gitlab.com/gitlab-org/modelops/applied-ml/code-suggestions/ai-assist/-/merge_requests/2630) to see all the code changes needed to add a new simple tool. You can continue reading to understand more complex cases.
+For a quick reference you can
+use [this merge request](https://gitlab.com/gitlab-org/modelops/applied-ml/code-suggestions/ai-assist/-/merge_requests/2630)
+to see all the code changes needed to add a new simple tool. You can continue reading to understand more complex cases.
 
 This guide provides step-by-step instructions for implementing and integrating a new tool into the GitLab Duo Workflow
 Service.
@@ -86,7 +88,8 @@ Before writing any code, clearly define:
 
 ### 3. Update Protocol Buffers (if needed)
 
-Some new tools will require new or updated behaviour from the Duo Workflow Executor. If this is the case you'll need to roll out these changes over multiple steps. This is usually means:
+Some new tools will require new or updated behaviour from the Duo Workflow Executor. If this is the case you'll need to
+roll out these changes over multiple steps. This is usually means:
 
 1. Update the protocol buffer definition
 1. Update the protocol buffer library in the 2 executors
@@ -122,7 +125,11 @@ To update the protocol buffer definitions:
 
 ### 4. Register the Tool
 
-It is critical for security that tools are categorized by their capabilities. These categories are not for code organization but for security and safety purposes. Our `read_write_files` and `read_only_gitlab` are the only tools that don't usually require approval and as such these lists should not contain any risky behaviour. Any additions to those lists requires an appsec approval and you should explain clearly what the new tool can do and the risks if this tool is called without user approval by an agent misled by prompt injection.
+It is critical for security that tools are categorized by their capabilities. These categories are not for code
+organization but for security and safety purposes. Our `read_write_files` and `read_only_gitlab` are the only tools that
+don't usually require approval and as such these lists should not contain any risky behaviour. Any additions to those
+lists requires an appsec approval and you should explain clearly what the new tool can do and the risks if this tool is
+called without user approval by an agent misled by prompt injection.
 
 Add your tool to the appropriate list in `duo_workflow_service/components/tools_registry.py`:
 
@@ -209,11 +216,10 @@ CONTEXT_BUILDER_TOOLS = [
 1. **Tool Not Appearing in Agent Interface**:
    - Verify the tool is registered in `tools_registry.py`
    - Check that the tool name is included in the appropriate workflow tool list
-   - Ensure the workflow is using the right agent privileges
+   - Ensure the workflow is using the tool created
 
 1. **Tool Failing to Execute**:
    - Check for missing parameters in the tool call
-   - Verify the GitLab client is properly configured
    - Look for API permission issues
 
 1. **Protocol Buffer Errors**:
