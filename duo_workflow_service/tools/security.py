@@ -289,10 +289,10 @@ class ListVulnerabilities(DuoBaseTool):
         # For GraphQL, we need to decode the URL-encoded project path
         # The URL parser returns URL-encoded paths for REST API compatibility,
         # but GraphQL expects normal paths
-        if project_id:
-            project_path = unquote(str(project_id))
-        else:
+        if not project_id:
             return json.dumps({"error": "No valid project path found"})
+
+        project_path = unquote(str(project_id))
 
         # Remove None values and prepare filters
         filters = {k: v for k, v in kwargs.items() if v is not None}
@@ -313,41 +313,43 @@ class ListVulnerabilities(DuoBaseTool):
                 parse_json=True,
             )
 
-            # Extract vulnerabilities from GraphQL response
-            if (
-                "data" in response
-                and response["data"]
-                and "project" in response["data"]
-            ):
-                project_data = response["data"]["project"]
-                if project_data and "vulnerabilities" in project_data:
-                    vulnerabilities = project_data["vulnerabilities"]["nodes"]
-                    return json.dumps(
-                        {
-                            "vulnerabilities": vulnerabilities,
-                            "project": {
-                                "id": project_data.get("id"),
-                                "name": project_data.get("name"),
-                                "fullPath": project_data.get("fullPath"),
-                            },
-                            "pagination": project_data["vulnerabilities"]["pageInfo"],
-                            "total_count": project_data["vulnerabilities"]["count"],
-                        }
-                    )
-                else:
-                    return json.dumps(
-                        {
-                            "vulnerabilities": [],
-                            "error": "Project not found or no vulnerabilities available",
-                        }
-                    )
-            elif "errors" in response:
-                return json.dumps({"error": f"GraphQL errors: {response['errors']}"})
-            else:
-                return json.dumps({"error": "Unexpected GraphQL response format"})
+            return self._process_graphql_response(response)
 
         except Exception as e:
             return json.dumps({"error": str(e)})
+
+    def _process_graphql_response(self, response: dict) -> str:
+        """Process GraphQL response and return formatted JSON."""
+        if "errors" in response:
+            return json.dumps({"error": f"GraphQL errors: {response['errors']}"})
+
+        if not (
+            "data" in response and response["data"] and "project" in response["data"]
+        ):
+            return json.dumps({"error": "Unexpected GraphQL response format"})
+
+        project_data = response["data"]["project"]
+        if not (project_data and "vulnerabilities" in project_data):
+            return json.dumps(
+                {
+                    "vulnerabilities": [],
+                    "error": "Project not found or no vulnerabilities available",
+                }
+            )
+
+        vulnerabilities = project_data["vulnerabilities"]["nodes"]
+        return json.dumps(
+            {
+                "vulnerabilities": vulnerabilities,
+                "project": {
+                    "id": project_data.get("id"),
+                    "name": project_data.get("name"),
+                    "fullPath": project_data.get("fullPath"),
+                },
+                "pagination": project_data["vulnerabilities"]["pageInfo"],
+                "total_count": project_data["vulnerabilities"]["count"],
+            }
+        )
 
     def format_display_message(self, args: ListVulnerabilitiesInput) -> str:
         if args.url:
