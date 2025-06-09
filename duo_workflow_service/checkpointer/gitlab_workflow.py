@@ -61,9 +61,9 @@ def not_implemented_sync_method(func: T) -> T:
     return wrapper  # type: ignore
 
 
-NOOP_WORKFLOW_STATUSES=[
-    WorkflowStatusEnum.APPROVAL_ERROR
-]
+NOOP_WORKFLOW_STATUSES = [WorkflowStatusEnum.APPROVAL_ERROR]
+
+
 class WorkflowStatusEventEnum(StrEnum):
     START = "start"
     FINISH = "finish"
@@ -77,14 +77,14 @@ class WorkflowStatusEventEnum(StrEnum):
     REQUIRE_TOOL_CALL_APPROVAL = "require_tool_call_approval"
 
 
-WorkflowStatusToStatusEvent = {
-    WorkflowStatusEnum.COMPLETED: WorkflowStatusEventEnum.FINISH,
-    WorkflowStatusEnum.ERROR: WorkflowStatusEventEnum.DROP,
-    WorkflowStatusEnum.CANCELLED: WorkflowStatusEventEnum.STOP,
-    WorkflowStatusEnum.PAUSED: WorkflowStatusEventEnum.PAUSE,
-    WorkflowStatusEnum.INPUT_REQUIRED: WorkflowStatusEventEnum.REQUIRE_INPUT,
-    WorkflowStatusEnum.PLAN_APPROVAL_REQUIRED: WorkflowStatusEventEnum.REQUIRE_PLAN_APPROVAL,
-    WorkflowStatusEnum.TOOL_CALL_APPROVAL_REQUIRED: WorkflowStatusEventEnum.REQUIRE_TOOL_CALL_APPROVAL,
+CheckpointStatusToStatusEvent = {
+    "FINISHED": WorkflowStatusEventEnum.FINISH,
+    "FAILED": WorkflowStatusEventEnum.DROP,
+    "STOPPED": WorkflowStatusEventEnum.STOP,
+    "PAUSED": WorkflowStatusEventEnum.PAUSE,
+    "INPUT_REQUIRED": WorkflowStatusEventEnum.REQUIRE_INPUT,
+    "PLAN_APPROVAL_REQUIRED": WorkflowStatusEventEnum.REQUIRE_PLAN_APPROVAL,
+    "TOOL_CALL_APPROVAL_REQUIRED": WorkflowStatusEventEnum.REQUIRE_TOOL_CALL_APPROVAL,
 }
 
 WORKFLOW_STATUS_TO_CHECKPOINT_STATUS = {
@@ -98,10 +98,11 @@ WORKFLOW_STATUS_TO_CHECKPOINT_STATUS = {
         WorkflowStatusEnum.NOT_STARTED: "CREATED",
         WorkflowStatusEnum.COMPLETED: "FINISHED",
         WorkflowStatusEnum.CANCELLED: "STOPPED",
-        WorkflowStatusEnum.TOOL_CALL_APPROVAL_REQUIRED: "REQUIRE_TOOL_CALL_APPROVAL",
+        WorkflowStatusEnum.TOOL_CALL_APPROVAL_REQUIRED: "TOOL_CALL_APPROVAL_REQUIRED",
     },
-    **{status: "RUNNING" for status in NOOP_WORKFLOW_STATUSES}
+    **{status: "RUNNING" for status in NOOP_WORKFLOW_STATUSES},
 }
+
 
 def _attribute_dirty(attribute: str, metadata: CheckpointMetadata) -> bool:
     writes = metadata.get("writes")
@@ -571,31 +572,18 @@ class GitLabWorkflow(BaseCheckpointSaver[Any], AbstractAsyncContextManager[Any])
 
         For example, `drop` status event changes a workflow status from
         `created`, `running` or `paused` to `failed`.
+        For workflow status `not started`, there is no status event
+        Resume, Retry and start workflow events are handled with  self._status_event method
         """
         status_event = None
         if _attribute_dirty("status", metadata):
             workflow_status = checkpoint["channel_values"].get("status")
-            if workflow_status in NOOP_WORKFLOW_STATUSES:
+            if workflow_status is None or workflow_status in NOOP_WORKFLOW_STATUSES:
                 return status_event
-            return WORKFLOW_STATUS_TO_CHECKPOINT_STATUS.get(workflow_status)
+            checkpoint_status = WORKFLOW_STATUS_TO_CHECKPOINT_STATUS.get(
+                workflow_status
+            )
+            if checkpoint_status:
+                status_event = CheckpointStatusToStatusEvent.get(checkpoint_status)
 
-
-    def _get_status_event_from_human_input(
-        self,
-        checkpoint: Checkpoint,
-    ) -> Optional[WorkflowStatusEventEnum]:
-        last_human_input = checkpoint["channel_values"].get("last_human_input")
-        if not (last_human_input and "event_type" in last_human_input):
-            return None
-
-        # workflow was already resumed when it was started again
-        # this can be unified when human input check uses interrupts too
-        if last_human_input["event_type"] == "resume" and checkpoint[
-            "channel_values"
-        ].get("status") not in (
-            WorkflowStatusEnum.INPUT_REQUIRED,
-            WorkflowStatusEnum.PLAN_APPROVAL_REQUIRED,
-        ):
-            return WorkflowStatusEventEnum.RESUME
-
-        return None
+        return status_event

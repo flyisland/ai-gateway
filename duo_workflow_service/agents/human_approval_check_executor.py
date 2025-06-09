@@ -21,7 +21,9 @@ log = structlog.get_logger("human_approval_check_executor")
 class HumanApprovalCheckExecutor:
     _agent_name: str
 
-    def __init__(self, agent_name: str, workflow_id: str, approved_agent_state: str) -> None:
+    def __init__(
+        self, agent_name: str, workflow_id: str, approved_agent_state: str
+    ) -> None:
         self._agent_name = agent_name
         self._workflow_id = workflow_id
         self._approved_agent_state = approved_agent_state

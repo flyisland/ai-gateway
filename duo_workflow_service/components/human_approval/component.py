@@ -26,7 +26,6 @@ log = structlog.get_logger("human_approval_component")
 class Routes(StrEnum):
     CONTINUE = "continue"
     BACK = "back"
-    SKIP = "skip"
     STOP = "stop"
 
 
@@ -82,7 +81,8 @@ class HumanApprovalComponent(ABC):
         graph.add_node(
             f"{self._node_prefix}_check_{self._approved_agent_name}",
             HumanApprovalCheckExecutor(
-                agent_name=self._approved_agent_name, workflow_id=self._workflow_id,
+                agent_name=self._approved_agent_name,
+                workflow_id=self._workflow_id,
                 approved_agent_state=self._approved_agent_state,
             ).run,
         )
@@ -123,8 +123,8 @@ class HumanApprovalComponent(ABC):
         self, state: WorkflowState
     ) -> Literal[Routes.CONTINUE, Routes.BACK]:
         if state["status"] == WorkflowStatusEnum.APPROVAL_ERROR:
-            return Routes.CONTINUE
-        return Routes.SKIP
+            return Routes.BACK
+        return Routes.CONTINUE
 
     def _request_approval(self, state: WorkflowState):
         approval_request = self._build_approval_request(state)

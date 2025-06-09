@@ -12,7 +12,6 @@ from duo_workflow_service.agents import HumanApprovalCheckExecutor
 from duo_workflow_service.components.human_approval.tools_approval import (
     ToolsApprovalComponent,
 )
-from duo_workflow_service.components.tools_registry import ToolsRegistry
 from duo_workflow_service.entities.event import WorkflowEventType
 from duo_workflow_service.entities.state import (
     MessageTypeEnum,
@@ -99,6 +98,7 @@ class TestToolsApprovalComponent:
         return ToolsApprovalComponent(
             workflow_id=graph_config["configurable"]["thread_id"],
             approved_agent_name="test-agent",
+            approved_agent_state=WorkflowStatusEnum.PLANNING,
             toolset=mock_toolset,
         )
 
@@ -427,7 +427,7 @@ class TestToolsApprovalComponent:
             mock_continuation_node.assert_not_called()
 
     @pytest.mark.asyncio
-    async def test_tools_approval_with_mallformed_tool_call_arguments(
+    async def test_tools_approval_with_malformed_tool_call_arguments(
         self,
         component: ToolsApprovalComponent,
         graph_config,

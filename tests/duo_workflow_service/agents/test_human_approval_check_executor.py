@@ -43,11 +43,17 @@ class TestHumanApprovalCheckExecutor:
     async def test_run_with_resume(self, mock_interrupt, workflow_state):
         event = {"event_type": WorkflowEventType.RESUME}
         mock_interrupt.return_value = event
-        executor = HumanApprovalCheckExecutor("agent", "1234")
+        executor = HumanApprovalCheckExecutor(
+            "agent", "1234", WorkflowStatusEnum.TOOL_CALL_APPROVAL_REQUIRED
+        )
 
         result = await executor.run(workflow_state)
 
-        assert result == {"last_human_input": event, "ui_chat_log": []}
+        assert result == {
+            "last_human_input": event,
+            "ui_chat_log": [],
+            "status": WorkflowStatusEnum.TOOL_CALL_APPROVAL_REQUIRED,
+        }
 
     @patch.dict(os.environ, {"WORKFLOW_INTERRUPT": "true"})
     @pytest.mark.asyncio
@@ -55,7 +61,9 @@ class TestHumanApprovalCheckExecutor:
     async def test_run_with_message(self, mock_interrupt, workflow_state):
         event = {"event_type": WorkflowEventType.MESSAGE, "message": "response"}
         mock_interrupt.return_value = event
-        executor = HumanApprovalCheckExecutor("agent", "1234")
+        executor = HumanApprovalCheckExecutor(
+            "agent", "1234", WorkflowStatusEnum.TOOL_CALL_APPROVAL_REQUIRED
+        )
         workflow_state["conversation_history"] = {
             "agent": [
                 AIMessage(
@@ -84,7 +92,9 @@ class TestHumanApprovalCheckExecutor:
     async def test_run_with_empty_message(self, mock_interrupt, workflow_state):
         event = {"event_type": WorkflowEventType.MESSAGE, "message": ""}
         mock_interrupt.return_value = event
-        executor = HumanApprovalCheckExecutor("agent", "1234")
+        executor = HumanApprovalCheckExecutor(
+            "agent", "1234", WorkflowStatusEnum.TOOL_CALL_APPROVAL_REQUIRED
+        )
         workflow_state["conversation_history"] = {
             "agent": [
                 AIMessage(
