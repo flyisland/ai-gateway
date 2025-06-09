@@ -1,5 +1,7 @@
 # Adding a New Tool to Duo Workflow Service
 
+For a quick reference you can use [this merge request](https://gitlab.com/gitlab-org/modelops/applied-ml/code-suggestions/ai-assist/-/merge_requests/2630) to see all the code changes needed to add a new simple tool. You can continue reading to understand more complex cases.
+
 This guide provides step-by-step instructions for implementing and integrating a new tool into the GitLab Duo Workflow
 Service.
 
@@ -84,8 +86,14 @@ Before writing any code, clearly define:
 
 ### 3. Update Protocol Buffers (if needed)
 
-If your tool requires communication with the Duo Workflow Executor, you'll need to update the protocol buffer
-definitions:
+Some new tools will require new or updated behaviour from the Duo Workflow Executor. If this is the case you'll need to roll out these changes over multiple steps. This is usually means:
+
+1. Update the protocol buffer definition
+1. Update the protocol buffer library in the 2 executors
+1. Release the new executors
+1. Update Duo Workflow Service to use the new protocol buffers (including adding the tool)
+
+To update the protocol buffer definitions:
 
 1. **Edit Contract Definition**:
    Modify `contract/contract.proto` to add your new action:
@@ -113,6 +121,8 @@ definitions:
    ```
 
 ### 4. Register the Tool
+
+It is critical for security that tools are categorized by their capabilities. These categories are not for code organization but for security and safety purposes. Our `read_write_files` and `read_only_gitlab` are the only tools that don't usually require approval and as such these lists should not contain any risky behaviour. Any additions to those lists requires an appsec approval and you should explain clearly what the new tool can do and the risks if this tool is called without user approval by an agent misled by prompt injection.
 
 Add your tool to the appropriate list in `duo_workflow_service/components/tools_registry.py`:
 
@@ -175,14 +185,12 @@ CONTEXT_BUILDER_TOOLS = [
    - Use PascalCase for classes (e.g., `GetFileContent`, `UpdateIssue`)
 
 1. **Write Clear Documentation**:
+   - Documentation is read by the LLM to determine when and how to call a tool
+   - Documentation that is too verbose may waste time and input tokens
+   - Documentation that is not clear enough may confuse an LLM
    - Provide detailed descriptions for your tool
    - Document parameters thoroughly with examples
-   - Explain any side effects or permissions required
-
-1. **Error Handling**:
-   - Handle errors gracefully and provide useful error messages
-   - Validate inputs before executing operations
-   - Return clear error information to the agent
+   - Explain any side effects
 
 1. **Security Considerations**:
    - Add the tool to the appropriate privilege group based on what it does
