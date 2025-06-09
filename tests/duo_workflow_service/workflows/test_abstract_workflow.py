@@ -307,6 +307,7 @@ async def test_workflow_get_chat_model_without_vertex():
 @patch.dict(
     os.environ,
     {
+        "DUO_WORKFLOW__CONFIG_NAME": "vertex",
         "DUO_WORKFLOW__VERTEX_PROJECT_ID": "123",
         "DUO_WORKFLOW__VERTEX_LOCATION": "us-central",
     },
