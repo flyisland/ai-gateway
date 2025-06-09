@@ -1,4 +1,5 @@
 from typing import Any, List, NamedTuple, Optional
+from urllib.parse import unquote
 
 from langchain.tools import BaseTool
 from pydantic import BaseModel
@@ -80,12 +81,18 @@ class DuoBaseTool(BaseTool):
             url_project_id = GitLabUrlParser.parse_project_url(url, self.gitlab_host)
 
             # If both URL and project_id are provided, check if they match
-            if project_id is not None and str(project_id) != url_project_id:
-                errors.append(
-                    f"Project ID mismatch: provided '{project_id}' but URL contains '{url_project_id}'"
-                )
+            # The URL parser returns URL-encoded paths, so we need to decode both for comparison
+            if project_id is not None:
+                # Decode both paths for comparison
+                decoded_url_project_id = unquote(url_project_id)
+                decoded_provided_project_id = unquote(str(project_id))
 
-            # Use the project_id from the URL
+                if decoded_provided_project_id != decoded_url_project_id:
+                    errors.append(
+                        f"Project ID mismatch: provided '{project_id}' but URL contains '{decoded_url_project_id}'"
+                    )
+
+            # Use the project_id from the URL (URL-encoded for compatibility)
             return ProjectURLValidationResult(url_project_id, errors)
         except GitLabUrlParseError as e:
             errors.append(f"Failed to parse URL: {str(e)}")
@@ -130,10 +137,15 @@ class DuoBaseTool(BaseTool):
             )
 
             # If both URL and IDs are provided, check if they match
-            if project_id is not None and str(project_id) != url_project_id:
-                errors.append(
-                    f"Project ID mismatch: provided '{project_id}' but URL contains '{url_project_id}'"
-                )
+            # The URL parser returns URL-encoded paths, so we need to decode both for comparison
+            if project_id is not None:
+                decoded_url_project_id = unquote(url_project_id)
+                decoded_provided_project_id = unquote(str(project_id))
+
+                if decoded_provided_project_id != decoded_url_project_id:
+                    errors.append(
+                        f"Project ID mismatch: provided '{project_id}' but URL contains '{decoded_url_project_id}'"
+                    )
             if (
                 merge_request_iid is not None
                 and merge_request_iid != url_merge_request_iid
