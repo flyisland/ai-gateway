@@ -79,7 +79,7 @@ you can manually set it up following these steps:
 
    ```shell
    poetry run python -m duo_workflow_service.server
-    ```
+   ```
 
 1. If you can correctly connect to Claude, you should see something
    like this in the output.

@@ -192,8 +192,9 @@ CONTEXT_BUILDER_TOOLS = [
 
 1. **Security Considerations**:
    - Add the tool to the appropriate privilege group based on what it does
-   - Consider whether the tool should require human approval before execution
-   - Sanitize and validate all inputs to prevent injection attacks
+   - Consider whether the tool should
+     require [human approval](https://handbook.gitlab.com/handbook/engineering/architecture/design-documents/duo_workflow/#how-agent-tool-set-is-being-defined-for-each-workflow-run)
+     before execution
 
 1. **Performance**:
    - Keep tools focused on a single responsibility
