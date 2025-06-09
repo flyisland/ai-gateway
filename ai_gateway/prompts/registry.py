@@ -11,7 +11,7 @@ from ai_gateway.internal_events.client import InternalEventsClient
 from ai_gateway.model_metadata import TypeModelMetadata
 from ai_gateway.model_selection.model_selection_config import LLMDefinition, UnitPrimitiveConfig
 from ai_gateway.prompts.base import BasePromptRegistry, Prompt
-from ai_gateway.prompts.config import ModelClassProvider, PromptConfig
+from ai_gateway.prompts.config import BaseModelConfig, ModelClassProvider, PromptConfig
 from ai_gateway.prompts.typing import TypeModelFactory
 from ai_gateway.model_selection import ModelSelectionConfig
 
@@ -139,23 +139,32 @@ class LocalPromptRegistry(BasePromptRegistry):
         """Iterate over all prompt definition files matching [usecase]/[type]/[version].yml, and create a corresponding
         prompt for each one.
 
-        The base Prompt class is
-        used if no matching override is provided in `class_overrides`.
+        The base Prompt class is used if no matching override is provided in `class_overrides`.
         """
 
         base_path = Path(__file__).parent
         prompts_definitions_dir = base_path / "definitions"
+        model_configs_dir = base_path / "model_configs"
         prompts_registered = {}
 
         model_definitions = model_selection.get_llm_definitions()
         unit_primitive_configuration = model_selection.get_unit_primitive_config()
-
+        
+        model_configs = {
+            file.stem: cls._parse_base_model(file)
+            for file in model_configs_dir.glob("*.yml")
+        }
 
         # Iterate over each folder
         for path in prompts_definitions_dir.glob("**"):
             # Iterate over each version file
             versions = {
-                version.stem: cls._process_version_file(version, model_definitions, unit_primitive_configuration)
+                version.stem: cls._process_version_file(
+                    version, 
+                    model_definitions, 
+                    unit_primitive_configuration,
+                    model_configs  # Pass model_configs for fallback
+                )
                 for version in path.glob("*.yml")
             }
 
@@ -178,6 +187,7 @@ class LocalPromptRegistry(BasePromptRegistry):
         )
 
         return cls(
+            model_selection,
             prompts_registered,
             model_factories,
             default_prompts,
@@ -188,58 +198,113 @@ class LocalPromptRegistry(BasePromptRegistry):
         )
 
     @classmethod
+    def _parse_base_model(cls, file_name: Path) -> BaseModelConfig:
+        """Parses a YAML file and converts its content to a BaseModelConfig object.
+
+        This method reads the specified YAML file, extracts the configuration
+        parameters, and constructs a BaseModelConfig object. It handles the
+        conversion of YAML data types to appropriate Python types.
+
+        Args:
+            file (Path): A Path object pointing to the YAML file to be parsed.
+
+        Returns:
+            BaseModelConfig: An instance of BaseModelConfig containing the
+            parsed configuration data.
+        """
+
+        with open(file_name, "r") as fp:
+            return BaseModelConfig(**yaml.safe_load(fp))
+
+    @classmethod
     def _process_version_file(
-        cls, version_file: Path,
-        model_definitions:dict[str,LLMDefinition], 
-        unit_primitive_configuration: list[UnitPrimitiveConfig]
+        cls, 
+        version_file: Path,
+        model_definitions: dict[str, LLMDefinition], 
+        unit_primitive_configuration: list[UnitPrimitiveConfig],
+        model_configs: dict[str, BaseModelConfig]
     ) -> PromptConfig:
         """Processes a single version YAML file and returns a PromptConfig.
 
         Args:
             version_file: Path to the version YAML file
-            unit_primitive_configuration: unit primitive configuration for specific model selection
             model_definitions: LLM definitions as a mapping of identifier to LLMDefinition
+            unit_primitive_configuration: unit primitive configuration for specific model selection
+            model_configs: Dictionary of model configurations for fallback
 
         Returns:
             PromptConfig: Processed prompt configuration
         """
-
 
         with open(version_file, "r") as fp:
             prompt_config_params = yaml.safe_load(fp)
 
             model_family = prompt_config_params.get('model', {}).get('name')
 
-            # Model metadata not associated with the following unit primitive
-            if not model_family:
-                unit_primitives = prompt_config_params['unit_primitives']
+            # Model metadata is provided in the respctives request to include
+            if model_family:
+                log.info("Using explicit model family", model_family=model_family, version_file=version_file)
+                return PromptConfig(**prompt_config_params)
+
+            unit_primitives = prompt_config_params.get('unit_primitives', [])
+            if unit_primitives:
                 unit_primitive_config = cls.get_config_for_unit_primitive(unit_primitive_configuration, unit_primitives)
-
-                if unit_primitive_config is None:
-                    log.info(f"Model selection for unit primitives {unit_primitives} is not defined in config")
-                    # Need to assign a default provider for Pydantic Validation
-                else:
+                
+                if unit_primitive_config is not None:
                     gitlab_identifier = unit_primitive_config.default_model
+                    model_definition = model_definitions[gitlab_identifier]
 
-                    model_selection_prompt_config_params = model_definitions[gitlab_identifier].params
-                    model_selection_prompt_config_params['model_class_provider'] = model_definitions[gitlab_identifier].provider
-                    model_selection_prompt_config_params["name"] = model_definitions[gitlab_identifier].provider_identifier
+                    
+                    model_selection_prompt_config_params = model_definition.params.copy()
+                    model_selection_prompt_config_params['model_class_provider'] = model_definition.provider
+                    model_selection_prompt_config_params["name"] = model_definition.provider_identifier
 
-                    log.info("Model selection params", model_selection_prompt_config_params=model_selection_prompt_config_params, version_file=version_file)
+                    log.info("Using unit primitive model selection", 
+                            model_selection_prompt_config_params=model_selection_prompt_config_params, 
+                            version_file=version_file,
+                            unit_primitives=unit_primitives)
 
-                    prompt_config_params = cls._patch_model_configuration(
-                        model_selection_prompt_config_params or {}, prompt_config_params
+                    prompt_config_params = cls._patch_model_configuration_from_unit_primitive(
+                        model_selection_prompt_config_params, prompt_config_params
                     )
+                    
+                    log.info("Final prompt config from unit primitive", prompt_config_params=prompt_config_params)
+                    return PromptConfig(**prompt_config_params)
+                else:
+                    log.info(f"Model selection for unit primitives {unit_primitives} is not defined in config, trying config_file fallback")
 
-
-            log.info("Final prompt config", prompt_config_params=prompt_config_params)
-
-            return PromptConfig(**prompt_config_params)
+            # Fallback to config_file approach if unit primitive lookup failed or no unit_primitives specified
+            if "config_file" in prompt_config_params.get("model", {}):
+                model_config_name = prompt_config_params["model"]["config_file"]
+                config_for_general_model = model_configs.get(model_config_name)
+                
+                if config_for_general_model:
+                    log.info("Using config_file fallback", 
+                            config_file=model_config_name, 
+                            version_file=version_file)
+                    
+                    prompt_config_params = cls._patch_model_configuration_from_config_file(
+                        config_for_general_model, prompt_config_params
+                    )
+                    
+                    log.info("Final prompt config from config_file", prompt_config_params=prompt_config_params)
+                    return PromptConfig(**prompt_config_params)
+                else:
+                    log.error(f"Config file '{model_config_name}' not found in model_configs")
+                    raise ValueError(f"Config file '{model_config_name}' not found in model_configs")
+            
+            # If we get here, neither unit primitive nor config_file approach worked
+            log.error("No valid model configuration found", 
+                     version_file=version_file,
+                     unit_primitives=unit_primitives,
+                     has_config_file="config_file" in prompt_config_params.get("model", {}))
+            raise ValueError(f"No valid model configuration found for {version_file}")
 
     @classmethod
-    def _patch_model_configuration(
+    def _patch_model_configuration_from_unit_primitive(
         cls, model_selection_prompt_config_params: dict, prompt_config_params: dict
     ) -> dict:
+        """Patch model configuration from unit primitive selection."""
         params_without_name = model_selection_prompt_config_params.copy()
         params_without_name.pop('name', None)
         
@@ -252,6 +317,29 @@ class LocalPromptRegistry(BasePromptRegistry):
             **prompt_config_params,
             "model": {
                 "name": model_selection_prompt_config_params['name'],
+                "params": params,
+            },
+        }
+
+    @classmethod
+    def _patch_model_configuration_from_config_file(
+        cls, config_for_general_model: BaseModelConfig, prompt_config_params: dict
+    ) -> dict:
+        """
+        TODO: please remove this codepath once all the tool unit primitives have
+        been moved over to the ai_gateway/model_selection/unit_primitives.yml, 
+        model selection. The following is only meant for a fallover assuming
+        the model selection information isn't present.
+        Patch model configuration from config file."""
+        params = {
+            **config_for_general_model.params.model_dump(),
+            **prompt_config_params["model"].get("params", {}),
+        }
+
+        return {
+            **prompt_config_params,
+            "model": {
+                "name": config_for_general_model.name,
                 "params": params,
             },
         }
