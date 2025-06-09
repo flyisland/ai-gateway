@@ -17,15 +17,6 @@ implementation details, and best practices.
 
 ## Implementation Steps
 
-### 1. Design Your Tool
-
-Before writing any code, clearly define:
-
-- What your tool will do
-- What inputs it requires
-- What outputs it will produce
-- What permissions or agent privileges it needs
-
 ### 2. Create the Tool Class
 
 1. **Choose the Right Location**:
