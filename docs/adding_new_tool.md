@@ -79,7 +79,7 @@ implementation details, and best practices.
 
 ### 3. Update Protocol Buffers (if needed)
 
-Some new tools will require new or updated behaviour from the Duo Workflow Executor. If this is the case you'll need to
+Some new tools will require new or updated behavior from the Duo Workflow Executor. If this is the case you'll need to
 roll out these changes over multiple steps. This is usually means:
 
 1. Update the protocol buffer definition
@@ -118,7 +118,7 @@ To update the protocol buffer definitions:
 
 It is critical for security that tools are categorized by their capabilities. These categories are not for code
 organization but for security and safety purposes. Our `read_write_files` and `read_only_gitlab` are the only tools that
-don't usually require approval and as such these lists should not contain any risky behaviour. Any additions to those
+don't usually require approval and as such these lists should not contain any risky behavior. Any additions to those
 lists requires an appsec approval and you should explain clearly what the new tool can do and the risks if this tool is
 called without user approval by an agent misled by prompt injection.
 
