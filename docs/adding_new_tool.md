@@ -211,8 +211,6 @@ CONTEXT_BUILDER_TOOLS = [
    - Ensure the workflow is using the tool created
 
 1. **Tool Failing to Execute**:
-   - Check for missing parameters in the tool call
-   - Look for API permission issues
 
 1. **Protocol Buffer Errors**:
    - Make sure you've regenerated the protocol buffers with `make gen-proto`
