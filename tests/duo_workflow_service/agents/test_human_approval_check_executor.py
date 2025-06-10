@@ -71,6 +71,7 @@ class TestHumanApprovalCheckExecutor:
 
         result = await executor.run(workflow_state)
 
+        assert result["status"] == "approved-agent-status"
         assert result["last_human_input"] == event
         assert result["conversation_history"]["agent"] == [
             ToolMessage(
@@ -100,6 +101,7 @@ class TestHumanApprovalCheckExecutor:
 
         result = await executor.run(workflow_state)
 
+        assert result["status"] == "approved-agent-status"
         assert result["last_human_input"] == event
         assert len(result["ui_chat_log"]) == 1
         assert result["ui_chat_log"][0]["message_type"] == MessageTypeEnum.AGENT

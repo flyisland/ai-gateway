@@ -51,6 +51,7 @@ class HumanApprovalCheckExecutor:
         )
 
         if event["event_type"] == WorkflowEventType.MESSAGE:
+            updates["status"] = self._approved_agent_state
             message = event["message"]
             correlation_id = (
                 event["correlation_id"] if event.get("correlation_id") else None

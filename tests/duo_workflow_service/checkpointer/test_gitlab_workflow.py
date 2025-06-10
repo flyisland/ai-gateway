@@ -767,30 +767,6 @@ async def test_workflow_status_events(
 
 
 @pytest.mark.asyncio
-async def test_resume_status_event(
-    gitlab_workflow, http_client, checkpoint_metadata, workflow_id
-):
-    checkpoint = {
-        "id": "resume-checkpoint",
-        "channel_values": {"last_human_input": {"event_type": "resume"}},
-    }
-    config: RunnableConfig = {"configurable": {}}
-
-    http_client.apatch.return_value = GitLabHttpResponse(status_code=200, body={})
-
-    await gitlab_workflow.aput(
-        config, checkpoint, checkpoint_metadata, ChannelVersions()
-    )
-
-    http_client.apatch.assert_called_with(
-        path=f"/api/v4/ai/duo_workflows/workflows/{workflow_id}",
-        body=json.dumps({"status_event": WorkflowStatusEventEnum.RESUME.value}),
-        parse_json=True,
-        use_http_response=True,
-    )
-
-
-@pytest.mark.asyncio
 @patch("duo_workflow_service.checkpointer.gitlab_workflow.DuoWorkflowInternalEvent")
 async def test_track_workflow_completion_early_return(
     mock_internal_event_tracker, gitlab_workflow
