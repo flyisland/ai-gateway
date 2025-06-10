@@ -6,6 +6,8 @@ from pydantic import BaseModel, Field
 from duo_workflow_service.gitlab.url_parser import GitLabUrlParseError, GitLabUrlParser
 from duo_workflow_service.tools.duo_base_tool import DuoBaseTool
 
+from gitlab_cloud_connector import GitLabUnitPrimitive
+
 DESCRIPTION_CHARACTER_LIMIT = 1_048_576
 
 GROUP_IDENTIFICATION_DESCRIPTION = """To identify the group you must provide either:
@@ -416,6 +418,8 @@ class GetEpic(EpicBaseTool):
         get_epic(url="https://gitlab.com/groups/namespace/group/-/epics/42")
     """
     args_schema: Type[BaseModel] = EpicResourceInput
+
+    unit_primitive: GitLabUnitPrimitive = GitLabUnitPrimitive.ASK_EPIC
 
     async def _arun(self, **kwargs: Any) -> str:
         url = kwargs.get("url")

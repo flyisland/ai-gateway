@@ -6,6 +6,8 @@ from pydantic import BaseModel
 from duo_workflow_service.gitlab.http_client import GitlabHttpClient
 from duo_workflow_service.gitlab.url_parser import GitLabUrlParseError, GitLabUrlParser
 
+from gitlab_cloud_connector import GitLabUnitPrimitive
+
 
 class ProjectURLValidationResult(NamedTuple):
     project_id: Optional[str]
@@ -37,6 +39,8 @@ def format_tool_display_message(tool: BaseTool, args: Any) -> Optional[str]:
 
 
 class DuoBaseTool(BaseTool):
+    unit_primitive: Optional[GitLabUnitPrimitive] = None
+
     @property
     def gitlab_client(self) -> GitlabHttpClient:
         client = self.metadata.get("gitlab_client")  # type: ignore
