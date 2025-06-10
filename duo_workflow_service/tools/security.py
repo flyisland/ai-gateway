@@ -54,6 +54,18 @@ class ListVulnerabilitiesInput(ProjectResourceInput):
         default=None,
         description="Include false positives in the results.",
     )
+    per_page: Optional[int] = Field(
+        default=100,
+        description="Number of results per page (default: 100, max: 100).",
+    )
+    page: Optional[int] = Field(
+        default=1,
+        description="Page number to fetch (default: 1).",
+    )
+    fetch_all_pages: Optional[bool] = Field(
+        default=True,
+        description="Whether to fetch all pages of results (default: True).",
+    )
 
 
 class ListVulnerabilities(DuoBaseTool):
@@ -73,6 +85,9 @@ class ListVulnerabilities(DuoBaseTool):
     async def _arun(self, **kwargs: Any) -> str:
         url = kwargs.pop("url", None)
         project_id = kwargs.pop("project_id", None)
+        fetch_all_pages = kwargs.pop("fetch_all_pages", True)
+        per_page = kwargs.pop("per_page", 100)
+        page = kwargs.pop("page", 1)
 
         project_id, errors = self._validate_project_url(url, project_id)
 
@@ -80,14 +95,44 @@ class ListVulnerabilities(DuoBaseTool):
             return json.dumps({"error": "; ".join(errors)})
 
         params = {k: v for k, v in kwargs.items() if v is not None}
+        params["per_page"] = per_page
+        params["page"] = page
+
+        all_vulnerabilities = []
+        current_page = page
+        total_pages = None
 
         try:
-            response = await self.gitlab_client.aget(
-                path=f"/api/v4/projects/{project_id}/vulnerabilities",
-                params=params,
-                parse_json=False,
-            )
-            return json.dumps({"vulnerabilities": response})
+            while True:
+                params["page"] = current_page
+                response = await self.gitlab_client.aget(
+                    path=f"/api/v4/projects/{project_id}/vulnerabilities",
+                    params=params,
+                    parse_json=True,
+                )
+                
+                vulnerabilities = response
+                all_vulnerabilities.extend(vulnerabilities)
+                
+                # Get total pages from headers if available
+                if total_pages is None and hasattr(self.gitlab_client, 'last_response'):
+                    total_pages = int(self.gitlab_client.last_response.headers.get('X-Total-Pages', 0))
+                
+                # Break if we're not fetching all pages or if we've reached the last page
+                if not fetch_all_pages or len(vulnerabilities) < per_page or (total_pages and current_page >= total_pages):
+                    break
+                    
+                current_page += 1
+
+            return json.dumps({
+                "vulnerabilities": all_vulnerabilities,
+                "pagination": {
+                    "total_items": len(all_vulnerabilities),
+                    "total_pages": total_pages,
+                    "current_page": current_page,
+                    "per_page": per_page
+                }
+            })
         except Exception as e:
             return json.dumps({"error": str(e)})
 
