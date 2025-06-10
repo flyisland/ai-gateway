@@ -28,6 +28,7 @@ from duo_workflow_service.interceptors.feature_flag_interceptor import (
 )
 from duo_workflow_service.tracking.errors import log_exception
 from duo_workflow_service.workflows.abstract_workflow import AbstractWorkflow
+from duo_workflow_service.llm_factory import create_chat_model
 
 MAX_TOKENS_TO_SAMPLE = 8192
 DEBUG = os.getenv("DEBUG")
@@ -82,13 +83,27 @@ CHAT_MUTATION_TOOLS = [
 class ReactAgentComponent:
     def __init__(
             self, 
-            prompt_registry, 
+            prompt,
+            model, 
             toolset,
             workflow_id,
             workflow_type,
         ):
-        self._agent: ChatAgent = prompt_registry.get(  # type: ignore[assignment]
-            "chat/agent", tools=toolset.bindable, prompt_version="^1.0.0"  # type: ignore[arg-type]
+        # self._agent: ChatAgent = prompt_registry.get(  # type: ignore[assignment]
+        #     "chat/agent", tools=toolset.bindable, prompt_version="^1.0.0"  # type: ignore[arg-type]
+        # )
+        self._agent_name = "chat/agent" + datetime.today().strftime("%Y%m%d")
+
+        self._agent = Agent(
+            goal="N/A",
+            model=model,
+            name=self._agent_name,
+            system_prompt=prompt,
+            toolset=toolset,
+            workflow_id=workflow_id,
+            http_client=None,
+            check_events=False,
+            workflow_type=workflow_type,
         )
         self.tools_runner = ToolsExecutor(
             tools_agent_name=self._agent.name,
@@ -226,7 +241,11 @@ class Workflow(AbstractWorkflow):
         agents_toolset = tools_registry.toolset(tools)
 
         chat_agent_component = ReactAgentComponent(
-            prompt_registry=prompt_registry,
+            prompt="You are a helpful assistant. Your answers should be useful, polite, concise, and human-friendly.",
+            model=create_chat_model(
+                max_tokens=MAX_TOKENS_TO_SAMPLE,
+                config=self._model_config,
+            ),
             toolset=agents_toolset,
             workflow_id=self._workflow_id,
             workflow_type=self._workflow_type,
