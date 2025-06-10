@@ -113,6 +113,7 @@ async def test_list_vulnerabilities(gitlab_client_mock, metadata, vulnerability_
 
     gitlab_client_mock.aget.assert_called_once_with(
         path="/api/v4/projects/1/vulnerabilities",
+        params={},
         parse_json=False,
     )
 
@@ -145,6 +146,7 @@ async def test_list_vulnerabilities_with_url_success(
 
     gitlab_client_mock.aget.assert_called_once_with(
         path=expected_path,
+        params={},
         parse_json=False,
     )
 
