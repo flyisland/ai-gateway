@@ -218,6 +218,75 @@ params:
 """,
     )
 
+    model_selection_dir = (
+        Path(__file__).parent.parent.parent / "ai_gateway" / "model_selection"
+    )
+    
+    fs.create_file(
+        model_selection_dir / "models.yml",
+        contents="""
+models:
+  - gitlab_identifier: "claude-3-7-sonnet-20250219"
+    name: "claude-3-7-sonnet-20250219"
+    provider: "anthropic"
+    model_family: "claude-3-7-sonnet"
+    input_cost_per_token: 0.000003
+    output_cost_per_token: 0.000015
+    max_input_tokens: 200000
+    max_output_tokens: 8192
+    context_window: 200000
+  - gitlab_identifier: "claude-3-haiku-20240307"
+    name: "claude-3-haiku-20240307"
+    provider: "anthropic"
+    model_family: "claude-3-haiku"
+    input_cost_per_token: 0.00000025
+    output_cost_per_token: 0.00000125
+    max_input_tokens: 200000
+    max_output_tokens: 4096
+    context_window: 200000
+  - gitlab_identifier: "claude-3-5-sonnet-20241022"
+    name: "claude-3-5-sonnet-20241022"
+    provider: "anthropic"
+    model_family: "claude-3-5-sonnet"
+    input_cost_per_token: 0.000003
+    output_cost_per_token: 0.000015
+    max_input_tokens: 200000
+    max_output_tokens: 8192
+    context_window: 200000
+""",
+    )
+    
+    fs.create_file(
+        model_selection_dir / "unit_primitives.yml",
+        contents="""
+configurable_unit_primitives:
+  - name: "generate_code"
+    unit_primitives: ["generate_code"]
+    model_selection:
+      temperature: 0.0
+      max_tokens: 4096
+      max_retries: 1
+      model_class_provider: "anthropic"
+      name: "claude-3-7-sonnet-20250219"
+  - name: "complete_code"
+    unit_primitives: ["complete_code"]
+    model_selection:
+      temperature: 0.7
+      max_tokens: 64
+      max_retries: 1
+      model_class_provider: "fireworks_ai"
+      name: "fireworks_ai/codestral-2501"
+  - name: "duo_chat"
+    unit_primitives: ["duo_chat"]
+    model_selection:
+      temperature: 0.0
+      max_tokens: 4096
+      max_retries: 1
+      model_class_provider: "anthropic"
+      name: "claude-4-0"
+""",
+    )
+
 
 @pytest.fixture
 def model_factories():
@@ -440,6 +509,7 @@ def registry(
     disable_streaming: bool,
 ):
     return LocalPromptRegistry(
+        model_selection=mock_model_selection,
         model_factories=model_factories,
         prompts_registered=prompts_registered,
         default_prompts=default_prompts,
@@ -927,6 +997,7 @@ class TestLocalPromptRegistry:
                     },
                 ),
             },
+            model_selection=mock_model_selection,
             model_factories=model_factories,
             default_prompts={},
             internal_event_client=internal_event_client,
