@@ -74,9 +74,7 @@ async def tool_url_success_response(
 ):
     gitlab_client_mock.aget = AsyncMock(return_value=response_data)
 
-    response = await tool._arun(
-        url=url, project_id=project_id, **kwargs
-    )
+    response = await tool._arun(url=url, project_id=project_id, **kwargs)
 
     return response
 
@@ -89,9 +87,7 @@ async def assert_tool_url_error(
     gitlab_client_mock,
     **kwargs,
 ):
-    response = await tool._arun(
-        url=url, project_id=project_id, **kwargs
-    )
+    response = await tool._arun(url=url, project_id=project_id, **kwargs)
 
     error_response = json.loads(response)
     assert "error" in error_response
@@ -173,7 +169,9 @@ async def test_list_vulnerabilities_with_url_error(
 
 
 @pytest.mark.asyncio
-async def test_list_vulnerabilities_with_filters(gitlab_client_mock, metadata, vulnerability_data):
+async def test_list_vulnerabilities_with_filters(
+    gitlab_client_mock, metadata, vulnerability_data
+):
     gitlab_client_mock.aget = AsyncMock(return_value=vulnerability_data)
 
     tool = ListVulnerabilities(metadata=metadata)
@@ -235,4 +233,4 @@ async def test_list_vulnerabilities_exception(gitlab_client_mock, metadata):
 )
 def test_list_vulnerabilities_format_display_message(input_data, expected_message):
     tool = ListVulnerabilities(metadata={})
-    assert tool.format_display_message(input_data) == expected_message 
+    assert tool.format_display_message(input_data) == expected_message
