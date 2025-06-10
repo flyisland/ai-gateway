@@ -1,5 +1,5 @@
 import os
-from typing import Union, Optional
+from typing import Optional, Union
 
 from ai_gateway.models import KindAnthropicModel
 from duo_workflow_service.interceptors.feature_flag_interceptor import (
