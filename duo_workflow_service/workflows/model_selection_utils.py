@@ -1,5 +1,5 @@
 import os
-from typing import Union
+from typing import Union, Optional
 
 from ai_gateway.models import KindAnthropicModel
 from duo_workflow_service.interceptors.feature_flag_interceptor import (
@@ -11,8 +11,7 @@ from duo_workflow_service.llm_factory import AnthropicConfig, VertexConfig
 
 def get_sonnet_4_config_with_feature_flag(
     workflow_type: str,
-    parent_get_model_config_method,
-) -> Union[AnthropicConfig, VertexConfig]:
+) -> Optional[Union[AnthropicConfig, VertexConfig]]:
     """Get model configuration based on workflow type and feature flags.
 
     Determines which model configuration to use by checking workflow-specific
@@ -22,8 +21,6 @@ def get_sonnet_4_config_with_feature_flag(
 
     Args:
         workflow_type: The type of workflow ("software development" or "chat").
-        parent_get_model_config_method: The parent class's _get_model_config
-            method to fall back to when a feature flag is not set.
 
     Returns:
         Union[AnthropicConfig, VertexConfig]: The appropriate model configuration
@@ -52,4 +49,4 @@ def get_sonnet_4_config_with_feature_flag(
                 )
 
     # Fall back to parent implementation if flag not set
-    return parent_get_model_config_method()
+    return None

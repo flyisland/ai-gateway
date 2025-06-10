@@ -205,10 +205,8 @@ def _should_continue(
 class Workflow(AbstractWorkflow):
     def _get_model_config(self) -> Union[AnthropicConfig, VertexConfig]:
         """Override to use Sonnet 4 model for software development tasks."""
-        return get_sonnet_4_config_with_feature_flag(
-            self._workflow_type,
-            super()._get_model_config,
-        )
+        config = get_sonnet_4_config_with_feature_flag(self._workflow_type)
+        return config if config else super()._get_model_config()
 
     async def _handle_workflow_failure(
         self, error: BaseException, compiled_graph, graph_config
