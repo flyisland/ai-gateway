@@ -77,6 +77,7 @@ class WorkflowStatusEventEnum(StrEnum):
     REQUIRE_TOOL_CALL_APPROVAL = "require_tool_call_approval"
 
 
+# Maps current checkpoint status to the rails workflow state machine's event (if applicable)
 CheckpointStatusToStatusEvent = {
     "FINISHED": WorkflowStatusEventEnum.FINISH,
     "FAILED": WorkflowStatusEventEnum.DROP,
@@ -87,6 +88,8 @@ CheckpointStatusToStatusEvent = {
     "TOOL_CALL_APPROVAL_REQUIRED": WorkflowStatusEventEnum.REQUIRE_TOOL_CALL_APPROVAL,
 }
 
+# Maps WorkflowStatus(status key in LangGraph's WorkflowState) to checkpoint status.
+# Checkpoint status represents status human-readable workflow status (displayed in the UI)
 WORKFLOW_STATUS_TO_CHECKPOINT_STATUS = {
     **{
         WorkflowStatusEnum.EXECUTION: "RUNNING",
@@ -162,7 +165,8 @@ class GitLabWorkflow(BaseCheckpointSaver[Any], AbstractAsyncContextManager[Any])
         config: RunnableConfig,
         writes: Sequence[Tuple[str, Any]],
         task_id: str,
-        task_path: str = "",  # We are ignoring this parameter for now since we don't care for the order the pending writes are fetched in
+        task_path: str = "",
+        # We are ignoring this parameter for now since we don't care for the order the pending writes are fetched in
     ) -> None:
         return
 
@@ -480,7 +484,8 @@ class GitLabWorkflow(BaseCheckpointSaver[Any], AbstractAsyncContextManager[Any])
         config: RunnableConfig,
         writes: Sequence[Tuple[str, Any]],
         task_id: str,
-        task_path: str = "",  # We are ignoring this parameter for now since we don't care for the order the pending writes are fetched in
+        task_path: str = "",
+        # We are ignoring this parameter for now since we don't care for the order the pending writes are fetched in
     ) -> None:
         configurable = config.get("configurable", {})
         checkpoint_id = configurable.get("checkpoint_id")

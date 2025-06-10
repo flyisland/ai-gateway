@@ -672,6 +672,22 @@ def test_aput_with_no_status_update(
     assert status_event is None
 
 
+def test_aput_with_noop_status_update(
+    checkpoint_data,
+    checkpoint_metadata,
+    http_client,
+    workflow_id,
+    workflow_type,
+):
+    workflow = GitLabWorkflow(http_client, workflow_id, workflow_type=workflow_type)
+    checkpoint = checkpoint_data[0]["checkpoint"]
+
+    # no status update in checkpoint
+    checkpoint["channel_values"]["status"] = "approval_error"
+    status_event = workflow._get_workflow_status_event(checkpoint, checkpoint_metadata)
+    assert status_event is None
+
+
 def test_aput_with_no_status_update_and_human_input(
     checkpoint_data,
     checkpoint_metadata,
@@ -713,6 +729,11 @@ def test_aput_with_no_status_update_and_human_input(
         (
             WorkflowStatusEnum.PLAN_APPROVAL_REQUIRED,
             WorkflowStatusEventEnum.REQUIRE_PLAN_APPROVAL,
+        ),
+        (WorkflowStatusEnum.INPUT_REQUIRED, WorkflowStatusEventEnum.REQUIRE_INPUT),
+        (
+            WorkflowStatusEnum.TOOL_CALL_APPROVAL_REQUIRED,
+            WorkflowStatusEventEnum.REQUIRE_TOOL_CALL_APPROVAL,
         ),
     ],
 )

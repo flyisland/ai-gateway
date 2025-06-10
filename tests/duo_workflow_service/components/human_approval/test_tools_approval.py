@@ -173,6 +173,7 @@ class TestToolsApprovalComponent:
 
             response = await graph.ainvoke(input=graph_input, config=graph_config)
 
+            assert response["status"] == WorkflowStatusEnum.PLANNING
             assert "ui_chat_log" in response
             assert len(response["ui_chat_log"]) == 1
             chat_log = response["ui_chat_log"][0]
@@ -245,6 +246,9 @@ class TestToolsApprovalComponent:
             response = await graph.ainvoke(input=graph_input, config=graph_config)
 
             assert mock_entry_node.call_count == 2
+            assert (
+                response["status"] == WorkflowStatusEnum.PLANNING
+            )  # goes back to previous state
             assert "ui_chat_log" in response
             assert len(response["ui_chat_log"]) == 0
 
@@ -379,6 +383,9 @@ class TestToolsApprovalComponent:
 
             assert "ui_chat_log" in response
             assert len(response["ui_chat_log"]) == 0
+            assert (
+                response["status"] == WorkflowStatusEnum.PLANNING
+            )  # goes back to previous state
 
             # Verify that graph execution returned back to the Agent
             assert mock_entry_node.call_count == 2
@@ -487,6 +494,9 @@ class TestToolsApprovalComponent:
 
             assert "ui_chat_log" in response
             assert len(response["ui_chat_log"]) == 0
+            assert (
+                response["status"] == WorkflowStatusEnum.PLANNING
+            )  # goes back to previous state
 
             # Verify that graph execution returned back to the Agent
             assert mock_entry_node.call_count == 2
@@ -554,6 +564,9 @@ class TestToolsApprovalComponent:
 
             response = await graph.ainvoke(input=graph_input, config=graph_config)
 
+            assert (
+                response["status"] == WorkflowStatusEnum.PLANNING
+            )  # goes back to previous state
             assert "ui_chat_log" in response
             assert len(response["ui_chat_log"]) == 1
             chat_log = response["ui_chat_log"][0]

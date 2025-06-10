@@ -95,7 +95,7 @@ class TestHumanApprovalComponent:
         return HumanApprovalComponentTestProxy(
             workflow_id=graph_config["configurable"]["thread_id"],
             approved_agent_name="test-agent",
-            approved_agent_state=WorkflowStatusEnum.TOOL_CALL_APPROVAL_REQUIRED,
+            approved_agent_state="test-approval-status",
         )
 
     @pytest.mark.asyncio
@@ -290,7 +290,7 @@ class TestHumanApprovalComponent:
             component = HumanApprovalComponentReturnToTheAgentTestProxy(
                 workflow_id=graph_config["configurable"]["thread_id"],
                 approved_agent_name="test-agent",
-                approved_agent_state="test-agent-state",
+                approved_agent_state="test-approval-status",
             )
 
             graph, mock_entry_node, mock_continuation_node, mock_termination_node = (
@@ -331,5 +331,5 @@ class TestHumanApprovalComponent:
             mock_check_exec_cls.assert_called_once_with(
                 agent_name="test-agent",
                 workflow_id="test-workflow",
-                approved_agent_state=WorkflowStatusEnum.TOOL_CALL_APPROVAL_REQUIRED,
+                approved_agent_state="test-approval-status",
             )
