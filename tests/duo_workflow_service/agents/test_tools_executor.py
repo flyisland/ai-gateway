@@ -35,10 +35,15 @@ from duo_workflow_service.tools.filesystem import (  # MkdirInput,
     WriteFileInput,
 )
 from duo_workflow_service.tools.planner import (
+    AddNewTask,
     AddNewTaskInput,
+    CreatePlan,
     CreatePlanInput,
+    RemoveTask,
     RemoveTaskInput,
+    SetTaskStatus,
     SetTaskStatusInput,
+    UpdateTaskDescription,
     UpdateTaskDescriptionInput,
 )
 
@@ -52,6 +57,20 @@ def mock_tool(name="test_tool", side_effect=None, args_schema=None):
     else:
         mock.arun.return_value = "test_tool result"
     return mock
+
+
+@pytest.fixture
+def planner_toolset():
+    return Toolset(
+        pre_approved=set(),
+        all_tools={
+            "set_task_status": SetTaskStatus(),
+            "add_new_task": AddNewTask(),
+            "remove_task": RemoveTask(),
+            "update_task_description": UpdateTaskDescription(),
+            "create_plan": CreatePlan(),
+        },
+    )
 
 
 @dataclass
@@ -494,6 +513,7 @@ async def test_adding_ai_context_to_ui_chat_logs(
 @patch("duo_workflow_service.agents.tools_executor.datetime")
 async def test_run_with_state_manipulating_tools(
     mock_datetime,
+    planner_toolset,
     workflow_state,
     test_case,
 ):
@@ -501,11 +521,9 @@ async def test_run_with_state_manipulating_tools(
     mock_datetime.now.return_value = mock_now
     mock_datetime.timezone = timezone
 
-    mock_toolset = MagicMock(spec=Toolset)
-
     tools_executor = ToolsExecutor(
         tools_agent_name="planner",
-        toolset=mock_toolset,
+        toolset=planner_toolset,
         workflow_id="123",
         workflow_type=CategoryEnum.WORKFLOW_SOFTWARE_DEVELOPMENT,
     )
@@ -781,10 +799,12 @@ async def test_run_error_handling(
         ("get_plan", {}, None),  # Hidden tool
     ],
 )
-def test_get_tool_display_message_action_handlers(tool_name, args, expected_message):
+def test_get_tool_display_message_action_handlers(
+    planner_toolset, tool_name, args, expected_message
+):
     tools_executor = ToolsExecutor(
         tools_agent_name="test_agent",
-        toolset=MagicMock(spec=Toolset),
+        toolset=planner_toolset,
         workflow_id="123",
         workflow_type=CategoryEnum.WORKFLOW_SOFTWARE_DEVELOPMENT,
     )

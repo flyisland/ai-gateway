@@ -4,6 +4,7 @@ from gitlab_cloud_connector import GitLabUnitPrimitive
 from langchain.tools import BaseTool
 from pydantic import BaseModel
 
+from duo_workflow_service.entities.state import Plan
 from duo_workflow_service.gitlab.http_client import GitlabHttpClient
 from duo_workflow_service.gitlab.url_parser import GitLabUrlParseError, GitLabUrlParser
 
@@ -39,6 +40,17 @@ def format_tool_display_message(tool: BaseTool, args: Any) -> Optional[str]:
 
 class DuoBaseTool(BaseTool):
     unit_primitive: Optional[GitLabUnitPrimitive] = None
+    _plan: Plan | None = None
+
+    @property
+    def plan(self) -> Plan:
+        if not self._plan:
+            raise RuntimeError("plan is not set")
+        return self._plan
+
+    @plan.setter
+    def plan(self, plan: Plan):
+        self._plan = plan
 
     @property
     def gitlab_client(self) -> GitlabHttpClient:

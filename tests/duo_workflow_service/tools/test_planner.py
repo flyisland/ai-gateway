@@ -1,5 +1,8 @@
+import json
+
 import pytest
 
+from duo_workflow_service.entities.state import Plan, Task, TaskStatus
 from duo_workflow_service.tools.planner import (
     AddNewTask,
     AddNewTaskInput,
@@ -16,73 +19,61 @@ from duo_workflow_service.tools.planner import (
 )
 
 
-@pytest.mark.parametrize(
-    "tool_class, input_class, input_data, expected_result",
-    [
-        (AddNewTask, AddNewTaskInput, {"description": "New task"}, "New task added"),
-        (
-            RemoveTask,
-            RemoveTaskInput,
-            {"task_id": "1", "description": "Task 1"},
-            "Task with ID 1 removed",
-        ),
-        (
-            UpdateTaskDescription,
-            UpdateTaskDescriptionInput,
-            {"task_id": "1", "new_description": "Updated task"},
-            "Task with ID 1 updated with description: Updated task",
-        ),
-        (
-            CreatePlan,
-            CreatePlanInput,
-            {"tasks": ["Task 1", "Task 2", "Task 3"]},
-            "Plan created successfully",
-        ),
-    ],
-)
-def test_tool_run(tool_class, input_class, input_data, expected_result):
-    tool = tool_class()
-    if input_class:
-        input_instance = input_class(**input_data)
-        if isinstance(tool, AddNewTask):
-            result = tool._run(description=input_instance.description)
-        elif isinstance(tool, CreatePlan):
-            result = tool._run(tasks=input_instance.tasks)
-        else:
-            result = tool._run(**input_instance.model_dump())
-    else:
-        result = tool._run()
-    assert result == expected_result
+@pytest.fixture
+def plan_steps() -> list[Task]:
+    return [
+        {"id": "task-0", "description": "Task 1", "status": TaskStatus.NOT_STARTED},
+        {"id": "task-1", "description": "Task 2", "status": TaskStatus.IN_PROGRESS},
+    ]
 
 
-def test_get_plan():
-    get_plan = GetPlan(description="test description")
-    result = get_plan._run()
-    assert result == "Done"
+def test_get_plan(plan: Plan, plan_steps: list[Task]):
+    tool = GetPlan()
+    tool.plan = plan
+    assert tool._run() == json.dumps(plan_steps)
 
 
 @pytest.mark.parametrize(
     "task_id, status, expected_result",
     [
-        ("1", "Not Started", "Status of task with ID 1 set to Not Started"),
-        ("2", "In Progress", "Status of task with ID 2 set to In Progress"),
-        ("3", "Completed", "Status of task with ID 3 set to Completed"),
-        ("4", "Cancelled", "Status of task with ID 4 set to Cancelled"),
+        ("task-0", "In Progress", "Task status set: task-0 - In Progress"),
+        ("task-1", "Completed", "Task status set: task-1 - Completed"),
     ],
 )
-def test_set_task_status(task_id, status, expected_result):
-    set_task_status = SetTaskStatus(description="test description")
-    input_data = SetTaskStatusInput(
-        task_id=task_id, status=status, description="test description"
-    )
-    result = set_task_status._run(
-        task_id=input_data.task_id, status=input_data.status, description=""
-    )
+def test_set_task_status(task_id: str, status: str, expected_result: str, plan: Plan):
+    tool = SetTaskStatus()
+    tool.plan = plan
+    result = tool._run(task_id=task_id, status=status, description="")
+
+    task = next(step for step in tool.plan["steps"] if step["id"] == task_id)
+    assert task["status"] == status
     assert result == expected_result
 
 
+def test_set_task_status_missing_task(plan: Plan):
+    tool = SetTaskStatus()
+    tool.plan = plan
+    result = tool._run(task_id="task-2", status="In Progress", description="")
+    assert result == "Task not found: task-2"
+
+
+def test_add_new_task(plan: Plan):
+    tool = AddNewTask()
+    tool.plan = plan
+    description = "Create new feature"
+
+    result = tool._run(description=description)
+
+    assert result == "Step added: task-2"
+    assert tool.plan["steps"][-1] == {
+        "id": "task-2",
+        "description": description,
+        "status": TaskStatus.NOT_STARTED,
+    }
+
+
 def test_add_new_task_format_display_message():
-    tool = AddNewTask(description="Add new task")
+    tool = AddNewTask()
 
     input_data = AddNewTaskInput(description="Create new feature")
 
@@ -92,8 +83,20 @@ def test_add_new_task_format_display_message():
     assert message == expected_message
 
 
+def test_remove_task(plan: Plan):
+    tool = RemoveTask()
+    tool.plan = plan
+
+    result = tool._run(task_id="task-0", description="Task 1")
+
+    assert result == "Task removed: task-0"
+    assert tool.plan["steps"] == [
+        {"id": "task-1", "description": "Task 2", "status": TaskStatus.IN_PROGRESS},
+    ]
+
+
 def test_remove_task_format_display_message():
-    tool = RemoveTask(description="Remove task")
+    tool = RemoveTask()
 
     input_data = RemoveTaskInput(task_id="task-1", description="Task 1")
 
@@ -103,8 +106,22 @@ def test_remove_task_format_display_message():
     assert message == expected_message
 
 
+def test_update_task_description(plan: Plan):
+    tool = UpdateTaskDescription()
+    tool.plan = plan
+    task_id = "task-1"
+    new_description = "Update project documentation"
+
+    result = tool._run(task_id=task_id, new_description=new_description)
+
+    assert result == f"Task updated: {task_id}"
+
+    task = next(step for step in tool.plan["steps"] if step["id"] == task_id)
+    assert task["description"] == "Update project documentation"
+
+
 def test_update_task_description_format_display_message():
-    tool = UpdateTaskDescription(description="Update task description")
+    tool = UpdateTaskDescription()
 
     input_data = UpdateTaskDescriptionInput(
         task_id="task-1", new_description="Update project documentation"
@@ -154,7 +171,7 @@ def test_update_task_description_format_display_message():
 def test_set_task_status_format_display_message(
     task_id, status, description, expected_result
 ):
-    tool = SetTaskStatus(description="Set task status")
+    tool = SetTaskStatus()
 
     input_data = SetTaskStatusInput(
         task_id=task_id,
@@ -166,20 +183,28 @@ def test_set_task_status_format_display_message(
     assert message == expected_result
 
 
-def test_create_plan():
-    create_plan = CreatePlan(description="Create a plan")
+def test_create_plan(plan: Plan):
+    tool = CreatePlan()
+    tool.plan = plan
     tasks = ["Task 1", "Task 2", "Task 3"]
-    result = create_plan._run(tasks=tasks)
-    assert result == "Plan created successfully"
+    result = tool._run(tasks=tasks)
+    assert tool.plan == Plan(
+        steps=[
+            Task(id="task-0", description="Task 1", status=TaskStatus.NOT_STARTED),
+            Task(id="task-1", description="Task 2", status=TaskStatus.NOT_STARTED),
+            Task(id="task-2", description="Task 3", status=TaskStatus.NOT_STARTED),
+        ]
+    )
+    assert result == "Plan created"
 
 
 def test_create_plan_format_display_message():
-    create_plan = CreatePlan(description="Create a plan")
+    create_plan = CreatePlan()
     tasks = ["Task 1", "Task 2", "Task 3"]
     input_data = CreatePlanInput(tasks=tasks)
 
     message = create_plan.format_display_message(input_data)
-    assert message == "Create a plan: Task 1, Task 2, Task 3..."
+    assert message == "Create plan with 3 tasks"
 
 
 @pytest.mark.parametrize(
