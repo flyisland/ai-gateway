@@ -18,8 +18,7 @@ LINT_WORKING_DIR ?= ${AI_GATEWAY_DIR} \
 	${TESTS_DIR} \
 	${INTEGRATION_TESTS_DIR}
 
-MYPY_LINT_TODO_DIR ?= --exclude "ai_gateway/models/anthropic.py" \
-	--exclude "ai_gateway/models/litellm.py" \
+MYPY_LINT_TODO_DIR ?= --exclude "ai_gateway/models/litellm.py" \
 	--exclude "ai_gateway/models/mock.py" \
 	--exclude "ai_gateway/api/v3/code/completions.py" \
 	--exclude "ai_gateway/api/v2/code/completions.py" \
@@ -276,4 +275,5 @@ eval: install-eval-deps
 .PHONY: duo-workflow-docs
 duo-workflow-docs:
 	@echo "Generating Duo Workflow Service graph documentation..."
-	@ANTHROPIC_API_KEY=temporary_key poetry run python scripts/generate_graph_docs.py ${DOC_DIR}/duo_workflow_service_graphs.md
+	@poetry install
+	@poetry run python scripts/generate_graph_docs.py ${DOC_DIR}/duo_workflow_service_graphs.md
