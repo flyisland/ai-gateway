@@ -70,7 +70,7 @@ class ListVulnerabilitiesInput(ProjectResourceInput):
 
 class ListVulnerabilities(DuoBaseTool):
     name: str = "list_vulnerabilities"
-    description: str = f"""List security vulnerabilities in a GitLab project.
+    description: str = f"""List security vulnerabilities in a GitLab project using GraphQL.
 
     {PROJECT_IDENTIFICATION_DESCRIPTION}
 
@@ -87,50 +87,74 @@ class ListVulnerabilities(DuoBaseTool):
         project_id = kwargs.pop("project_id", None)
         fetch_all_pages = kwargs.pop("fetch_all_pages", True)
         per_page = kwargs.pop("per_page", 100)
-        page = kwargs.pop("page", 1)
 
         project_id, errors = self._validate_project_url(url, project_id)
 
         if errors:
             return json.dumps({"error": "; ".join(errors)})
 
-        params = {k: v for k, v in kwargs.items() if v is not None}
-        params["per_page"] = per_page
-        params["page"] = page
+        # Build GraphQL query
+        query = """
+        query($projectId: ID!, $first: Int, $after: String) {
+          project(fullPath: $projectId) {
+            vulnerabilities(first: $first, after: $after) {
+              pageInfo {
+                hasNextPage
+                endCursor
+              }
+              nodes {
+                id
+                title
+                severity
+                confidence
+                reportType
+                state
+                scanner {
+                  id
+                  name
+                }
+                hasResolution
+                hasIssues
+                falsePositive
+              }
+            }
+          }
+        }
+        """
 
         all_vulnerabilities = []
-        current_page = page
-        total_pages = None
+        cursor = None
 
         try:
             while True:
-                params["page"] = current_page
-                response = await self.gitlab_client.aget(
-                    path=f"/api/v4/projects/{project_id}/vulnerabilities",
-                    params=params,
-                    parse_json=True,
+                variables = {
+                    "projectId": project_id,
+                    "first": per_page,
+                    "after": cursor
+                }
+
+                response = await self.gitlab_client.apost(
+                    path="/api/graphql",
+                    body=json.dumps({
+                        "query": query,
+                        "variables": variables
+                    })
                 )
-                
-                vulnerabilities = response
+
+                vulnerabilities = response["data"]["project"]["vulnerabilities"]["nodes"]
                 all_vulnerabilities.extend(vulnerabilities)
+
+                page_info = response["data"]["project"]["vulnerabilities"]["pageInfo"]
                 
-                # Get total pages from headers if available
-                if total_pages is None and hasattr(self.gitlab_client, 'last_response'):
-                    total_pages = int(self.gitlab_client.last_response.headers.get('X-Total-Pages', 0))
-                
-                # Break if we're not fetching all pages or if we've reached the last page
-                if not fetch_all_pages or len(vulnerabilities) < per_page or (total_pages and current_page >= total_pages):
+                if not fetch_all_pages or not page_info["hasNextPage"]:
                     break
-                    
-                current_page += 1
+
+                cursor = page_info["endCursor"]
 
             return json.dumps({
                 "vulnerabilities": all_vulnerabilities,
                 "pagination": {
-                    "total_items": len(all_vulnerabilities),
-                    "total_pages": total_pages,
-                    "current_page": current_page,
-                    "per_page": per_page
+                    "total_items": len(all_vulnerabilities)
                 }
             })
         except Exception as e:
