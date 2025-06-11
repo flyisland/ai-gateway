@@ -202,7 +202,7 @@ async def test_generate_token(mock_generate_token_response, mock_token_authority
     current_user.set(user)
 
     servicer = GrpcServer()
-    await servicer.GenerateToken(contract_pb2.GenerateTokenRequest(), mock_context)
+    await servicer.GenerateToken(contract_pb2.GenerateTokenRequest(workflowDefinition='software-developer'), mock_context)
 
     mock_token_authority.return_value.encode.assert_called_once_with(
         None, None, user, None, [GitLabUnitPrimitive.DUO_WORKFLOW_EXECUTE_WORKFLOW]
@@ -213,6 +213,43 @@ async def test_generate_token(mock_generate_token_response, mock_token_authority
 
 
 @pytest.mark.asyncio
+@patch("duo_workflow_service.servers.grpc_server.TokenAuthority")
+@patch("contract.contract_pb2.GenerateTokenResponse")
+@patch.dict(os.environ, {"CLOUD_CONNECTOR_SERVICE_NAME": "gitlab-duo-workflow-service"})
+async def test_generate_token_for_chat(mock_generate_token_response, mock_token_authority):
+    one_hour_later = datetime.now(tz=timezone.utc) + timedelta(hours=1)
+    mock_token_authority.return_value.encode = MagicMock(
+        return_value=("token", one_hour_later)
+    )
+    mock_context = MagicMock(spec=grpc.ServicerContext)
+
+    user = CloudConnectorUser(
+        authenticated=True,
+        is_debug=False,
+        claims=UserClaims(
+            issuer="gitlab.com", scopes=["duo_chat", "ask_epic", "ask_issue"]
+        ),
+    )
+    current_user.set(user)
+
+    servicer = GrpcServer()
+    await servicer.GenerateToken(contract_pb2.GenerateTokenRequest(workflowDefinition='chat'), mock_context)
+
+    # Get the call arguments to inspect the scope parameter
+    call_args = mock_token_authority.return_value.encode.call_args
+    scopes = call_args[0][4]  # The 5th argument (index 4) is the scope
+
+    assert len(scopes) == 11, f"Scope array should have exactly 1 element, but has {len(scopes)}"
+    assert GitLabUnitPrimitive.DUO_CHAT in scopes, f"Scopes should contain {GitLabUnitPrimitive.DUO_CHAT}"
+    assert GitLabUnitPrimitive.ASK_EPIC in scopes, f"Scopes should contain {GitLabUnitPrimitive.ASK_EPIC}"
+    assert GitLabUnitPrimitive.ASK_ISSUE in scopes, f"Scopes should contain {GitLabUnitPrimitive.ASK_ISSUE}"
+
+    # mock_generate_token_response.assert_called_once_with(
+    #     token="token", expiresAt=one_hour_later
+    # )
+
+
+@pytest.mark.asyncio
 @patch.dict(os.environ, {"CLOUD_CONNECTOR_SERVICE_NAME": "gitlab-duo-workflow-service"})
 async def test_generate_token_with_self_signed_token_issuer():
     user = CloudConnectorUser(
@@ -220,7 +257,7 @@ async def test_generate_token_with_self_signed_token_issuer():
         is_debug=False,
         claims=UserClaims(
             issuer=CloudConnectorConfig().service_name,
-            scopes=["duo_workflow_execute_workflow"],
+            scopes=["duo_workflow_execute_workflow", "duo_chat"],
         ),
     )
     current_user.set(user)
