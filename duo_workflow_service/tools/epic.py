@@ -43,6 +43,8 @@ class EpicIdsResult(NamedTuple):
 
 
 class EpicBaseTool(DuoBaseTool):
+    unit_primitive: GitLabUnitPrimitive = GitLabUnitPrimitive.ASK_EPIC
+
     def _validate_group_url(
         self, url: Optional[str], group_id: Optional[int | str]
     ) -> GroupURLValidationResult:
@@ -418,8 +420,6 @@ class GetEpic(EpicBaseTool):
         get_epic(url="https://gitlab.com/groups/namespace/group/-/epics/42")
     """
     args_schema: Type[BaseModel] = EpicResourceInput
-
-    unit_primitive: GitLabUnitPrimitive = GitLabUnitPrimitive.ASK_EPIC
 
     async def _arun(self, **kwargs: Any) -> str:
         url = kwargs.get("url")

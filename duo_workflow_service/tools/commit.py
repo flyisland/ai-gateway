@@ -7,6 +7,8 @@ from duo_workflow_service.gitlab.url_parser import GitLabUrlParseError, GitLabUr
 from duo_workflow_service.tools.duo_base_tool import DuoBaseTool
 from duo_workflow_service.tools.gitlab_resource_input import ProjectResourceInput
 
+from gitlab_cloud_connector import GitLabUnitPrimitive
+
 PROJECT_IDENTIFICATION_DESCRIPTION = """To identify the project you must provide either:
 - project_id parameter, or
 - A GitLab URL like:
@@ -38,6 +40,8 @@ class CommitURLValidationResult(NamedTuple):
 
 
 class CommitBaseTool(DuoBaseTool):
+    unit_primitive: GitLabUnitPrimitive = GitLabUnitPrimitive.ASK_COMMIT
+
     def _validate_commit_url(
         self, url: Optional[str], project_id: Optional[Any], commit_sha: Optional[str]
     ) -> CommitURLValidationResult:

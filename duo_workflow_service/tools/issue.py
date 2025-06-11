@@ -7,6 +7,8 @@ from duo_workflow_service.gitlab.url_parser import GitLabUrlParseError, GitLabUr
 from duo_workflow_service.tools.duo_base_tool import DuoBaseTool
 from duo_workflow_service.tools.gitlab_resource_input import ProjectResourceInput
 
+from gitlab_cloud_connector import GitLabUnitPrimitive
+
 DESCRIPTION_CHARACTER_LIMIT = 1_048_576
 
 PROJECT_IDENTIFICATION_DESCRIPTION = """To identify the project you must provide either:
@@ -34,6 +36,8 @@ class IssueResourceInput(ProjectResourceInput):
 
 
 class IssueBaseTool(DuoBaseTool):
+    unit_primitive: GitLabUnitPrimitive = GitLabUnitPrimitive.ASK_ISSUE
+
     def _validate_issue_url(
         self, url: Optional[str], project_id: Optional[Any], issue_iid: Optional[int]
     ) -> Tuple[Optional[str], Optional[int], List[str]]:

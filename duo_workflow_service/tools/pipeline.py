@@ -9,6 +9,7 @@ from duo_workflow_service.tools.merge_request import (
     MERGE_REQUEST_IDENTIFICATION_DESCRIPTION,
 )
 
+from gitlab_cloud_connector import GitLabUnitPrimitive
 
 class PipelineException(Exception):
     pass
@@ -44,6 +45,8 @@ class GetPipelineErrorsForMergeRequest(DuoBaseTool):
         get_pipeline_errors(url="https://gitlab.com/namespace/project/-/merge_requests/103")
     """
     args_schema: Type[BaseModel] = GetPipelineErrorsInput  # type: ignore
+
+    unit_primitive: GitLabUnitPrimitive = GitLabUnitPrimitive.ASK_MERGE_REQUEST
 
     async def _arun(self, **kwargs: Any) -> str:
         url = kwargs.get("url", None)
