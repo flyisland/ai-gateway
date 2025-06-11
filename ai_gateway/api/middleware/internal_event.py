@@ -65,10 +65,15 @@ class InternalEventMiddleware:
             )
 
         try:
-            feature_enabled_by_namespace_ids = [
-                int(str_id) for str_id in feature_enabled_by_namespace_ids
-            ]
-        except ValueError:
+            valid_ids = []
+            for str_id in feature_enabled_by_namespace_ids:
+                try:
+                    valid_ids.append(int(str_id))
+                except ValueError:
+                    # Skip invalid namespace IDs that cannot be converted to integers
+                    pass
+            feature_enabled_by_namespace_ids = valid_ids
+        except Exception:
             feature_enabled_by_namespace_ids = None
 
         context = EventContext(
