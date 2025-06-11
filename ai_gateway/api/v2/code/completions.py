@@ -420,7 +420,7 @@ def _resolve_code_completions_litellm(
             model__provider=payload.model_provider,
             model__using_cache=use_llm_prompt_caching,
         )
-    
+
     model_metadata = ModelMetadata(
         name=payload.model_name,
         endpoint=payload.model_endpoint,
@@ -476,13 +476,13 @@ def _build_code_completions(
 
         if model_metadata.provider == KindModelProvider.ANTHROPIC:
             AnthropicHandler(payload, request, kwargs).update_completion_params()
-            
+
             anthropic_model_metadata = ModelMetadata(
                 name=payload.model_name,
                 engine=KindModelProvider.ANTHROPIC.value,
                 provider=KindModelProvider.ANTHROPIC,
             )
-            
+
             code_completions = _resolve_agent_code_completions(
                 model_metadata=anthropic_model_metadata,
                 current_user=current_user,
@@ -505,7 +505,7 @@ def _build_code_completions(
                 engine=KindModelProvider.VERTEX_AI.value,
                 provider=KindModelProvider.VERTEX_AI,
             )
-            
+
             code_completions = _resolve_agent_code_completions(
                 model_metadata=vertex_model_metadata,
                 current_user=current_user,
@@ -527,13 +527,13 @@ def _build_code_completions(
 
     elif payload.model_provider == KindModelProvider.ANTHROPIC:
         AnthropicHandler(payload, request, kwargs).update_completion_params()
-        
+
         anthropic_model_metadata = ModelMetadata(
             name=payload.model_name,
             engine=KindModelProvider.ANTHROPIC.value,
             provider=KindModelProvider.ANTHROPIC,
         )
-        
+
         code_completions = _resolve_agent_code_completions(
             model_metadata=anthropic_model_metadata,
             current_user=current_user,
@@ -587,7 +587,7 @@ def _build_code_completions(
             engine=KindModelProvider.VERTEX_AI.value,
             provider=KindModelProvider.VERTEX_AI,
         )
-        
+
         code_completions = _resolve_agent_code_completions(
             model_metadata=vertex_model_metadata,
             current_user=current_user,
