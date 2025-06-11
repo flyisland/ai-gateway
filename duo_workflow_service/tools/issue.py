@@ -4,6 +4,7 @@ from typing import Any, List, Optional, Tuple, Type
 from pydantic import BaseModel, Field
 
 from duo_workflow_service.gitlab.url_parser import GitLabUrlParseError, GitLabUrlParser
+from duo_workflow_service.prompt_security import PromptSecurity, SecurityException
 from duo_workflow_service.tools.duo_base_tool import DuoBaseTool
 from duo_workflow_service.tools.gitlab_resource_input import ProjectResourceInput
 
@@ -298,7 +299,16 @@ class GetIssue(IssueBaseTool):
                 path=f"/api/v4/projects/{project_id}/issues/{issue_iid}",
                 parse_json=False,
             )
-            return json.dumps({"issue": response})
+            try:
+                if isinstance(response, str):
+                    response = json.loads(response)
+                response = PromptSecurity.apply_security(response, self.name)
+
+                return json.dumps({"notes": response})
+
+            except SecurityException as e:
+                return json.dumps({"error": str(e)})
+
         except Exception as e:
             return json.dumps({"error": str(e)})
 
