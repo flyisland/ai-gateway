@@ -48,6 +48,20 @@ from duo_workflow_service.workflows.typing import AdditionalContext
 
 log = structlog.stdlib.get_logger("server")
 
+CHAT_SCOPES = [
+    GitLabUnitPrimitive.DUO_CHAT,
+    GitLabUnitPrimitive.ASK_EPIC,
+    GitLabUnitPrimitive.ASK_ISSUE,
+    GitLabUnitPrimitive.ASK_MERGE_REQUEST,
+    GitLabUnitPrimitive.ASK_BUILD,
+    GitLabUnitPrimitive.ASK_COMMIT,
+    GitLabUnitPrimitive.DOCUMENTATION_SEARCH,
+    GitLabUnitPrimitive.FIX_CODE,
+    GitLabUnitPrimitive.GENERATE_CODE,
+    GitLabUnitPrimitive.REFACTOR_CODE,
+    GitLabUnitPrimitive.WRITE_TESTS,
+]
+
 
 def string_to_category_enum(category_string: str) -> CategoryEnum:
     try:
@@ -259,12 +273,9 @@ class GrpcServer(contract_pb2_grpc.DuoWorkflowServicer):
         # Check workflow_definition and determine the required permission
         workflow_definition = request.workflowDefinition
         if not workflow_definition:
-            required_scopes = [
-                GitLabUnitPrimitive.DUO_CHAT,
-                GitLabUnitPrimitive.DUO_WORKFLOW_EXECUTE_WORKFLOW,
-            ]
+            required_scopes = CHAT_SCOPES.append(GitLabUnitPrimitive.DUO_WORKFLOW_EXECUTE_WORKFLOW)
         elif workflow_definition == "chat":
-            required_scopes = [GitLabUnitPrimitive.DUO_CHAT]
+            required_scopes = CHAT_SCOPES
         else:
             required_scopes = [GitLabUnitPrimitive.DUO_WORKFLOW_EXECUTE_WORKFLOW]
 
