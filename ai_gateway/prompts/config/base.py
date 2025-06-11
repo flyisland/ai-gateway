@@ -1,3 +1,4 @@
+from typing import Optional
 from gitlab_cloud_connector import GitLabUnitPrimitive
 from pydantic import BaseModel, ConfigDict
 
@@ -9,7 +10,8 @@ __all__ = ["PromptConfig", "ModelConfig", "BaseModelConfig"]
 class BaseModelConfig(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
-    name: str
+    name: Optional[str] | None = None
+    config_file: Optional[str] = None  # Add this field
     params: BaseModelParams
 
 

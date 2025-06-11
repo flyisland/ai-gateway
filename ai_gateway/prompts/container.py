@@ -2,6 +2,7 @@ from dependency_injector import containers, providers
 
 from ai_gateway.chat import agents as chat
 from ai_gateway.config import ConfigModelLimits
+from ai_gateway.model_selection.model_selection_config import ModelSelectionConfig
 from ai_gateway.prompts.config import ModelClassProvider
 from ai_gateway.prompts.registry import LocalPromptRegistry
 from duo_workflow_service.agents.chat_agent import ChatAgent
@@ -15,9 +16,11 @@ class ContainerPrompts(containers.DeclarativeContainer):
     config = providers.Configuration(strict=True)
     models = providers.DependenciesContainer()
     internal_event = providers.DependenciesContainer()
+    model_selection = providers.Singleton(ModelSelectionConfig)
 
     prompt_registry = providers.Singleton(
         LocalPromptRegistry.from_local_yaml,
+        model_selection = model_selection,
         class_overrides={
             "chat/react": chat.ReActAgent,
             "chat/react/vertex": chat.ReActAgent,

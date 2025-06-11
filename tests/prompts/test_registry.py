@@ -1,8 +1,9 @@
 from pathlib import Path
 from textwrap import dedent
-from typing import Sequence, Type, cast
+from typing import Dict, Sequence, Type, cast
 from unittest.mock import Mock, patch
 
+from gitlab_cloud_connector import GitLabUnitPrimitive
 import pytest
 import yaml
 from langchain_anthropic import ChatAnthropic
@@ -19,6 +20,7 @@ from ai_gateway.config import ConfigModelLimits
 from ai_gateway.integrations.amazon_q.chat import ChatAmazonQ
 from ai_gateway.integrations.amazon_q.client import AmazonQClientFactory
 from ai_gateway.model_metadata import AmazonQModelMetadata, ModelMetadata
+from ai_gateway.model_selection.model_selection_config import LLMDefinition, UnitPrimitiveConfig
 from ai_gateway.prompts import LocalPromptRegistry, Prompt, PromptRegistered
 from ai_gateway.prompts.config import (
     ChatAmazonQParams,
@@ -177,18 +179,111 @@ params:
     - Bar
 """,
     )
+
+    fs.create_file(
+        prompts_definitions_dir / "chat" / "commit_reader" / "base" / "1.0.0.yml",
+        contents="""
+---
+name: Model Selection fix code prompt
+model:
+  params:
+    model_class_provider: anthropic
+    temperature: 0.1
+unit_primitives:
+  - fix_code
+prompt_template:
+  system: |
+    {% include 'chat/fix_code/system/1.0.0.jinja' %}
+  user: |
+    {% include 'chat/fix_code/user/1.0.0.jinja' %}
+params:
+  timeout: 60
+""",
+    )
+    
     model_configs_dir = (
         Path(__file__).parent.parent.parent / "ai_gateway" / "prompts" / "model_configs"
     )
+    
     fs.create_file(
-        model_configs_dir / "conversation_quick.yml",
+        model_configs_dir / "claude_4_0.yml",
         contents="""
 ---
-name: claude-3-5-sonnet-20241022
+name: claude-sonnet-4-20250514
 params:
-  temperature: 0.9
-  max_tokens: 200
-  model_class_provider: test
+  temperature: 0.0
+  max_tokens: 4_096
+  max_retries: 1
+  model_class_provider: anthropic
+""",
+    )
+
+    model_selection_dir = (
+        Path(__file__).parent.parent.parent / "ai_gateway" / "model_selection"
+    )
+    
+    fs.create_file(
+        model_selection_dir / "models.yml",
+        contents="""
+models:
+  - gitlab_identifier: "claude-3-7-sonnet-20250219"
+    name: "claude-3-7-sonnet-20250219"
+    provider: "anthropic"
+    model_family: "claude-3-7-sonnet"
+    input_cost_per_token: 0.000003
+    output_cost_per_token: 0.000015
+    max_input_tokens: 200000
+    max_output_tokens: 8192
+    context_window: 200000
+  - gitlab_identifier: "claude-3-haiku-20240307"
+    name: "claude-3-haiku-20240307"
+    provider: "anthropic"
+    model_family: "claude-3-haiku"
+    input_cost_per_token: 0.00000025
+    output_cost_per_token: 0.00000125
+    max_input_tokens: 200000
+    max_output_tokens: 4096
+    context_window: 200000
+  - gitlab_identifier: "claude-3-5-sonnet-20241022"
+    name: "claude-3-5-sonnet-20241022"
+    provider: "anthropic"
+    model_family: "claude-3-5-sonnet"
+    input_cost_per_token: 0.000003
+    output_cost_per_token: 0.000015
+    max_input_tokens: 200000
+    max_output_tokens: 8192
+    context_window: 200000
+""",
+    )
+    
+    fs.create_file(
+        model_selection_dir / "unit_primitives.yml",
+        contents="""
+configurable_unit_primitives:
+  - name: "generate_code"
+    unit_primitives: ["generate_code"]
+    model_selection:
+      temperature: 0.0
+      max_tokens: 4096
+      max_retries: 1
+      model_class_provider: "anthropic"
+      name: "claude-3-7-sonnet-20250219"
+  - name: "complete_code"
+    unit_primitives: ["complete_code"]
+    model_selection:
+      temperature: 0.7
+      max_tokens: 64
+      max_retries: 1
+      model_class_provider: "fireworks_ai"
+      name: "fireworks_ai/codestral-2501"
+  - name: "duo_chat"
+    unit_primitives: ["duo_chat"]
+    model_selection:
+      temperature: 0.0
+      max_tokens: 4096
+      max_retries: 1
+      model_class_provider: "anthropic"
+      name: "claude-4-0"
 """,
     )
 
@@ -343,6 +438,50 @@ def prompts_registered():
         ),
     }
 
+@pytest.fixture
+def mock_model_selection(llm_definitions, unit_primitive_configs):
+    """Fixture that provides a mocked model selection object with real data from YAML files."""
+    mock = Mock()
+    
+    # Configure the mock methods
+    mock.get_llm_definitions.return_value = llm_definitions
+    mock.get_unit_primitive_config.return_value = unit_primitive_configs
+
+    return mock
+
+@pytest.fixture
+def llm_definitions():
+    """Fixture that provides just the LLM definitions."""
+    models_file = Path("ai_gateway/model_selection/models.yml")
+    with open(models_file, 'r') as f:
+        models_data = yaml.safe_load(f)
+    
+    return {
+        model_data["gitlab_identifier"]: LLMDefinition(**model_data)
+        for model_data in models_data["models"]
+    }
+
+
+@pytest.fixture
+def unit_primitive_configs():
+    """Fixture that provides just the unit primitive configurations."""
+    unit_primitives_file = Path("ai_gateway/model_selection/unit_primitives.yml")
+    with open(unit_primitives_file, 'r') as f:
+        unit_primitives_data = yaml.safe_load(f)
+    
+    return [
+        UnitPrimitiveConfig(
+            **{
+                **config_data,
+                'unit_primitives': [
+                    GitLabUnitPrimitive(primitive) if isinstance(primitive, str) 
+                    else primitive
+                    for primitive in config_data['unit_primitives']
+                ]
+            }
+        )
+        for config_data in unit_primitives_data.get('configurable_unit_primitives', [])
+    ]
 
 @pytest.fixture
 def default_prompts():
@@ -370,6 +509,7 @@ def registry(
     disable_streaming: bool,
 ):
     return LocalPromptRegistry(
+        model_selection=mock_model_selection,
         model_factories=model_factories,
         prompts_registered=prompts_registered,
         default_prompts=default_prompts,
@@ -384,12 +524,14 @@ class TestLocalPromptRegistry:
     @pytest.mark.usefixtures("mock_fs")
     def test_from_local_yaml(
         self,
+        mock_model_selection,
         model_factories: dict[ModelClassProvider, TypeModelFactory],
         prompts_registered: dict[str, PromptRegistered],
         internal_event_client: Mock,
         model_limits: ConfigModelLimits,
     ):
         registry = LocalPromptRegistry.from_local_yaml(
+            model_selection=mock_model_selection,
             class_overrides={
                 "chat/react": MockPromptClass,
             },
@@ -672,6 +814,7 @@ class TestLocalPromptRegistry:
         self,
         model_factories: dict[ModelClassProvider, TypeModelFactory],
         internal_event_client: Mock,
+        mock_model_selection: Mock,
         model_limits: ConfigModelLimits,
         prompt_id: str,
         expected_name: str,
@@ -681,8 +824,9 @@ class TestLocalPromptRegistry:
         expected_model_class: Type[Model],
         expected_kwargs: dict,
         default_prompt_env_config: dict[str, str],
-    ):
+    ):      
         registry = LocalPromptRegistry.from_local_yaml(
+            model_selection=mock_model_selection,
             class_overrides={},
             model_factories=model_factories,
             default_prompts=default_prompt_env_config,
@@ -789,9 +933,11 @@ class TestLocalPromptRegistry:
         self,
         model_factories: dict[ModelClassProvider, TypeModelFactory],
         internal_event_client: Mock,
+        mock_model_selection,
         model_limits: ConfigModelLimits,
     ):
         registry = LocalPromptRegistry.from_local_yaml(
+            model_selection=mock_model_selection,
             class_overrides={
                 "chat/react": MockPromptClass,
             },
@@ -851,6 +997,7 @@ class TestLocalPromptRegistry:
                     },
                 ),
             },
+            model_selection=mock_model_selection,
             model_factories=model_factories,
             default_prompts={},
             internal_event_client=internal_event_client,
@@ -871,10 +1018,12 @@ class TestLocalPromptRegistry:
     def test_load_prompt_without_unit_primitive(
         self,
         model_factories,
+        mock_model_selection,
         internal_event_client: Mock,
         model_limits: ConfigModelLimits,
     ):
         registry = LocalPromptRegistry.from_local_yaml(
+            model_selection=mock_model_selection,
             class_overrides={},
             model_factories=model_factories,
             default_prompts={},
@@ -926,11 +1075,13 @@ class TestLocalPromptRegistry:
     def test_get_on_behalf_no_unit_primitive(
         self,
         user: StarletteUser,
+        mock_model_selection,
         prompt: Prompt,
         internal_event_client: Mock,
         model_limits: ConfigModelLimits,
     ):
         test_registry = LocalPromptRegistry.from_local_yaml(
+            model_selection=mock_model_selection,
             class_overrides={},
             model_factories={},
             default_prompts={},
