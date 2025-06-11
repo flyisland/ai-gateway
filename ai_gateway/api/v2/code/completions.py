@@ -412,28 +412,28 @@ def _resolve_code_completions_litellm(
     completions_agent_factory: Factory[CodeCompletions],
     completions_litellm_factory: Factory[CodeCompletions],
 ) -> CodeCompletions:
-    if payload.prompt_version == 2 and not payload.prompt:
-        model_metadata = ModelMetadata(
-            name=payload.model_name,
-            endpoint=payload.model_endpoint,
-            api_key=payload.model_api_key,
-            identifier=payload.model_identifier,
-            provider=payload.model_provider or "text-completion-openai",
+    if payload.prompt_version == 2 and payload.prompt:
+        return completions_litellm_factory(
+            model__name=payload.model_name,
+            model__endpoint=payload.model_endpoint,
+            model__api_key=payload.model_api_key,
+            model__provider=payload.model_provider,
+            model__using_cache=use_llm_prompt_caching,
         )
+    
+    model_metadata = ModelMetadata(
+        name=payload.model_name,
+        endpoint=payload.model_endpoint,
+        api_key=payload.model_api_key,
+        identifier=payload.model_identifier,
+        provider=payload.model_provider or "text-completion-openai",
+    )
 
-        return _resolve_agent_code_completions(
-            model_metadata=model_metadata,
-            current_user=current_user,
-            prompt_registry=prompt_registry,
-            completions_agent_factory=completions_agent_factory,
-        )
-
-    return completions_litellm_factory(
-        model__name=payload.model_name,
-        model__endpoint=payload.model_endpoint,
-        model__api_key=payload.model_api_key,
-        model__provider=payload.model_provider,
-        model__using_cache=use_llm_prompt_caching,
+    return _resolve_agent_code_completions(
+        model_metadata=model_metadata,
+        current_user=current_user,
+        prompt_registry=prompt_registry,
+        completions_agent_factory=completions_agent_factory,
     )
 
 
@@ -476,8 +476,18 @@ def _build_code_completions(
 
         if model_metadata.provider == KindModelProvider.ANTHROPIC:
             AnthropicHandler(payload, request, kwargs).update_completion_params()
-            code_completions = completions_anthropic_factory(
-                model__name=payload.model_name,
+            
+            anthropic_model_metadata = ModelMetadata(
+                name=payload.model_name,
+                engine=KindModelProvider.ANTHROPIC.value,
+                provider=KindModelProvider.ANTHROPIC,
+            )
+            
+            code_completions = _resolve_agent_code_completions(
+                model_metadata=anthropic_model_metadata,
+                current_user=current_user,
+                prompt_registry=prompt_registry,
+                completions_agent_factory=completions_agent_factory,
             )
         elif model_metadata.provider == KindModelProvider.FIREWORKS:
             FireworksHandler(payload, request, kwargs).update_completion_params()
@@ -490,9 +500,17 @@ def _build_code_completions(
                 completions_litellm_factory=completions_fireworks_factory,
             )
         elif model_metadata.provider == KindModelProvider.VERTEX_AI:
-            code_completions = _resolve_code_completions_vertex_codestral(
-                payload=payload,
-                completions_litellm_vertex_codestral_factory=completions_litellm_vertex_codestral_factory,
+            vertex_model_metadata = ModelMetadata(
+                name=payload.model_name,
+                engine=KindModelProvider.VERTEX_AI.value,
+                provider=KindModelProvider.VERTEX_AI,
+            )
+            
+            code_completions = _resolve_agent_code_completions(
+                model_metadata=vertex_model_metadata,
+                current_user=current_user,
+                prompt_registry=prompt_registry,
+                completions_agent_factory=completions_agent_factory,
             )
 
             kwargs.update(
@@ -509,8 +527,18 @@ def _build_code_completions(
 
     elif payload.model_provider == KindModelProvider.ANTHROPIC:
         AnthropicHandler(payload, request, kwargs).update_completion_params()
-        code_completions = completions_anthropic_factory(
-            model__name=payload.model_name,
+        
+        anthropic_model_metadata = ModelMetadata(
+            name=payload.model_name,
+            engine=KindModelProvider.ANTHROPIC.value,
+            provider=KindModelProvider.ANTHROPIC,
+        )
+        
+        code_completions = _resolve_agent_code_completions(
+            model_metadata=anthropic_model_metadata,
+            current_user=current_user,
+            prompt_registry=prompt_registry,
+            completions_agent_factory=completions_agent_factory,
         )
     elif payload.model_provider in (
         KindModelProvider.LITELLM,
@@ -554,9 +582,17 @@ def _build_code_completions(
 
         return code_completions, kwargs
     else:
-        code_completions = _resolve_code_completions_vertex_codestral(
-            payload=payload,
-            completions_litellm_vertex_codestral_factory=completions_litellm_vertex_codestral_factory,
+        vertex_model_metadata = ModelMetadata(
+            name="codestral-2501",
+            engine=KindModelProvider.VERTEX_AI.value,
+            provider=KindModelProvider.VERTEX_AI,
+        )
+        
+        code_completions = _resolve_agent_code_completions(
+            model_metadata=vertex_model_metadata,
+            current_user=current_user,
+            prompt_registry=prompt_registry,
+            completions_agent_factory=completions_agent_factory,
         )
 
         # We need to pass this here since litellm.LiteLlmTextGenModel
@@ -585,19 +621,6 @@ def _build_code_completions(
     _track_code_suggestions_event(tracking_event, internal_event_client)
 
     return code_completions, kwargs
-
-
-def _resolve_code_completions_vertex_codestral(
-    payload: SuggestionsRequest,
-    completions_litellm_vertex_codestral_factory: Factory[CodeCompletions],
-) -> CodeCompletions:
-    if payload.prompt_version == 2 and payload.prompt is not None:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="You cannot specify a prompt with the given provider and model combination",
-        )
-
-    return completions_litellm_vertex_codestral_factory()
 
 
 def _resolve_agent_code_completions(
