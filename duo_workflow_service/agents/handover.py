@@ -120,7 +120,7 @@ class HandoverAgent:
                         context_elements=None,
                     )
                 )
-                return HumanMessage(content=summary)
+                return AIMessage(content=summary)
 
         return None
 

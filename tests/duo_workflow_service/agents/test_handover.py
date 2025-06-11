@@ -126,7 +126,7 @@ class TestHandoverAgent:
                 ],
                 True,
                 [
-                    HumanMessage(
+                    AIMessage(
                         content="This is awesome summary",
                     ),
                 ],
@@ -167,7 +167,7 @@ class TestHandoverAgent:
                     )
                 ],
                 True,
-                [HumanMessage(content="This is summary")],
+                [AIMessage(content="This is summary")],
                 [
                     {
                         "message_type": MessageTypeEnum.AGENT,

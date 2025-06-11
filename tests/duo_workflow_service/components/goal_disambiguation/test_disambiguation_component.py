@@ -320,7 +320,7 @@ class TestGoalDisambiguationComponent:
             )
 
             assert len(response["handover"]) == 1
-            assert response["handover"][-1] == HumanMessage(content="This is a summary")
+            assert response["handover"][-1] == AIMessage(content="This is a summary")
 
     @pytest.mark.asyncio
     @patch("duo_workflow_service.components.goal_disambiguation.component.interrupt")
