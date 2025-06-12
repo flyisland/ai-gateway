@@ -124,9 +124,13 @@ class TestGLAgentRemoteExecutor:
                     "issue_reader",
                     "merge_request_reader",
                     "commit_reader",
+                    "work_item_reader",
                 }
             else:
-                assert context.get("duo_chat.agent_available_tools") == ["issue_reader"]
+                assert context.get("duo_chat.agent_available_tools") == [
+                    "issue_reader",
+                    "work_item_reader",
+                ]
 
         agent.astream.assert_called_once_with(inputs)
         assert actual_actions == agent_events
@@ -156,7 +160,7 @@ class TestGLAgentRemoteExecutorToolAction:
                 ReActAgentInputs(messages=[Message(role=Role.USER, content="Hi")]),
                 None,
                 [AgentToolAction(thought="", tool="issue_reader", tool_input="")],
-                ["issue_reader"],
+                ["issue_reader", "work_item_reader"],
                 [call("request_ask_issue", category="ai_gateway.chat.executor")],
             ),
             (
@@ -317,7 +321,12 @@ class TestGLAgentRemoteExecutorToolAction:
                     role_arn="role-arn", provider="amazon_q", name="amazon_q"
                 ),
                 [],
-                ["epic_reader", "issue_reader", "gitlab_documentation"],
+                [
+                    "epic_reader",
+                    "issue_reader",
+                    "work_item_reader",
+                    "gitlab_documentation",
+                ],
                 [],
             ),
         ],
