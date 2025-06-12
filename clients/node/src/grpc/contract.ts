@@ -222,6 +222,11 @@ export interface AdditionalContext {
   metadata?: string | undefined;
 }
 
+export interface UiUpdate {
+  status: string;
+  chatLogDelta: string;
+}
+
 function createBaseClientEvent(): ClientEvent {
   return { startRequest: undefined, actionResponse: undefined };
 }
@@ -2471,6 +2476,82 @@ export const AdditionalContext: MessageFns<AdditionalContext> = {
     message.id = object.id ?? undefined;
     message.content = object.content ?? undefined;
     message.metadata = object.metadata ?? undefined;
+    return message;
+  },
+};
+
+function createBaseUiUpdate(): UiUpdate {
+  return { status: "", chatLogDelta: "" };
+}
+
+export const UiUpdate: MessageFns<UiUpdate> = {
+  encode(message: UiUpdate, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
+    if (message.status !== "") {
+      writer.uint32(10).string(message.status);
+    }
+    if (message.chatLogDelta !== "") {
+      writer.uint32(18).string(message.chatLogDelta);
+    }
+    return writer;
+  },
+
+  decode(input: BinaryReader | Uint8Array, length?: number): UiUpdate {
+    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+    let end = length === undefined ? reader.len : reader.pos + length;
+    const message = createBaseUiUpdate();
+    while (reader.pos < end) {
+      const tag = reader.uint32();
+      switch (tag >>> 3) {
+        case 1: {
+          if (tag !== 10) {
+            break;
+          }
+
+          message.status = reader.string();
+          continue;
+        }
+        case 2: {
+          if (tag !== 18) {
+            break;
+          }
+
+          message.chatLogDelta = reader.string();
+          continue;
+        }
+      }
+      if ((tag & 7) === 4 || tag === 0) {
+        break;
+      }
+      reader.skip(tag & 7);
+    }
+    return message;
+  },
+
+  fromJSON(object: any): UiUpdate {
+    return {
+      status: isSet(object.status) ? globalThis.String(object.status) : "",
+      chatLogDelta: isSet(object.chatLogDelta) ? globalThis.String(object.chatLogDelta) : "",
+    };
+  },
+
+  toJSON(message: UiUpdate): unknown {
+    const obj: any = {};
+    if (message.status !== "") {
+      obj.status = message.status;
+    }
+    if (message.chatLogDelta !== "") {
+      obj.chatLogDelta = message.chatLogDelta;
+    }
+    return obj;
+  },
+
+  create<I extends Exact<DeepPartial<UiUpdate>, I>>(base?: I): UiUpdate {
+    return UiUpdate.fromPartial(base ?? ({} as any));
+  },
+  fromPartial<I extends Exact<DeepPartial<UiUpdate>, I>>(object: I): UiUpdate {
+    const message = createBaseUiUpdate();
+    message.status = object.status ?? "";
+    message.chatLogDelta = object.chatLogDelta ?? "";
     return message;
   },
 };

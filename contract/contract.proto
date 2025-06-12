@@ -160,3 +160,8 @@ message AdditionalContext {
     optional string content = 3;
     optional string metadata = 4;
 }
+
+message UiUpdate {
+    string status = 1;
+    string chat_log_delta = 2;
+}

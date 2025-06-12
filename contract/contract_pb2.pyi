@@ -257,3 +257,11 @@ class AdditionalContext(_message.Message):
     content: str
     metadata: str
     def __init__(self, category: _Optional[str] = ..., id: _Optional[str] = ..., content: _Optional[str] = ..., metadata: _Optional[str] = ...) -> None: ...
+
+class UiUpdate(_message.Message):
+    __slots__ = ("status", "chat_log_delta")
+    STATUS_FIELD_NUMBER: _ClassVar[int]
+    CHAT_LOG_DELTA_FIELD_NUMBER: _ClassVar[int]
+    status: str
+    chat_log_delta: str
+    def __init__(self, status: _Optional[str] = ..., chat_log_delta: _Optional[str] = ...) -> None: ...
