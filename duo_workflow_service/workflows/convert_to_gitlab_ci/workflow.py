@@ -59,11 +59,27 @@ def _router(state: WorkflowState) -> str:
     if len(tool_calls) == 0:
         return Routes.END
 
-    if tool_calls and tool_calls[0].get("name") == "read_file":
+    tool_name = tool_calls[0].get("name")
+
+    if tool_name == "read_file":
         return Routes.AGENT
 
-    if tool_calls[0].get("name") == "create_file_with_contents":
-        return Routes.COMMIT_CHANGES
+    if tool_name == "ci_linter":
+        last_msg = agent_messages[-1].content if agent_messages else ""
+        if '"valid": true' in last_msg or '"valid":true' in last_msg:
+            return Routes.COMMIT_CHANGES
+
+        # Count validation attempts
+        validation_count = len(
+            [i for i, msg in enumerate(agent_messages) if "ci_linter" in str(msg)]
+        )
+        if validation_count >= 3:
+            return Routes.COMMIT_CHANGES
+
+        return Routes.AGENT
+
+    if tool_name == "create_file_with_contents":
+        return Routes.AGENT
 
     return Routes.END
 
@@ -178,7 +194,7 @@ class Workflow(AbstractWorkflow):
         return graph.compile(checkpointer=checkpointer)
 
     def _setup_translator_nodes(self, tools_registry: ToolsRegistry):
-        translation_tools = ["create_file_with_contents", "read_file"]
+        translation_tools = ["create_file_with_contents", "read_file", "ci_linter"]
         agents_toolset = tools_registry.toolset(translation_tools)
         translator_agent = Agent(
             goal="N/A",
@@ -216,13 +232,28 @@ class Workflow(AbstractWorkflow):
 
         self.log.info("Starting %s workflow graph compilation", self._workflow_type)
         graph.set_entry_point("load_files")
+
+        # Create a wrapper that adds project_id to the prompt
+        def _load_file_with_project(file_contents: list[str], state: WorkflowState):
+            result = _load_file_contents(file_contents, state)
+            # Inject project_id into the conversation
+            if result["conversation_history"][AGENT_NAME]:
+                messages = result["conversation_history"][AGENT_NAME]
+                # Add a new message with project info instead of modifying existing ones
+                messages.append(
+                    HumanMessage(
+                        content=f"Note: The project_id for ci_linter validation is {self._project['id']}."
+                    )
+                )
+            return result
+
         # Load jenkins file contents
         graph.add_node(
             "load_files",
             RunToolNode[WorkflowState](
                 tool=tools_registry.get("read_file"),  # type: ignore
                 input_parser=lambda _: [{"file_path": ci_config_file_path}],
-                output_parser=_load_file_contents,  # type: ignore
+                output_parser=_load_file_with_project,  # type: ignore
             ).run,
         )
         # translator nodes
