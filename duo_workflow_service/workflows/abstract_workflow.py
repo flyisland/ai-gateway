@@ -86,13 +86,13 @@ class AbstractWorkflow(ABC):
         workflow_id: str,
         workflow_metadata: Dict[str, Any],
         workflow_type: CategoryEnum,
-        user: CloudConnectorUser,
         context_elements: list = None,  # type: ignore[assignment]
         invocation_metadata: InvocationMetadata = {
             "base_url": "",
             "gitlab_token": "",
         },
         mcp_tools: list[contract_pb2.McpTool] = [],
+        user: Optional[CloudConnectorUser] = None,
         additional_context: Optional[list[AdditionalContext]] = None,
     ):
         self._outbox = asyncio.Queue(maxsize=QUEUE_MAX_SIZE)
@@ -207,14 +207,19 @@ class AbstractWorkflow(ABC):
                 self._http_client, self._workflow_id
             )
 
+            if self._workflow_type == CategoryEnum.WORKFLOW_CHAT:
+                user_for_registry = self._user
+            else:
+                user_for_registry = None
+
             tools_registry = await ToolsRegistry.configure(
                 outbox=self._outbox,
                 inbox=self._inbox,
                 workflow_config=self._workflow_config,
                 gl_http_client=self._http_client,
                 gitlab_host=gitlab_host,
-                user=self._user,
                 additional_tools=self._additional_tools,
+                user=user_for_registry,
             )
             checkpoint_notifier = UserInterface(
                 outbox=self._streaming_outbox, goal=goal
