@@ -24,6 +24,7 @@ from duo_workflow_service.workflows.software_development.workflow import (
     PLANNER_TOOLS,
     Workflow,
 )
+from duo_workflow_service.workflows.type_definitions import AdditionalContext
 from lib.feature_flags import current_feature_flag_context
 
 
@@ -1324,3 +1325,51 @@ def test_log_workflow_elements(mock_logger_info, feature_flags, expected_output)
             assert len(format_call_args) == 1
     finally:
         current_feature_flag_context.reset(token)
+
+
+@pytest.mark.parametrize(
+    "additional_context,expected_os_info",
+    [
+        (None, ""),
+        ([AdditionalContext(category="os_information", content="")], ""),
+        (
+            [AdditionalContext(category="os_information", content="Ubuntu 22.04")],
+            "Ubuntu 22.04",
+        ),
+        (
+            [
+                AdditionalContext(category="other_info", content="some data"),
+                AdditionalContext(category="os_information", content="Windows 11"),
+                AdditionalContext(category="more_info", content="more data"),
+            ],
+            "Windows 11",
+        ),
+        ([], ""),
+        ([AdditionalContext(category="other_category", content="some content")], ""),
+    ],
+)
+def test_format_executor_message(additional_context, expected_os_info):
+    tools_registry = MagicMock()
+    get_plan_tool = MagicMock()
+    get_plan_tool.name = "get_plan"
+    tools_registry.get.return_value = get_plan_tool
+
+    wf = Workflow(
+        workflow_id="",
+        workflow_metadata={},
+        workflow_type=CategoryEnum("software_development"),
+        additional_context=additional_context,
+    )
+    wf._project = {
+        "id": 123,
+        "name": "Test Project",
+        "http_url_to_repo": "https://github.com/test/project",
+        "description": "This is a test project description",
+        "web_url": "",
+    }
+
+    result = wf._format_executor_message(tools_registry)
+
+    assert "{os_information}" not in result
+
+    assert expected_os_info in result

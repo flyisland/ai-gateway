@@ -313,7 +313,6 @@ async def test_workflow_run(
         (
             [],
             {},
-            {},
             CHAT_READ_ONLY_TOOLS + CHAT_MUTATION_TOOLS,
         ),
         (

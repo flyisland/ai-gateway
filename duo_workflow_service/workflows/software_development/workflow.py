@@ -28,6 +28,7 @@ from duo_workflow_service.agents.prompts import (
     BUILD_CONTEXT_SYSTEM_MESSAGE,
     EXECUTOR_SYSTEM_MESSAGE,
     HANDOVER_TOOL_NAME,
+    OS_INFORMATION_COMPONENT,
     PLANNER_GOAL,
     PLANNER_INSTRUCTIONS,
     PLANNER_PROMPT,
@@ -206,14 +207,7 @@ class Workflow(AbstractWorkflow):
             goal=goal,
             model=base_model_executor,
             name="executor",
-            system_prompt=EXECUTOR_SYSTEM_MESSAGE.format(
-                set_task_status_tool_name=SET_TASK_STATUS_TOOL_NAME,
-                handover_tool_name=HANDOVER_TOOL_NAME,
-                get_plan_tool_name=tools_registry.get("get_plan").name,  # type: ignore
-                project_id=self._project["id"],
-                project_name=self._project["name"],
-                project_url=self._project["http_url_to_repo"],
-            ),
+            system_prompt=self._format_executor_message(tools_registry),
             toolset=executors_toolset,
             workflow_id=self._workflow_id,
             http_client=self._http_client,
@@ -236,6 +230,30 @@ class Workflow(AbstractWorkflow):
                 workflow_type=self._workflow_type,
             ),
         }
+
+    def _format_executor_message(self, tools_registry: ToolsRegistry) -> str:
+        os_information = ""
+        for additional_context in self._additional_context or []:
+            # We only want to add os_information if it's not empty
+            if (
+                additional_context.category == "os_information"
+                and additional_context.content
+            ):
+                os_information = OS_INFORMATION_COMPONENT.format(
+                    os_information=additional_context.content
+                )
+
+        system_prompt = EXECUTOR_SYSTEM_MESSAGE.format(
+            set_task_status_tool_name=SET_TASK_STATUS_TOOL_NAME,
+            handover_tool_name=HANDOVER_TOOL_NAME,
+            get_plan_tool_name=tools_registry.get("get_plan").name,  # type: ignore
+            project_id=self._project["id"],
+            project_name=self._project["name"],
+            project_url=self._project["http_url_to_repo"],
+            os_information=os_information,
+        )
+
+        return system_prompt
 
     def _setup_planner(
         self,

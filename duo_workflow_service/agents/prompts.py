@@ -163,6 +163,14 @@ Here is the project information for the current GitLab project:
   <project_name>{project_name}</project_name>
   <project_url>{project_url}</project_url>
 </project>
+
+{os_information}
 """
 
 NEXT_STEP_PROMPT = f"What is the next task? Call the `{HANDOVER_TOOL_NAME}` tool if your task is complete"
+
+
+OS_INFORMATION_COMPONENT = """
+Here is the information about the operating system where you are executing these tasks:
+<os_information>{os_information}</os_information>
+"""
