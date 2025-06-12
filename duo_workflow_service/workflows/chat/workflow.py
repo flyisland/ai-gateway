@@ -26,9 +26,9 @@ from duo_workflow_service.entities.state import (
 from duo_workflow_service.interceptors.feature_flag_interceptor import (
     current_feature_flag_context,
 )
+from duo_workflow_service.llm_factory import create_chat_model
 from duo_workflow_service.tracking.errors import log_exception
 from duo_workflow_service.workflows.abstract_workflow import AbstractWorkflow
-from duo_workflow_service.llm_factory import create_chat_model
 
 MAX_TOKENS_TO_SAMPLE = 8192
 DEBUG = os.getenv("DEBUG")
@@ -80,15 +80,16 @@ CHAT_MUTATION_TOOLS = [
     "mkdir",
 ]
 
+
 class ReactAgentComponent:
     def __init__(
-            self, 
-            prompt,
-            model, 
-            toolset,
-            workflow_id,
-            workflow_type,
-        ):
+        self,
+        prompt,
+        model,
+        toolset,
+        workflow_id,
+        workflow_type,
+    ):
         # self._agent: ChatAgent = prompt_registry.get(  # type: ignore[assignment]
         #     "chat/agent", tools=toolset.bindable, prompt_version="^1.0.0"  # type: ignore[arg-type]
         # )
@@ -124,10 +125,41 @@ class ReactAgentComponent:
         return Routes.STOP
 
     def attach(
-            self, 
-            graph: StateGraph,
-            exit_node: str
-        ) -> Annotated[str, "Entry node name"]:
+        self, graph: StateGraph, exit_nodes: dict[str, str]
+    ) -> Annotated[str, "Entry node name"]:
+        """Attaches the React Agent component to a LangGraph StateGraph.
+
+        This method integrates the component into a larger workflow by adding its nodes
+        and edges to the provided graph. The component follows a single-entry,
+        multiple-exit pattern where:
+
+        - Input: The component has one entry point ("agent" node) that receives the
+          workflow state
+        - Output: The component can have multiple exit points, though in this
+          implementation it has one exit route (Routes.STOP)
+
+        Args:
+            graph: The StateGraph instance to attach this component to
+            exit_nodes: A mapping of component exit routes to destination nodes in the
+                       parent graph. Keys are custom node names or Routes enum (e.g., Routes.STOP)
+                       and values are node names to connect to. This allows the parent
+                       workflow to control where the component's outputs flow.
+
+        Returns:
+            str: The name of the component's entry node ("agent") that the parent
+                 workflow should connect to when routing to this component.
+
+        Example:
+            ```python
+            # Parent workflow connects to this component
+            react_agent = ReactAgentComponent(...)
+            entry_node = react_agent.attach(
+                graph,
+                exit_nodes={Routes.STOP: END, "fallback": "another_parent_node"}
+            )
+            graph.add_edge("previous_node", entry_node)
+            ```
+        """
 
         graph.add_node("agent", self._agent.run)
         graph.add_node("run_tools", self.tools_runner)
@@ -135,16 +167,11 @@ class ReactAgentComponent:
         graph.add_conditional_edges(
             "agent",
             self._are_tools_called,
-            {
-                Routes.TOOL_USE: "run_tools",
-                Routes.STOP: exit_node
-            },
+            {Routes.TOOL_USE: "run_tools", Routes.STOP: exit_nodes[Routes.STOP]},
         )
         graph.add_edge("run_tools", "agent")
-        
+
         return "agent"
-
-
 
 
 class Workflow(AbstractWorkflow):
@@ -250,12 +277,11 @@ class Workflow(AbstractWorkflow):
             workflow_id=self._workflow_id,
             workflow_type=self._workflow_type,
         )
-        compoment_entry_point = chat_agent_component.attach(
-            graph, 
-            exit_node=END
+        component_entry_node = chat_agent_component.attach(
+            graph, exit_nodes={Routes.STOP: END}
         )
         self._agent = chat_agent_component._agent
-        graph.set_entry_point(compoment_entry_point)
+        graph.set_entry_point(component_entry_node)
 
         return graph.compile(checkpointer=checkpointer)
 
