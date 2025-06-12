@@ -91,7 +91,7 @@ class HttpResponse(_message.Message):
     def __init__(self, headers: _Optional[_Mapping[str, str]] = ..., statusCode: _Optional[int] = ..., body: _Optional[str] = ..., error: _Optional[str] = ...) -> None: ...
 
 class Action(_message.Message):
-    __slots__ = ("requestID", "runCommand", "runHTTPRequest", "runReadFile", "runWriteFile", "runGitCommand", "runEditFile", "newCheckpoint", "listDirectory", "grep", "findFiles", "runMCPTool")
+    __slots__ = ("requestID", "runCommand", "runHTTPRequest", "runReadFile", "runWriteFile", "runGitCommand", "runEditFile", "newCheckpoint", "listDirectory", "grep", "findFiles", "runMCPTool", "uiUpdate")
     REQUESTID_FIELD_NUMBER: _ClassVar[int]
     RUNCOMMAND_FIELD_NUMBER: _ClassVar[int]
     RUNHTTPREQUEST_FIELD_NUMBER: _ClassVar[int]
@@ -104,6 +104,7 @@ class Action(_message.Message):
     GREP_FIELD_NUMBER: _ClassVar[int]
     FINDFILES_FIELD_NUMBER: _ClassVar[int]
     RUNMCPTOOL_FIELD_NUMBER: _ClassVar[int]
+    UIUPDATE_FIELD_NUMBER: _ClassVar[int]
     requestID: str
     runCommand: RunCommandAction
     runHTTPRequest: RunHTTPRequest
@@ -116,7 +117,8 @@ class Action(_message.Message):
     grep: Grep
     findFiles: FindFiles
     runMCPTool: RunMCPTool
-    def __init__(self, requestID: _Optional[str] = ..., runCommand: _Optional[_Union[RunCommandAction, _Mapping]] = ..., runHTTPRequest: _Optional[_Union[RunHTTPRequest, _Mapping]] = ..., runReadFile: _Optional[_Union[ReadFile, _Mapping]] = ..., runWriteFile: _Optional[_Union[WriteFile, _Mapping]] = ..., runGitCommand: _Optional[_Union[RunGitCommand, _Mapping]] = ..., runEditFile: _Optional[_Union[EditFile, _Mapping]] = ..., newCheckpoint: _Optional[_Union[NewCheckpoint, _Mapping]] = ..., listDirectory: _Optional[_Union[ListDirectory, _Mapping]] = ..., grep: _Optional[_Union[Grep, _Mapping]] = ..., findFiles: _Optional[_Union[FindFiles, _Mapping]] = ..., runMCPTool: _Optional[_Union[RunMCPTool, _Mapping]] = ...) -> None: ...
+    uiUpdate: UiUpdate
+    def __init__(self, requestID: _Optional[str] = ..., runCommand: _Optional[_Union[RunCommandAction, _Mapping]] = ..., runHTTPRequest: _Optional[_Union[RunHTTPRequest, _Mapping]] = ..., runReadFile: _Optional[_Union[ReadFile, _Mapping]] = ..., runWriteFile: _Optional[_Union[WriteFile, _Mapping]] = ..., runGitCommand: _Optional[_Union[RunGitCommand, _Mapping]] = ..., runEditFile: _Optional[_Union[EditFile, _Mapping]] = ..., newCheckpoint: _Optional[_Union[NewCheckpoint, _Mapping]] = ..., listDirectory: _Optional[_Union[ListDirectory, _Mapping]] = ..., grep: _Optional[_Union[Grep, _Mapping]] = ..., findFiles: _Optional[_Union[FindFiles, _Mapping]] = ..., runMCPTool: _Optional[_Union[RunMCPTool, _Mapping]] = ..., uiUpdate: _Optional[_Union[UiUpdate, _Mapping]] = ...) -> None: ...
 
 class RunCommandAction(_message.Message):
     __slots__ = ("program", "arguments", "flags")

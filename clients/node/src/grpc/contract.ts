@@ -134,6 +134,7 @@ export interface Action {
   grep?: Grep | undefined;
   findFiles?: FindFiles | undefined;
   runMCPTool?: RunMCPTool | undefined;
+  uiUpdate?: UiUpdate | undefined;
 }
 
 export interface RunCommandAction {
@@ -918,6 +919,7 @@ function createBaseAction(): Action {
     grep: undefined,
     findFiles: undefined,
     runMCPTool: undefined,
+    uiUpdate: undefined,
   };
 }
 
@@ -958,6 +960,9 @@ export const Action: MessageFns<Action> = {
     }
     if (message.runMCPTool !== undefined) {
       RunMCPTool.encode(message.runMCPTool, writer.uint32(98).fork()).join();
+    }
+    if (message.uiUpdate !== undefined) {
+      UiUpdate.encode(message.uiUpdate, writer.uint32(106).fork()).join();
     }
     return writer;
   },
@@ -1065,6 +1070,14 @@ export const Action: MessageFns<Action> = {
           message.runMCPTool = RunMCPTool.decode(reader, reader.uint32());
           continue;
         }
+        case 13: {
+          if (tag !== 106) {
+            break;
+          }
+
+          message.uiUpdate = UiUpdate.decode(reader, reader.uint32());
+          continue;
+        }
       }
       if ((tag & 7) === 4 || tag === 0) {
         break;
@@ -1088,6 +1101,7 @@ export const Action: MessageFns<Action> = {
       grep: isSet(object.grep) ? Grep.fromJSON(object.grep) : undefined,
       findFiles: isSet(object.findFiles) ? FindFiles.fromJSON(object.findFiles) : undefined,
       runMCPTool: isSet(object.runMCPTool) ? RunMCPTool.fromJSON(object.runMCPTool) : undefined,
+      uiUpdate: isSet(object.uiUpdate) ? UiUpdate.fromJSON(object.uiUpdate) : undefined,
     };
   },
 
@@ -1129,6 +1143,9 @@ export const Action: MessageFns<Action> = {
     if (message.runMCPTool !== undefined) {
       obj.runMCPTool = RunMCPTool.toJSON(message.runMCPTool);
     }
+    if (message.uiUpdate !== undefined) {
+      obj.uiUpdate = UiUpdate.toJSON(message.uiUpdate);
+    }
     return obj;
   },
 
@@ -1168,6 +1185,9 @@ export const Action: MessageFns<Action> = {
       : undefined;
     message.runMCPTool = (object.runMCPTool !== undefined && object.runMCPTool !== null)
       ? RunMCPTool.fromPartial(object.runMCPTool)
+      : undefined;
+    message.uiUpdate = (object.uiUpdate !== undefined && object.uiUpdate !== null)
+      ? UiUpdate.fromPartial(object.uiUpdate)
       : undefined;
     return message;
   },
