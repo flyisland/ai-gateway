@@ -30,7 +30,7 @@ class TestChatAnthropic:
                     "default_headers": {"anthropic-version": "2021-06-01"},
                 },
             ),
-                        (
+            (
                 {
                     "default_request_timeout": 10,
                     "max_retries": 2,
@@ -39,7 +39,7 @@ class TestChatAnthropic:
                         "extra_headers": {
                             "anthropic-beta": "token-efficient-tools-2025-02-19"
                         }
-                    }
+                    },
                 },
                 {
                     "default_request_timeout": 10,
@@ -49,7 +49,7 @@ class TestChatAnthropic:
                         "extra_headers": {
                             "anthropic-beta": "token-efficient-tools-2025-02-19"
                         }
-                    }
+                    },
                 },
             ),
         ],

@@ -1,9 +1,9 @@
-from typing import Any, Dict, List, Mapping, Optional, Self, Union
+from typing import Any, List, Mapping, Optional, Self
 
 from anthropic import AsyncAnthropic
 from langchain_anthropic import ChatAnthropic as _LChatAnthropic
 from langchain_core.callbacks import CallbackManagerForLLMRun
-from langchain_core.messages import BaseMessage, HumanMessage
+from langchain_core.messages import BaseMessage
 from langchain_core.outputs import ChatResult
 from pydantic import model_validator
 
