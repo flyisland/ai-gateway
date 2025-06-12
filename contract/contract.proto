@@ -62,6 +62,7 @@ message Action {
         Grep grep = 10;
         FindFiles findFiles = 11;
         RunMCPTool runMCPTool = 12;
+        UiUpdate uiUpdate = 13;
     };
 }
 
@@ -159,4 +160,9 @@ message AdditionalContext {
     optional string id = 2;
     optional string content = 3;
     optional string metadata = 4;
+}
+
+message UiUpdate {
+    string status = 1;
+    string chat_log_delta = 2;
 }

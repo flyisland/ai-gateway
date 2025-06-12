@@ -39,58 +39,33 @@ class UserInterface:
         if type == "values" and isinstance(state, dict):
             self.status = state["status"]
             self.steps = state.get("plan", {}).get("steps", [])
-            self.ui_chat_log = deepcopy(state["ui_chat_log"])
 
-            return await self._execute_action()
+            new_ui_chat_log = deepcopy(state["ui_chat_log"])
+            diff = [item | { "id": i } for i, item in enumerate(new_ui_chat_log) if item not in self.ui_chat_log]
+            self.ui_chat_log = new_ui_chat_log
+
+            return await self._execute_action(diff)
 
         if not stream:
             return
 
         if type == "messages":
             (message, _) = state
-            self._append_chunk_to_ui_chat_log(message)
+            content = StrOutputParser().invoke(message) or ""
 
-            return await self._execute_action()
+            if not content:
+                return
 
-    async def _execute_action(self):
+            return await self._execute_action([
+                { "message_type": "agent_delta", "content": content, "id": len(self.ui_chat_log) }
+            ])
+
+    async def _execute_action(self, content):
         action = contract_pb2.Action(
-            newCheckpoint=contract_pb2.NewCheckpoint(
-                goal=self.goal,
+            uiUpdate=contract_pb2.UiUpdate(
                 status=WORKFLOW_STATUS_TO_CHECKPOINT_STATUS[self.status],
-                checkpoint=dumps(
-                    {
-                        "channel_values": {
-                            "ui_chat_log": self.ui_chat_log,
-                            "plan": {"steps": self.steps},
-                        }
-                    }
-                ),
+                chat_log_delta=dumps(content),
             ),
         )
 
         return await self.outbox.put(action)
-
-    def _append_chunk_to_ui_chat_log(self, message: BaseMessage):
-        content = StrOutputParser().invoke(message) or ""
-        if not content:
-            return
-
-        if (
-            not self.ui_chat_log
-            or self.ui_chat_log[-1]["message_type"] != MessageTypeEnum.AGENT
-            or self.ui_chat_log[-1]["status"]
-        ):
-            last_message = UiChatLog(
-                status=None,
-                correlation_id=None,
-                message_type=MessageTypeEnum.AGENT,
-                timestamp=datetime.now(timezone.utc).isoformat(),
-                content="",
-                tool_info=None,
-                context_elements=None,
-            )
-            self.ui_chat_log.append(last_message)
-        else:
-            last_message = self.ui_chat_log[-1]
-
-        last_message["content"] = last_message["content"] + content

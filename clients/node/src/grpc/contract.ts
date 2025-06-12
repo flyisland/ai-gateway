@@ -134,6 +134,7 @@ export interface Action {
   grep?: Grep | undefined;
   findFiles?: FindFiles | undefined;
   runMCPTool?: RunMCPTool | undefined;
+  uiUpdate?: UiUpdate | undefined;
 }
 
 export interface RunCommandAction {
@@ -220,6 +221,11 @@ export interface AdditionalContext {
   id?: string | undefined;
   content?: string | undefined;
   metadata?: string | undefined;
+}
+
+export interface UiUpdate {
+  status: string;
+  chatLogDelta: string;
 }
 
 function createBaseClientEvent(): ClientEvent {
@@ -913,6 +919,7 @@ function createBaseAction(): Action {
     grep: undefined,
     findFiles: undefined,
     runMCPTool: undefined,
+    uiUpdate: undefined,
   };
 }
 
@@ -953,6 +960,9 @@ export const Action: MessageFns<Action> = {
     }
     if (message.runMCPTool !== undefined) {
       RunMCPTool.encode(message.runMCPTool, writer.uint32(98).fork()).join();
+    }
+    if (message.uiUpdate !== undefined) {
+      UiUpdate.encode(message.uiUpdate, writer.uint32(106).fork()).join();
     }
     return writer;
   },
@@ -1060,6 +1070,14 @@ export const Action: MessageFns<Action> = {
           message.runMCPTool = RunMCPTool.decode(reader, reader.uint32());
           continue;
         }
+        case 13: {
+          if (tag !== 106) {
+            break;
+          }
+
+          message.uiUpdate = UiUpdate.decode(reader, reader.uint32());
+          continue;
+        }
       }
       if ((tag & 7) === 4 || tag === 0) {
         break;
@@ -1083,6 +1101,7 @@ export const Action: MessageFns<Action> = {
       grep: isSet(object.grep) ? Grep.fromJSON(object.grep) : undefined,
       findFiles: isSet(object.findFiles) ? FindFiles.fromJSON(object.findFiles) : undefined,
       runMCPTool: isSet(object.runMCPTool) ? RunMCPTool.fromJSON(object.runMCPTool) : undefined,
+      uiUpdate: isSet(object.uiUpdate) ? UiUpdate.fromJSON(object.uiUpdate) : undefined,
     };
   },
 
@@ -1124,6 +1143,9 @@ export const Action: MessageFns<Action> = {
     if (message.runMCPTool !== undefined) {
       obj.runMCPTool = RunMCPTool.toJSON(message.runMCPTool);
     }
+    if (message.uiUpdate !== undefined) {
+      obj.uiUpdate = UiUpdate.toJSON(message.uiUpdate);
+    }
     return obj;
   },
 
@@ -1163,6 +1185,9 @@ export const Action: MessageFns<Action> = {
       : undefined;
     message.runMCPTool = (object.runMCPTool !== undefined && object.runMCPTool !== null)
       ? RunMCPTool.fromPartial(object.runMCPTool)
+      : undefined;
+    message.uiUpdate = (object.uiUpdate !== undefined && object.uiUpdate !== null)
+      ? UiUpdate.fromPartial(object.uiUpdate)
       : undefined;
     return message;
   },
@@ -2471,6 +2496,82 @@ export const AdditionalContext: MessageFns<AdditionalContext> = {
     message.id = object.id ?? undefined;
     message.content = object.content ?? undefined;
     message.metadata = object.metadata ?? undefined;
+    return message;
+  },
+};
+
+function createBaseUiUpdate(): UiUpdate {
+  return { status: "", chatLogDelta: "" };
+}
+
+export const UiUpdate: MessageFns<UiUpdate> = {
+  encode(message: UiUpdate, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
+    if (message.status !== "") {
+      writer.uint32(10).string(message.status);
+    }
+    if (message.chatLogDelta !== "") {
+      writer.uint32(18).string(message.chatLogDelta);
+    }
+    return writer;
+  },
+
+  decode(input: BinaryReader | Uint8Array, length?: number): UiUpdate {
+    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+    let end = length === undefined ? reader.len : reader.pos + length;
+    const message = createBaseUiUpdate();
+    while (reader.pos < end) {
+      const tag = reader.uint32();
+      switch (tag >>> 3) {
+        case 1: {
+          if (tag !== 10) {
+            break;
+          }
+
+          message.status = reader.string();
+          continue;
+        }
+        case 2: {
+          if (tag !== 18) {
+            break;
+          }
+
+          message.chatLogDelta = reader.string();
+          continue;
+        }
+      }
+      if ((tag & 7) === 4 || tag === 0) {
+        break;
+      }
+      reader.skip(tag & 7);
+    }
+    return message;
+  },
+
+  fromJSON(object: any): UiUpdate {
+    return {
+      status: isSet(object.status) ? globalThis.String(object.status) : "",
+      chatLogDelta: isSet(object.chatLogDelta) ? globalThis.String(object.chatLogDelta) : "",
+    };
+  },
+
+  toJSON(message: UiUpdate): unknown {
+    const obj: any = {};
+    if (message.status !== "") {
+      obj.status = message.status;
+    }
+    if (message.chatLogDelta !== "") {
+      obj.chatLogDelta = message.chatLogDelta;
+    }
+    return obj;
+  },
+
+  create<I extends Exact<DeepPartial<UiUpdate>, I>>(base?: I): UiUpdate {
+    return UiUpdate.fromPartial(base ?? ({} as any));
+  },
+  fromPartial<I extends Exact<DeepPartial<UiUpdate>, I>>(object: I): UiUpdate {
+    const message = createBaseUiUpdate();
+    message.status = object.status ?? "";
+    message.chatLogDelta = object.chatLogDelta ?? "";
     return message;
   },
 };
