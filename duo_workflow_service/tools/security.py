@@ -15,45 +15,6 @@ PROJECT_IDENTIFICATION_DESCRIPTION = """To identify the project you must provide
 
 
 class ListVulnerabilitiesInput(ProjectResourceInput):
-    severity: Optional[str] = Field(
-        default=None,
-        description="Filter vulnerabilities by severity. Possible values: critical, high, medium, low, unknown, info.",
-    )
-    confidence: Optional[str] = Field(
-        default=None,
-        description="Filter vulnerabilities by confidence. Possible values: confirmed, high, medium, low, unknown, experimental.",
-    )
-    report_type: Optional[str] = Field(
-        default=None,
-        description=(
-            "Filter vulnerabilities by report type. Possible values: sast, dependency_scanning, "
-            "container_scanning, dast, secret_detection, coverage_fuzzing, api_fuzzing."
-        ),
-    )
-    state: Optional[str] = Field(
-        default=None,
-        description="Filter vulnerabilities by state. Possible values: detected, confirmed, dismissed, resolved.",
-    )
-    scanner: Optional[str] = Field(
-        default=None,
-        description="Filter vulnerabilities by scanner.",
-    )
-    scanner_id: Optional[str] = Field(
-        default=None,
-        description="Filter vulnerabilities by scanner ID.",
-    )
-    has_resolution: Optional[bool] = Field(
-        default=None,
-        description="Filter vulnerabilities by whether they have a resolution.",
-    )
-    has_issues: Optional[bool] = Field(
-        default=None,
-        description="Filter vulnerabilities by whether they have issues.",
-    )
-    include_false_positives: Optional[bool] = Field(
-        default=None,
-        description="Include false positives in the results.",
-    )
     per_page: Optional[int] = Field(
         default=100,
         description="Number of results per page (default: 100, max: 100).",
