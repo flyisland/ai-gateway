@@ -1,7 +1,7 @@
 import os
 from datetime import datetime, timezone
 from enum import StrEnum
-from typing import Any, List
+from typing import Annotated, Any, List
 
 from dependency_injector.wiring import Provide, inject
 from langchain_core.messages import AIMessage, BaseMessage, HumanMessage
@@ -11,6 +11,7 @@ from langgraph.types import Command
 
 from ai_gateway.container import ContainerApplication
 from ai_gateway.prompts.registry import LocalPromptRegistry
+from duo_workflow_service.agents import Agent
 from duo_workflow_service.agents.chat_agent import ChatAgent
 from duo_workflow_service.agents.tools_executor import ToolsExecutor
 from duo_workflow_service.checkpointer.gitlab_workflow import WorkflowStatusEventEnum
@@ -25,6 +26,7 @@ from duo_workflow_service.entities.state import (
 from duo_workflow_service.interceptors.feature_flag_interceptor import (
     current_feature_flag_context,
 )
+from duo_workflow_service.llm_factory import create_chat_model
 from duo_workflow_service.tracking.errors import log_exception
 from duo_workflow_service.workflows.abstract_workflow import AbstractWorkflow
 
@@ -77,6 +79,102 @@ CHAT_MUTATION_TOOLS = [
     "edit_file",
     "mkdir",
 ]
+
+
+class ReactAgentComponent:
+    def __init__(
+        self,
+        prompt,
+        model,
+        toolset,
+        workflow_id,
+        workflow_type,
+    ):
+        # self._agent: ChatAgent = prompt_registry.get(  # type: ignore[assignment]
+        #     "chat/agent", tools=toolset.bindable, prompt_version="^1.0.0"  # type: ignore[arg-type]
+        # )
+        self._agent_name = "chat/agent" + datetime.today().strftime("%Y%m%d")
+
+        self._agent = Agent(
+            goal="N/A",
+            model=model,
+            name=self._agent_name,
+            system_prompt=prompt,
+            toolset=toolset,
+            workflow_id=workflow_id,
+            http_client=None,
+            check_events=False,
+            workflow_type=workflow_type,
+        )
+        self.tools_runner = ToolsExecutor(
+            tools_agent_name=self._agent.name,
+            toolset=toolset,
+            workflow_id=workflow_id,
+            workflow_type=workflow_type,
+        ).run
+
+    def _are_tools_called(self, state: ChatWorkflowState) -> Routes:
+        if state["status"] in [WorkflowStatusEnum.CANCELLED, WorkflowStatusEnum.ERROR]:
+            return Routes.STOP
+
+        history: List[BaseMessage] = state["conversation_history"][self._agent.name]
+        last_message = history[-1]
+        if isinstance(last_message, AIMessage) and len(last_message.tool_calls) > 0:
+            return Routes.TOOL_USE
+
+        return Routes.STOP
+
+    def attach(
+        self, graph: StateGraph, exit_nodes: dict[str, str]
+    ) -> Annotated[str, "Entry node name"]:
+        """Attaches the React Agent component to a LangGraph StateGraph.
+
+        This method integrates the component into a larger workflow by adding its nodes
+        and edges to the provided graph. The component follows a single-entry,
+        multiple-exit pattern where:
+
+        - Input: The component has one entry point ("agent" node) that receives the
+          workflow state
+        - Output: The component can have multiple exit points, though in this
+          implementation it has one exit route (Routes.STOP)
+
+        Args:
+            graph: The StateGraph instance to attach this component to
+            exit_nodes: A mapping of component exit routes to destination nodes in the
+                       parent graph. Keys are custom node names or Routes enum (e.g., Routes.STOP)
+                       and values are node names to connect to. This allows the parent
+                       workflow to control where the component's outputs flow.
+
+        Returns:
+            str: The name of the component's entry node ("agent") that the parent
+                 workflow should connect to when routing to this component.
+
+        Example:
+            ```python
+            # Parent workflow connects to this component
+            react_agent = ReactAgentComponent(...)
+            entry_node = react_agent.attach(
+                graph,
+                exit_nodes={Routes.STOP: END, "fallback": "another_parent_node"}
+            )
+            graph.add_edge("previous_node", entry_node)
+            ```
+        """
+
+        if not (Routes.STOP in exit_nodes and len(exit_nodes) == 1):
+            raise ValueError("component expects one exit route (Routes.STOP)")
+
+        graph.add_node("agent", self._agent.run)
+        graph.add_node("run_tools", self.tools_runner)
+
+        graph.add_conditional_edges(
+            "agent",
+            self._are_tools_called,
+            {Routes.TOOL_USE: "run_tools", Routes.STOP: exit_nodes[Routes.STOP]},
+        )
+        graph.add_edge("run_tools", "agent")
+
+        return "agent"
 
 
 class Workflow(AbstractWorkflow):
@@ -178,34 +276,25 @@ class Workflow(AbstractWorkflow):
 
         self._goal = goal
         graph = StateGraph(ChatWorkflowState)
+
         tools = self._get_tools()
         agents_toolset = tools_registry.toolset(tools)
 
-        self._agent: ChatAgent = prompt_registry.get(  # type: ignore[assignment]
-            "chat/agent", tools=agents_toolset.bindable, prompt_version="^1.0.0"  # type: ignore[arg-type]
-        )
-
-        tools_runner = ToolsExecutor(
-            tools_agent_name=self._agent.name,
+        chat_agent_component = ReactAgentComponent(
+            prompt="You are a helpful assistant. Your answers should be useful, polite, concise, and human-friendly.",
+            model=create_chat_model(
+                max_tokens=MAX_TOKENS_TO_SAMPLE,
+                config=self._model_config,
+            ),
             toolset=agents_toolset,
             workflow_id=self._workflow_id,
             workflow_type=self._workflow_type,
-        ).run
-
-        graph.add_node("agent", self._agent.run)
-        graph.add_node("run_tools", tools_runner)
-
-        graph.set_entry_point("agent")
-
-        graph.add_conditional_edges(
-            "agent",
-            self._are_tools_called,
-            {
-                Routes.TOOL_USE: "run_tools",
-                Routes.STOP: END,
-            },
         )
-        graph.add_edge("run_tools", "agent")
+        component_entry_node = chat_agent_component.attach(
+            graph, exit_nodes={Routes.STOP: END}
+        )
+        self._agent = chat_agent_component._agent
+        graph.set_entry_point(component_entry_node)
 
         return graph.compile(checkpointer=checkpointer)
 
