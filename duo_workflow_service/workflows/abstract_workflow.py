@@ -6,6 +6,7 @@ from typing import Any, Dict, Optional, Type, TypedDict, Union
 import structlog
 from langchain.tools import BaseTool
 from langchain_core.runnables import RunnableConfig
+from gitlab_cloud_connector import CloudConnectorUser
 
 # pylint disable are going to be fixed via
 # https://gitlab.com/gitlab-org/duo-workflow/duo-workflow-service/-/issues/78
@@ -85,6 +86,7 @@ class AbstractWorkflow(ABC):
         workflow_id: str,
         workflow_metadata: Dict[str, Any],
         workflow_type: CategoryEnum,
+        user: CloudConnectorUser,
         context_elements: list = None,  # type: ignore[assignment]
         invocation_metadata: InvocationMetadata = {
             "base_url": "",
@@ -99,6 +101,7 @@ class AbstractWorkflow(ABC):
         self._workflow_id = workflow_id
         self._workflow_metadata = workflow_metadata
         self._context_elements = context_elements or []
+        self._user = user
         self.log = structlog.stdlib.get_logger("workflow").bind(workflow_id=workflow_id)
         self._http_client = get_http_client(
             self._outbox,
@@ -210,6 +213,7 @@ class AbstractWorkflow(ABC):
                 workflow_config=self._workflow_config,
                 gl_http_client=self._http_client,
                 gitlab_host=gitlab_host,
+                user=self._user,
                 additional_tools=self._additional_tools,
             )
             checkpoint_notifier = UserInterface(
