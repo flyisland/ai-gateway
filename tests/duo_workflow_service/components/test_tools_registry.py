@@ -3,7 +3,6 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 from langchain.tools import BaseTool
-from gitlab_cloud_connector import CloudConnectorUser, GitLabUnitPrimitive
 
 from duo_workflow_service import tools
 from duo_workflow_service.components.tools_registry import (
@@ -19,14 +18,6 @@ from lib.feature_flags import current_feature_flag_context
 @pytest.fixture
 def gl_http_client():
     return AsyncMock(spec=GitlabHttpClient)
-
-
-@pytest.fixture
-def mock_user():
-    """Create a mock user with all permissions."""
-    user = MagicMock(spec=CloudConnectorUser)
-    user.can.return_value = True
-    return user
 
 
 _inbox = MagicMock(spec=asyncio.Queue)
@@ -191,19 +182,18 @@ _outbox = MagicMock(spec=asyncio.Queue)
         "read_write_files_privileges",
     ],
 )
-def test_registry_initialization(tool_metadata, mock_user, config, expected_tools_set):
+def test_registry_initialization(tool_metadata, config, expected_tools_set):
     registry = ToolsRegistry(
         enabled_tools=config,
         preapproved_tools=[],
         tool_metadata=tool_metadata,
-        user=mock_user,
     )
 
     assert set(registry._enabled_tools.keys()) == expected_tools_set
 
 
 def test_registry_initialization_initialises_tools_with_correct_attributes(
-    tool_metadata, mock_user,
+    tool_metadata,
 ):
     registry = ToolsRegistry(
         enabled_tools=[
@@ -215,7 +205,6 @@ def test_registry_initialization_initialises_tools_with_correct_attributes(
         ],
         preapproved_tools=[],
         tool_metadata=tool_metadata,
-        user=mock_user,
     )
     expected_tools = {
         "create_plan": tools.CreatePlan(),
@@ -282,7 +271,7 @@ def test_registry_initialization_initialises_tools_with_correct_attributes(
 
 
 @pytest.mark.asyncio
-async def test_registry_configuration(gl_http_client, mock_user):
+async def test_registry_configuration(gl_http_client):
     workflow_config = {
         "id": "test_workflow",
         "agent_privileges_names": ["run_commands"],
@@ -296,7 +285,6 @@ async def test_registry_configuration(gl_http_client, mock_user):
         outbox=_outbox,
         inbox=_inbox,
         gitlab_host="gitlab.example.com",
-        user=mock_user,
         additional_tools=[extra_tool],
     )
 
@@ -337,12 +325,11 @@ async def test_registry_configuration(gl_http_client, mock_user):
     ],
     ids=["approved_tool", "not_approved_tool", "nonexistent_tool", "handover_tool"],
 )
-def test_get_tool(tool_metadata, mock_user, tool_name, expected_tool, config):
+def test_get_tool(tool_metadata, tool_name, expected_tool, config):
     registry = ToolsRegistry(
         enabled_tools=config,
         preapproved_tools=[],
         tool_metadata=tool_metadata,
-        user=mock_user,
     )
 
     tool = registry.get(tool_name)
@@ -361,12 +348,11 @@ def test_get_tool(tool_metadata, mock_user, tool_name, expected_tool, config):
     ],
     ids=["multiple_tools", "no_tools"],
 )
-def test_get_batch_tools(tool_metadata, mock_user, requested_tools, expected_tools, config):
+def test_get_batch_tools(tool_metadata, requested_tools, expected_tools, config):
     registry = ToolsRegistry(
         enabled_tools=config,
         preapproved_tools=[],
         tool_metadata=tool_metadata,
-        user=mock_user,
     )
 
     assert [
@@ -386,12 +372,11 @@ def test_get_batch_tools(tool_metadata, mock_user, requested_tools, expected_too
     ],
     ids=["tools_and_noop_tools_mixed", "noop_tools_only"],
 )
-def test_get_handlers(tool_metadata, mock_user, requested_tools, expected_tools, config):
+def test_get_handlers(tool_metadata, requested_tools, expected_tools, config):
     registry = ToolsRegistry(
         enabled_tools=config,
         preapproved_tools=[],
         tool_metadata=tool_metadata,
-        user=mock_user,
     )
 
     assert [
@@ -399,12 +384,11 @@ def test_get_handlers(tool_metadata, mock_user, requested_tools, expected_tools,
     ] == expected_tools
 
 
-def test_preapproved_tools_initialization(tool_metadata, mock_user):
+def test_preapproved_tools_initialization(tool_metadata):
     registry = ToolsRegistry(
         enabled_tools=["read_write_files", "read_only_gitlab"],
         preapproved_tools=["read_write_files"],
         tool_metadata=tool_metadata,
-        user=mock_user,
     )
 
     # Default tools should always be in preapproved_tools
@@ -432,14 +416,13 @@ def test_preapproved_tools_initialization(tool_metadata, mock_user):
     assert registry._preapproved_tool_names == default_tools.union(read_write_tools)
 
 
-def test_approval_required(tool_metadata, mock_user):
+def test_approval_required(tool_metadata):
     registry = ToolsRegistry(
         enabled_tools=["read_write_files", "read_only_gitlab"],
         preapproved_tools=[
             "read_write_files"
         ],  # Only read_write_files tools are preapproved
         tool_metadata=tool_metadata,
-        user=mock_user,
     )
 
     # Tool is in preapproved list
@@ -455,7 +438,7 @@ def test_approval_required(tool_metadata, mock_user):
 
 
 @pytest.mark.asyncio
-async def test_registry_configuration_with_preapproved_tools(gl_http_client, mock_user):
+async def test_registry_configuration_with_preapproved_tools(gl_http_client):
     workflow_config = {
         "id": "test_workflow",
         "agent_privileges_names": ["read_write_files", "run_commands"],
@@ -468,7 +451,6 @@ async def test_registry_configuration_with_preapproved_tools(gl_http_client, moc
         outbox=_outbox,
         inbox=_inbox,
         gitlab_host="gitlab.example.com",
-        user=mock_user,
     )
 
     always_enabled_tools = set([tool_cls.tool_title for tool_cls in NO_OP_TOOLS])  # type: ignore
@@ -498,7 +480,7 @@ async def test_registry_configuration_with_preapproved_tools(gl_http_client, moc
     [(None), ({"id": 123})],
     ids=["no_workflow", "no_agent_privileges_in_workflow"],
 )
-async def test_registry_configuration_error(gl_http_client, mock_user, workflow_config):
+async def test_registry_configuration_error(gl_http_client, workflow_config):
     with pytest.raises(RuntimeError, match="Failed to find tools configuration"):
         await ToolsRegistry.configure(
             workflow_config=workflow_config,
@@ -506,7 +488,6 @@ async def test_registry_configuration_error(gl_http_client, mock_user, workflow_
             outbox=_outbox,
             inbox=_inbox,
             gitlab_host="gitlab.example.com",
-            user=mock_user,
         )
 
 
@@ -537,12 +518,11 @@ async def test_registry_configuration_error(gl_http_client, mock_user, workflow_
         "with nonexistent tool",
     ],
 )
-def test_toolset_method(tool_metadata, mock_user, tool_names, expected_preapproved):
+def test_toolset_method(tool_metadata, tool_names, expected_preapproved):
     registry = ToolsRegistry(
         enabled_tools=["read_write_files", "use_git"],
         preapproved_tools=["read_write_files"],
         tool_metadata=tool_metadata,
-        user=mock_user,
     )
 
     with patch("duo_workflow_service.components.tools_registry.Toolset") as MockToolset:
@@ -574,7 +554,6 @@ def test_commit_tools_feature_flag(
     feature_flag_value,
     should_include_commit_tools,
     tool_metadata,
-    mock_user,
 ):
     current_feature_flag_context.set({feature_flag_value})
 
@@ -582,7 +561,6 @@ def test_commit_tools_feature_flag(
         enabled_tools=["read_only_gitlab"],
         preapproved_tools=[],
         tool_metadata=tool_metadata,
-        user=mock_user,
     )
 
     assert ("get_commit" in registry._enabled_tools) == should_include_commit_tools
@@ -591,69 +569,3 @@ def test_commit_tools_feature_flag(
     assert (
         "get_commit_comments" in registry._enabled_tools
     ) == should_include_commit_tools
-
-
-def test_user_permission_filtering(tool_metadata):
-    """Test that tools are filtered based on user permissions."""
-    # Create a user that only has ASK_ISSUE permission
-    restricted_user = MagicMock(spec=CloudConnectorUser)
-    restricted_user.can.side_effect = lambda primitive: primitive == GitLabUnitPrimitive.ASK_ISSUE
-
-    registry = ToolsRegistry(
-        enabled_tools=["read_write_gitlab"],
-        preapproved_tools=[],
-        tool_metadata=tool_metadata,
-        user=restricted_user,
-    )
-
-    # Should include issue tools since user has ASK_ISSUE permission
-    assert "create_issue" in registry._enabled_tools
-    assert "get_issue" in registry._enabled_tools
-    assert "list_issues" in registry._enabled_tools
-
-    # Should NOT include epic tools since user lacks ASK_EPIC permission
-    assert "create_epic" not in registry._enabled_tools
-    assert "get_epic" not in registry._enabled_tools
-    assert "list_epics" not in registry._enabled_tools
-
-    # Should NOT include merge request tools since user lacks ASK_MERGE_REQUEST permission
-    assert "create_merge_request" not in registry._enabled_tools
-    assert "get_merge_request" not in registry._enabled_tools
-
-
-@pytest.mark.asyncio
-async def test_registry_configuration_with_restricted_user(gl_http_client):
-    """Test registry configuration with a user that has limited permissions."""
-    # Create a user that only has ASK_EPIC permission
-    restricted_user = MagicMock(spec=CloudConnectorUser)
-    restricted_user.can.side_effect = lambda primitive: primitive == GitLabUnitPrimitive.ASK_EPIC
-
-    workflow_config = {
-        "id": "test_workflow",
-        "agent_privileges_names": ["read_write_gitlab"],
-    }
-
-    registry = await ToolsRegistry.configure(
-        workflow_config=workflow_config,
-        gl_http_client=gl_http_client,
-        outbox=_outbox,
-        inbox=_inbox,
-        gitlab_host="gitlab.example.com",
-        user=restricted_user,
-    )
-
-    # Should include epic tools
-    assert "create_epic" in registry._enabled_tools
-    assert "get_epic" in registry._enabled_tools
-
-    # Should NOT include issue tools
-    assert "create_issue" not in registry._enabled_tools
-    assert "get_issue" not in registry._enabled_tools
-
-    # Should NOT include merge request tools
-    assert "create_merge_request" not in registry._enabled_tools
-    assert "get_merge_request" not in registry._enabled_tools
-
-    # Should still include permission-exempt tools
-    assert "create_plan" in registry._enabled_tools
-    assert "handover_tool" in registry._enabled_tools
