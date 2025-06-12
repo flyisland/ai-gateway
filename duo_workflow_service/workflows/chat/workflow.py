@@ -26,6 +26,8 @@ from duo_workflow_service.tracking.errors import log_exception
 from duo_workflow_service.workflows.abstract_workflow import AbstractWorkflow
 from lib.feature_flags.context import FeatureFlag, is_feature_enabled
 
+# from gitlab_cloud_connector import CloudConnectorUser
+
 MAX_TOKENS_TO_SAMPLE = 8192
 DEBUG = os.getenv("DEBUG")
 MAX_MESSAGE_LENGTH = 200
@@ -227,6 +229,17 @@ class Workflow(AbstractWorkflow):
             available_tools += [tool.name for tool in self._additional_tools]
 
         return available_tools
+
+
+    def _filter_available_tools(self, tools):
+        tools_for_user = []
+
+        for tool in tools:
+            if tool.unit_primitive and self._user.can(tool.unit_primitive):
+                tools_for_user.append(tool)
+
+        return tools_for_user
+
 
     async def _handle_workflow_failure(
         self, error: BaseException, compiled_graph: Any, graph_config: Any
