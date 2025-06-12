@@ -161,6 +161,9 @@ class ReactAgentComponent:
             ```
         """
 
+        if not (Routes.STOP in exit_nodes and len(exit_nodes) == 1):
+            raise ValueError("component expects one exit route (Routes.STOP)")
+
         graph.add_node("agent", self._agent.run)
         graph.add_node("run_tools", self.tools_runner)
 
