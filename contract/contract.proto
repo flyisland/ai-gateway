@@ -100,7 +100,9 @@ message RunGitCommand {
     string repository_url = 3;
 }
 
-message GenerateTokenRequest {}
+message GenerateTokenRequest {
+    string workflowDefinition = 1;
+}
 
 message GenerateTokenResponse {
     string token = 1;
