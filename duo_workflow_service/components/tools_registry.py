@@ -7,7 +7,6 @@ from pydantic import BaseModel
 from duo_workflow_service import tools
 from duo_workflow_service.gitlab.http_client import GitlabHttpClient
 from duo_workflow_service.tools import Toolset, ToolType
-from lib.feature_flags.context import FeatureFlag, is_feature_enabled
 
 
 class ToolMetadata(TypedDict):
