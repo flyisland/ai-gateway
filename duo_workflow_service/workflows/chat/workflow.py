@@ -84,8 +84,8 @@ class Workflow(AbstractWorkflow):
     def _are_tools_called(self, state: ChatWorkflowState) -> Routes:
         if state["status"] in [WorkflowStatusEnum.CANCELLED, WorkflowStatusEnum.ERROR]:
             return Routes.STOP
-        
-        if state['status'] == WorkflowStatusEnum.TOOL_CALL_APPROVAL_REQUIRED:
+
+        if state["status"] == WorkflowStatusEnum.TOOL_CALL_APPROVAL_REQUIRED:
             return Routes.STOP
 
         history: List[BaseMessage] = state["conversation_history"][self._agent.name]
@@ -126,7 +126,7 @@ class Workflow(AbstractWorkflow):
             last_human_input=None,
             context_elements=contextElements,
             project=self._project,
-            cancel_tool_message=None
+            cancel_tool_message=None,
         )
 
     async def get_graph_input(self, goal: str, status_event: str) -> Any:
@@ -134,9 +134,7 @@ class Workflow(AbstractWorkflow):
             case WorkflowStatusEventEnum.START:
                 return self.get_workflow_state(goal)
             case WorkflowStatusEventEnum.RESUME:
-                state_update = {
-                    "status": WorkflowStatusEnum.EXECUTION
-                }
+                state_update = {"status": WorkflowStatusEnum.EXECUTION}
                 next_step = "agent"
 
                 if self._approval is None:
@@ -152,14 +150,11 @@ class Workflow(AbstractWorkflow):
                     }
                 else:
                     if self._approval.status:
-                        next_step="run_tools"
+                        next_step = "run_tools"
                     else:
                         state_update["cancel_tool_message"] = self._approval.message
-                    
-                return Command(
-                    goto=next_step,
-                    update=state_update
-                )
+
+                return Command(goto=next_step, update=state_update)
             case _:
                 return None
 

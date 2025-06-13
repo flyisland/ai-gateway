@@ -1,7 +1,13 @@
 from datetime import datetime, timezone
 from typing import Any, Dict, Optional
 
-from langchain_core.messages import AIMessage, BaseMessage, HumanMessage, SystemMessage, ToolMessage
+from langchain_core.messages import (
+    AIMessage,
+    BaseMessage,
+    HumanMessage,
+    SystemMessage,
+    ToolMessage,
+)
 from langchain_core.output_parsers.string import StrOutputParser
 from langchain_core.prompt_values import ChatPromptValue, PromptValue
 from langchain_core.runnables import Runnable, RunnableConfig
@@ -92,14 +98,14 @@ class ChatAgent(Prompt[ChatWorkflowState, BaseMessage]):
                         tool_info=call["args"],
                     )
                 )
-            
+
         return approval_required, approval_messages
-        
+
     async def run(self, input: ChatWorkflowState) -> Dict[str, Any]:
 
         new_messages = []
 
-        if 'cancel_tool_message' in input and input['cancel_tool_message']:
+        if "cancel_tool_message" in input and input["cancel_tool_message"]:
             last_message = input["conversation_history"][self.name][-1]
             messages: list[BaseMessage] = [
                 ToolMessage(
@@ -110,8 +116,8 @@ class ChatAgent(Prompt[ChatWorkflowState, BaseMessage]):
             ]
             new_messages.extend(messages)
             # update history
-            input['conversation_history'][self.name].extend(messages)
-        
+            input["conversation_history"][self.name].extend(messages)
+
         agent_response = await super().ainvoke(input=input, agent_name=self.name)
         new_messages.append(agent_response)
 

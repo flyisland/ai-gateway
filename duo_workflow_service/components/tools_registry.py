@@ -164,10 +164,10 @@ class ToolsRegistry:
             **{tool_cls.tool_title: tool_cls for tool_cls in NO_OP_TOOLS},  # type: ignore
             **{tool.name: tool for tool in [tool_cls() for tool_cls in _DEFAULT_TOOLS]},
         }
-        
+
         # Add additional tools separately
         additional_tool_dict = {tool.name: tool for tool in additional_tools}
-        
+
         # Combine all tools
         self._enabled_tools = {
             **default_tools,

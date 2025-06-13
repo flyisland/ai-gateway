@@ -21,7 +21,6 @@ from ai_gateway.model_metadata import TypeModelMetadata, current_model_metadata_
 from ai_gateway.prompts.config.base import ModelConfig, PromptConfig, PromptParams
 from ai_gateway.prompts.typing import Model, TypeModelFactory
 from ai_gateway.structured_logging import get_request_logger
-
 from duo_workflow_service.components.tools_registry import ToolsRegistry
 
 __all__ = [

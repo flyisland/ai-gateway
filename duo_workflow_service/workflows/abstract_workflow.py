@@ -95,7 +95,7 @@ class AbstractWorkflow(ABC):
         mcp_tools: list[contract_pb2.McpTool] = [],
         user: Optional[CloudConnectorUser] = None,
         additional_context: Optional[list[AdditionalContext]] = None,
-        approval: Optional[contract_pb2.Approval] = None
+        approval: Optional[contract_pb2.Approval] = None,
     ):
         self._outbox = asyncio.Queue(maxsize=QUEUE_MAX_SIZE)
         self._inbox = asyncio.Queue(maxsize=QUEUE_MAX_SIZE)
