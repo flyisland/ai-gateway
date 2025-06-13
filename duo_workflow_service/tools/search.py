@@ -2,11 +2,11 @@ import json
 from abc import ABC, abstractmethod
 from typing import Any, Literal, Optional, Type
 
+from gitlab_cloud_connector import GitLabUnitPrimitive
 from pydantic import BaseModel, Field
 
 from duo_workflow_service.tools.duo_base_tool import DuoBaseTool
 
-from gitlab_cloud_connector import GitLabUnitPrimitive
 
 class BaseSearchInput(BaseModel):
     id: str = Field(description="The ID of the project or group")

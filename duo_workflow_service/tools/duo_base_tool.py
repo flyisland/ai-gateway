@@ -1,12 +1,11 @@
 from typing import Any, List, NamedTuple, Optional
 
+from gitlab_cloud_connector import GitLabUnitPrimitive
 from langchain.tools import BaseTool
 from pydantic import BaseModel
 
 from duo_workflow_service.gitlab.http_client import GitlabHttpClient
 from duo_workflow_service.gitlab.url_parser import GitLabUrlParseError, GitLabUrlParser
-
-from gitlab_cloud_connector import GitLabUnitPrimitive
 
 
 class ProjectURLValidationResult(NamedTuple):

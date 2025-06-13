@@ -1,6 +1,7 @@
 import asyncio
 from typing import Any, Optional, Type, TypedDict, Union
 
+from gitlab_cloud_connector import CloudConnectorUser
 from langchain.tools import BaseTool
 from pydantic import BaseModel
 
@@ -9,7 +10,6 @@ from duo_workflow_service.gitlab.http_client import GitlabHttpClient
 from duo_workflow_service.tools import Toolset, ToolType
 from lib.feature_flags.context import FeatureFlag, is_feature_enabled
 
-from gitlab_cloud_connector import CloudConnectorUser
 
 class ToolMetadata(TypedDict):
     outbox: asyncio.Queue

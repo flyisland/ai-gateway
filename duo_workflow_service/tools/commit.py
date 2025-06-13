@@ -1,13 +1,12 @@
 import json
 from typing import Any, List, NamedTuple, Optional, Type
 
+from gitlab_cloud_connector import GitLabUnitPrimitive
 from pydantic import BaseModel, Field
 
 from duo_workflow_service.gitlab.url_parser import GitLabUrlParseError, GitLabUrlParser
 from duo_workflow_service.tools.duo_base_tool import DuoBaseTool
 from duo_workflow_service.tools.gitlab_resource_input import ProjectResourceInput
-
-from gitlab_cloud_connector import GitLabUnitPrimitive
 
 PROJECT_IDENTIFICATION_DESCRIPTION = """To identify the project you must provide either:
 - project_id parameter, or

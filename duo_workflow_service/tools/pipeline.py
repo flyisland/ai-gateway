@@ -1,6 +1,7 @@
 import json
 from typing import Any, Optional, Type
 
+from gitlab_cloud_connector import GitLabUnitPrimitive
 from pydantic import BaseModel, Field
 
 from duo_workflow_service.tools.duo_base_tool import DuoBaseTool
@@ -9,7 +10,6 @@ from duo_workflow_service.tools.merge_request import (
     MERGE_REQUEST_IDENTIFICATION_DESCRIPTION,
 )
 
-from gitlab_cloud_connector import GitLabUnitPrimitive
 
 class PipelineException(Exception):
     pass
