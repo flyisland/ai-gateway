@@ -33,3 +33,8 @@ class TestGetValidNamespaceIds:
     def test_empty_list(self, input_ids, expected):
         result = get_valid_namespace_ids(input_ids)
         assert result == expected
+
+    @pytest.mark.parametrize("input_ids, expected", [(None, [])])
+    def test_none_input(self, input_ids, expected):
+        result = get_valid_namespace_ids(input_ids)
+        assert result == expected
