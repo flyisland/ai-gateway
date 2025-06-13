@@ -1,6 +1,7 @@
 import httpx
 import pytest
 from anthropic import Anthropic, AsyncAnthropic
+from langchain_core.messages import HumanMessage, SystemMessage
 
 from ai_gateway.models.v2 import ChatAnthropic
 
@@ -27,6 +28,28 @@ class TestChatAnthropic:
                     "default_request_timeout": 10,
                     "max_retries": 2,
                     "default_headers": {"anthropic-version": "2021-06-01"},
+                },
+            ),
+            (
+                {
+                    "default_request_timeout": 10,
+                    "max_retries": 2,
+                    "default_headers": {"anthropic-version": "2021-06-01"},
+                    "model_kwargs": {
+                        "extra_headers": {
+                            "anthropic-beta": "token-efficient-tools-2025-02-19"
+                        }
+                    },
+                },
+                {
+                    "default_request_timeout": 10,
+                    "max_retries": 2,
+                    "default_headers": {"anthropic-version": "2021-06-01"},
+                    "model_kwargs": {
+                        "extra_headers": {
+                            "anthropic-beta": "token-efficient-tools-2025-02-19"
+                        }
+                    },
                 },
             ),
         ],

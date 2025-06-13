@@ -27,12 +27,19 @@ class ChatAnthropic(_LChatAnthropic):
     default_headers: Mapping[str, str] = {"anthropic-version": "2023-06-01"}
     """Headers to pass to the Anthropic clients, will be used for every API call."""
 
+    model_kwargs: dict[str, Any] = {}
+    """List of beta features to enable, such as ['files-api-2025-04-14'] for Files API support."""
+
     @model_validator(mode="after")
     def post_init(self) -> Self:
         client_options: dict[str, Any] = {
             "api_key": self.anthropic_api_key.get_secret_value(),
             "base_url": self.anthropic_api_url,
         }
+
+        headers = dict(self.default_headers or {})
+        if "extra_headers" in self.model_kwargs:
+            headers.update(self.model_kwargs["extra_headers"])
 
         client_options.update(
             {
