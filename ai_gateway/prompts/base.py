@@ -21,7 +21,6 @@ from ai_gateway.model_metadata import TypeModelMetadata, current_model_metadata_
 from ai_gateway.prompts.config.base import ModelConfig, PromptConfig, PromptParams
 from ai_gateway.prompts.typing import Model, TypeModelFactory
 from ai_gateway.structured_logging import get_request_logger
-from duo_workflow_service.components.tools_registry import ToolsRegistry
 
 __all__ = [
     "Prompt",
@@ -85,7 +84,6 @@ class Prompt(RunnableBinding[Input, Output]):
     prompt_tpl: Runnable[Input, PromptValue]
     internal_event_client: Optional[InternalEventsClient] = None
     limits: Optional[ModelLimits] = None
-    approved_tools: set[str] = set()
 
     def __init__(
         self,
@@ -94,7 +92,6 @@ class Prompt(RunnableBinding[Input, Output]):
         model_metadata: Optional[TypeModelMetadata] = None,
         disable_streaming: bool = False,
         tools: Optional[List[BaseTool]] = None,
-        approved_tools: set[str] = set(),
     ):
         model_override = None
         model_provider = config.model.params.model_class_provider
@@ -120,7 +117,6 @@ class Prompt(RunnableBinding[Input, Output]):
             unit_primitives=config.unit_primitives,
             bound=chain,
             prompt_tpl=prompt,
-            approved_tools=approved_tools,
         )  # type: ignore[call-arg]
 
     def _build_model_kwargs(

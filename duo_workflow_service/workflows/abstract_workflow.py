@@ -261,6 +261,8 @@ class AbstractWorkflow(ABC):
             await self._handle_workflow_failure(e, compiled_graph, graph_config)
             raise TraceableException(e)
         finally:
+            # Wait until outbox is checked to gracefully stop a workflow
+            await asyncio.sleep(self.OUTBOX_CHECK_INTERVAL * 2)
             self.is_done = True
 
     async def get_graph_input(self, goal: str, status_event: str) -> Any:

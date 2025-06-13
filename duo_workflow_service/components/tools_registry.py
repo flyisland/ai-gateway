@@ -160,7 +160,7 @@ class ToolsRegistry:
             additional_tools = []
 
         # Create a dictionary of default and NO_OP tools
-        default_tools = {
+        default_tools: dict[str, Union[BaseTool, Type[BaseModel]]] = {
             **{tool_cls.tool_title: tool_cls for tool_cls in NO_OP_TOOLS},  # type: ignore
             **{tool.name: tool for tool in [tool_cls() for tool_cls in _DEFAULT_TOOLS]},
         }
@@ -174,7 +174,7 @@ class ToolsRegistry:
             **additional_tool_dict,
         }
 
-        self._preapproved_tool_names = set(self._enabled_tools.keys())
+        self._preapproved_tool_names = set(default_tools.keys())
 
         for privilege in enabled_tools:
             for tool_cls in _AGENT_PRIVILEGES[privilege]:

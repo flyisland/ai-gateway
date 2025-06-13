@@ -134,25 +134,25 @@ class Workflow(AbstractWorkflow):
             case WorkflowStatusEventEnum.START:
                 return self.get_workflow_state(goal)
             case WorkflowStatusEventEnum.RESUME:
-                state_update = {"status": WorkflowStatusEnum.EXECUTION}
+                state_update: dict[str, Any] = {"status": WorkflowStatusEnum.EXECUTION}
                 next_step = "agent"
 
-                if self._approval is None:
-                    state_update["conversation_history"] = {
-                        self._agent.name: [
-                            HumanMessage(
-                                content=goal,
-                                additional_kwargs={
-                                    "additional_context": self._additional_context
-                                },
-                            )
-                        ]
-                    }
-                else:
-                    if self._approval.status:
+                match self._approval and self._approval.WhichOneof("user_decision"):
+                    case "approval":
                         next_step = "run_tools"
-                    else:
-                        state_update["cancel_tool_message"] = self._approval.message
+                    case "rejection":
+                        state_update["cancel_tool_message"] = self._approval.rejection.message  # type: ignore
+                    case _:
+                        state_update["conversation_history"] = {
+                            self._agent.name: [
+                                HumanMessage(
+                                    content=goal,
+                                    additional_kwargs={
+                                        "additional_context": self._additional_context
+                                    },
+                                )
+                            ]
+                        }
 
                 return Command(goto=next_step, update=state_update)
             case _:
@@ -180,8 +180,9 @@ class Workflow(AbstractWorkflow):
         agents_toolset = tools_registry.toolset(tools)
 
         self._agent: ChatAgent = prompt_registry.get(  # type: ignore[assignment]
-            "chat/agent", tools=agents_toolset.bindable, approved_tools=set(tools_registry._preapproved_tool_names), prompt_version="^1.0.0"  # type: ignore[arg-type]
+            "chat/agent", tools=agents_toolset.bindable, prompt_version="^1.0.0"  # type: ignore[arg-type]
         )
+        self._agent.tools_registry = tools_registry
 
         tools_runner = ToolsExecutor(
             tools_agent_name=self._agent.name,
