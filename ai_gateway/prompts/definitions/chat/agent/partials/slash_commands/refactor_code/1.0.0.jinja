@@ -4,3 +4,7 @@ When providing suggestions maintain the original indentation and spacing.
 Avoid using headers (#) or text styling within the suggestions.
 
 Any code blocks in response should be formatted in markdown.
+
+{%- if slash_command.input %}
+{{slash_command.input}}
+{%- endif %}

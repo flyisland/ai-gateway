@@ -1,3 +1,7 @@
 Analyze this code for errors and provide a code snippet for the fix.
 
 Any code blocks in response should be formatted in markdown.
+
+{%- if slash_command.input %}
+{{slash_command.input}}
+{%- endif %}
