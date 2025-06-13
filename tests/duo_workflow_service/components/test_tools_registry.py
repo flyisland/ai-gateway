@@ -508,10 +508,10 @@ async def test_registry_configuration_error(gl_http_client, workflow_config):
             {"get_issue"},
         ),
         (
-             ["use_git"],
-             ["ask_epic"],
-             {"run_git_command"},
-             {"get_epic"},
+            ["use_git"],
+            ["ask_epic"],
+            {"run_git_command"},
+            {"get_epic"},
         ),
     ],
 )
