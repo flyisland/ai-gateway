@@ -181,9 +181,8 @@ class ToolsRegistry:
 
                 # If user is passed, we check user permission to access this tool
                 if user:
-                    if getattr(tool, "unit_primitive", None) and not user.can(
-                        tool.unit_primitive
-                    ):
+                    tool_primitive = getattr(tool, "unit_primitive", None)
+                    if tool_primitive and not user.can(tool_primitive):
                         continue
 
                 self._enabled_tools[tool.name] = tool

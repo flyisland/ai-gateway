@@ -207,10 +207,11 @@ class AbstractWorkflow(ABC):
                 self._http_client, self._workflow_id
             )
 
-            if self._workflow_type == CategoryEnum.WORKFLOW_CHAT:
-                user_for_registry = self._user
-            else:
-                user_for_registry = None
+            user_for_registry = (
+                self._user
+                if self._workflow_type == CategoryEnum.WORKFLOW_CHAT
+                else None
+            )
 
             tools_registry = await ToolsRegistry.configure(
                 outbox=self._outbox,
