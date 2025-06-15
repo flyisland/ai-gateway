@@ -1,6 +1,6 @@
 import re
 from enum import Enum
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any
 
 
 class SecurityException(Exception):
@@ -86,55 +86,12 @@ class PromptSecurity:
         """
         function_map = {
             SecurityFunction.ENCODE_TAGS: PromptSecurity._encode_tags_recursive,
-            SecurityFunction.STRIP_TOOL_CALLS: PromptSecurity._strip_tool_calls_wrapper,
-            SecurityFunction.DETECT_CONTRADICTIONS: PromptSecurity._detect_contradictions_wrapper,
-            SecurityFunction.MONITOR_DIVERGENCE: PromptSecurity._monitor_divergence_wrapper,
         }
 
         func = function_map.get(function)
         if func:
             return func(data)
         return data
-
-    # === Wrapper functions for validation (return tuples) ===
-
-    @staticmethod
-    def _strip_tool_calls_wrapper(data: Any) -> Any:
-        """Wrapper for strip_tool_calls that transforms data."""
-        # For now, just return the data unchanged (placeholder)
-        # In real implementation, this would strip unauthorized tool calls
-        return data
-
-    @staticmethod
-    def _detect_contradictions_wrapper(data: Any) -> Tuple[bool, Optional[str]]:
-        """Wrapper for detect_contradictions that validates data."""
-        # Extract title and description from data
-        if isinstance(data, dict):
-            title = data.get("title", "")
-            description = data.get("description", "")
-
-            # Call the actual validation function
-            return PromptSecurity.detect_contradictory_inputs(title, description)
-
-        # If data format is unexpected, pass validation
-        return True, None
-
-    @staticmethod
-    def _monitor_divergence_wrapper(data: Any) -> Tuple[bool, Optional[str]]:
-        """Wrapper for monitor_divergence that validates data."""
-        # Extract original intent and comments from data
-        if isinstance(data, dict):
-            original_intent = {
-                "title": data.get("title", ""),
-                "description": data.get("description", ""),
-            }
-            comments = data.get("comments", [])
-
-            # Call the actual validation function
-            return PromptSecurity.monitor_comment_divergence(original_intent, comments)
-
-        # If data format is unexpected, pass validation
-        return True, None
 
     @staticmethod
     def _encode_tags_recursive(data: Any) -> Any:
@@ -179,75 +136,3 @@ class PromptSecurity:
             )
 
         return text
-
-    @staticmethod
-    def strip_tool_calls(text: str, allowed_tools: List[str] = None) -> str:
-        """Strip out any specifically named tool calls found in user-generated content.
-
-        Args:
-            text: Input text that may contain tool call attempts
-            allowed_tools: List of tools that are allowed (if any)
-
-        Returns:
-            Text with unauthorized tool calls removed
-
-        Example:
-            Input: "Please call get_admin_access() and then get_issue()"
-            Output: "Please call and then get_issue()" (if get_issue is allowed)
-        """
-        # TODO: Implement tool call detection and stripping
-        pass
-
-    @staticmethod
-    def detect_contradictory_inputs(
-        title: str, description: str, threshold: float = 0.7
-    ) -> Tuple[bool, Optional[str]]:
-        """Detect if issue title and description are significantly contradictory.
-
-        Args:
-            title: Issue title
-            description: Issue description
-            threshold: Similarity threshold (0-1) below which inputs are considered contradictory
-
-        Returns:
-            Tuple of (is_safe, contradiction_message)
-
-        Example:
-            Title: "Add user authentication"
-            Description: "Remove all security features"
-            Returns: (False, "Title suggests adding security but description suggests removing it")
-        """
-        # TODO: Implement using embeddings or semantic similarity
-        pass
-
-    @staticmethod
-    def monitor_comment_divergence(
-        original_intent: Dict[str, str], comments: List[str], threshold: float = 0.6
-    ) -> Tuple[bool, Optional[str]]:
-        """Monitor if comments deviate substantially from original issue intent.
-
-        Args:
-            original_intent: Dict with 'title' and 'description' of original issue
-            comments: List of comment texts
-            threshold: Divergence threshold (0-1) below which comments are considered off-topic
-
-        Returns:
-            Tuple of (is_safe, divergence_message)
-
-        Example:
-            Original: {"title": "Update documentation", "description": "Fix typos in README"}
-            Comments: ["Let's refactor the entire codebase", "We should rewrite in Rust"]
-            Returns: (False, "Comments have diverged significantly from original documentation task")
-        """
-        # TODO: Implement comment divergence detection
-        pass
-
-    @staticmethod
-    def add_tool_config(tool_name: str, security_functions: List[SecurityFunction]):
-        """Add or update security configuration for a tool."""
-        PromptSecurity.TOOL_SECURITY_CONFIG[tool_name] = security_functions
-
-    @staticmethod
-    def get_tool_config(tool_name: str) -> List[SecurityFunction]:
-        """Get security configuration for a tool."""
-        return PromptSecurity.TOOL_SECURITY_CONFIG.get(tool_name, [])
