@@ -26,7 +26,6 @@ class PromptSecurity:
         "goal": "goal",
         "system": "system",
         "s": "system",  # Shortened version
-        # Add more tags here as needed
     }
 
     # Define which security functions to apply for each tool
@@ -58,7 +57,6 @@ class PromptSecurity:
         # Get security functions for this tool
         security_functions = PromptSecurity.TOOL_SECURITY_CONFIG.get(tool_name, [])
 
-        # Apply each security function in order
         secured_response = response
         for func in security_functions:
             result = PromptSecurity._apply_function(secured_response, func)
@@ -71,7 +69,6 @@ class PromptSecurity:
                         f"Security validation failed: {error_message}"
                     )
             else:
-                # It's transformed data, update the response
                 secured_response = result
 
         return secured_response
