@@ -304,7 +304,7 @@ class GetIssue(IssueBaseTool):
                     response = json.loads(response)
                 response = PromptSecurity.apply_security(response, self.name)
 
-                return json.dumps({"notes": response})
+                return json.dumps({"issue": response})
 
             except SecurityException as e:
                 return json.dumps({"error": str(e)})

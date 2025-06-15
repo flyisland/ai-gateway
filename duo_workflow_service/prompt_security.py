@@ -1,16 +1,16 @@
 import re
 from enum import Enum
-from typing import Any, Dict, List, Tuple, Optional
+from typing import Any, Dict, List, Optional, Tuple
 
 
 class SecurityException(Exception):
-    """Custom exception raised when security validation fails"""
+    """Custom exception raised when security validation fails."""
 
     pass
 
 
 class SecurityFunction(Enum):
-    """Available security functions"""
+    """Available security functions."""
 
     ENCODE_TAGS = "encode_tags"
     STRIP_TOOL_CALLS = "strip_tool_calls"
@@ -19,7 +19,7 @@ class SecurityFunction(Enum):
 
 
 class PromptSecurity:
-    """Security class with multiple security functions"""
+    """Security class with multiple security functions."""
 
     # Define dangerous tags to encode
     DANGEROUS_TAGS = {
@@ -43,8 +43,7 @@ class PromptSecurity:
 
     @staticmethod
     def apply_security(response: Any, tool_name: str) -> Any:
-        """
-        Apply all configured security functions for a specific tool.
+        """Apply all configured security functions for a specific tool.
 
         Args:
             response: The response to secure
@@ -79,8 +78,7 @@ class PromptSecurity:
 
     @staticmethod
     def _apply_function(data: Any, function: SecurityFunction) -> Any:
-        """
-        Apply a specific security function to data.
+        """Apply a specific security function to data.
 
         Returns:
             - For transform functions: transformed data
@@ -102,14 +100,14 @@ class PromptSecurity:
 
     @staticmethod
     def _strip_tool_calls_wrapper(data: Any) -> Any:
-        """Wrapper for strip_tool_calls that transforms data"""
+        """Wrapper for strip_tool_calls that transforms data."""
         # For now, just return the data unchanged (placeholder)
         # In real implementation, this would strip unauthorized tool calls
         return data
 
     @staticmethod
     def _detect_contradictions_wrapper(data: Any) -> Tuple[bool, Optional[str]]:
-        """Wrapper for detect_contradictions that validates data"""
+        """Wrapper for detect_contradictions that validates data."""
         # Extract title and description from data
         if isinstance(data, dict):
             title = data.get("title", "")
@@ -123,7 +121,7 @@ class PromptSecurity:
 
     @staticmethod
     def _monitor_divergence_wrapper(data: Any) -> Tuple[bool, Optional[str]]:
-        """Wrapper for monitor_divergence that validates data"""
+        """Wrapper for monitor_divergence that validates data."""
         # Extract original intent and comments from data
         if isinstance(data, dict):
             original_intent = {
@@ -140,7 +138,7 @@ class PromptSecurity:
 
     @staticmethod
     def _encode_tags_recursive(data: Any) -> Any:
-        """Recursively encode all dangerous tags"""
+        """Recursively encode all dangerous tags."""
         if isinstance(data, str):
             return PromptSecurity._encode_tags(data)
         elif isinstance(data, dict):
@@ -153,7 +151,7 @@ class PromptSecurity:
 
     @staticmethod
     def _encode_tags(text: str) -> str:
-        """Encode all dangerous tags in text"""
+        """Encode all dangerous tags in text."""
         # Process each dangerous tag
         for tag, replacement in PromptSecurity.DANGEROUS_TAGS.items():
             # Handle exact tag
@@ -184,8 +182,7 @@ class PromptSecurity:
 
     @staticmethod
     def strip_tool_calls(text: str, allowed_tools: List[str] = None) -> str:
-        """
-        Strip out any specifically named tool calls found in user-generated content.
+        """Strip out any specifically named tool calls found in user-generated content.
 
         Args:
             text: Input text that may contain tool call attempts
@@ -205,8 +202,7 @@ class PromptSecurity:
     def detect_contradictory_inputs(
         title: str, description: str, threshold: float = 0.7
     ) -> Tuple[bool, Optional[str]]:
-        """
-        Detect if issue title and description are significantly contradictory.
+        """Detect if issue title and description are significantly contradictory.
 
         Args:
             title: Issue title
@@ -228,8 +224,7 @@ class PromptSecurity:
     def monitor_comment_divergence(
         original_intent: Dict[str, str], comments: List[str], threshold: float = 0.6
     ) -> Tuple[bool, Optional[str]]:
-        """
-        Monitor if comments deviate substantially from original issue intent.
+        """Monitor if comments deviate substantially from original issue intent.
 
         Args:
             original_intent: Dict with 'title' and 'description' of original issue
@@ -249,10 +244,10 @@ class PromptSecurity:
 
     @staticmethod
     def add_tool_config(tool_name: str, security_functions: List[SecurityFunction]):
-        """Add or update security configuration for a tool"""
+        """Add or update security configuration for a tool."""
         PromptSecurity.TOOL_SECURITY_CONFIG[tool_name] = security_functions
 
     @staticmethod
     def get_tool_config(tool_name: str) -> List[SecurityFunction]:
-        """Get security configuration for a tool"""
+        """Get security configuration for a tool."""
         return PromptSecurity.TOOL_SECURITY_CONFIG.get(tool_name, [])
