@@ -134,6 +134,7 @@ async def chat(
         Depends(get_gl_agent_remote_executor_factory),
     ],
 ):
+    import pdb;pdb.set_trace()
 
     agent_request = convert_v1_to_v2_inputs(chat_request)
     payload = chat_request.prompt_components[0].payload
