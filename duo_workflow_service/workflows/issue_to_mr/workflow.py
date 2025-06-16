@@ -75,8 +75,9 @@ an implementation plan.
 (
 "human",
 """
-Prepare implementation plan for the issue provided in <issue> tag,
-then create a comment with the plan  on this issue. When you done
+Create a comment on an issue provided in <issue> tag,
+the comment should outline implementation plan for the issue provided in <issue> tag.
+After you will have create the comment on the issue
 call handover_tool to finish your work.
 
 <issue>
@@ -113,18 +114,17 @@ class AgentNode:
         self._check_events = check_events
 
     async def run(self, state: DuoWorkflowStateType) -> dict:
-
             model_completion: list[MessageLikeRepresentation]
 
             if self.name in state["conversation_history"]:
-                model_completion = self._model.ainvoke(
+                model_completion = await self._model.ainvoke(
                     state["conversation_history"][self.name]
                 )
                 state["conversation_history"][self.name].append(model_completion)
             else:
                 messages = self._conversation_preamble(state)
                 model_completion = await self._model.ainvoke(messages)
-                state["conversation_history"][self.name] = [*messages, *model_completion]
+                state["conversation_history"][self.name] = [*messages, model_completion]
                 
 
             return state
@@ -150,7 +150,7 @@ class AgentNode:
         return conversation_preamble
 
 class ToolNode:
-
+    _tools_agent_name: str
     def __init__(
             self,
             agent_name,
@@ -158,10 +158,10 @@ class ToolNode:
             workflow_id,
             workflow_type,
         ):
-        self._tools_agent_name=agent_name,
-        self._toolset=toolset,
-        self._workflow_id=workflow_id,
-        self._workflow_type=workflow_type,
+        self._tools_agent_name=agent_name
+        self._toolset=toolset
+        self._workflow_id=workflow_id
+        self._workflow_type=workflow_type
   
     async def run(self, state: DuoWorkflowStateType):
         conversation_history=state["conversation_history"]
@@ -189,7 +189,12 @@ class ToolNode:
 class BaseComponent:
     inputs: list[str] = []
     output: Optional[str]
-    _id: str = Field(default_factory=lambda: str(uuid.uuid4()))    
+    _id: str
+
+    def __init__(self, inputs, output):
+        self.inputs = inputs
+        self.output = output
+        self._id = str(uuid.uuid4())   
 
 class AgentComponent(BaseComponent):
     def __init__(
@@ -205,8 +210,8 @@ class AgentComponent(BaseComponent):
         # self._agent: ChatAgent = prompt_registry.get(  # type: ignore[assignment]
         #     "chat/agent", tools=toolset.bindable, prompt_version="^1.0.0"  # type: ignore[arg-type]
         # )
-        self.inputs = inputs
-        self.output = output
+
+        super().__init__(inputs=inputs, output=output)
         self._prompt_template = prompt_template
         self._model = model
         self._toolset = toolset
@@ -222,7 +227,8 @@ class AgentComponent(BaseComponent):
         last_message = history[-1]
         if isinstance(last_message, AIMessage) and len(last_message.tool_calls) > 0:
             if last_message.tool_calls[0]['name'] == 'handover_tool':
-                Routes.STOP
+                return Routes.STOP
+            
             return Routes.TOOL_USE
 
         return Routes.STOP
@@ -276,9 +282,8 @@ class RunToolComponent(BaseComponent):
             output: str,
             inputs: list[str], # issue_iid
         ):
+        super().__init__(inputs=inputs, output=output)
         self._tool = tool
-        self.output = output
-        self.inputs = inputs
 
     def output_parser(self, raw_outputs: list, state: PoCWorkflowState):
         context = state['context']
@@ -303,7 +308,6 @@ class RunToolComponent(BaseComponent):
         return f"tool_node_{self._id}"
 
 class Workflow(AbstractWorkflow):
-    _stream: bool = True
     _agent: ChatAgent
 
     def _assemble(self, components: list[BaseComponent], graph_input):

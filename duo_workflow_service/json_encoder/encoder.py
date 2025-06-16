@@ -28,7 +28,10 @@ class CustomEncoder(json.JSONEncoder):
                 SearchAndReplaceConfig,
             ),
         ):
+        
             data = o.model_dump()
             data.update({"type": o.__class__.__name__})
             return data
         return super().default(o)
+
+
