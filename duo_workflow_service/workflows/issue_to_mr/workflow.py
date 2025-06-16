@@ -3,17 +3,11 @@ from datetime import datetime, timezone
 from enum import StrEnum
 from typing import Annotated, Any, List, Optional
 
-from dependency_injector.wiring import Provide, inject
 from langchain_core.messages import AIMessage, BaseMessage, HumanMessage, ToolMessage
 from langgraph.checkpoint.memory import BaseCheckpointSaver
 from langgraph.graph import END, StateGraph
-from langgraph.types import Command
 
-from ai_gateway.container import ContainerApplication
-from ai_gateway.prompts.registry import LocalPromptRegistry
-from duo_workflow_service.agents import Agent
 from duo_workflow_service.agents.chat_agent import ChatAgent
-from duo_workflow_service.agents.tools_executor import ToolsExecutor
 from duo_workflow_service.checkpointer.gitlab_workflow import WorkflowStatusEventEnum
 from duo_workflow_service.components.tools_registry import ToolsRegistry
 from duo_workflow_service.entities.state import (
@@ -87,6 +81,34 @@ call handover_tool to finish your work.
 ),
 ]
 
+DEVELOPER_PROMPT_TEMPLATE = [(
+"system",
+"""
+You are software engieer working on issue triage. 
+Your task is to implement new featrues.
+"""
+),
+(
+"human",
+"""
+Implement new featrure desribed in issue provided in <implementation plan> tag.
+After you will have implemented the feature,
+call handover_tool to finish your work.
+Parent issue is provided in <issue> tag.
+
+<issue>
+{issue}
+</issue>
+
+<implementation plan>
+{create_issue_note__body}
+</implementation plan>
+
+Implement changes according to the implementation plan provided above.
+"""
+),
+]
+
 
 
 class AgentNode:
@@ -125,7 +147,6 @@ class AgentNode:
                 messages = self._conversation_preamble(state)
                 model_completion = await self._model.ainvoke(messages)
                 state["conversation_history"][self.name] = [*messages, model_completion]
-                
 
             return state
     
@@ -136,7 +157,18 @@ class AgentNode:
 
         for type, template in self._prompt_template:
             keys = [field_name for _, field_name, _, _ in formatter.parse(template) if field_name]
-            content  = template.format(**{key:state['context'][key] for key in keys})
+            variables = {}
+
+            for key in keys:
+                if "__" in key:
+                    subkeys = key.split("__")
+                    current = state["context"]
+                    for subkey in subkeys:
+                        current = current[subkey]
+                    variables[key] = current
+                else:
+                    variables[key] = state["context"].get(key, "")
+            content  = template.format(**variables)
 
             if type == "system":
                 conversation_preamble.append(
@@ -165,6 +197,7 @@ class ToolNode:
   
     async def run(self, state: DuoWorkflowStateType):
         conversation_history=state["conversation_history"]
+        context=state["context"]
 
         last_message = conversation_history[self._tools_agent_name][-1]
         tool_calls = getattr(last_message, "tool_calls", [])
@@ -172,9 +205,9 @@ class ToolNode:
 
         for tool_call in tool_calls:
             tool_name = tool_call["name"]
-            tool_response = f"Tool {tool_name} not found"
             tool_args = tool_call.get("args", {})
-
+            context[tool_name] = tool_args
+            tool_response = f"Tool {tool_name} not found"
             if tool_name in self._toolset:
                 tool_response = await self._toolset[tool_name].arun(tool_args)
 
@@ -183,8 +216,10 @@ class ToolNode:
             )
 
         conversation_history[self._tools_agent_name].extend(tools_responses)
-
-        return {'conversation_history': conversation_history }
+        return {
+                'conversation_history': conversation_history,
+                'context': context 
+            }
 
 class BaseComponent:
     inputs: list[str] = []
@@ -388,9 +423,18 @@ class Workflow(AbstractWorkflow):
             AgentComponent(
                 prompt_template=PROMPT_TEMPLATE,
                 inputs=['issue'],
-                output=None,
+                output='create_issue_note__body',
                 model=create_chat_model(self._model_config),
                 toolset=agents_toolset,
+                workflow_id=self._workflow_id,
+                workflow_type=self._workflow_type
+            ),
+            AgentComponent(
+                prompt_template=DEVELOPER_PROMPT_TEMPLATE,
+                inputs=['issue', 'create_issue_note__body'],
+                output=None,
+                model=create_chat_model(self._model_config),
+                toolset=tools_registry.toolset(['read_file', 'create_file_with_contents', 'edit_file', 'mkdir', 'list_dir', 'handover_tool']),
                 workflow_id=self._workflow_id,
                 workflow_type=self._workflow_type
             )
