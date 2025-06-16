@@ -1,10 +1,10 @@
 import os
 from datetime import datetime, timezone
 from enum import StrEnum
-from typing import Annotated, Any, List
+from typing import Annotated, Any, List, Optional
 
 from dependency_injector.wiring import Provide, inject
-from langchain_core.messages import AIMessage, BaseMessage, HumanMessage
+from langchain_core.messages import AIMessage, BaseMessage, HumanMessage, ToolMessage
 from langgraph.checkpoint.memory import BaseCheckpointSaver
 from langgraph.graph import END, StateGraph
 from langgraph.types import Command
@@ -18,6 +18,7 @@ from duo_workflow_service.checkpointer.gitlab_workflow import WorkflowStatusEven
 from duo_workflow_service.components.tools_registry import ToolsRegistry
 from duo_workflow_service.entities.state import (
     ChatWorkflowState,
+    PoCWorkflowState,
     MessageTypeEnum,
     ToolStatus,
     UiChatLog,
@@ -48,6 +49,9 @@ from langchain_core.runnables import Runnable
 from duo_workflow_service.tools import Toolset
 from langchain_core.language_models.chat_models import BaseChatModel
 from duo_workflow_service.entities.state import DuoWorkflowStateType
+from duo_workflow_service.agents import RunToolNode
+from duo_workflow_service.tools import DuoBaseTool
+
 from langchain_core.messages import (
     AIMessage,
     BaseMessage,
@@ -56,7 +60,8 @@ from langchain_core.messages import (
     SystemMessage,
 )
 import string
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
+import uuid
 
 PROMPT_TEMPLATE = [(
 "system",
@@ -70,17 +75,18 @@ an implementation plan.
 (
 "human",
 """
-Prepare implementation plan for the issue provided in <issue> tag
-
-To complete your assignment once you are ready you must call the handover_tool          
-{state}
+Prepare implementation plan for the issue provided in <issue> tag,
+then create a comment with the plan  on this issue. When you done
+call handover_tool to finish your work.
 
 <issue>
-{context.issue}
+{issue}
 </issue>
 """
 ),
 ]
+
+
 
 class AgentNode:
     name: str
@@ -107,24 +113,21 @@ class AgentNode:
         self._check_events = check_events
 
     async def run(self, state: DuoWorkflowStateType) -> dict:
-            updates: dict[str, Any] = {
-                "handover": [],
-            }
+
             model_completion: list[MessageLikeRepresentation]
 
             if self.name in state["conversation_history"]:
                 model_completion = self._model.ainvoke(
                     state["conversation_history"][self.name]
                 )
-                updates["conversation_history"] = {self.name: model_completion}
+                state["conversation_history"][self.name].append(model_completion)
             else:
                 messages = self._conversation_preamble(state)
                 model_completion = await self._model.ainvoke(messages)
-                updates["conversation_history"] = {
-                    self.name: [*messages, *model_completion]
-                }
+                state["conversation_history"][self.name] = [*messages, *model_completion]
+                
 
-            return updates
+            return state
     
     def _conversation_preamble(self, state: DuoWorkflowStateType) -> list[BaseMessage]:
         formatter = string.Formatter()
@@ -147,9 +150,23 @@ class AgentNode:
         return conversation_preamble
 
 class ToolNode:
-    _tool: Runnable    
+
+    def __init__(
+            self,
+            agent_name,
+            toolset,
+            workflow_id,
+            workflow_type,
+        ):
+        self._tools_agent_name=agent_name,
+        self._toolset=toolset,
+        self._workflow_id=workflow_id,
+        self._workflow_type=workflow_type,
+  
     async def run(self, state: DuoWorkflowStateType):
-        last_message = state["conversation_history"][self._tools_agent_name][-1]
+        conversation_history=state["conversation_history"]
+
+        last_message = conversation_history[self._tools_agent_name][-1]
         tool_calls = getattr(last_message, "tool_calls", [])
         tools_responses = []
 
@@ -165,18 +182,21 @@ class ToolNode:
                 ToolMessage(content=tool_response, tool_call_id=tool_call.get("id"))
             )
 
-        return {
-            "conversation_history": {self._tools_agent_name: tools_responses},
-        }
-    
-class AgentComponent:
-    inputs: list[str] = []
-    outputs: BaseModel
+        conversation_history[self._tools_agent_name].extend(tools_responses)
 
+        return {'conversation_history': conversation_history }
+
+class BaseComponent:
+    inputs: list[str] = []
+    output: Optional[str]
+    _id: str = Field(default_factory=lambda: str(uuid.uuid4()))    
+
+class AgentComponent(BaseComponent):
     def __init__(
             self, 
             prompt_template,
             inputs, # ['issue']
+            output,
             model, 
             toolset,
             workflow_id,
@@ -185,105 +205,124 @@ class AgentComponent:
         # self._agent: ChatAgent = prompt_registry.get(  # type: ignore[assignment]
         #     "chat/agent", tools=toolset.bindable, prompt_version="^1.0.0"  # type: ignore[arg-type]
         # )
-        self._agent_name = "chat/agent" + datetime.today().strftime("%Y%m%d")
         self.inputs = inputs
-        self._agent = AgentNode(
-            model=model,
-            name=self._agent_name,
-            prompt_template=prompt_template,
-            toolset=toolset,
-            workflow_id=workflow_id,
+        self.output = output
+        self._prompt_template = prompt_template
+        self._model = model
+        self._toolset = toolset
+        self._workflow_id = workflow_id
+        self._workflow_type = workflow_type
 
-        )
-        self.tools_runner = ToolNode(
-            tools_agent_name=self._agent.name,
-            toolset=toolset,
-            workflow_id=workflow_id,
-            workflow_type=workflow_type,
-        ).run
 
     def _are_tools_called(self, state: ChatWorkflowState) -> Routes:
         if state["status"] in [WorkflowStatusEnum.CANCELLED, WorkflowStatusEnum.ERROR]:
             return Routes.STOP
 
-        history: List[BaseMessage] = state["conversation_history"][self._agent.name]
+        history: List[BaseMessage] = state["conversation_history"][self.agent_name]
         last_message = history[-1]
         if isinstance(last_message, AIMessage) and len(last_message.tool_calls) > 0:
+            if last_message.tool_calls[0]['name'] == 'handover_tool':
+                Routes.STOP
             return Routes.TOOL_USE
 
         return Routes.STOP
+
+    @property
+    def agent_name(self):
+        return f"agent_{self._id}"
     
-
-
     def attach(
             self, 
             graph: StateGraph,
             exit_node: str
         ) -> Annotated[str, "Entry node name"]:
 
-        graph.add_node("agent", self._agent.run)
-        graph.add_node("run_tools", self.tools_runner)
+        agent = AgentNode(
+            model=self._model,
+            name=self.agent_name,
+            prompt_template=self._prompt_template,
+            toolset=self._toolset,
+            workflow_id=self._workflow_id,
+
+        )
+        tools_runner = ToolNode(
+            agent_name=self.agent_name,
+            toolset=self._toolset,
+            workflow_id=self._workflow_id,
+            workflow_type=self._workflow_type,
+        ).run
+
+        graph.add_node(f"{self.agent_name}", agent.run)
+        graph.add_node(f"{self.agent_name}_run_tools", tools_runner)
 
         graph.add_conditional_edges(
-            "agent",
+            f"{self.agent_name}",
             self._are_tools_called,
             {
-                Routes.TOOL_USE: "run_tools",
+                Routes.TOOL_USE: f"{self.agent_name}_run_tools",
                 Routes.STOP: exit_node
             },
         )
-        graph.add_edge("run_tools", "agent")
+        graph.add_edge(f"{self.agent_name}_run_tools", f"{self.agent_name}")
         
-        return "agent"
+        return f"{self.agent_name}"
 
+class RunToolComponent(BaseComponent):
+    _tool: DuoBaseTool
 
-class JokerOputput(BaseModel):
-    joke: str
+    def __init__(
+            self,
+            tool,
+            output: str,
+            inputs: list[str], # issue_iid
+        ):
+        self._tool = tool
+        self.output = output
+        self.inputs = inputs
 
-class MyAwesomeWorkflow:
-    def compile():
-        comedian_agent = AgentComponent(
-            inputs=['context.subject']
-            outputs=JokerOputput,
-            external_updates_emmiter=
+    def output_parser(self, raw_outputs: list, state: PoCWorkflowState):
+        context = state['context']
+        context[self.output] = raw_outputs[0]
+
+        return  { 'context': context }
+    
+    def input_parser(self, state: PoCWorkflowState):
+        return [{key:state['context'][key] for key in self.inputs}]
+
+    def attach(
+        self, 
+        graph: StateGraph,
+        exit_node: str
+    ) -> Annotated[str, "Entry node name"]:
+        graph.add_node(
+            f"tool_node_{self._id}",
+            RunToolNode[PoCWorkflowState](self._tool, self.input_parser, self.output_parser).run
         )
-        censor_agent = AgentComponent(
-            inputs=['context.joke', 'conversation_history[comic_agent.name]']
-            outputs=JokerOputput,
-        )
+        graph.add_edge(f"tool_node_{self._id}", exit_node)
 
-        self._assemble([
-            comedian_agent,
-            censor_agent,
-        ])
-
-    def _assemble(self, components: list[AgentComponent]):
-        graph = StateGraph(ChatWorkflowState)
-        outputs = []
-        for component in components:
-            if not component.inputs in outputs:
-                raise Exception('missing inputs')
-            
-            outputs.append(component.outputs)            
-            component.attach(graph,exit_node=END)
-
+        return f"tool_node_{self._id}"
 
 class Workflow(AbstractWorkflow):
     _stream: bool = True
     _agent: ChatAgent
 
-    def _are_tools_called(self, state: ChatWorkflowState) -> Routes:
-        if state["status"] in [WorkflowStatusEnum.CANCELLED, WorkflowStatusEnum.ERROR]:
-            return Routes.STOP
+    def _assemble(self, components: list[BaseComponent], graph_input):
+        graph = StateGraph(PoCWorkflowState)
+        outputs = []
+        previous_node = END
+        for component in components:
+            for input in component.inputs:
+                if not input in outputs and not input in graph_input['context']:
+                    raise Exception('missing inputs')
+            outputs.append(component.output)
+        
+        for component in reversed(components):
+            previous_node = component.attach(graph, exit_node=previous_node)
+        
+        graph.set_entry_point(previous_node)
+        return graph
 
-        history: List[BaseMessage] = state["conversation_history"][self._agent.name]
-        last_message = history[-1]
-        if isinstance(last_message, AIMessage) and len(last_message.tool_calls) > 0:
-            return Routes.TOOL_USE
-
-        return Routes.STOP
-
-    def get_workflow_state(self, goal: str) -> ChatWorkflowState:
+    def get_workflow_state(self, goal: str) -> PoCWorkflowState:
         contextElements = self._context_elements or []
 
         initial_ui_chat_log = UiChatLog(
@@ -296,58 +335,30 @@ class Workflow(AbstractWorkflow):
             context_elements=contextElements,
         )
 
-        return ChatWorkflowState(
-            plan={"steps": []},
+        return PoCWorkflowState(
             status=WorkflowStatusEnum.NOT_STARTED,
             conversation_history={
-                self._agent.name: [
-                    HumanMessage(
-                        content=goal,
-                        additional_kwargs={
-                            "additional_context": self._additional_context
-                        },
-                    ),
-                ]
             },
             ui_chat_log=[initial_ui_chat_log],
-            last_human_input=None,
-            context_elements=contextElements,
-            project=self._project,
+            context={
+                'issue_iid': 1,
+                'project_id': self._project.get('id'),
+            }
         )
 
     async def get_graph_input(self, goal: str, status_event: str) -> Any:
         match status_event:
             case WorkflowStatusEventEnum.START:
                 return self.get_workflow_state(goal)
-            case WorkflowStatusEventEnum.RESUME:
-                return Command(
-                    goto="agent",
-                    update={
-                        "status": WorkflowStatusEnum.EXECUTION,
-                        "conversation_history": {
-                            self._agent.name: [
-                                HumanMessage(
-                                    content=goal,
-                                    additional_kwargs={
-                                        "additional_context": self._additional_context
-                                    },
-                                )
-                            ]
-                        },
-                    },
-                )
             case _:
                 return None
 
-    @inject
+
     def _compile(
         self,
         goal: str,
         tools_registry: ToolsRegistry,
         checkpointer: BaseCheckpointSaver,
-        prompt_registry: LocalPromptRegistry = Provide[
-            ContainerApplication.pkg_prompts.prompt_registry
-        ],
     ):
         self.log.info(
             "ChatWorkflow._compile: Starting chat workflow compilation",
@@ -356,27 +367,31 @@ class Workflow(AbstractWorkflow):
         )
 
         self._goal = goal
-        graph = StateGraph(ChatWorkflowState)
 
-        tools = self._get_tools()
+        tools = [
+            'create_issue_note',
+            'handover_tool'
+        ]
         agents_toolset = tools_registry.toolset(tools)
+        deterministic_toolset = tools_registry.toolset(['get_issue'])
 
-        chat_agent_component = ReactAgentComponent(
-            prompt="You are a helpful assistant. Your answers should be useful, polite, concise, and human-friendly.",
-            model=create_chat_model(
-                max_tokens=MAX_TOKENS_TO_SAMPLE,
-                config=self._model_config,
+        components = [
+            RunToolComponent(
+                deterministic_toolset['get_issue'],
+                inputs=['issue_iid', 'project_id'],
+                output='issue'
             ),
-            toolset=agents_toolset,
-            workflow_id=self._workflow_id,
-            workflow_type=self._workflow_type,
-        )
-        compoment_entry_point = chat_agent_component.attach(
-            graph, 
-            exit_node=END
-        )
-        self._agent = chat_agent_component._agent
-        graph.set_entry_point(compoment_entry_point)
+            AgentComponent(
+                prompt_template=PROMPT_TEMPLATE,
+                inputs=['issue'],
+                output=None,
+                model=create_chat_model(self._model_config),
+                toolset=agents_toolset,
+                workflow_id=self._workflow_id,
+                workflow_type=self._workflow_type
+            )
+        ]
+        graph = self._assemble(components=components, graph_input=self.get_workflow_state(goal))
 
         return graph.compile(checkpointer=checkpointer)
 
@@ -389,17 +404,6 @@ class Workflow(AbstractWorkflow):
                     log["message_type"],
                     log["content"],
                 )
-
-    def _get_tools(self):
-        available_tools = CHAT_READ_ONLY_TOOLS
-        feature_flags = current_feature_flag_context.get()
-        if "duo_workflow_chat_mutation_tools" in feature_flags:
-            available_tools = CHAT_READ_ONLY_TOOLS + CHAT_MUTATION_TOOLS
-
-        if "duo_workflow_mcp_support" in feature_flags:
-            available_tools += [tool.name for tool in self._additional_tools]
-
-        return available_tools
 
     async def _handle_workflow_failure(
         self, error: BaseException, compiled_graph: Any, graph_config: Any

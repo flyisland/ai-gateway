@@ -320,3 +320,10 @@ class WorkflowContext(TypedDict):
 
 class Context(TypedDict):
     workflow: WorkflowContext
+
+
+class PoCWorkflowState(TypedDict):
+    status: WorkflowStatusEnum
+    conversation_history: Dict[str, List[BaseMessage]]
+    ui_chat_log: Annotated[List[UiChatLog], _ui_chat_log_reducer]
+    context: dict[str, Any]
