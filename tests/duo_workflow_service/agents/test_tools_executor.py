@@ -53,9 +53,11 @@ def mock_tool(name="test_tool", side_effect=None, args_schema=None):
     mock.name = name
     mock.args_schema = args_schema
     if side_effect:
-        mock.arun.side_effect = side_effect
+        mock.ainvoke.side_effect = side_effect
     else:
-        mock.arun.return_value = "test_tool result"
+        mock.ainvoke.return_value = ToolMessage(
+            content="test_tool result", name=name, tool_call_id="fake-call-1"
+        )
     return mock
 
 
@@ -101,7 +103,13 @@ class ToolTestCase:
                 }
             ],
             tools={mock_tool(): True},
-            tools_response=[ToolMessage(content="test_tool result", tool_call_id="1")],
+            tools_response=[
+                ToolMessage(
+                    content="test_tool result",
+                    name=mock_tool().name,
+                    tool_call_id="fake-call-1",
+                )
+            ],
         ),
         ToolTestCase(
             tool_calls=[
@@ -132,7 +140,11 @@ class ToolTestCase:
             tools={mock_tool(): True, mock_tool(name="other_tool"): False},
             tools_response=[
                 ToolMessage(content="Tool does_not_exist not found", tool_call_id="1"),
-                ToolMessage(content="test_tool result", tool_call_id="2"),
+                ToolMessage(
+                    content="test_tool result",
+                    name=mock_tool().name,
+                    tool_call_id="fake-call-1",
+                ),
             ],
         ),
     ],
@@ -216,7 +228,7 @@ async def test_run(
 
     for tool, expect_call in test_case.tools.items():
         if expect_call:
-            tool.arun.assert_called_once()
+            tool.ainvoke.assert_called_once()
             assert mock_internal_event_tracker.track_event.call_count == 1
             mock_internal_event_tracker.track_event.assert_has_calls(
                 [
@@ -232,7 +244,7 @@ async def test_run(
                 ]
             )
         else:
-            tool.arun.assert_not_called()
+            tool.ainvoke.assert_not_called()
 
 
 @pytest.mark.asyncio
@@ -386,7 +398,11 @@ async def test_adding_ai_context_to_ui_chat_logs(
                     ).model_dump(),
                 }
             ],
-            "tools_response": [ToolMessage(content="Plan created", tool_call_id="1")],
+            "tools_response": [
+                ToolMessage(
+                    content="Plan created", name="create_plan", tool_call_id="1"
+                )
+            ],
             "expected_plan": {
                 "steps": [
                     {"id": "task-0", "description": "Task 1", "status": "Not Started"},
@@ -408,7 +424,11 @@ async def test_adding_ai_context_to_ui_chat_logs(
                 }
             ],
             "tools_response": [
-                ToolMessage(content="Task not found: 1", tool_call_id="1")
+                ToolMessage(
+                    content="Task not found: 1",
+                    name="update_task_description",
+                    tool_call_id="1",
+                )
             ],
             "expected_plan": {"steps": []},
             "expected_log_content": "Update description for task 'step1'",
@@ -425,7 +445,11 @@ async def test_adding_ai_context_to_ui_chat_logs(
                 }
             ],
             "tools_response": [
-                ToolMessage(content="Task updated: 1", tool_call_id="1")
+                ToolMessage(
+                    content="Task updated: 1",
+                    name="update_task_description",
+                    tool_call_id="1",
+                )
             ],
             "expected_plan": {"steps": [{"id": "1", "description": "new step1"}]},
             "expected_log_content": "Update description for task 'new step1'",
@@ -440,7 +464,9 @@ async def test_adding_ai_context_to_ui_chat_logs(
                 }
             ],
             "tools_response": [
-                ToolMessage(content="Step added: task-0", tool_call_id="1")
+                ToolMessage(
+                    content="Step added: task-0", name="add_new_task", tool_call_id="1"
+                )
             ],
             "expected_plan": {
                 "steps": [
@@ -465,7 +491,9 @@ async def test_adding_ai_context_to_ui_chat_logs(
                 }
             ],
             "tools_response": [
-                ToolMessage(content="Task removed: 1", tool_call_id="1")
+                ToolMessage(
+                    content="Task removed: 1", name="remove_task", tool_call_id="1"
+                )
             ],
             "expected_plan": {"steps": []},
             "expected_log_content": "Remove task 'Test description 1'",
@@ -494,6 +522,7 @@ async def test_adding_ai_context_to_ui_chat_logs(
             "tools_response": [
                 ToolMessage(
                     content="Task status set: 1 - In Progress",
+                    name="set_task_status",
                     tool_call_id="1",
                 )
             ],
@@ -765,7 +794,7 @@ async def test_run_error_handling(
     assert tool_log["message_type"] == MessageTypeEnum.TOOL
     assert tool_log["content"].startswith(expected_log_prefix)
     assert tool_log["tool_info"] == expected_tool_info
-    tool.arun.assert_called_once()
+    tool.ainvoke.assert_called_once()
 
 
 @pytest.mark.parametrize(

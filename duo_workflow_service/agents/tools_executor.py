@@ -3,6 +3,7 @@ from typing import Any, Dict, List, Optional
 
 import structlog
 from langchain_core.messages import AIMessage, BaseMessage, ToolMessage
+from langchain_core.messages.tool import ToolCall
 from langchain_core.output_parsers.string import StrOutputParser
 from pydantic import ValidationError
 
@@ -74,7 +75,7 @@ class ToolsExecutor:
 
     async def run(self, state: DuoWorkflowStateType):
         last_message = state["conversation_history"][self._tools_agent_name][-1]
-        tool_calls = getattr(last_message, "tool_calls", [])
+        tool_calls: list[ToolCall] = getattr(last_message, "tool_calls", [])
         tools_responses = []
         ui_chat_logs: List[UiChatLog] = []
         files_changed: List[FileChanges] = []
@@ -84,58 +85,59 @@ class ToolsExecutor:
 
         for tool_call in tool_calls:
             tool_name = tool_call["name"]
-            tool_response = f"Tool {tool_name} not found"
-            tool_args = tool_call.get("args", {})
 
-            if tool_name in self._toolset:
-                result = await self._execute_tool(tool_name, tool_args, plan)
-                chat_logs = result.get("chat_logs", [])
-                if chat_logs and isinstance(chat_logs[0], dict):
-                    chat_logs[0].setdefault("message_sub_type", tool_name)
-
-                if tool_name in _COMMAND_OUTPUT_TOOLS:
-                    if chat_logs and "tool_info" in chat_logs[0]:
-                        chat_log = chat_logs[0]
-                        chat_log["tool_info"]["tool_response"] = result.get("response")
-                        chat_log["message_sub_type"] = "command_output"
-                        ui_chat_logs.extend([chat_log])
-                else:
-                    ui_chat_logs.extend(result.get("chat_logs", []))
-
-                # Grab the modified plan the tool call generated (if any), and pass it to the next tool.
-                # This allows us to compound modifications across tool calls.
-                if "plan" in result:
-                    plan = result["plan"]
-
-                if result.get("status") == WorkflowStatusEnum.ERROR:
-                    tools_responses.append(
-                        ToolMessage(
-                            content=result["response"],
-                            tool_call_id=tool_call.get("id"),
-                        )
+            if tool_name not in self._toolset:
+                tools_responses.append(
+                    ToolMessage(
+                        content=f"Tool {tool_name} not found",
+                        tool_call_id=tool_call.get("id"),
                     )
-                    return {
-                        "conversation_history": {
-                            self._tools_agent_name: tools_responses
-                        },
-                        "plan": plan,
-                        "status": WorkflowStatusEnum.ERROR,
-                        "ui_chat_log": ui_chat_logs,
-                    }
+                )
+                continue
 
-                if tool_name in _TRACK_FILE_CHANGES_TOOLS:
-                    files_changed.append(
-                        FileChanges(
-                            tool_name=tool_name,
-                            tool_args=tool_args,
-                        )
+            result = await self._execute_tool(tool_name, tool_call, plan)
+
+            chat_logs = result.get("chat_logs", [])
+            if chat_logs and isinstance(chat_logs[0], dict):
+                chat_logs[0].setdefault("message_sub_type", tool_name)
+
+            if tool_name in _TRACK_FILE_CHANGES_TOOLS:
+                files_changed.append(
+                    FileChanges(
+                        tool_name=tool_name,
+                        tool_args=tool_call.get("args", {}),
                     )
+                )
 
-                tool_response = result["response"]
+            if tool_name in _COMMAND_OUTPUT_TOOLS:
+                if chat_logs and "tool_info" in chat_logs[0]:
+                    chat_log = chat_logs[0]
+                    chat_log["tool_info"]["tool_response"] = result.get("response")
+                    chat_log["message_sub_type"] = "command_output"
+                    ui_chat_logs.extend([chat_log])
+            else:
+                ui_chat_logs.extend(result.get("chat_logs", []))
 
-            tools_responses.append(
-                ToolMessage(content=tool_response, tool_call_id=tool_call.get("id"))
-            )
+            tool_response = result["response"]
+            if isinstance(tool_response, str):
+                tools_responses.append(
+                    ToolMessage(content=tool_response, tool_call_id=tool_call.get("id"))
+                )
+            else:
+                tools_responses.append(tool_response)
+
+            # Grab the modified plan the tool call generated (if any), and pass it to the next tool.
+            # This allows us to compound modifications across tool calls.
+            if "plan" in result:
+                plan = result["plan"]
+
+            if result.get("status") == WorkflowStatusEnum.ERROR:
+                return {
+                    "conversation_history": {self._tools_agent_name: tools_responses},
+                    "plan": plan,
+                    "status": WorkflowStatusEnum.ERROR,
+                    "ui_chat_log": ui_chat_logs,
+                }
 
         return {
             "conversation_history": {self._tools_agent_name: tools_responses},
@@ -186,8 +188,9 @@ class ToolsExecutor:
             ui_chat_logs.append(chat_log)
 
     async def _execute_tool(
-        self, tool_name: str, tool_args: Dict[str, Any], plan: Plan
+        self, tool_name: str, tool_call: ToolCall, plan: Plan
     ) -> Dict[str, Any]:
+        tool_args = tool_call.get("args", {})
         tool = self._toolset[tool_name]
         chat_logs: List[UiChatLog] = []
 
@@ -196,7 +199,7 @@ class ToolsExecutor:
 
         try:
             with duo_workflow_metrics.time_tool_call(tool_name=tool_name):
-                tool_response = await tool.arun(tool_args)
+                tool_response = await tool.ainvoke(tool_call)
 
             self._track_internal_event(
                 event_name=EventEnum.WORKFLOW_TOOL_SUCCESS,
