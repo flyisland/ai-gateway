@@ -3,12 +3,14 @@ import asyncio
 import os
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
-from typing import Any, Dict, List, Type
+from typing import Any, Dict, List, Type, cast
 from unittest.mock import MagicMock, call, patch
 
 import pytest
 from langchain.tools import BaseTool
 from langchain_core.messages import AIMessage, HumanMessage, ToolMessage
+from langgraph.graph import StateGraph
+from langgraph.types import Command
 from pydantic import BaseModel, Field, ValidationError
 
 from duo_workflow_service.agents import ToolsExecutor
@@ -16,6 +18,7 @@ from duo_workflow_service.entities.state import (
     MessageTypeEnum,
     TaskStatus,
     ToolInfo,
+    WorkflowState,
     WorkflowStatusEnum,
 )
 from duo_workflow_service.internal_events import InternalEventAdditionalProperties
@@ -75,11 +78,16 @@ def planner_toolset():
     )
 
 
+@pytest.fixture
+def ui_chat_log():
+    return []
+
+
 @dataclass
 class ToolTestCase:
     tool_calls: List[Dict]
     tools: Dict[MagicMock, bool]
-    tools_response: List[ToolMessage]
+    tools_response: List[dict[str, Any]]
     ai_content: Any = field(
         default_factory=lambda: [
             {
@@ -104,11 +112,17 @@ class ToolTestCase:
             ],
             tools={mock_tool(): True},
             tools_response=[
-                ToolMessage(
-                    content="test_tool result",
-                    name=mock_tool().name,
-                    tool_call_id="fake-call-1",
-                )
+                {
+                    "conversation_history": {
+                        "planner": [
+                            ToolMessage(
+                                content="test_tool result",
+                                name=mock_tool().name,
+                                tool_call_id="fake-call-1",
+                            )
+                        ]
+                    }
+                },
             ],
         ),
         ToolTestCase(
@@ -121,7 +135,16 @@ class ToolTestCase:
             ],
             tools={mock_tool(): False},
             tools_response=[
-                ToolMessage(content="Tool does_not_exist not found", tool_call_id="1")
+                {
+                    "conversation_history": {
+                        "planner": [
+                            ToolMessage(
+                                content="Tool does_not_exist not found",
+                                tool_call_id="1",
+                            )
+                        ]
+                    }
+                },
             ],
         ),
         ToolTestCase(
@@ -139,12 +162,27 @@ class ToolTestCase:
             ],
             tools={mock_tool(): True, mock_tool(name="other_tool"): False},
             tools_response=[
-                ToolMessage(content="Tool does_not_exist not found", tool_call_id="1"),
-                ToolMessage(
-                    content="test_tool result",
-                    name=mock_tool().name,
-                    tool_call_id="fake-call-1",
-                ),
+                {
+                    "conversation_history": {
+                        "planner": [
+                            ToolMessage(
+                                content="Tool does_not_exist not found",
+                                tool_call_id="1",
+                            )
+                        ]
+                    }
+                },
+                {
+                    "conversation_history": {
+                        "planner": [
+                            ToolMessage(
+                                content="test_tool result",
+                                name=mock_tool().name,
+                                tool_call_id="fake-call-1",
+                            )
+                        ]
+                    }
+                },
             ],
         ),
     ],
@@ -197,14 +235,11 @@ async def test_run(
 
     result = await tools_executor.run(workflow_state)
 
-    assert (
-        result["conversation_history"]["planner"][-len(test_case.tools_response) :]
-        == test_case.tools_response
-    )
+    assert result[: len(test_case.tools_response)] == test_case.tools_response
 
-    assert "ui_chat_log" in result
-    ui_chat_logs = result["ui_chat_log"]
-    assert "ui_chat_log" in result
+    update = cast(Command, result[-1]).update
+    assert update and "ui_chat_log" in update
+    ui_chat_logs = update["ui_chat_log"]
     has_non_hidden_tools = any(
         tool_call["name"] not in ["get_plan"] for tool_call in test_case.tool_calls
     )
@@ -361,12 +396,15 @@ async def test_adding_ai_context_to_ui_chat_logs(
 
     result = await tools_executor.run(workflow_state)
 
-    assert "ui_chat_log" in result
-    assert len(result["ui_chat_log"]) == len(expected_message_types)
+    update = cast(Command, result[-1]).update
+    assert update and "ui_chat_log" in update
+    ui_chat_log = update["ui_chat_log"]
+
+    assert len(ui_chat_log) == len(expected_message_types)
 
     for i, expected_type in enumerate(expected_message_types):
-        if i < len(result["ui_chat_log"]):
-            assert result["ui_chat_log"][i]["message_type"] == expected_type
+        if i < len(ui_chat_log):
+            assert ui_chat_log[i]["message_type"] == expected_type
 
     if expected_message_types and expected_message_types[0] == MessageTypeEnum.AGENT:
         message = last_message(tool)
@@ -380,7 +418,7 @@ async def test_adding_ai_context_to_ui_chat_logs(
                 expected_content = message.content[0]["text"]
             else:
                 expected_content = message.content
-            assert result["ui_chat_log"][0]["content"] == expected_content
+            assert ui_chat_log[0]["content"] == expected_content
 
 
 @pytest.mark.asyncio
@@ -540,7 +578,7 @@ async def test_adding_ai_context_to_ui_chat_logs(
     ],
 )
 @patch("duo_workflow_service.agents.tools_executor.datetime")
-async def test_run_with_state_manipulating_tools(
+async def test_state_manipulation(
     mock_datetime,
     planner_toolset,
     workflow_state,
@@ -564,7 +602,12 @@ async def test_run_with_state_manipulating_tools(
     ]
     workflow_state["plan"] = test_case["plan"]
 
-    result = await tools_executor.run(workflow_state)
+    graph_builder = StateGraph(WorkflowState)
+    graph_builder.add_node("exec", tools_executor.run)
+    graph_builder.set_entry_point("exec")
+    graph_builder.set_finish_point("exec")
+    graph = graph_builder.compile()
+    result = await graph.ainvoke(workflow_state)
 
     assert (
         result["conversation_history"]["planner"][-len(test_case["tools_response"]) :]
@@ -658,13 +701,18 @@ async def test_tool_changes_are_tracked(
     ]
 
     result = await tools_executor.run(workflow_state)
+    updates = cast(Command, result[1]).update
 
     if test_case["tool_tracked"]:
-        assert len(result["files_changed"]) == 1
-        assert result["files_changed"][0]["tool_name"] == test_case["tool_call"]["name"]
-        assert result["files_changed"][0]["tool_args"] == test_case["tool_call"]["args"]
+        assert len(updates["files_changed"]) == 1
+        assert (
+            updates["files_changed"][0]["tool_name"] == test_case["tool_call"]["name"]
+        )
+        assert (
+            updates["files_changed"][0]["tool_args"] == test_case["tool_call"]["args"]
+        )
     else:
-        assert len(result["files_changed"]) == 0
+        assert len(updates["files_changed"]) == 0
 
 
 @pytest.mark.asyncio
@@ -771,16 +819,17 @@ async def test_run_error_handling(
             ),
         ]
     )
-    assert len(result["conversation_history"]["planner"]) == 1
-    assert result["conversation_history"]["planner"][0].content.startswith(
+    assert len(result) == 2
+    assert result[0]["conversation_history"]["planner"][0].content.startswith(
         expected_response
     )
 
-    if expected_error:
-        assert result["status"] == WorkflowStatusEnum.ERROR
+    updates = cast(Command, result[1]).update
 
-    assert "ui_chat_log" in result
-    ui_chat_logs = result["ui_chat_log"]
+    if expected_error:
+        assert updates["status"] == WorkflowStatusEnum.ERROR
+
+    ui_chat_logs = updates["ui_chat_log"]
     assert len(ui_chat_logs) == 2
 
     agent_log = ui_chat_logs[0]
@@ -941,5 +990,9 @@ async def test_run_command_output(workflow_state):
 
     result = await tools_executor.run(workflow_state)
 
-    assert result["ui_chat_log"][-1]["tool_info"]["tool_response"]
-    assert result["ui_chat_log"][-1]["message_sub_type"] == "command_output"
+    update = cast(Command, result[-1]).update
+    assert update and "ui_chat_log" in update
+    ui_chat_logs = update["ui_chat_log"]
+
+    assert ui_chat_logs[-1]["tool_info"]["tool_response"]
+    assert ui_chat_logs[-1]["message_sub_type"] == "command_output"

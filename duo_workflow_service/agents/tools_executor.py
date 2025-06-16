@@ -5,6 +5,7 @@ import structlog
 from langchain_core.messages import AIMessage, BaseMessage, ToolMessage
 from langchain_core.messages.tool import ToolCall
 from langchain_core.output_parsers.string import StrOutputParser
+from langgraph.types import Command
 from pydantic import ValidationError
 
 from duo_workflow_service.entities import WorkflowStatusEnum
@@ -76,7 +77,8 @@ class ToolsExecutor:
     async def run(self, state: DuoWorkflowStateType):
         last_message = state["conversation_history"][self._tools_agent_name][-1]
         tool_calls: list[ToolCall] = getattr(last_message, "tool_calls", [])
-        tools_responses = []
+        state_updates = {}
+        responses: list[dict[str, Any] | Command] = []
         ui_chat_logs: List[UiChatLog] = []
         files_changed: List[FileChanges] = []
         plan = state["plan"]
@@ -87,11 +89,8 @@ class ToolsExecutor:
             tool_name = tool_call["name"]
 
             if tool_name not in self._toolset:
-                tools_responses.append(
-                    ToolMessage(
-                        content=f"Tool {tool_name} not found",
-                        tool_call_id=tool_call.get("id"),
-                    )
+                responses.append(
+                    self._process_response(tool_call, f"Tool {tool_name} not found")
                 )
                 continue
 
@@ -118,13 +117,7 @@ class ToolsExecutor:
             else:
                 ui_chat_logs.extend(result.get("chat_logs", []))
 
-            tool_response = result["response"]
-            if isinstance(tool_response, str):
-                tools_responses.append(
-                    ToolMessage(content=tool_response, tool_call_id=tool_call.get("id"))
-                )
-            else:
-                tools_responses.append(tool_response)
+            responses.append(self._process_response(tool_call, result["response"]))
 
             # Grab the modified plan the tool call generated (if any), and pass it to the next tool.
             # This allows us to compound modifications across tool calls.
@@ -132,19 +125,27 @@ class ToolsExecutor:
                 plan = result["plan"]
 
             if result.get("status") == WorkflowStatusEnum.ERROR:
-                return {
-                    "conversation_history": {self._tools_agent_name: tools_responses},
-                    "plan": plan,
-                    "status": WorkflowStatusEnum.ERROR,
-                    "ui_chat_log": ui_chat_logs,
-                }
+                state_updates["status"] = WorkflowStatusEnum.ERROR
+                break
 
-        return {
-            "conversation_history": {self._tools_agent_name: tools_responses},
-            "plan": plan,
-            "ui_chat_log": ui_chat_logs,
-            "files_changed": files_changed,
-        }
+        responses.append(
+            Command(
+                update={
+                    "ui_chat_log": ui_chat_logs,
+                    "plan": plan,
+                    "files_changed": files_changed,
+                    **state_updates,
+                }
+            )
+        )
+
+        return responses
+
+    def _process_response(self, tool_call, response) -> dict[str, Any]:
+        if isinstance(response, str):
+            response = ToolMessage(content=response, tool_call_id=tool_call.get("id"))
+
+        return {"conversation_history": {self._tools_agent_name: [response]}}
 
     def _create_ai_message_ui_chat_log(
         self, message: BaseMessage, ui_chat_logs: List[UiChatLog]
