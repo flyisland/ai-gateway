@@ -90,6 +90,7 @@ class LocalPromptRegistry(BasePromptRegistry):
         model_metadata: Optional[TypeModelMetadata] = None,
         tools: Optional[List[BaseTool]] = None,
     ) -> Prompt:
+        import pdb;pdb.set_trace()
         prompt_id = self._resolve_id(prompt_id, model_metadata)
 
         log.info("Resolved prompt id", prompt_id=prompt_id)
