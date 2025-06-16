@@ -11,9 +11,7 @@ from duo_workflow_service.entities.state import (
     UiChatLog,
     WorkflowStatusEnum,
 )
-from duo_workflow_service.interceptors.feature_flag_interceptor import (
-    current_feature_flag_context,
-)
+from lib.feature_flags.context import FeatureFlag, is_feature_enabled
 
 __all__ = ["HandoverAgent"]
 
@@ -50,8 +48,7 @@ class HandoverAgent:
             last_message = messages[-1]
             summary = self._extract_summary(last_message, ui_chat_logs)
 
-            feature_flags = current_feature_flag_context.get()
-            if "duo_workflow_use_handover_summary" in feature_flags:
+            if is_feature_enabled(FeatureFlag.DUO_WORKFLOW_USE_HANDOVER_SUMMARY):
                 handover_messages = self._get_summary_to_handover(summary)
             else:
                 handover_messages = [

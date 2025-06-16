@@ -37,6 +37,7 @@ from duo_workflow_service.tools import HandoverTool
 from duo_workflow_service.tools.request_user_clarification import (
     RequestUserClarificationTool,
 )
+from lib.feature_flags import current_feature_flag_context
 
 
 class TestGoalDisambiguationComponent:
@@ -252,19 +253,15 @@ class TestGoalDisambiguationComponent:
 
     @pytest.mark.asyncio
     @patch.dict(os.environ, {"FEATURE_GOAL_DISAMBIGUATION": "True"})
-    @patch("duo_workflow_service.agents.handover.current_feature_flag_context")
     async def test_component_run_with_clear_goal(
         self,
-        mock_feature_flag_context,
         chat_mock: BaseChatModel,
         tools_registry_mock: ToolsRegistry,
         mock_http_client: GitlabHttpClient,
         graph_input: WorkflowState,
         graph_config: RunnableConfig,
     ):
-        mock_feature_flag_context.get.return_value = {
-            "duo_workflow_use_handover_summary"
-        }
+        current_feature_flag_context.set({"duo_workflow_use_handover_summary"})
         graph = StateGraph(WorkflowState)
         input = WorkflowState(
             plan=Plan(steps=[]),
@@ -325,10 +322,8 @@ class TestGoalDisambiguationComponent:
     @pytest.mark.asyncio
     @patch("duo_workflow_service.components.goal_disambiguation.component.interrupt")
     @patch.dict(os.environ, {"FEATURE_GOAL_DISAMBIGUATION": "True"})
-    @patch("duo_workflow_service.agents.handover.current_feature_flag_context")
     async def test_component_run_with_unclear_goal(
         self,
-        mock_feature_flag_context,
         mock_interrupt,
         chat_mock: BaseChatModel,
         tools_registry_mock: ToolsRegistry,
@@ -337,9 +332,7 @@ class TestGoalDisambiguationComponent:
         graph_config: RunnableConfig,
         llm_judge_response_unclear: AIMessage,
     ):
-        mock_feature_flag_context.get.return_value = {
-            "duo_workflow_use_handover_summary"
-        }
+        current_feature_flag_context.set({"duo_workflow_use_handover_summary"})
         graph = StateGraph(WorkflowState)
         mock_interrupt.return_value = {
             "event_type": WorkflowEventType.MESSAGE,

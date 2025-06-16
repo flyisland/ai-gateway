@@ -13,6 +13,7 @@ from duo_workflow_service.entities.state import (
     WorkflowState,
     WorkflowStatusEnum,
 )
+from lib.feature_flags import current_feature_flag_context
 
 
 class TestHandoverAgent:
@@ -272,10 +273,8 @@ class TestHandoverAgent:
         ],
     )
     @patch("duo_workflow_service.agents.handover.datetime")
-    @patch("duo_workflow_service.agents.handover.current_feature_flag_context")
     async def test_run_handover(
         self,
-        mock_feature_flag_context,
         mock_datetime,
         handover_from,
         conversation_history,
@@ -287,9 +286,7 @@ class TestHandoverAgent:
             2025, 1, 1, 12, 0, tzinfo=timezone.utc
         )
         mock_datetime.timezone = timezone
-        mock_feature_flag_context.get.return_value = {
-            "duo_workflow_use_handover_summary"
-        }
+        current_feature_flag_context.set({"duo_workflow_use_handover_summary"})
 
         state = WorkflowState(
             plan=Plan(steps=[]),
