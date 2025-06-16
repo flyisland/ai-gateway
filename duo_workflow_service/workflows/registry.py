@@ -35,3 +35,27 @@ def resolve_workflow_class(workflow_definition: Optional[str]) -> TypeWorkflow:
     if workflow_definition:
         return _WORKFLOWS_LOOKUP[workflow_definition]
     return software_development.Workflow  # for backwards compatibility
+
+
+_WORKFLOWS_DETAILS = [
+    {
+        'id': 'software_development',
+        'name': 'Software Development',
+        'description': ''      
+    },
+    {
+        'id': 'chat',
+        'name': 'Chat',
+        'description': ''      
+    },
+    {
+        'id': 'search_and_replace',
+        'name': 'Search and Replace',
+        'description': ''      
+    },
+    {
+        'id': 'convert_to_gitlab_ci',
+        'name': 'Convert to Gitlab CI',
+        'description': ''      
+    }
+    ]

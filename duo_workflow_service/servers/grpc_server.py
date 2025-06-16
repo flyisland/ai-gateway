@@ -43,7 +43,7 @@ from duo_workflow_service.workflows.abstract_workflow import (
     AbstractWorkflow,
     TypeWorkflow,
 )
-from duo_workflow_service.workflows.registry import resolve_workflow_class
+from duo_workflow_service.workflows.registry import resolve_workflow_class, _WORKFLOWS_DETAILS
 from duo_workflow_service.workflows.type_definitions import AdditionalContext
 
 log = structlog.stdlib.get_logger("server")
@@ -274,6 +274,24 @@ class GrpcServer(contract_pb2_grpc.DuoWorkflowServicer):
         )
 
         return contract_pb2.GenerateTokenResponse(token=token, expiresAt=expires_at)
+        
+    async def ListWorkflows(
+        self,
+        request: contract_pb2.ListWorkflowsRequest,
+        context: grpc.ServicerContext
+    ) -> contract_pb2.ListWorkflowsResponse:
+        
+        # Authentication code goes here
+        
+        response = contract_pb2.ListWorkflowsResponse()
+        
+        for workflow_detail in _WORKFLOWS_DETAILS:
+            workflow_info = response.workflows.add()
+            workflow_info.id = workflow_detail['id']
+            workflow_info.name = workflow_detail['name']
+            workflow_info.description = workflow_detail['description']
+                        
+        return response
 
     # pylint: enable=invalid-overridden-method
 

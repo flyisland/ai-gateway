@@ -6,6 +6,7 @@ option ruby_package = "DuoWorkflowService";
 service DuoWorkflow {
     rpc ExecuteWorkflow(stream ClientEvent) returns (stream Action);
     rpc GenerateToken(GenerateTokenRequest) returns (GenerateTokenResponse);
+    rpc ListWorkflows(ListWorkflowsRequest) returns (ListWorkflowsResponse);
 }
 
 message ClientEvent {
@@ -159,4 +160,17 @@ message AdditionalContext {
     optional string id = 2;
     optional string content = 3;
     optional string metadata = 4;
+}
+
+message ListWorkflowsRequest {
+}
+
+message WorkflowInfo {
+    string id = 1;       
+    string name = 2;     
+    string description = 3; 
+}
+
+message ListWorkflowsResponse {
+    repeated WorkflowInfo workflows = 1;
 }
