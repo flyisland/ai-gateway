@@ -222,6 +222,19 @@ export interface AdditionalContext {
   metadata?: string | undefined;
 }
 
+export interface ListWorkflowsRequest {
+}
+
+export interface WorkflowInfo {
+  id: string;
+  name: string;
+  description: string;
+}
+
+export interface ListWorkflowsResponse {
+  workflows: WorkflowInfo[];
+}
+
 function createBaseClientEvent(): ClientEvent {
   return { startRequest: undefined, actionResponse: undefined };
 }
@@ -2475,6 +2488,203 @@ export const AdditionalContext: MessageFns<AdditionalContext> = {
   },
 };
 
+function createBaseListWorkflowsRequest(): ListWorkflowsRequest {
+  return {};
+}
+
+export const ListWorkflowsRequest: MessageFns<ListWorkflowsRequest> = {
+  encode(_: ListWorkflowsRequest, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
+    return writer;
+  },
+
+  decode(input: BinaryReader | Uint8Array, length?: number): ListWorkflowsRequest {
+    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+    let end = length === undefined ? reader.len : reader.pos + length;
+    const message = createBaseListWorkflowsRequest();
+    while (reader.pos < end) {
+      const tag = reader.uint32();
+      switch (tag >>> 3) {
+      }
+      if ((tag & 7) === 4 || tag === 0) {
+        break;
+      }
+      reader.skip(tag & 7);
+    }
+    return message;
+  },
+
+  fromJSON(_: any): ListWorkflowsRequest {
+    return {};
+  },
+
+  toJSON(_: ListWorkflowsRequest): unknown {
+    const obj: any = {};
+    return obj;
+  },
+
+  create<I extends Exact<DeepPartial<ListWorkflowsRequest>, I>>(base?: I): ListWorkflowsRequest {
+    return ListWorkflowsRequest.fromPartial(base ?? ({} as any));
+  },
+  fromPartial<I extends Exact<DeepPartial<ListWorkflowsRequest>, I>>(_: I): ListWorkflowsRequest {
+    const message = createBaseListWorkflowsRequest();
+    return message;
+  },
+};
+
+function createBaseWorkflowInfo(): WorkflowInfo {
+  return { id: "", name: "", description: "" };
+}
+
+export const WorkflowInfo: MessageFns<WorkflowInfo> = {
+  encode(message: WorkflowInfo, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
+    if (message.id !== "") {
+      writer.uint32(10).string(message.id);
+    }
+    if (message.name !== "") {
+      writer.uint32(18).string(message.name);
+    }
+    if (message.description !== "") {
+      writer.uint32(26).string(message.description);
+    }
+    return writer;
+  },
+
+  decode(input: BinaryReader | Uint8Array, length?: number): WorkflowInfo {
+    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+    let end = length === undefined ? reader.len : reader.pos + length;
+    const message = createBaseWorkflowInfo();
+    while (reader.pos < end) {
+      const tag = reader.uint32();
+      switch (tag >>> 3) {
+        case 1: {
+          if (tag !== 10) {
+            break;
+          }
+
+          message.id = reader.string();
+          continue;
+        }
+        case 2: {
+          if (tag !== 18) {
+            break;
+          }
+
+          message.name = reader.string();
+          continue;
+        }
+        case 3: {
+          if (tag !== 26) {
+            break;
+          }
+
+          message.description = reader.string();
+          continue;
+        }
+      }
+      if ((tag & 7) === 4 || tag === 0) {
+        break;
+      }
+      reader.skip(tag & 7);
+    }
+    return message;
+  },
+
+  fromJSON(object: any): WorkflowInfo {
+    return {
+      id: isSet(object.id) ? globalThis.String(object.id) : "",
+      name: isSet(object.name) ? globalThis.String(object.name) : "",
+      description: isSet(object.description) ? globalThis.String(object.description) : "",
+    };
+  },
+
+  toJSON(message: WorkflowInfo): unknown {
+    const obj: any = {};
+    if (message.id !== "") {
+      obj.id = message.id;
+    }
+    if (message.name !== "") {
+      obj.name = message.name;
+    }
+    if (message.description !== "") {
+      obj.description = message.description;
+    }
+    return obj;
+  },
+
+  create<I extends Exact<DeepPartial<WorkflowInfo>, I>>(base?: I): WorkflowInfo {
+    return WorkflowInfo.fromPartial(base ?? ({} as any));
+  },
+  fromPartial<I extends Exact<DeepPartial<WorkflowInfo>, I>>(object: I): WorkflowInfo {
+    const message = createBaseWorkflowInfo();
+    message.id = object.id ?? "";
+    message.name = object.name ?? "";
+    message.description = object.description ?? "";
+    return message;
+  },
+};
+
+function createBaseListWorkflowsResponse(): ListWorkflowsResponse {
+  return { workflows: [] };
+}
+
+export const ListWorkflowsResponse: MessageFns<ListWorkflowsResponse> = {
+  encode(message: ListWorkflowsResponse, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
+    for (const v of message.workflows) {
+      WorkflowInfo.encode(v!, writer.uint32(10).fork()).join();
+    }
+    return writer;
+  },
+
+  decode(input: BinaryReader | Uint8Array, length?: number): ListWorkflowsResponse {
+    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+    let end = length === undefined ? reader.len : reader.pos + length;
+    const message = createBaseListWorkflowsResponse();
+    while (reader.pos < end) {
+      const tag = reader.uint32();
+      switch (tag >>> 3) {
+        case 1: {
+          if (tag !== 10) {
+            break;
+          }
+
+          message.workflows.push(WorkflowInfo.decode(reader, reader.uint32()));
+          continue;
+        }
+      }
+      if ((tag & 7) === 4 || tag === 0) {
+        break;
+      }
+      reader.skip(tag & 7);
+    }
+    return message;
+  },
+
+  fromJSON(object: any): ListWorkflowsResponse {
+    return {
+      workflows: globalThis.Array.isArray(object?.workflows)
+        ? object.workflows.map((e: any) => WorkflowInfo.fromJSON(e))
+        : [],
+    };
+  },
+
+  toJSON(message: ListWorkflowsResponse): unknown {
+    const obj: any = {};
+    if (message.workflows?.length) {
+      obj.workflows = message.workflows.map((e) => WorkflowInfo.toJSON(e));
+    }
+    return obj;
+  },
+
+  create<I extends Exact<DeepPartial<ListWorkflowsResponse>, I>>(base?: I): ListWorkflowsResponse {
+    return ListWorkflowsResponse.fromPartial(base ?? ({} as any));
+  },
+  fromPartial<I extends Exact<DeepPartial<ListWorkflowsResponse>, I>>(object: I): ListWorkflowsResponse {
+    const message = createBaseListWorkflowsResponse();
+    message.workflows = object.workflows?.map((e) => WorkflowInfo.fromPartial(e)) || [];
+    return message;
+  },
+};
+
 export type DuoWorkflowService = typeof DuoWorkflowService;
 export const DuoWorkflowService = {
   executeWorkflow: {
@@ -2495,11 +2705,21 @@ export const DuoWorkflowService = {
     responseSerialize: (value: GenerateTokenResponse) => Buffer.from(GenerateTokenResponse.encode(value).finish()),
     responseDeserialize: (value: Buffer) => GenerateTokenResponse.decode(value),
   },
+  listWorkflows: {
+    path: "/DuoWorkflow/ListWorkflows",
+    requestStream: false,
+    responseStream: false,
+    requestSerialize: (value: ListWorkflowsRequest) => Buffer.from(ListWorkflowsRequest.encode(value).finish()),
+    requestDeserialize: (value: Buffer) => ListWorkflowsRequest.decode(value),
+    responseSerialize: (value: ListWorkflowsResponse) => Buffer.from(ListWorkflowsResponse.encode(value).finish()),
+    responseDeserialize: (value: Buffer) => ListWorkflowsResponse.decode(value),
+  },
 } as const;
 
 export interface DuoWorkflowServer extends UntypedServiceImplementation {
   executeWorkflow: handleBidiStreamingCall<ClientEvent, Action>;
   generateToken: handleUnaryCall<GenerateTokenRequest, GenerateTokenResponse>;
+  listWorkflows: handleUnaryCall<ListWorkflowsRequest, ListWorkflowsResponse>;
 }
 
 export interface DuoWorkflowClient extends Client {
@@ -2520,6 +2740,21 @@ export interface DuoWorkflowClient extends Client {
     metadata: Metadata,
     options: Partial<CallOptions>,
     callback: (error: ServiceError | null, response: GenerateTokenResponse) => void,
+  ): ClientUnaryCall;
+  listWorkflows(
+    request: ListWorkflowsRequest,
+    callback: (error: ServiceError | null, response: ListWorkflowsResponse) => void,
+  ): ClientUnaryCall;
+  listWorkflows(
+    request: ListWorkflowsRequest,
+    metadata: Metadata,
+    callback: (error: ServiceError | null, response: ListWorkflowsResponse) => void,
+  ): ClientUnaryCall;
+  listWorkflows(
+    request: ListWorkflowsRequest,
+    metadata: Metadata,
+    options: Partial<CallOptions>,
+    callback: (error: ServiceError | null, response: ListWorkflowsResponse) => void,
   ): ClientUnaryCall;
 }
 

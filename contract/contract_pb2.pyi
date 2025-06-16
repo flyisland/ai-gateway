@@ -257,3 +257,23 @@ class AdditionalContext(_message.Message):
     content: str
     metadata: str
     def __init__(self, category: _Optional[str] = ..., id: _Optional[str] = ..., content: _Optional[str] = ..., metadata: _Optional[str] = ...) -> None: ...
+
+class ListWorkflowsRequest(_message.Message):
+    __slots__ = ()
+    def __init__(self) -> None: ...
+
+class WorkflowInfo(_message.Message):
+    __slots__ = ("id", "name", "description")
+    ID_FIELD_NUMBER: _ClassVar[int]
+    NAME_FIELD_NUMBER: _ClassVar[int]
+    DESCRIPTION_FIELD_NUMBER: _ClassVar[int]
+    id: str
+    name: str
+    description: str
+    def __init__(self, id: _Optional[str] = ..., name: _Optional[str] = ..., description: _Optional[str] = ...) -> None: ...
+
+class ListWorkflowsResponse(_message.Message):
+    __slots__ = ("workflows",)
+    WORKFLOWS_FIELD_NUMBER: _ClassVar[int]
+    workflows: _containers.RepeatedCompositeFieldContainer[WorkflowInfo]
+    def __init__(self, workflows: _Optional[_Iterable[_Union[WorkflowInfo, _Mapping]]] = ...) -> None: ...

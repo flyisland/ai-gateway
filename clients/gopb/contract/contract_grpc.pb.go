@@ -21,6 +21,7 @@ const _ = grpc.SupportPackageIsVersion9
 const (
 	DuoWorkflow_ExecuteWorkflow_FullMethodName = "/DuoWorkflow/ExecuteWorkflow"
 	DuoWorkflow_GenerateToken_FullMethodName   = "/DuoWorkflow/GenerateToken"
+	DuoWorkflow_ListWorkflows_FullMethodName   = "/DuoWorkflow/ListWorkflows"
 )
 
 // DuoWorkflowClient is the client API for DuoWorkflow service.
@@ -29,6 +30,7 @@ const (
 type DuoWorkflowClient interface {
 	ExecuteWorkflow(ctx context.Context, opts ...grpc.CallOption) (grpc.BidiStreamingClient[ClientEvent, Action], error)
 	GenerateToken(ctx context.Context, in *GenerateTokenRequest, opts ...grpc.CallOption) (*GenerateTokenResponse, error)
+	ListWorkflows(ctx context.Context, in *ListWorkflowsRequest, opts ...grpc.CallOption) (*ListWorkflowsResponse, error)
 }
 
 type duoWorkflowClient struct {
@@ -62,12 +64,23 @@ func (c *duoWorkflowClient) GenerateToken(ctx context.Context, in *GenerateToken
 	return out, nil
 }
 
+func (c *duoWorkflowClient) ListWorkflows(ctx context.Context, in *ListWorkflowsRequest, opts ...grpc.CallOption) (*ListWorkflowsResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(ListWorkflowsResponse)
+	err := c.cc.Invoke(ctx, DuoWorkflow_ListWorkflows_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 // DuoWorkflowServer is the server API for DuoWorkflow service.
 // All implementations must embed UnimplementedDuoWorkflowServer
 // for forward compatibility.
 type DuoWorkflowServer interface {
 	ExecuteWorkflow(grpc.BidiStreamingServer[ClientEvent, Action]) error
 	GenerateToken(context.Context, *GenerateTokenRequest) (*GenerateTokenResponse, error)
+	ListWorkflows(context.Context, *ListWorkflowsRequest) (*ListWorkflowsResponse, error)
 	mustEmbedUnimplementedDuoWorkflowServer()
 }
 
@@ -83,6 +96,9 @@ func (UnimplementedDuoWorkflowServer) ExecuteWorkflow(grpc.BidiStreamingServer[C
 }
 func (UnimplementedDuoWorkflowServer) GenerateToken(context.Context, *GenerateTokenRequest) (*GenerateTokenResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method GenerateToken not implemented")
+}
+func (UnimplementedDuoWorkflowServer) ListWorkflows(context.Context, *ListWorkflowsRequest) (*ListWorkflowsResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method ListWorkflows not implemented")
 }
 func (UnimplementedDuoWorkflowServer) mustEmbedUnimplementedDuoWorkflowServer() {}
 func (UnimplementedDuoWorkflowServer) testEmbeddedByValue()                     {}
@@ -130,6 +146,24 @@ func _DuoWorkflow_GenerateToken_Handler(srv interface{}, ctx context.Context, de
 	return interceptor(ctx, in, info, handler)
 }
 
+func _DuoWorkflow_ListWorkflows_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(ListWorkflowsRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(DuoWorkflowServer).ListWorkflows(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: DuoWorkflow_ListWorkflows_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(DuoWorkflowServer).ListWorkflows(ctx, req.(*ListWorkflowsRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 // DuoWorkflow_ServiceDesc is the grpc.ServiceDesc for DuoWorkflow service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
@@ -140,6 +174,10 @@ var DuoWorkflow_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "GenerateToken",
 			Handler:    _DuoWorkflow_GenerateToken_Handler,
+		},
+		{
+			MethodName: "ListWorkflows",
+			Handler:    _DuoWorkflow_ListWorkflows_Handler,
 		},
 	},
 	Streams: []grpc.StreamDesc{
