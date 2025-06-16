@@ -25,19 +25,13 @@ class PromptSecurity:
     DANGEROUS_TAGS = {
         "goal": "goal",
         "system": "system",
-        "s": "system",  # Shortened version
+        "s": "system",
     }
 
     # Define which security functions to apply for each tool
     TOOL_SECURITY_CONFIG = {
         "get_issue": [SecurityFunction.ENCODE_TAGS, SecurityFunction.STRIP_TOOL_CALLS],
         "get_epic": [SecurityFunction.ENCODE_TAGS, SecurityFunction.STRIP_TOOL_CALLS],
-        "create_issue": [
-            SecurityFunction.ENCODE_TAGS,
-            SecurityFunction.DETECT_CONTRADICTIONS,
-            SecurityFunction.MONITOR_DIVERGENCE,
-        ],
-        # Add more tools and their security functions here
     }
 
     @staticmethod
