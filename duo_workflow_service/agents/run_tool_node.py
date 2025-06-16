@@ -10,6 +10,7 @@ from duo_workflow_service.entities.state import (
     SearchAndReplaceWorkflowState,
     ToolInfo,
     WorkflowState,
+    PoCWorkflowState,
 )
 from duo_workflow_service.monitoring import duo_workflow_metrics
 
@@ -35,7 +36,7 @@ class OutputParserProtocol(Protocol[WorkflowStateT_contra]):
     ) -> dict[str, Any]: ...
 
 
-WorkflowStateT = TypeVar("WorkflowStateT", SearchAndReplaceWorkflowState, WorkflowState)
+WorkflowStateT = TypeVar("WorkflowStateT", SearchAndReplaceWorkflowState, WorkflowState, PoCWorkflowState)
 
 
 class RunToolNode(Generic[WorkflowStateT]):
