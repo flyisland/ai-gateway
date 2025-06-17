@@ -5,9 +5,15 @@ from pydantic import BaseModel, Field
 
 from duo_workflow_service.tools.duo_base_tool import DuoBaseTool
 
+PROJECT_IDENTIFICATION_DESCRIPTION = """The project must be specified using its full path (e.g., 'namespace/project' or 'group/subgroup/project')."""
+
 class ListVulnerabilitiesInput(BaseModel):
     project_full_path: str = Field(
         description="The full path of the GitLab project (e.g., 'namespace/project' or 'group/subgroup/project')",
+    )
+    severity: Optional[str] = Field(
+        default=None,
+        description="Filter vulnerabilities by severity (CRITICAL, HIGH, MEDIUM, LOW, INFO, UNKNOWN). If not specified, all severities will be returned.",
     )
     per_page: Optional[int] = Field(
         default=100,
@@ -25,13 +31,18 @@ class ListVulnerabilitiesInput(BaseModel):
 
 class ListVulnerabilities(DuoBaseTool):
     name: str = "list_vulnerabilities"
-    description: str = """List security vulnerabilities in a GitLab project using GraphQL.
+    description: str = f"""List security vulnerabilities in a GitLab project using GraphQL.
 
-    The project must be specified using its full path (e.g., 'namespace/project' or 'group/subgroup/project').
+    {PROJECT_IDENTIFICATION_DESCRIPTION}
+
+    The tool supports filtering vulnerabilities by severity level (CRITICAL, HIGH, MEDIUM, LOW, INFO, UNKNOWN).
+    If no severity is specified, vulnerabilities of all severity levels will be returned.
 
     For example:
-    - Given the project path 'namespace/project', the tool call would be:
+    - List all vulnerabilities in a project:
         list_vulnerabilities(project_full_path="namespace/project")
+    - List only critical vulnerabilities:
+        list_vulnerabilities(project_full_path="namespace/project", severity="CRITICAL")
     """
     args_schema: Type[BaseModel] = ListVulnerabilitiesInput  # type: ignore
 
@@ -39,12 +50,13 @@ class ListVulnerabilities(DuoBaseTool):
         project_full_path = kwargs.pop("project_full_path")
         fetch_all_pages = kwargs.pop("fetch_all_pages", True)
         per_page = kwargs.pop("per_page", 100)
+        severity = kwargs.pop("severity", None)
 
         # Build GraphQL query
         query = """
-        query($projectFullPath: ID!, $first: Int, $after: String) {
+        query($projectFullPath: ID!, $first: Int, $after: String, $severity: [VulnerabilitySeverity!]) {
           project(fullPath: $projectFullPath) {
-            vulnerabilities(first: $first, after: $after) {
+            vulnerabilities(first: $first, after: $after, severity: $severity) {
               pageInfo {
                 hasNextPage
                 endCursor
@@ -74,7 +86,8 @@ class ListVulnerabilities(DuoBaseTool):
                 variables = {
                     "projectFullPath": project_full_path,
                     "first": per_page,
-                    "after": cursor
+                    "after": cursor,
+                    "severity": severity
                 }
 
                 response = await self.gitlab_client.apost(
