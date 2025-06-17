@@ -14,8 +14,6 @@ class SecurityFunction(Enum):
 
     ENCODE_TAGS = "encode_tags"
     STRIP_TOOL_CALLS = "strip_tool_calls"
-    DETECT_CONTRADICTIONS = "detect_contradictions"
-    MONITOR_DIVERGENCE = "monitor_divergence"
 
 
 class PromptSecurity:
@@ -102,17 +100,13 @@ class PromptSecurity:
         """Encode all dangerous tags in text."""
         # Process each dangerous tag
         for tag, replacement in PromptSecurity.DANGEROUS_TAGS.items():
-            # Handle exact tag
-            text = text.replace(f"<{tag}>", f"&lt;{replacement}&gt;")
-            text = text.replace(f"</{tag}>", f"&lt;/{replacement}&gt;")
-
             # Handle case variations and spaces
             # Create pattern for case-insensitive matching with optional spaces
             tag_pattern = "".join(f"[{c.upper()}{c.lower()}]" for c in tag)
 
             # Opening tag with optional spaces
             text = re.sub(
-                f"<(\\s*{tag_pattern}\\s*)>",
+                f"</(?:\\s*{tag_pattern}\\s*)>",
                 lambda m: f"&lt;{replacement}&gt;",
                 text,
                 flags=re.IGNORECASE,
@@ -120,7 +114,7 @@ class PromptSecurity:
 
             # Closing tag with optional spaces
             text = re.sub(
-                f"</(\\s*{tag_pattern}\\s*)>",
+                f"</(?:\\s*{tag_pattern}\\s*)>",
                 lambda m: f"&lt;/{replacement}&gt;",
                 text,
                 flags=re.IGNORECASE,
