@@ -7,6 +7,7 @@ from duo_workflow_service.tools.duo_base_tool import DuoBaseTool
 
 PROJECT_IDENTIFICATION_DESCRIPTION = """The project must be specified using its full path (e.g., 'namespace/project' or 'group/subgroup/project')."""
 
+
 class ListVulnerabilitiesInput(BaseModel):
     project_full_path: str = Field(
         description="The full path of the GitLab project (e.g., 'namespace/project' or 'group/subgroup/project')",
@@ -87,18 +88,17 @@ class ListVulnerabilities(DuoBaseTool):
                     "projectFullPath": project_full_path,
                     "first": per_page,
                     "after": cursor,
-                    "severity": severity
+                    "severity": severity,
                 }
 
                 response = await self.gitlab_client.apost(
                     path="/api/graphql",
-                    body=json.dumps({
-                        "query": query,
-                        "variables": variables
-                    })
+                    body=json.dumps({"query": query, "variables": variables}),
                 )
 
-                vulnerabilities = response["data"]["project"]["vulnerabilities"]["nodes"]
+                vulnerabilities = response["data"]["project"]["vulnerabilities"][
+                    "nodes"
+                ]
                 all_vulnerabilities.extend(vulnerabilities)
 
                 page_info = response["data"]["project"]["vulnerabilities"]["pageInfo"]
@@ -108,12 +108,12 @@ class ListVulnerabilities(DuoBaseTool):
 
                 cursor = page_info["endCursor"]
 
-            return json.dumps({
-                "vulnerabilities": all_vulnerabilities,
-                "pagination": {
-                    "total_items": len(all_vulnerabilities)
+            return json.dumps(
+                {
+                    "vulnerabilities": all_vulnerabilities,
+                    "pagination": {"total_items": len(all_vulnerabilities)},
                 }
-            })
+            )
         except Exception as e:
             return json.dumps({"error": str(e)})
 

@@ -45,10 +45,14 @@ def vulnerability_data():
     """Fixture for common vulnerability data."""
     return [
         {
-            "id": 1,
+            "id": "gid://gitlab/Vulnerability/1",
             "title": "Test Vulnerability",
-            "severity": "high",
-            "state": "detected",
+            "reportType": "SAST",
+            "severity": "HIGH",
+            "location": {
+                "file": "app/controllers/users_controller.rb",
+                "startLine": 42,
+            },
         }
     ]
 
@@ -100,17 +104,27 @@ async def assert_tool_url_error(
 
 @pytest.mark.asyncio
 async def test_list_vulnerabilities(gitlab_client_mock, metadata, vulnerability_data):
-    gitlab_client_mock.aget = AsyncMock(return_value=vulnerability_data)
-    gitlab_client_mock.last_response = Mock()
-    gitlab_client_mock.last_response.headers = {"X-Total-Pages": "1"}
+    gitlab_client_mock.apost = AsyncMock(
+        return_value={
+            "data": {
+                "project": {
+                    "vulnerabilities": {
+                        "pageInfo": {"hasNextPage": False, "endCursor": None},
+                        "nodes": vulnerability_data,
+                    }
+                }
+            }
+        }
+    )
 
     tool = ListVulnerabilities(metadata=metadata)
 
     input_data = {
-        "project_id": 1,
+        "project_full_path": "namespace/project",
         "per_page": 50,
-        "page": 2,
+        "page": 1,
         "fetch_all_pages": False,
+        "severity": "HIGH",
     }
 
     response = await tool.arun(input_data)
@@ -118,104 +132,112 @@ async def test_list_vulnerabilities(gitlab_client_mock, metadata, vulnerability_
     expected_response = json.dumps(
         {
             "vulnerabilities": vulnerability_data,
-            "pagination": {
-                "total_items": len(vulnerability_data),
-                "total_pages": 1,
-                "current_page": 2,
-                "per_page": 50,
-            },
+            "pagination": {"total_items": len(vulnerability_data)},
         }
     )
     assert response == expected_response
 
-    gitlab_client_mock.aget.assert_called_once_with(
-        path="/api/v4/projects/1/vulnerabilities",
-        params={"per_page": 50, "page": 2},
-        parse_json=True,
+    expected_query = """
+        query($projectFullPath: ID!, $first: Int, $after: String, $severity: [VulnerabilitySeverity!]) {
+          project(fullPath: $projectFullPath) {
+            vulnerabilities(first: $first, after: $after, severity: $severity) {
+              pageInfo {
+                hasNextPage
+                endCursor
+              }
+              nodes {
+                id
+                title
+                reportType
+                severity
+                location{
+                  ... on VulnerabilityLocationSast {
+                    file
+                    startLine
+                  }
+                }
+              }
+            }
+          }
+        }
+        """
+
+    gitlab_client_mock.apost.assert_called_once_with(
+        path="/api/graphql",
+        body=json.dumps(
+            {
+                "query": expected_query,
+                "variables": {
+                    "projectFullPath": "namespace/project",
+                    "first": 50,
+                    "after": None,
+                    "severity": "HIGH",
+                },
+            }
+        ),
     )
 
 
 @pytest.mark.asyncio
-@pytest.mark.parametrize(
-    "url,project_id,expected_path",
-    URL_SUCCESS_CASES,
-)
-async def test_list_vulnerabilities_with_url_success(
-    url,
-    project_id,
-    expected_path,
-    gitlab_client_mock,
-    metadata,
-    vulnerability_data,
+async def test_list_vulnerabilities_with_pagination(
+    gitlab_client_mock, metadata, vulnerability_data
 ):
+    # First page response
+    first_page_response = {
+        "data": {
+            "project": {
+                "vulnerabilities": {
+                    "pageInfo": {"hasNextPage": True, "endCursor": "cursor1"},
+                    "nodes": vulnerability_data,
+                }
+            }
+        }
+    }
+
+    # Second page response
+    second_page_response = {
+        "data": {
+            "project": {
+                "vulnerabilities": {
+                    "pageInfo": {"hasNextPage": False, "endCursor": None},
+                    "nodes": vulnerability_data,
+                }
+            }
+        }
+    }
+
+    gitlab_client_mock.apost = AsyncMock(
+        side_effect=[first_page_response, second_page_response]
+    )
+
     tool = ListVulnerabilities(metadata=metadata)
 
-    gitlab_client_mock.last_response = Mock()
-    gitlab_client_mock.last_response.headers = {"X-Total-Pages": "1"}
+    input_data = {
+        "project_full_path": "namespace/project",
+        "per_page": 50,
+        "fetch_all_pages": True,
+    }
 
-    response = await tool_url_success_response(
-        tool=tool,
-        url=url,
-        project_id=project_id,
-        gitlab_client_mock=gitlab_client_mock,
-        response_data=vulnerability_data,
-        per_page=20,
-        page=1,
-        fetch_all_pages=True,
-    )
+    response = await tool.arun(input_data)
 
     expected_response = json.dumps(
         {
-            "vulnerabilities": vulnerability_data,
-            "pagination": {
-                "total_items": len(vulnerability_data),
-                "total_pages": 1,
-                "current_page": 1,
-                "per_page": 20,
-            },
+            "vulnerabilities": vulnerability_data + vulnerability_data,
+            "pagination": {"total_items": len(vulnerability_data) * 2},
         }
     )
     assert response == expected_response
 
-    gitlab_client_mock.aget.assert_called_once_with(
-        path=expected_path,
-        params={"per_page": 20, "page": 1},
-        parse_json=True,
-    )
-
-
-@pytest.mark.asyncio
-@pytest.mark.parametrize(
-    "url,project_id,error_contains",
-    URL_ERROR_CASES,
-)
-async def test_list_vulnerabilities_with_url_error(
-    url, project_id, error_contains, gitlab_client_mock, metadata
-):
-    tool = ListVulnerabilities(metadata=metadata)
-
-    gitlab_client_mock.last_response = Mock()
-    gitlab_client_mock.last_response.headers = {"X-Total-Pages": "1"}
-
-    await assert_tool_url_error(
-        tool=tool,
-        url=url,
-        project_id=project_id,
-        error_contains=error_contains,
-        gitlab_client_mock=gitlab_client_mock,
-    )
+    assert gitlab_client_mock.apost.call_count == 2
 
 
 @pytest.mark.asyncio
 async def test_list_vulnerabilities_exception(gitlab_client_mock, metadata):
-    gitlab_client_mock.aget = AsyncMock(side_effect=Exception("API Error"))
+    gitlab_client_mock.apost = AsyncMock(side_effect=Exception("API Error"))
 
     tool = ListVulnerabilities(metadata=metadata)
 
-    gitlab_client_mock.last_response = Mock()
-    gitlab_client_mock.last_response.headers = {"X-Total-Pages": "1"}
-
-    response = await tool.arun({"project_id": 1})
+    response = await tool.arun({"project_full_path": "namespace/project"})
 
     error_response = json.loads(response)
     assert "error" in error_response
@@ -226,12 +248,12 @@ async def test_list_vulnerabilities_exception(gitlab_client_mock, metadata):
     "input_data,expected_message",
     [
         (
-            ListVulnerabilitiesInput(project_id=42),
-            "List vulnerabilities in project 42",
+            ListVulnerabilitiesInput(project_full_path="namespace/project"),
+            "List vulnerabilities in project namespace/project",
         ),
         (
-            ListVulnerabilitiesInput(url="https://gitlab.com/namespace/project"),
-            "List vulnerabilities in https://gitlab.com/namespace/project",
+            ListVulnerabilitiesInput(project_full_path="group/subgroup/project"),
+            "List vulnerabilities in project group/subgroup/project",
         ),
     ],
 )
