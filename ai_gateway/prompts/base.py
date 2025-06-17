@@ -216,12 +216,20 @@ class Prompt(RunnableBinding[Input, Output]):
             watcher.register_token_usage(model, usage)
 
             for unit_primitive in self.unit_primitives:
+                # Access langchain usage_metadata for optional cache
+                # specific token details
+                input_token_details = usage.get("input_token_details", {})
+                cache_creation = input_token_details.get("cache_creation", 0)
+                cache_read = input_token_details.get("cache_read", 0)
+
                 self.internal_event_client.track_event(
                     f"token_usage_{unit_primitive}",
                     category=__name__,
                     input_tokens=usage["input_tokens"],
                     output_tokens=usage["output_tokens"],
                     total_tokens=usage["total_tokens"],
+                    cache_creation=cache_creation,
+                    cache_read=cache_read,
                     model_engine=self.model_engine,
                     model_name=model,
                     model_provider=self.model_provider,

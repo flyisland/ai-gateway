@@ -45,6 +45,8 @@ class EventContext(BaseModel):
     input_tokens: Optional[int] = None
     output_tokens: Optional[int] = None
     total_tokens: Optional[int] = None
+    cache_creation: Optional[int] = None
+    cache_read: Optional[int] = None
     model_engine: Optional[str] = None
     model_name: Optional[str] = None
     model_provider: Optional[str] = None
