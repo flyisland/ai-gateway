@@ -1,5 +1,5 @@
 from enum import StrEnum
-from typing import Any, Union
+from typing import Any, Optional, Union
 
 from langchain_core.messages import AIMessage
 from langgraph.graph import StateGraph
@@ -10,7 +10,7 @@ from duo_workflow_service.agents import (
     PlanSupervisorAgent,
     ToolsExecutor,
 )
-from duo_workflow_service.components import ToolsRegistry
+from duo_workflow_service.components import PlanApprovalComponent, ToolsRegistry
 from duo_workflow_service.components.planner.prompt import (
     HANDOVER_TOOL_NAME,
     PLANNER_GOAL,
@@ -80,6 +80,7 @@ class PlannerComponent:
         graph: StateGraph,
         exit_node: str,
         next_node: str,
+        approval_component: Optional[PlanApprovalComponent],
     ):
         planner_toolset = self.planner_toolset
         base_model_planner = create_chat_model(
@@ -119,6 +120,14 @@ class PlannerComponent:
             workflow_type=self.workflow_type,
         )
         plan_supervisor = PlanSupervisorAgent(supervised_agent_name="planner")
+        plan_approval_entry_node = next_node  # fallback for
+        if approval_component is not None:
+            plan_approval_entry_node = approval_component.attach(
+                graph=graph,
+                next_node="set_status_to_execution",
+                back_node="planning",
+                exit_node="plan_terminator",
+            )
 
         graph.add_node("planning", planner.run)
         graph.add_node("update_plan", tools_executor.run)
@@ -130,7 +139,7 @@ class PlannerComponent:
             {
                 Routes.CALL_TOOL: "update_plan",
                 Routes.SUPERVISOR: "planning_supervisor",
-                Routes.HANDOVER: next_node,
+                Routes.HANDOVER: plan_approval_entry_node,
                 Routes.STOP: exit_node,
             },
         )

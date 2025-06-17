@@ -48,6 +48,7 @@ from duo_workflow_service.entities import (
 from duo_workflow_service.llm_factory import create_chat_model
 from duo_workflow_service.tracking.errors import log_exception
 from duo_workflow_service.workflows.abstract_workflow import AbstractWorkflow
+from lib.feature_flags import is_feature_enabled, FeatureFlag
 
 # Constants
 QUEUE_MAX_SIZE = 1
@@ -267,7 +268,7 @@ class Workflow(AbstractWorkflow):
         )
 
         graph.add_edge(last_node_name, disambiguation_entry_node)
-        # graph.add_edge(disambiguation_exit_node, "planning")
+
         planner_component = PlannerComponent(
             workflow_id=self._workflow_id,
             workflow_type=self._workflow_type,
@@ -280,25 +281,19 @@ class Workflow(AbstractWorkflow):
             http_client=self._http_client,
         )
 
-        planner_entry_node = planner_component.attach(
-            graph=graph,
-            next_node="plan_approval_entry_planner",
-            exit_node="plan_terminator",
-        )
-
-        planner_approval_component = PlanApprovalComponent(
+        plan_approval_component = PlanApprovalComponent(
             workflow_id=self._workflow_id,
             approved_agent_name="planner",
             approved_agent_state=WorkflowStatusEnum.PLANNING,
         )
 
-        planner_approval_component.attach(
+        planner_component.attach(
             graph=graph,
             next_node="set_status_to_execution",
-            back_node=planner_entry_node,
             exit_node="plan_terminator",
+            approval_component=plan_approval_component,
         )
-
+        # graph.add_edge(disambiguation_exit_node, "planning")
         plan_terminator = PlanTerminatorAgent(workflow_id=self._workflow_id)
         graph.add_node("plan_terminator", plan_terminator.run)
 

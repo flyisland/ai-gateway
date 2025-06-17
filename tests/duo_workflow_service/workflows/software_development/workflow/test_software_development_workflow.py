@@ -160,10 +160,6 @@ def _agent_responses(status: WorkflowStatusEnum, agent_name: str):
     autospec=True,
 )
 @patch(
-    "duo_workflow_service.workflows.software_development.workflow.PlanApprovalComponent",
-    autospec=True,
-)
-@patch(
     "duo_workflow_service.workflows.software_development.workflow.GoalDisambiguationComponent",
     autospec=True,
 )
@@ -172,7 +168,6 @@ def _agent_responses(status: WorkflowStatusEnum, agent_name: str):
 async def test_workflow_run(
     mock_checkpoint_notifier,
     mock_goal_disambiguator_component,
-    mock_plan_approval_component,
     mock_tools_approval_component,
     mock_planner_component,
     mock_gitlab_workflow,
@@ -250,12 +245,7 @@ async def test_workflow_run(
     mock_goal_disambiguator_component.return_value.attach.return_value = (
         "set_status_to_execution"
     )
-    mock_planner_component.return_value.attach.return_value = (
-        "plan_approval_entry_planner"
-    )
-    mock_plan_approval_component.return_value.attach.return_value = (
-        "set_status_to_execution"
-    )
+    mock_planner_component.return_value.attach.return_value = "set_status_to_execution"
     mock_tools_approval_component.return_value.attach.side_effect = [
         "build_context_tools",
         "execution_tools",
@@ -270,7 +260,6 @@ async def test_workflow_run(
 
     assert mock_goal_disambiguator_component.return_value.attach.call_count == 1
     assert mock_planner_component.return_value.attach.call_count == 1
-    assert mock_plan_approval_component.return_value.attach.call_count == 1
     assert mock_tools_approval_component.return_value.attach.call_count == 2
 
     assert mock_agent.call_count == 2
@@ -1112,7 +1101,12 @@ async def test_workflow_run_with_retry(
 @patch("duo_workflow_service.workflows.software_development.workflow.Agent")
 @patch("duo_workflow_service.workflows.software_development.workflow.HandoverAgent")
 @patch(
-    "duo_workflow_service.workflows.software_development.workflow.PlanSupervisorAgent"
+    "duo_workflow_service.workflows.software_development.workflow.GoalDisambiguationComponent",
+    autospec=True,
+)
+@patch(
+    "duo_workflow_service.workflows.software_development.workflow.PlannerComponent",
+    autospec=True,
 )
 @patch("duo_workflow_service.workflows.software_development.workflow.ToolsExecutor")
 @patch(
@@ -1133,7 +1127,8 @@ async def test_workflow_run_with_tool_approvals(
     mock_fetch_workflow_config,
     mock_fetch_project_data_with_workflow_id,
     mock_tools_executor,
-    mock_plan_supervisor_agent,
+    mock_planner_component,
+    mock_disambiguation_component,
     mock_handover_agent,
     mock_agent,
     mock_tools_registry_cls,
@@ -1168,18 +1163,11 @@ async def test_workflow_run_with_tool_approvals(
     )
     mock_git_lab_workflow_instance.get_next_version = MagicMock(return_value=1)
 
-    mock_handover_agent.return_value.run.side_effect = [
-        {
-            "plan": Plan(steps=[]),
-            "status": WorkflowStatusEnum.COMPLETED,
-            "conversation_history": {},
-        },
-        {
-            "plan": Plan(steps=[]),
-            "status": WorkflowStatusEnum.COMPLETED,
-            "conversation_history": {},
-        },
-    ]
+    mock_handover_agent.return_value.run.return_value = {
+        "plan": Plan(steps=[]),
+        "status": WorkflowStatusEnum.COMPLETED,
+        "conversation_history": {},
+    }
 
     mock_tools_registry.approval_required.return_value = [True, False, False]
 
@@ -1192,12 +1180,30 @@ async def test_workflow_run_with_tool_approvals(
                     SystemMessage(content="system message"),
                     HumanMessage(content="human message"),
                     AIMessage(
-                        content="Tool calls are present, route to planner tools execution",
+                        content="Tool calls are present, route to build context tools execution",
                         tool_calls=[
                             {
                                 "id": "1",
-                                "name": "update_plan",
-                                "args": {"summary": "done"},
+                                "name": "run_command",
+                                "args": {"test": "test"},
+                            }
+                        ],
+                    ),
+                ],
+            },
+        },
+        {
+            "plan": Plan(steps=[]),
+            "status": WorkflowStatusEnum.EXECUTION,
+            "conversation_history": {
+                "context_builder": [
+                    AIMessage(
+                        content="Tool calls are present, route to build executor tools execution",
+                        tool_calls=[
+                            {
+                                "id": "1",
+                                "name": "run_command",
+                                "args": {"test": "test"},
                             }
                         ],
                     ),
@@ -1205,15 +1211,14 @@ async def test_workflow_run_with_tool_approvals(
             },
         },
     ]
-
-    mock_plan_supervisor_agent.return_value.run.return_value = {
-        "plan": Plan(steps=[]),
-        "status": WorkflowStatusEnum.EXECUTION,
-        "conversation_history": {},
-    }
-
+    mock_disambiguation_component.return_value.attach.return_value = (
+        "set_status_to_execution"
+    )
+    mock_planner_component.return_value.attach.return_value = "set_status_to_execution"
     mock_tools_aprroval_execution = MagicMock()
-    mock_tools_aprroval_execution.return_value = {"status": WorkflowStatusEnum.PLANNING}
+    mock_tools_aprroval_execution.return_value = {
+        "status": WorkflowStatusEnum.EXECUTION
+    }
     mock_tools_approval_component.side_effect = [
         MockComponent(
             mock_node_run=mock_tools_aprroval_execution,
