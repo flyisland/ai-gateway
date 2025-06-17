@@ -218,9 +218,19 @@ class Prompt(RunnableBinding[Input, Output]):
             for unit_primitive in self.unit_primitives:
                 # Access langchain usage_metadata for optional cache
                 # specific token details
-                input_token_details = usage.get("input_token_details", {})
-                cache_creation = input_token_details.get("cache_creation", 0)
-                cache_read = input_token_details.get("cache_read", 0)
+                input_token_details = getattr(
+                    usage_metadata, "input_token_details", None
+                )
+                cache_creation = (
+                    getattr(input_token_details, "cache_creation", 0)
+                    if input_token_details
+                    else 0
+                )
+                cache_read = (
+                    getattr(input_token_details, "cache_read", 0)
+                    if input_token_details
+                    else 0
+                )
 
                 self.internal_event_client.track_event(
                     f"token_usage_{unit_primitive}",

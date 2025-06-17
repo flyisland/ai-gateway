@@ -10,7 +10,7 @@ from anthropic import APITimeoutError, AsyncAnthropic
 from gitlab_cloud_connector import GitLabUnitPrimitive, WrongUnitPrimitives
 from langchain_community.chat_models import ChatLiteLLM
 from langchain_core.messages import HumanMessage, SystemMessage
-from langchain_core.messages.ai import UsageMetadata, InputTokenDetails
+from langchain_core.messages.ai import InputTokenDetails, UsageMetadata
 from langchain_core.prompt_values import ChatPromptValue
 from langchain_core.prompts import ChatPromptTemplate
 from langchain_core.runnables import Runnable
@@ -223,12 +223,16 @@ class TestPrompt:
     @pytest.mark.asyncio
     @pytest.mark.parametrize(
         ("usage_metadata"),
-        [UsageMetadata(
-            input_tokens=1, 
-            output_tokens=2, 
-            total_tokens=3, 
-            input_token_details=InputTokenDetails(audio=0, cache_creation=4, cache_read=0)
-        )],
+        [
+            UsageMetadata(
+                input_tokens=1,
+                output_tokens=2,
+                total_tokens=3,
+                input_token_details=InputTokenDetails(
+                    audio=0, cache_creation=4, cache_read=0
+                ),
+            )
+        ],
     )
     async def test_astream_handle_usage_metadata_with_cache_control(
         self,
@@ -244,11 +248,11 @@ class TestPrompt:
         with self._mock_usage_metadata(prompt.model_name, usage_metadata):
             # Consume stream with cache control for Anthropic
             async for _ in prompt.astream(
-                {"name": "Duo", "content": "What's up?"}, 
-                cache_control={"type": "ephemeral"}
+                {"name": "Duo", "content": "What's up?"},
+                cache_control={"type": "ephemeral"},
             ):
                 pass
-        
+
         _assert_usage_metadata_handling(
             mock_watcher, internal_event_client, prompt, usage_metadata
         )
@@ -315,10 +319,16 @@ def _assert_usage_metadata_handling(
         prompt.model_name, usage_metadata
     )
     for unit_primitive in prompt.unit_primitives:
-        input_token_details = usage_metadata.get('input_token_details', None)
-        cache_creation = input_token_details.get('cache_creation', 0) if input_token_details else 0
-        cache_read = input_token_details.get('cache_read', 0) if input_token_details else 0
-    
+        input_token_details = getattr(usage_metadata, "input_token_details", None)
+        cache_creation = (
+            getattr(input_token_details, "cache_creation", 0)
+            if input_token_details
+            else 0
+        )
+        cache_read = (
+            getattr(input_token_details, "cache_read", 0) if input_token_details else 0
+        )
+
         internal_event_client.track_event.assert_any_call(
             f"token_usage_{unit_primitive}",
             category="ai_gateway.prompts.base",
