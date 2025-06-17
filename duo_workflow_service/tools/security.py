@@ -4,17 +4,11 @@ from typing import Any, Optional, Type
 from pydantic import BaseModel, Field
 
 from duo_workflow_service.tools.duo_base_tool import DuoBaseTool
-from duo_workflow_service.tools.gitlab_resource_input import ProjectResourceInput
 
-PROJECT_IDENTIFICATION_DESCRIPTION = """To identify the project you must provide either:
-- project_id parameter, or
-- A GitLab URL like:
-  - https://gitlab.com/namespace/project
-  - https://gitlab.com/group/subgroup/project
-"""
-
-
-class ListVulnerabilitiesInput(ProjectResourceInput):
+class ListVulnerabilitiesInput(BaseModel):
+    project_full_path: str = Field(
+        description="The full path of the GitLab project (e.g., 'namespace/project' or 'group/subgroup/project')",
+    )
     severity: Optional[str] = Field(
         default=None,
         description="Filter vulnerabilities by severity. Possible values: critical, high, medium, low, unknown, info.",
@@ -70,33 +64,25 @@ class ListVulnerabilitiesInput(ProjectResourceInput):
 
 class ListVulnerabilities(DuoBaseTool):
     name: str = "list_vulnerabilities"
-    description: str = f"""List security vulnerabilities in a GitLab project using GraphQL.
+    description: str = """List security vulnerabilities in a GitLab project using GraphQL.
 
-    {PROJECT_IDENTIFICATION_DESCRIPTION}
+    The project must be specified using its full path (e.g., 'namespace/project' or 'group/subgroup/project').
 
     For example:
-    - Given project_id 13, the tool call would be:
-        list_vulnerabilities(project_id=13)
-    - Given the URL https://gitlab.com/namespace/project, the tool call would be:
-        list_vulnerabilities(url="https://gitlab.com/namespace/project")
+    - Given the project path 'namespace/project', the tool call would be:
+        list_vulnerabilities(project_full_path="namespace/project")
     """
     args_schema: Type[BaseModel] = ListVulnerabilitiesInput  # type: ignore
 
     async def _arun(self, **kwargs: Any) -> str:
-        url = kwargs.pop("url", None)
-        project_id = kwargs.pop("project_id", None)
+        project_full_path = kwargs.pop("project_full_path")
         fetch_all_pages = kwargs.pop("fetch_all_pages", True)
         per_page = kwargs.pop("per_page", 100)
 
-        project_id, errors = self._validate_project_url(url, project_id)
-
-        if errors:
-            return json.dumps({"error": "; ".join(errors)})
-
         # Build GraphQL query
         query = """
-        query($projectId: ID!, $first: Int, $after: String) {
-          project(fullPath: $projectId) {
+        query($projectFullPath: ID!, $first: Int, $after: String) {
+          project(fullPath: $projectFullPath) {
             vulnerabilities(first: $first, after: $after) {
               pageInfo {
                 hasNextPage
@@ -106,15 +92,12 @@ class ListVulnerabilities(DuoBaseTool):
                 id
                 title
                 severity
-                confidence
                 reportType
                 state
                 scanner {
                   id
                   name
                 }
-                hasResolution
-                hasIssues
                 falsePositive
               }
             }
@@ -128,7 +111,7 @@ class ListVulnerabilities(DuoBaseTool):
         try:
             while True:
                 variables = {
-                    "projectId": project_id,
+                    "projectFullPath": project_full_path,
                     "first": per_page,
                     "after": cursor
                 }
@@ -145,7 +128,7 @@ class ListVulnerabilities(DuoBaseTool):
                 all_vulnerabilities.extend(vulnerabilities)
 
                 page_info = response["data"]["project"]["vulnerabilities"]["pageInfo"]
-                
+
                 if not fetch_all_pages or not page_info["hasNextPage"]:
                     break
 
@@ -161,6 +144,4 @@ class ListVulnerabilities(DuoBaseTool):
             return json.dumps({"error": str(e)})
 
     def format_display_message(self, args: ListVulnerabilitiesInput) -> str:
-        if args.url:
-            return f"List vulnerabilities in {args.url}"
-        return f"List vulnerabilities in project {args.project_id}"
+        return f"List vulnerabilities in project {args.project_full_path}"
