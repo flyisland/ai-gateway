@@ -23,6 +23,7 @@ import {
 
 export const protobufPackage = "";
 
+/** @deprecated */
 export enum ContextElementType {
   USER_PREFERENCE = 0,
   SELECTED_TEXT = 1,
@@ -92,6 +93,7 @@ export interface StartWorkflowRequest {
   goal: string;
   workflowMetadata: string;
   clientCapabilities: string[];
+  /** @deprecated */
   context: ContextElement[];
   mcpTools: McpTool[];
   additionalContext: AdditionalContext[];
@@ -178,6 +180,7 @@ export interface GenerateTokenResponse {
   expiresAt: number;
 }
 
+/** @deprecated */
 export interface ContextElement {
   type: ContextElementType;
   name: string;
