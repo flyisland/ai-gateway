@@ -53,13 +53,6 @@ class ListVulnerabilities(DuoBaseTool):
                 id
                 title
                 severity
-                reportType
-                state
-                scanner {
-                  id
-                  name
-                }
-                falsePositive
               }
             }
           }
