@@ -249,7 +249,6 @@ class TestPrompt:
             ):
                 pass
         
-        import pdb; pdb.set_trace()
         _assert_usage_metadata_handling(
             mock_watcher, internal_event_client, prompt, usage_metadata
         )
@@ -316,14 +315,18 @@ def _assert_usage_metadata_handling(
         prompt.model_name, usage_metadata
     )
     for unit_primitive in prompt.unit_primitives:
+        input_token_details = usage_metadata.get('input_token_details', None)
+        cache_creation = input_token_details.get('cache_creation', 0) if input_token_details else 0
+        cache_read = input_token_details.get('cache_read', 0) if input_token_details else 0
+    
         internal_event_client.track_event.assert_any_call(
             f"token_usage_{unit_primitive}",
             category="ai_gateway.prompts.base",
             input_tokens=usage_metadata["input_tokens"],
             output_tokens=usage_metadata["output_tokens"],
             total_tokens=usage_metadata["total_tokens"],
-            cache_creation=usage_metadata["input_token_details"]["cache_creation"],
-            cache_read=usage_metadata["input_token_details"]["cache_read"],
+            cache_creation=cache_creation,
+            cache_read=cache_read,
             model_engine=prompt.model_engine,
             model_name=prompt.model_name,
             model_provider=prompt.model_provider,
