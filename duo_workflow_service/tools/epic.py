@@ -8,7 +8,7 @@ from duo_workflow_service.gitlab.url_parser import GitLabUrlParseError, GitLabUr
 from duo_workflow_service.tools.duo_base_tool import DuoBaseTool
 from duo_workflow_service.tools.queries.epics import (
     GET_EPIC_NOTE_QUERY,
-    LIST_EPIC_NOTES_QUERY,
+    GET_EPIC_NOTES_QUERY,
 )
 
 DESCRIPTION_CHARACTER_LIMIT = 1_048_576
@@ -502,21 +502,19 @@ class ListEpicNotes(EpicBaseTool):
         }
 
         try:
-            response = await self.gitlab_client.graphql(
-                LIST_EPIC_NOTES_QUERY, variables
+            response = await self.gitlab_client.graphql(GET_EPIC_NOTES_QUERY, variables)
+            widgets = (
+                response.get("namespace", {}).get("workItem", {}).get("widgets", [])
             )
-            widgets = response.get("group", {}).get("workItem", {}).get("widgets", [])
             if not widgets:
                 return json.dumps({"error": "No widgets found in the response."})
 
             notes = []
 
             for widget in widgets:
-                if widget.get("type") == "NOTES" and "discussions" in widget:
-                    for discussion in widget.get("discussions", {}).get("nodes", []):
-                        for note_edge in discussion.get("notes", {}).get("edges", []):
-                            note = note_edge["node"]
-                            notes.append(note)
+                if "notes" in widget:
+                    notes_nodes = widget.get("notes", {}).get("nodes", [])
+                    notes.extend(notes_nodes)
 
             return json.dumps({"notes": notes}, indent=2)
         except Exception as e:

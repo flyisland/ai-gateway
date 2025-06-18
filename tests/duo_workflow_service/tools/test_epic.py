@@ -1065,35 +1065,25 @@ async def test_list_epic_notes(
     sort, order_by, expected_variables, gitlab_client_mock, metadata
 ):
     mock_response = {
-        "group": {
+        "namespace": {
             "workItem": {
                 "widgets": [
                     {
                         "type": "NOTES",
-                        "discussions": {
+                        "notes": {
                             "nodes": [
                                 {
-                                    "notes": {
-                                        "edges": [
-                                            {
-                                                "node": {
-                                                    "id": "gid://gitlab/Note/1",
-                                                    "body": "Epic Note 1",
-                                                    "author": {"username": "user1"},
-                                                    "createdAt": "2025-01-01T12:00:00Z",
-                                                }
-                                            },
-                                            {
-                                                "node": {
-                                                    "id": "gid://gitlab/Note/2",
-                                                    "body": "Epic Note 2",
-                                                    "author": {"username": "user2"},
-                                                    "createdAt": "2025-01-02T12:00:00Z",
-                                                }
-                                            },
-                                        ]
-                                    }
-                                }
+                                    "id": "gid://gitlab/Note/1",
+                                    "body": "Epic Note 1",
+                                    "author": {"username": "user1"},
+                                    "createdAt": "2025-01-01T12:00:00Z",
+                                },
+                                {
+                                    "id": "gid://gitlab/Note/2",
+                                    "body": "Epic Note 2",
+                                    "author": {"username": "user2"},
+                                    "createdAt": "2025-01-02T12:00:00Z",
+                                },
                             ]
                         },
                     }
@@ -1174,26 +1164,18 @@ async def test_list_epic_notes_with_url_success(
     url, expected_variables, gitlab_client_mock, metadata
 ):
     mock_graphql_response = {
-        "group": {
+        "namespace": {
             "workItem": {
                 "widgets": [
                     {
                         "type": "NOTES",
-                        "discussions": {
+                        "notes": {
                             "nodes": [
                                 {
-                                    "notes": {
-                                        "edges": [
-                                            {
-                                                "node": {
-                                                    "id": "gid://gitlab/Note/1",
-                                                    "body": "Epic Note 1",
-                                                    "author": {"username": "user1"},
-                                                    "createdAt": "2025-01-01T12:00:00Z",
-                                                }
-                                            }
-                                        ]
-                                    }
+                                    "id": "gid://gitlab/Note/1",
+                                    "body": "Epic Note 1",
+                                    "author": {"username": "user1"},
+                                    "createdAt": "2025-01-01T12:00:00Z",
                                 }
                             ]
                         },

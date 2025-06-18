@@ -3,35 +3,27 @@ GET_EPIC_NOTE_QUERY = """
       note(id: $id) {
         id
         body
+        createdAt
         author {
           username
         }
-        createdAt
       }
     }
     """
 
-LIST_EPIC_NOTES_QUERY = """
+GET_EPIC_NOTES_QUERY = """
     query GetEpicNotes($fullPath: ID!, $epicIid: String!) {
-      group(fullPath: $fullPath) {
-        name
+      namespace(fullPath: $fullPath) {
         workItem(iid: $epicIid) {
           widgets {
             ... on WorkItemWidgetNotes {
-              type
-              discussions {
+              notes {
                 nodes {
-                  notes {
-                    edges {
-                      node {
-                        id
-                        body
-                        author {
-                          username
-                        }
-                        createdAt
-                      }
-                    }
+                  id
+                  body
+                  createdAt
+                  author {
+                    username
                   }
                 }
               }
