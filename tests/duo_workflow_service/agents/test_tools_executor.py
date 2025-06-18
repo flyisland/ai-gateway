@@ -19,6 +19,7 @@ from duo_workflow_service.entities.state import (
     MessageTypeEnum,
     TaskStatus,
     ToolInfo,
+    ToolStatus,
     WorkflowState,
     WorkflowStatusEnum,
 )
@@ -49,7 +50,9 @@ from duo_workflow_service.tools.planner import (
 from duo_workflow_service.tools.toolset import ToolType
 
 
-def mock_tool(name="test_tool", side_effect=None, args_schema=None):
+def mock_tool(
+    name="test_tool", content="test_tool result", side_effect=None, args_schema=None
+):
     mock = MagicMock(BaseTool)
     mock.name = name
     mock.args_schema = args_schema
@@ -57,7 +60,7 @@ def mock_tool(name="test_tool", side_effect=None, args_schema=None):
         mock.ainvoke.side_effect = side_effect
     else:
         mock.ainvoke.return_value = ToolMessage(
-            content="test_tool result", name=name, tool_call_id="fake-call-1"
+            content=content, name=name, tool_call_id="fake-call-1"
         )
     return mock
 
@@ -928,3 +931,56 @@ async def test_run_command_output(workflow_state, tools_executor):
 
     assert ui_chat_logs[-1]["tool_info"]["tool_response"]
     assert ui_chat_logs[-1]["message_sub_type"] == "command_output"
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    "all_tools",
+    [
+        {
+            "a": mock_tool(name="a", content="tool a"),
+            "b": mock_tool(name="b", content="tool b"),
+        }
+    ],
+)
+@pytest.mark.usefixtures("mock_datetime")
+async def test_multiple_tool_calls(workflow_state, graph):
+    workflow_state["conversation_history"]["planner"] = [
+        AIMessage(
+            content=[{"type": "text", "text": "test"}],
+            tool_calls=[
+                {"id": "1", "name": "a", "args": {"a1": 1}},
+                {"id": "2", "name": "b", "args": {"b1": 1}},
+            ],
+        )
+    ]
+
+    result = await graph.ainvoke(workflow_state)
+
+    assert result["conversation_history"]["planner"][-2:] == [
+        HumanMessage(content="tool a"),
+        HumanMessage(content="tool b"),
+    ]
+
+    assert result["ui_chat_log"][-2:] == [
+        {
+            "message_type": MessageTypeEnum.TOOL,
+            "message_sub_type": "a",
+            "content": "Using a: a1=1",
+            "timestamp": "2025-01-01T12:00:00+00:00",
+            "status": ToolStatus.SUCCESS,
+            "tool_info": {"name": "a", "args": {"a1": 1}},
+            "context_elements": None,
+            "correlation_id": None,
+        },
+        {
+            "message_type": MessageTypeEnum.TOOL,
+            "message_sub_type": "b",
+            "content": "Using b: b1=1",
+            "timestamp": "2025-01-01T12:00:00+00:00",
+            "status": ToolStatus.SUCCESS,
+            "tool_info": {"name": "b", "args": {"b1": 1}},
+            "context_elements": None,
+            "correlation_id": None,
+        },
+    ]
