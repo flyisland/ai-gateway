@@ -9,6 +9,7 @@ from unittest.mock import MagicMock, call, patch
 import pytest
 from langchain.tools import BaseTool
 from langchain_core.messages import AIMessage, HumanMessage, ToolMessage
+from langchain_core.runnables import Runnable
 from langgraph.graph import StateGraph
 from langgraph.types import Command
 from pydantic import BaseModel, Field, ValidationError
@@ -41,14 +42,11 @@ from duo_workflow_service.tools.planner import (
     AddNewTask,
     AddNewTaskInput,
     CreatePlan,
-    CreatePlanInput,
     RemoveTask,
-    RemoveTaskInput,
     SetTaskStatus,
-    SetTaskStatusInput,
     UpdateTaskDescription,
-    UpdateTaskDescriptionInput,
 )
+from duo_workflow_service.tools.toolset import ToolType
 
 
 def mock_tool(name="test_tool", side_effect=None, args_schema=None):
@@ -65,22 +63,55 @@ def mock_tool(name="test_tool", side_effect=None, args_schema=None):
 
 
 @pytest.fixture
-def planner_toolset():
+def all_tools() -> dict[str, ToolType]:
+    return {
+        "set_task_status": SetTaskStatus(),
+        "add_new_task": AddNewTask(),
+        "remove_task": RemoveTask(),
+        "update_task_description": UpdateTaskDescription(),
+        "create_plan": CreatePlan(),
+    }
+
+
+@pytest.fixture
+def toolset(all_tools: dict[str, ToolType]) -> Toolset:
     return Toolset(
         pre_approved=set(),
-        all_tools={
-            "set_task_status": SetTaskStatus(),
-            "add_new_task": AddNewTask(),
-            "remove_task": RemoveTask(),
-            "update_task_description": UpdateTaskDescription(),
-            "create_plan": CreatePlan(),
-        },
+        all_tools=all_tools,
     )
+
+
+@pytest.fixture
+def tools_executor(toolset: Toolset) -> ToolsExecutor:
+    return ToolsExecutor(
+        tools_agent_name="planner",
+        toolset=toolset,
+        workflow_id="123",
+        workflow_type=CategoryEnum.WORKFLOW_SOFTWARE_DEVELOPMENT,
+    )
+
+
+@pytest.fixture
+def graph(tools_executor: ToolsExecutor) -> Runnable:
+    graph_builder = StateGraph(WorkflowState)
+    graph_builder.add_node("exec", tools_executor.run)
+    graph_builder.set_entry_point("exec")
+    graph_builder.set_finish_point("exec")
+
+    return graph_builder.compile()
 
 
 @pytest.fixture
 def ui_chat_log():
     return []
+
+
+@pytest.fixture
+def mock_datetime(mock_now: datetime):
+    with patch("duo_workflow_service.agents.tools_executor.datetime") as mock:
+        mock.now.return_value = mock_now
+        mock.timezone = timezone
+        yield mock
 
 
 @dataclass
@@ -187,19 +218,13 @@ class ToolTestCase:
         ),
     ],
 )
-@patch("duo_workflow_service.agents.tools_executor.datetime")
 @patch("duo_workflow_service.agents.tools_executor.DuoWorkflowInternalEvent")
 @patch.dict(os.environ, {"DW_INTERNAL_EVENT__ENABLED": "true"})
 async def test_run(
     mock_internal_event_tracker,
-    mock_datetime,
     workflow_state,
     test_case: ToolTestCase,
 ):
-    mock_now = datetime(2025, 1, 1, 12, 0, tzinfo=timezone.utc)
-    mock_datetime.now.return_value = mock_now
-    mock_datetime.timezone = timezone
-
     mock_internal_event_tracker.instance = MagicMock(return_value=None)
     mock_internal_event_tracker.track_event = MagicMock(return_value=None)
     workflow_type = CategoryEnum.WORKFLOW_SOFTWARE_DEVELOPMENT
@@ -283,6 +308,7 @@ async def test_run(
 
 
 @pytest.mark.asyncio
+@pytest.mark.parametrize("all_tools", [{"test_tool": mock_tool()}])
 @pytest.mark.parametrize(
     "last_message, expected_message_types",
     [
@@ -374,25 +400,15 @@ async def test_run(
     ],
 )
 async def test_adding_ai_context_to_ui_chat_logs(
+    all_tools,
+    tools_executor,
     workflow_state,
     last_message,
     expected_message_types,
 ):
-    tool = mock_tool()
-
-    mock_toolset = MagicMock(spec=Toolset)
-    mock_toolset.__contains__ = MagicMock(return_value=True)
-    mock_toolset.__getitem__ = MagicMock(return_value=tool)
-
-    tools_executor = ToolsExecutor(
-        tools_agent_name="planner",
-        toolset=mock_toolset,
-        workflow_id="123",
-        workflow_type=CategoryEnum.WORKFLOW_SOFTWARE_DEVELOPMENT,
-    )
+    tool = all_tools["test_tool"]
 
     workflow_state["conversation_history"]["planner"] = [last_message(tool)]
-    workflow_state["plan"] = {"steps": []}
 
     result = await tools_executor.run(workflow_state)
 
@@ -431,9 +447,9 @@ async def test_adding_ai_context_to_ui_chat_logs(
                 {
                     "id": "1",
                     "name": "create_plan",
-                    "args": CreatePlanInput(
-                        tasks=["Task 1", "Task 2", "Task 3"]
-                    ).model_dump(),
+                    "args": {
+                        "tasks": ["Task 1", "Task 2", "Task 3"],
+                    },
                 }
             ],
             "tools_response": [
@@ -456,9 +472,10 @@ async def test_adding_ai_context_to_ui_chat_logs(
                 {
                     "id": "1",
                     "name": "update_task_description",
-                    "args": UpdateTaskDescriptionInput(
-                        task_id="1", new_description="step1"
-                    ).model_dump(),
+                    "args": {
+                        "task_id": "1",
+                        "new_description": "step1",
+                    },
                 }
             ],
             "tools_response": [
@@ -477,9 +494,10 @@ async def test_adding_ai_context_to_ui_chat_logs(
                 {
                     "id": "1",
                     "name": "update_task_description",
-                    "args": UpdateTaskDescriptionInput(
-                        task_id="1", new_description="new step1"
-                    ).model_dump(),
+                    "args": {
+                        "task_id": "1",
+                        "new_description": "new step1",
+                    },
                 }
             ],
             "tools_response": [
@@ -498,7 +516,7 @@ async def test_adding_ai_context_to_ui_chat_logs(
                 {
                     "id": "1",
                     "name": "add_new_task",
-                    "args": AddNewTaskInput(description="New task").model_dump(),
+                    "args": {"description": "New task"},
                 }
             ],
             "tools_response": [
@@ -523,9 +541,7 @@ async def test_adding_ai_context_to_ui_chat_logs(
                 {
                     "id": "1",
                     "name": "remove_task",
-                    "args": RemoveTaskInput(
-                        task_id="1", description="Test description 1"
-                    ).model_dump(),
+                    "args": {"task_id": "1", "description": "Test description 1"},
                 }
             ],
             "tools_response": [
@@ -550,11 +566,11 @@ async def test_adding_ai_context_to_ui_chat_logs(
                 {
                     "id": "1",
                     "name": "set_task_status",
-                    "args": SetTaskStatusInput(
-                        task_id="1",
-                        status=TaskStatus.IN_PROGRESS,
-                        description="Test description",
-                    ).model_dump(),
+                    "args": {
+                        "task_id": "1",
+                        "status": TaskStatus.IN_PROGRESS,
+                        "description": "Test description",
+                    },
                 }
             ],
             "tools_response": [
@@ -577,23 +593,12 @@ async def test_adding_ai_context_to_ui_chat_logs(
         },
     ],
 )
-@patch("duo_workflow_service.agents.tools_executor.datetime")
+@pytest.mark.usefixtures("mock_datetime")
 async def test_state_manipulation(
-    mock_datetime,
-    planner_toolset,
+    graph,
     workflow_state,
     test_case,
 ):
-    mock_now = datetime(2025, 1, 1, 12, 0, tzinfo=timezone.utc)
-    mock_datetime.now.return_value = mock_now
-    mock_datetime.timezone = timezone
-
-    tools_executor = ToolsExecutor(
-        tools_agent_name="planner",
-        toolset=planner_toolset,
-        workflow_id="123",
-        workflow_type=CategoryEnum.WORKFLOW_SOFTWARE_DEVELOPMENT,
-    )
     workflow_state["conversation_history"]["planner"] = [
         AIMessage(
             content=[{"type": "text", "text": "test"}],
@@ -602,11 +607,6 @@ async def test_state_manipulation(
     ]
     workflow_state["plan"] = test_case["plan"]
 
-    graph_builder = StateGraph(WorkflowState)
-    graph_builder.add_node("exec", tools_executor.run)
-    graph_builder.set_entry_point("exec")
-    graph_builder.set_finish_point("exec")
-    graph = graph_builder.compile()
     result = await graph.ainvoke(workflow_state)
 
     assert (
@@ -762,12 +762,11 @@ async def test_tool_changes_are_tracked(
         ),
     ],
 )
-@patch("duo_workflow_service.agents.tools_executor.datetime")
+@pytest.mark.usefixtures("mock_datetime")
 @patch("duo_workflow_service.agents.tools_executor.DuoWorkflowInternalEvent")
 @patch.dict(os.environ, {"DW_INTERNAL_EVENT__ENABLED": "true"})
 async def test_run_error_handling(
     mock_internal_event_tracker,
-    mock_datetime,
     workflow_state,
     *,
     tool_call,
@@ -778,10 +777,6 @@ async def test_run_error_handling(
     expected_log_prefix,
     expected_tool_info,
 ):
-    mock_now = datetime(2025, 1, 1, 12, 0, tzinfo=timezone.utc)
-    mock_datetime.now.return_value = mock_now
-    mock_datetime.timezone = timezone
-
     mock_internal_event_tracker.instance = MagicMock(return_value=None)
     mock_internal_event_tracker.track_event = MagicMock(return_value=None)
     workflow_type = CategoryEnum.WORKFLOW_SOFTWARE_DEVELOPMENT
@@ -846,51 +841,6 @@ async def test_run_error_handling(
     tool.ainvoke.assert_called_once()
 
 
-@pytest.mark.parametrize(
-    "tool_name, args, expected_message",
-    [
-        (
-            "add_new_task",
-            {"description": "Create a new feature"},
-            "Add new task to the plan: Create a new feature",
-        ),
-        (
-            "remove_task",
-            {"task_id": "task-1", "description": "Test task 2"},
-            "Remove task 'Test task 2'",
-        ),
-        (
-            "update_task_description",
-            {"task_id": "task-2", "new_description": "Updated description"},
-            "Update description for task 'Updated description'",
-        ),
-        (
-            "set_task_status",
-            {"task_id": "task-3", "status": "Completed", "description": "Test task"},
-            "Set task 'Test task' to 'Completed'",
-        ),
-        (
-            "create_plan",
-            {"tasks": ["Task 1", "Task 2", "Task 3"]},
-            "Create plan with 3 tasks",
-        ),
-        ("get_plan", {}, None),  # Hidden tool
-    ],
-)
-def test_get_tool_display_message_action_handlers(
-    planner_toolset, tool_name, args, expected_message
-):
-    tools_executor = ToolsExecutor(
-        tools_agent_name="test_agent",
-        toolset=planner_toolset,
-        workflow_id="123",
-        workflow_type=CategoryEnum.WORKFLOW_SOFTWARE_DEVELOPMENT,
-    )
-
-    message = tools_executor.get_tool_display_message(tool_name, args)
-    assert message == expected_message
-
-
 class MockGetIssueInput(BaseModel):
     project_id: int = Field(description="Id of the project")
     issue_id: int = Field(description="The internal ID of the project issue")
@@ -911,38 +861,27 @@ class MockGetIssue(BaseTool):
         return f"Read issue #{args.issue_id} in project {args.project_id}"
 
 
-def test_get_tool_display_message_tool_lookup():
-    mock_tool = MockGetIssue()
+@pytest.mark.parametrize("all_tools", [{"get_issue": MockGetIssue()}])
+@pytest.mark.parametrize(
+    "tool_name, args, expected_message",
+    [
+        (
+            "get_issue",
+            {"project_id": 123, "issue_id": 456},
+            "Read issue #456 in project 123",
+        ),
+        ("get_plan", {}, None),  # Hidden tool
+    ],
+)
+def test_get_tool_display_message_tool_lookup(
+    tools_executor: ToolsExecutor, tool_name: str, args: dict, expected_message: str
+):
+    message = tools_executor.get_tool_display_message(tool_name, args)
+    assert message == expected_message
 
-    mock_toolset = MagicMock(spec=Toolset)
 
-    mock_toolset.__contains__ = MagicMock(return_value=True)
-    mock_toolset.__getitem__ = MagicMock(return_value=mock_tool)
-
-    tools_executor = ToolsExecutor(
-        tools_agent_name="test_agent",
-        toolset=mock_toolset,
-        workflow_id="123",
-        workflow_type=CategoryEnum.WORKFLOW_SOFTWARE_DEVELOPMENT,
-    )
-
-    valid_args = {"project_id": 123, "issue_id": 456}
-    message = tools_executor.get_tool_display_message("get_issue", valid_args)
-    assert message == "Read issue #456 in project 123"
-
-
-def test_get_tool_display_message_unknown_tool():
-    mock_toolset = MagicMock(spec=Toolset)
-
-    mock_toolset.__contains__ = MagicMock(return_value=False)
-
-    tools_executor = ToolsExecutor(
-        tools_agent_name="test_agent",
-        toolset=mock_toolset,
-        workflow_id="123",
-        workflow_type=CategoryEnum.WORKFLOW_SOFTWARE_DEVELOPMENT,
-    )
-
+@pytest.mark.parametrize("all_tools", [{}])
+def test_get_tool_display_message_unknown_tool(tools_executor: ToolsExecutor):
     message = tools_executor.get_tool_display_message(
         "unknown_tool", {"param": "value"}
     )
@@ -950,27 +889,20 @@ def test_get_tool_display_message_unknown_tool():
 
 
 @pytest.mark.asyncio
-async def test_run_command_output(workflow_state):
-
-    tool_set = Toolset(
-        pre_approved=set(),
-        all_tools={
+@pytest.mark.parametrize(
+    "all_tools",
+    [
+        {
             "run_command": RunCommand(
                 metadata={
                     "outbox": MagicMock(spec=asyncio.Queue),
                     "inbox": MagicMock(spec=asyncio.Queue),
                 }
             )
-        },
-    )
-
-    tools_executor = ToolsExecutor(
-        tools_agent_name="planner",
-        toolset=tool_set,
-        workflow_id="123",
-        workflow_type=CategoryEnum.WORKFLOW_SOFTWARE_DEVELOPMENT,
-    )
-
+        }
+    ],
+)
+async def test_run_command_output(workflow_state, tools_executor):
     workflow_state["conversation_history"]["planner"] = [
         AIMessage(
             content=[{"type": "text", "text": "testing"}],
