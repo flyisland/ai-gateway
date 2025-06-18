@@ -1,7 +1,7 @@
 dotenv-vars:
-  stage: test
-  needs:
-    - job: build-docker-model-gateway
+  stage: build
+  # needs:
+  #   - job: build-docker-model-gateway
   script:
     - echo "JOB_WITH_ARTIFACTS=$CI_JOB_NAME" >> variables.env
     - echo "JOB_WITH_ARTIFACTS_ID=$CI_JOB_ID" >> variables.env
@@ -27,13 +27,13 @@ dotenv-vars:
     - when: never
 
 tests:performance:
-  stage: test
+  stage: build
   needs:
     - job: dotenv-vars
       artifacts: true
   trigger:
     project: gitlab-org/quality/component-performance-testing
-    branch: main
+    branch: vp/add-cng-to-cpt
     strategy: depend
     forward:
       pipeline_variables: true
@@ -47,6 +47,7 @@ tests:performance:
     PARENT_PIPELINE_SOURCE: $CI_PIPELINE_SOURCE
     COMPONENT_MR_CI_COMMIT_SHA: $CI_COMMIT_SHORT_SHA
     COMPONENT_SERVICE_NAME: "ai-gateway-influx"
+    RUN_ON_CNG: true
   rules:
     - if: $CI_PROJECT_NAMESPACE =~ /^gitlab-org\/security.*/
       when: never
