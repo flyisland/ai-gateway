@@ -91,6 +91,7 @@ class UiChatLog(TypedDict):
     correlation_id: Optional[str]
     tool_info: Optional[ToolInfo]
     context_elements: Optional[List[ContextElement]]
+    additional_context: Optional[dict[str, Any]]
 
 
 def _pretrim_large_messages(

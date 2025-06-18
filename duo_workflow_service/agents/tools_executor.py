@@ -224,6 +224,7 @@ class ToolsExecutor:
                     correlation_id=None,
                     tool_info=None,
                     context_elements=None,
+                    additional_context=None,
                 )
             )
 
@@ -432,6 +433,7 @@ class ToolsExecutor:
                 else None
             ),
             context_elements=None,
+            additional_context=None,
         )
 
     def get_tool_display_message(

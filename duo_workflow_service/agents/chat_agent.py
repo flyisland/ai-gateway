@@ -102,6 +102,7 @@ class ChatAgent(Prompt[ChatWorkflowState, BaseMessage]):
                     correlation_id=None,
                     tool_info=None,
                     context_elements=[],
+                    additional_context=None,
                 )
             ]
 

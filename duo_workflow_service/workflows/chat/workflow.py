@@ -104,6 +104,7 @@ class Workflow(AbstractWorkflow):
             correlation_id=None,
             tool_info=None,
             context_elements=contextElements,
+            additional_context=None,
         )
 
         return ChatWorkflowState(
@@ -130,6 +131,16 @@ class Workflow(AbstractWorkflow):
             case WorkflowStatusEventEnum.START:
                 return self.get_workflow_state(goal)
             case WorkflowStatusEventEnum.RESUME:
+                initial_ui_chat_log = UiChatLog(
+                    message_type=MessageTypeEnum.USER,
+                    message_sub_type=None,
+                    content=f"{goal}",
+                    timestamp=datetime.now(timezone.utc).isoformat(),
+                    status=ToolStatus.SUCCESS,
+                    correlation_id=None,
+                    tool_info=None,
+                    additional_context=self._additional_context,
+                )
                 return Command(
                     goto="agent",
                     update={
