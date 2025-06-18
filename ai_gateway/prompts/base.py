@@ -17,6 +17,7 @@ from ai_gateway.api.auth_utils import StarletteUser
 from ai_gateway.config import ConfigModelLimits, ModelLimits
 from ai_gateway.instrumentators.model_requests import ModelRequestInstrumentator
 from ai_gateway.internal_events.client import InternalEventsClient
+from ai_gateway.internal_events.context import InternalEventAdditionalProperties
 from ai_gateway.model_metadata import TypeModelMetadata, current_model_metadata_context
 from ai_gateway.prompts.config.base import ModelConfig, PromptConfig, PromptParams
 from ai_gateway.prompts.typing import Model, TypeModelFactory
@@ -218,18 +219,16 @@ class Prompt(RunnableBinding[Input, Output]):
             for unit_primitive in self.unit_primitives:
                 # Access langchain usage_metadata for optional cache
                 # specific token details
-                input_token_details = getattr(
-                    usage_metadata, "input_token_details", None
-                )
-                cache_creation = (
-                    getattr(input_token_details, "cache_creation", 0)
-                    if input_token_details
-                    else 0
-                )
-                cache_read = (
-                    getattr(input_token_details, "cache_read", 0)
-                    if input_token_details
-                    else 0
+                input_token_details = usage.get("input_token_details", {})
+                cache_creation = input_token_details.get("cache_creation", 0)
+                cache_read = input_token_details.get("cache_read", 0)
+
+                additional_properties = InternalEventAdditionalProperties(
+                    label="cache_creation_details",
+                    extra={
+                        "cache_read": cache_read,
+                        "cache_creation": cache_creation,
+                    },
                 )
 
                 self.internal_event_client.track_event(
@@ -238,11 +237,10 @@ class Prompt(RunnableBinding[Input, Output]):
                     input_tokens=usage["input_tokens"],
                     output_tokens=usage["output_tokens"],
                     total_tokens=usage["total_tokens"],
-                    cache_creation=cache_creation,
-                    cache_read=cache_read,
                     model_engine=self.model_engine,
                     model_name=model,
                     model_provider=self.model_provider,
+                    additional_properties=additional_properties,
                 )
 
     # Subclasses can override this method to add steps at either side of the chain

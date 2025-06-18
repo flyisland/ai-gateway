@@ -13,7 +13,7 @@ __all__ = [
 
 
 class EventContext(BaseModel):
-    """This model class represents the available attributes in AI Gateway for the GitLab standard context.
+    """This model class represents the available attributes in the AI Gateway for the GitLab standard context.
 
     See https://gitlab.com/gitlab-org/iglu/-/tree/master/public/schemas/com.gitlab/gitlab_standard?ref_type=heads
     about the spec of the GitLab standard context.
@@ -45,8 +45,6 @@ class EventContext(BaseModel):
     input_tokens: Optional[int] = None
     output_tokens: Optional[int] = None
     total_tokens: Optional[int] = None
-    cache_creation: Optional[int] = None
-    cache_read: Optional[int] = None
     model_engine: Optional[str] = None
     model_name: Optional[str] = None
     model_provider: Optional[str] = None

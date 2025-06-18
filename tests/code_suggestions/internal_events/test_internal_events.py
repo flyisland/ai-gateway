@@ -25,8 +25,6 @@ BASE_CONTEXT_SCHEMA = {
     "global_user_id": None,
     "host_name": None,
     "input_tokens": None,
-    "cache_creation": None,
-    "cache_read": None,
     "instance_id": None,
     "instance_version": None,
     "interface": None,
