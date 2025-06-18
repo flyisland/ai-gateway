@@ -35,17 +35,6 @@ class DummyToolWithArgs(DuoBaseTool):
         return f"{param1} {param2} {optional_param}"
 
 
-def test_plan():
-    tool = DummyTool()
-    with pytest.raises(RuntimeError):
-        tool.plan
-
-    plan = MagicMock()
-    tool = DummyTool()
-    tool.plan = plan
-    assert tool.plan == plan
-
-
 def test_gitlab_client():
     tool = DummyTool(metadata={})
     with pytest.raises(RuntimeError):

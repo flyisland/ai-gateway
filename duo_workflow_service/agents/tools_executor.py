@@ -34,7 +34,7 @@ from duo_workflow_service.tools import (
     Toolset,
     format_tool_display_message,
 )
-from duo_workflow_service.tools.duo_base_tool import DuoBaseTool
+from duo_workflow_service.tools.planner import PlannerTool
 
 _HIDDEN_TOOLS = ["get_plan"]
 
@@ -119,11 +119,6 @@ class ToolsExecutor:
 
             responses.append(self._process_response(tool_call, result["response"]))
 
-            # Grab the modified plan the tool call generated (if any), and pass it to the next tool.
-            # This allows us to compound modifications across tool calls.
-            if "plan" in result:
-                plan = result["plan"]
-
             if result.get("status") == WorkflowStatusEnum.ERROR:
                 state_updates["status"] = WorkflowStatusEnum.ERROR
                 break
@@ -132,7 +127,6 @@ class ToolsExecutor:
             Command(
                 update={
                     "ui_chat_log": ui_chat_logs,
-                    "plan": plan,
                     "files_changed": files_changed,
                     **state_updates,
                 }
@@ -141,7 +135,10 @@ class ToolsExecutor:
 
         return responses
 
-    def _process_response(self, tool_call, response) -> dict[str, Any]:
+    def _process_response(self, tool_call, response) -> Command | dict[str, Any]:
+        if isinstance(response, Command):
+            return response
+
         if isinstance(response, str):
             response = ToolMessage(content=response, tool_call_id=tool_call.get("id"))
 
@@ -195,8 +192,10 @@ class ToolsExecutor:
         tool = self._toolset[tool_name]
         chat_logs: List[UiChatLog] = []
 
-        if isinstance(tool, DuoBaseTool):
+        if isinstance(tool, PlannerTool):
             tool.plan = plan
+            tool.tools_agent_name = self._tools_agent_name
+            tool.tool_call_id = tool_call["id"]
 
         try:
             with duo_workflow_metrics.time_tool_call(tool_name=tool_name):
@@ -213,15 +212,10 @@ class ToolsExecutor:
                 ui_chat_logs=chat_logs,
             )
 
-            response = {
+            return {
                 "response": tool_response,
                 "chat_logs": chat_logs,
             }
-
-            if isinstance(tool, DuoBaseTool):
-                response["plan"] = tool.plan
-
-            return response
 
         except TypeError as error:
             tool_context = {"tool": tool, "name": tool_name, "args": tool_args}
