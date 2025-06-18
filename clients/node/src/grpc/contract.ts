@@ -93,7 +93,11 @@ export interface StartWorkflowRequest {
   goal: string;
   workflowMetadata: string;
   clientCapabilities: string[];
-  /** @deprecated */
+  /**
+   * Use additional_context instead
+   *
+   * @deprecated
+   */
   context: ContextElement[];
   mcpTools: McpTool[];
   additionalContext: AdditionalContext[];

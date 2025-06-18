@@ -170,7 +170,7 @@ type StartWorkflowRequest struct {
 	WorkflowMetadata   string   `protobuf:"bytes,5,opt,name=workflowMetadata,proto3" json:"workflowMetadata,omitempty"`
 	ClientCapabilities []string `protobuf:"bytes,6,rep,name=clientCapabilities,proto3" json:"clientCapabilities,omitempty"`
 	// Deprecated: Marked as deprecated in contract/contract.proto.
-	Context           []*ContextElement    `protobuf:"bytes,7,rep,name=context,proto3" json:"context,omitempty"`
+	Context           []*ContextElement    `protobuf:"bytes,7,rep,name=context,proto3" json:"context,omitempty"` // Use additional_context instead
 	McpTools          []*McpTool           `protobuf:"bytes,8,rep,name=mcpTools,proto3" json:"mcpTools,omitempty"`
 	AdditionalContext []*AdditionalContext `protobuf:"bytes,9,rep,name=additional_context,json=additionalContext,proto3" json:"additional_context,omitempty"`
 	Approval          *Approval            `protobuf:"bytes,10,opt,name=approval,proto3,oneof" json:"approval,omitempty"`
