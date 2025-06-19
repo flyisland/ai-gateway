@@ -1,4 +1,5 @@
-import os
+import ast
+from pathlib import Path
 
 HEADER_TEXT = """# Dependencies for Duo Workflow Service. Extended tests are run when these change patterns are matched.
 # Note: Do not modify this file manually. Instead, run: make duo-workflow-service-dependencies
@@ -17,26 +18,34 @@ def main():
     target_directory = "duo_workflow_service/"
 
     # Get lines that reference ai_gateway
-    matching_lines = set()
-    for root, _, filenames in os.walk(target_directory):
-        for filename in filenames:
-            full_path = os.path.join(root, filename)
-            if full_path.endswith(".py"):
-                with open(full_path, "r") as file_contents:
-                    for _, line in enumerate(file_contents):
-                        if "ai_gateway" in line:
-                            matching_lines.add(line.strip())
-
-    # Add any import statements to the list of change patterns
     change_patterns = set()
-    for line in matching_lines:
-        splits = line.split()
-        if splits[0] in ["import", "from"]:
-            change_patterns.add(convert_to_path(splits[1]))
-        else:
-            raise Exception(  # pylint: disable=broad-exception-raised)
-                f"Error, invalid import format: {line}"
-            )
+    target_dir_path = Path(target_directory)
+    search_string = "ai_gateway"
+    for root, _, filenames in target_dir_path.walk():
+        for filename in filenames:
+            full_path = Path(root) / filename
+            if full_path.suffix == ".py":
+                with open(full_path, "r") as file:
+                    content = file.read()
+                    tree = ast.parse(content, filename=full_path)
+                    for node in ast.walk(tree):
+                        # Handle "import ..." statements
+                        if isinstance(node, ast.Import):
+                            matching = [
+                                alias.name
+                                for alias in node.names
+                                if search_string in alias.name
+                            ]
+                            if len(matching) > 0:
+                                import_path = convert_to_path(matching[0])
+                                change_patterns.add(import_path)
+
+                        # Handle "from ... import" statements
+                        elif isinstance(node, ast.ImportFrom):
+                            module = node.module if node.module else ""
+                            if module and search_string in module:
+                                import_path = convert_to_path(module)
+                                change_patterns.add(import_path)
 
     change_patterns = sorted(change_patterns)
     with open(OUTPUT_FILE_PATH, "w") as output_file:
@@ -47,10 +56,13 @@ def main():
 
 def convert_to_path(module_path):
     module_path = module_path.replace(".", "/")
-    if os.path.isdir(module_path):
+
+    path = Path(module_path)
+    if path.is_dir():
         return module_path + "/*.py"
 
-    if os.path.exists(module_path + ".py"):
+    path = Path(module_path + ".py")
+    if path.is_file():
         return module_path + ".py"
 
     raise Exception(  # pylint: disable=broad-exception-raised)
