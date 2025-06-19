@@ -2,9 +2,9 @@ import asyncio
 from typing import Annotated
 
 import typer
-from dependency_injector.wiring import Provide, inject
 from cef.core.evaluators.prebuilt import CorrectnessEvaluator
 from cef.evaluator import evaluate
+from dependency_injector.wiring import Provide, inject
 from langchain_anthropic import ChatAnthropic
 
 from ai_gateway.config import Config

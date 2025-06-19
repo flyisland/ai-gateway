@@ -3,12 +3,9 @@ from pathlib import Path
 from unittest.mock import MagicMock, Mock, call, patch
 
 import pytest
-from cef.datasets.generator import DatasetGenerator, ModelConfig
 from cef.datasets.base import PromptConfig
-from cef.datasets.serializers import (
-    JsonFileSerializer,
-    LangSmithSerializer,
-)
+from cef.datasets.generator import DatasetGenerator, ModelConfig
+from cef.datasets.serializers import JsonFileSerializer, LangSmithSerializer
 from langsmith import Client
 
 from ai_gateway.prompts.base import BasePromptRegistry
