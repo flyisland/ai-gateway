@@ -3,14 +3,13 @@ from unittest.mock import AsyncMock, MagicMock, patch
 import pytest
 
 from contract import contract_pb2
-from duo_workflow_service.tools.filesystem import (
+from duo_workflow_service.tools.filesystem import (  # Mkdir,
     EditFile,
     EditFileInput,
     FindFiles,
     FindFilesInput,
     ListDir,
     ListDirInput,
-    # Mkdir,
     ReadFile,
     ReadFileInput,
     WriteFile,
