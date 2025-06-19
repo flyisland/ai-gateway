@@ -4,18 +4,18 @@ import pytest
 
 from contract import contract_pb2
 from duo_workflow_service.tools.filesystem import (
-    Mkdir,
     EditFile,
     EditFileInput,
     FindFiles,
     FindFilesInput,
     ListDir,
     ListDirInput,
+    Mkdir,
+    MkdirInput,
     ReadFile,
     ReadFileInput,
     WriteFile,
     WriteFileInput,
-    MkdirInput,
 )
 
 
