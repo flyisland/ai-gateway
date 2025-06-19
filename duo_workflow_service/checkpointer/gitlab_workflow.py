@@ -109,9 +109,8 @@ WORKFLOW_STATUS_TO_CHECKPOINT_STATUS = {
 
 def _attribute_dirty(attribute: str, metadata: CheckpointMetadata) -> bool:
     writes = metadata.get("writes")
-    if not writes:
+    if not writes or not isinstance(writes, dict):
         return False
-
     return next(
         (True for node_writes in writes.values() if attribute in node_writes), False
     )
