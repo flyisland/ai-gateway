@@ -120,7 +120,8 @@ class PlannerComponent:
             workflow_type=self.workflow_type,
         )
         plan_supervisor = PlanSupervisorAgent(supervised_agent_name="planner")
-        plan_approval_entry_node = next_node  # fallback for
+        # When plan approval component is not attached, proceed to next node
+        plan_approval_entry_node = next_node
         if approval_component is not None:
             plan_approval_entry_node = approval_component.attach(
                 graph=graph,

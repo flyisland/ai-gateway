@@ -326,9 +326,7 @@ async def test_workflow_run_with_memory_saver(
     mock_goal_disambiguator_component.return_value.attach.return_value = (
         "set_status_to_execution"
     )
-    mock_planner_component.return_value.attach.return_value = (
-        "plan_approval_entry_planner"
-    )
+    mock_planner_component.return_value.attach.return_value = "set_status_to_execution"
     mock_tools_registry = MagicMock(spec=ToolsRegistry)
     mock_tools_registry_cls.configure = AsyncMock(return_value=mock_tools_registry)
     mock_tools_registry.approval_required.return_value = False
@@ -454,9 +452,7 @@ async def test_workflow_run_when_exception(
     mock_goal_disambiguator_component.return_value.attach.return_value = (
         "set_status_to_execution"
     )
-    mock_planner_component.return_value.attach.return_value = (
-        "plan_approval_entry_planner"
-    )
+    mock_planner_component.return_value.attach.return_value = "set_status_to_execution"
     mock_tools_registry.configure = AsyncMock(
         return_value=MagicMock(spec=ToolsRegistry)
     )
@@ -556,9 +552,7 @@ async def test_workflow_run_with_error_state(
     mock_goal_disambiguator_component.return_value.attach.return_value = (
         "set_status_to_execution"
     )
-    mock_planner_component.return_value.attach.return_value = (
-        "plan_approval_entry_planner"
-    )
+    mock_planner_component.return_value.attach.return_value = "set_status_to_execution"
     mock_tools_registry = MagicMock(spec=ToolsRegistry)
     mock_tools_registry_cls.configure = AsyncMock(return_value=mock_tools_registry)
     mock_tools_registry.approval_required.return_value = False
@@ -664,9 +658,7 @@ async def test_workflow_run_with_tools_registry(
     mock_goal_disambiguator_component.return_value.attach.return_value = (
         "set_status_to_execution"
     )
-    mock_planner_component.return_value.attach.return_value = (
-        "plan_approval_entry_planner"
-    )
+    mock_planner_component.return_value.attach.return_value = "set_status_to_execution"
     mock_tools_registry = MagicMock(spec=ToolsRegistry)
     mock_tools_registry_cls.return_value = mock_tools_registry
     mock_tools_registry_cls.configure = AsyncMock(return_value=mock_tools_registry)
@@ -818,9 +810,7 @@ async def test_workflow_run_with_setup_error(
     mock_goal_disambiguator_component.return_value.attach.return_value = (
         "set_status_to_execution"
     )
-    mock_planner_component.return_value.attach.return_value = (
-        "plan_approval_entry_planner"
-    )
+    mock_planner_component.return_value.attach.return_value = "set_status_to_execution"
     mock_tools_registry.configure = AsyncMock(
         side_effect=Exception("Failed to configure tools")
     )
@@ -995,9 +985,7 @@ async def test_workflow_run_with_retry(
     mock_goal_disambiguator_component.return_value.attach.return_value = (
         "set_status_to_execution"
     )
-    mock_planner_component.return_value.attach.return_value = (
-        "plan_approval_entry_planner"
-    )
+    mock_planner_component.return_value.attach.return_value = "set_status_to_execution"
     mock_tools_registry.configure = AsyncMock(
         return_value=MagicMock(spec=ToolsRegistry)
     )
