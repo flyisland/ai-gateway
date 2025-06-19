@@ -4,7 +4,7 @@ from unittest.mock import MagicMock, Mock, call, patch
 
 import pytest
 from cef.datasets.base import PromptConfig
-from cef.datasets.generator import DatasetGenerator, ModelConfig, LangGraphAdapter
+from cef.datasets.generator import DatasetGenerator, LangGraphAdapter, ModelConfig
 from cef.datasets.serializers import JsonFileSerializer, LangSmithSerializer
 from langsmith import Client
 
@@ -338,7 +338,9 @@ class TestRun:
         mock_prompt_config_class.from_source.assert_called_once_with(mock_prompt_source)
         mock_model_config_class.assert_called_once_with(temperature=0.7)
         mock_json_serializer_class.assert_called_once_with(dataset_name, Path.cwd())
-        mock_langgraph_adapter_class.from_model_config.assert_called_once_with(mock_model_config)
+        mock_langgraph_adapter_class.from_model_config.assert_called_once_with(
+            mock_model_config
+        )
         mock_dataset_generator_class.assert_called_once_with(
             prompt_config=mock_prompt_config,
             generator_adapter=mock_adapter,
@@ -423,7 +425,9 @@ class TestRun:
             dataset_name=dataset_name,
             dataset_description=description,
         )
-        mock_langgraph_adapter_class.from_model_config.assert_called_once_with(mock_model_config)
+        mock_langgraph_adapter_class.from_model_config.assert_called_once_with(
+            mock_model_config
+        )
         mock_dataset_generator_class.assert_called_once_with(
             prompt_config=mock_prompt_config,
             generator_adapter=mock_adapter,
