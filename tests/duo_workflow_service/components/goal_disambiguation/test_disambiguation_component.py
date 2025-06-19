@@ -5,13 +5,10 @@ import pytest
 from langchain_core.language_models.chat_models import BaseChatModel
 from langchain_core.messages import (
     AIMessage,
-    BaseMessage,
     HumanMessage,
     SystemMessage,
-    ToolMessage,
 )
 from langchain_core.runnables import RunnableConfig
-from langgraph.checkpoint.memory import MemorySaver
 from langgraph.graph import END, StateGraph
 
 from duo_workflow_service.agents.agent import Agent
@@ -25,8 +22,6 @@ from duo_workflow_service.components.goal_disambiguation.prompts import (
 from duo_workflow_service.entities import (
     MessageTypeEnum,
     Plan,
-    ToolStatus,
-    UiChatLog,
     WorkflowEventType,
     WorkflowState,
     WorkflowStatusEnum,
@@ -393,7 +388,7 @@ class TestGoalDisambiguationComponent:
             # assert that the component requested user input
             mock_interrupt.assert_called_once()
             # assert correct ui communication between the component and UI client
-            assert len(response["ui_chat_log"]) == 3
+            assert len(response["ui_chat_log"]) == 4
             assert (
                 response["ui_chat_log"][0]["content"]
                 == "I need to understand which bug do you need to fix\n\nI'm ready to help with your project but I need a few key details:\n\n1. List issue links for bugs to fix"
@@ -406,7 +401,11 @@ class TestGoalDisambiguationComponent:
             assert response["ui_chat_log"][1]["message_type"] == MessageTypeEnum.USER
             assert response["ui_chat_log"][2]["content"] == "This is a summary"
             assert response["ui_chat_log"][2]["message_type"] == MessageTypeEnum.AGENT
-
+            assert (
+                    response["ui_chat_log"][3]["content"]
+                    == "Thank you for clarifying! Let me take this into account to propose the best plan possible."
+            )
+            assert response["ui_chat_log"][2]["message_type"] == MessageTypeEnum.AGENT
             # assert clarity reevaluation cycle
             assert mock_agent.run.call_count == 2
             # only 1 handover message which is a summary
@@ -480,7 +479,7 @@ class TestGoalDisambiguationComponent:
             # assert that the component requested user input
             mock_interrupt.assert_called_once()
             # assert correct ui communication between the component and UI client
-            assert len(response["ui_chat_log"]) == 2
+            assert len(response["ui_chat_log"]) == 3
             assert (
                 response["ui_chat_log"][0]["content"]
                 == "I need to understand which bug do you need to fix\n\nI'm ready to help with your project but I need a few key details:\n\n1. List issue links for bugs to fix"

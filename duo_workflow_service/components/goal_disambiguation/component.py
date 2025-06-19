@@ -32,15 +32,14 @@ from duo_workflow_service.gitlab.http_client import GitlabHttpClient
 from duo_workflow_service.tools.request_user_clarification import (
     RequestUserClarificationTool,
 )
-
-from ...internal_events.event_enum import CategoryEnum
-from ...tools import HandoverTool
 from .prompts import (
     ASSIGNMENT_PROMPT,
     CLARITY_JUDGE_RESPONSE_TEMPLATE,
     PROMPT,
     SYS_PROMPT,
 )
+from ...internal_events.event_enum import CategoryEnum
+from ...tools import HandoverTool
 
 _AGENT_NAME = "clarity_judge"
 
@@ -239,19 +238,29 @@ class GoalDisambiguationComponent:
             return {"status": WorkflowStatusEnum.INPUT_REQUIRED}
 
         message = event["message"]
+        acknowledgment_message = "Thank you for clarifying! Let me take this into account to propose the best plan possible."
         ui_chat_logs = [
             UiChatLog(
                 correlation_id=(
                     event["correlation_id"] if event.get("correlation_id") else None
                 ),
-                message_type=MessageTypeEnum.USER,
+                message_type=MessageTypeEnum.AGENT,
                 message_sub_type=None,
-                content=message,
+                content=acknowledgment_message,
                 timestamp=datetime.now(timezone.utc).isoformat(),
                 status=ToolStatus.SUCCESS,
                 tool_info=None,
                 context_elements=None,
-            )
+            ),
+            UiChatLog(
+                correlation_id=None,
+                message_type=MessageTypeEnum.USER,
+                content=message,
+                timestamp=(datetime.now(timezone.utc)).isoformat(),
+                status=ToolStatus.SUCCESS,
+                tool_info=None,
+                context_elements=None,
+            ),
         ]
 
         last_message = state["conversation_history"][_AGENT_NAME][-1]

@@ -71,17 +71,29 @@ class HumanApprovalCheckExecutor:
                     )
                 )
             else:
-                ui_chat_logs.append(
-                    UiChatLog(
-                        correlation_id=correlation_id,
-                        message_type=MessageTypeEnum.USER,
-                        message_sub_type=None,
-                        content=f"Received message: {message}",
-                        timestamp=datetime.now(timezone.utc).isoformat(),
-                        status=ToolStatus.SUCCESS,
-                        tool_info=None,
-                        context_elements=None,
-                    )
+                ui_chat_logs.extend(
+                    [
+                        UiChatLog(
+                            correlation_id=correlation_id,
+                            message_sub_type=None,
+                            message_type=MessageTypeEnum.USER,
+                            content="Thank you for the feedback, I am going to revaluate and adjust the plan.",
+                            timestamp=datetime.now(timezone.utc).isoformat(),
+                            status=ToolStatus.SUCCESS,
+                            tool_info=None,
+                            context_elements=None,
+                        ),
+                        UiChatLog(
+                            correlation_id=None,
+                            message_sub_type=None,
+                            message_type=MessageTypeEnum.AGENT,
+                            content=message,
+                            timestamp=(datetime.now(timezone.utc)).isoformat(),
+                            status=ToolStatus.SUCCESS,
+                            tool_info=None,
+                            context_elements=None,
+                        ),
+                    ]
                 )
 
                 # Check if last message was a tool call
@@ -96,4 +108,17 @@ class HumanApprovalCheckExecutor:
 
                 messages.append(HumanMessage(content=message))
                 updates["conversation_history"] = {self._agent_name: messages}
+
+        if event["event_type"] == WorkflowEventType.RESUME:  # Plan approved
+            ui_chat_logs.append(
+                UiChatLog(
+                    correlation_id=None,
+                    message_type=MessageTypeEnum.AGENT,
+                    content="Sounds good, let’s get started!",
+                    timestamp=(datetime.now(timezone.utc)).isoformat(),
+                    status=ToolStatus.SUCCESS,
+                    tool_info=None,
+                    context_elements=None,
+                )
+            )
         return updates
