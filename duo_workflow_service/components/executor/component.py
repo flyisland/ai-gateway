@@ -30,15 +30,11 @@ from duo_workflow_service.workflows.abstract_workflow import MAX_TOKENS_TO_SAMPL
 
 
 class Routes(StrEnum):
-    END = "end"
     CALL_TOOL = "call_tool"
     TOOLS_APPROVAL = "tools_approval"
     SUPERVISOR = PlanSupervisorAgent.__name__
     HANDOVER = HandoverAgent.__name__
-    BUILD_CONTEXT = "build_context"
     STOP = "stop"
-    CHAT = "chat"
-    WAIT_FOR_HUMAN_INPUT = "wait_for_human_input"
 
 
 def _router(
@@ -123,7 +119,8 @@ class ExecutorComponent:
             include_conversation_history=True,
         )
         supervisor = PlanSupervisorAgent(supervised_agent_name="executor")
-        tools_approval_entry_node = exit_node  # fallback for
+        # When tools approval component is not attached, proceed with tools execution
+        tools_approval_entry_node = "execution_tools"
         if approval_component is not None:
             tools_approval_entry_node = approval_component.attach(
                 graph=graph,
