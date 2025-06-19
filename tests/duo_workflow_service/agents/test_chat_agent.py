@@ -35,6 +35,7 @@ class TestChatAgent:
         agent = Mock(spec=ChatAgent)
         agent.name = "test_agent"
         agent.ainvoke = AsyncMock(return_value=mock_ai_message)
+        agent._get_approvals = Mock(return_value=(False, []))
 
         with patch(
             "duo_workflow_service.agents.chat_agent.Prompt.ainvoke",
