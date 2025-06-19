@@ -1,6 +1,7 @@
 from datetime import datetime, timezone
 from typing import Any, Dict, Optional
 
+import structlog
 from langchain_core.messages import (
     AIMessage,
     BaseMessage,
@@ -8,7 +9,6 @@ from langchain_core.messages import (
     SystemMessage,
     ToolMessage,
 )
-import structlog
 from langchain_core.output_parsers.string import StrOutputParser
 from langchain_core.prompt_values import ChatPromptValue, PromptValue
 from langchain_core.runnables import Runnable, RunnableConfig
@@ -132,7 +132,10 @@ class ChatAgent(Prompt[ChatWorkflowState, BaseMessage]):
             agent_response = await super().ainvoke(input=input, agent_name=self.name)
             new_messages.append(agent_response)
 
-            if isinstance(agent_response, AIMessage) and len(agent_response.tool_calls) > 0:
+            if (
+                isinstance(agent_response, AIMessage)
+                and len(agent_response.tool_calls) > 0
+            ):
                 status = WorkflowStatusEnum.EXECUTION
             else:
                 status = WorkflowStatusEnum.INPUT_REQUIRED
@@ -178,8 +181,9 @@ class ChatAgent(Prompt[ChatWorkflowState, BaseMessage]):
                 "conversation_history": {self.name: [error_message]},
                 "status": WorkflowStatusEnum.INPUT_REQUIRED,
                 "ui_chat_log": [
-                    UiChatLog(  # type: ignore[list-item]
+                    UiChatLog(
                         message_type=MessageTypeEnum.AGENT,
+                        message_sub_type=None,
                         content="There was an error processing your request. Please try again or contact support if the issue persists.",
                         timestamp=datetime.now(timezone.utc).isoformat(),
                         status=ToolStatus.FAILURE,
@@ -189,5 +193,3 @@ class ChatAgent(Prompt[ChatWorkflowState, BaseMessage]):
                     )
                 ],
             }
-
-
