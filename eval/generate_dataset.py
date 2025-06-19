@@ -4,8 +4,9 @@ from typing import Annotated, Optional, cast
 
 import typer
 from dependency_injector.wiring import Provide, inject
-from eli5.datasets.generator import DatasetGenerator, ModelConfig, PromptConfig
-from eli5.datasets.serializers import (
+from cef.datasets.generator import DatasetGenerator, ModelConfig
+from cef.datasets.base import PromptConfig
+from cef.datasets.serializers import (
     DatasetSerializer,
     JsonFileSerializer,
     LangSmithSerializer,
@@ -88,7 +89,7 @@ def get_prompt_source(
     if not user_message:
         raise ValueError("Prompt must include a user message")
 
-    # The LLM prompt in ELI5 that's used to generate the dataset examples only expects system or user messages.
+    # The LLM prompt in CEF that's used to generate the dataset examples only expects system or user messages.
     # Append any other messages to the user message.
     other_messages = []
     for role, content in source_messages.items():
