@@ -73,7 +73,7 @@ CHAT_READ_ONLY_TOOLS = [
 CHAT_MUTATION_TOOLS = [
     "create_file_with_contents",
     "edit_file",
-    "mkdir",
+    # "mkdir",
 ]
 
 
