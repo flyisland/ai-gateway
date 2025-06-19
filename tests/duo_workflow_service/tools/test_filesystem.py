@@ -3,7 +3,8 @@ from unittest.mock import AsyncMock, MagicMock, patch
 import pytest
 
 from contract import contract_pb2
-from duo_workflow_service.tools.filesystem import (  # Mkdir,
+from duo_workflow_service.tools.filesystem import (
+    Mkdir,
     EditFile,
     EditFileInput,
     FindFiles,
@@ -14,6 +15,7 @@ from duo_workflow_service.tools.filesystem import (  # Mkdir,
     ReadFileInput,
     WriteFile,
     WriteFileInput,
+    MkdirInput,
 )
 
 
@@ -188,43 +190,72 @@ class TestLsDir:
         assert message == expected_message
 
 
-# class TestMkdir:
-#     @pytest.mark.asyncio
-#     @patch("duo_workflow_service.tools.filesystem.RunCommand", autospec=True)
-#     async def test_mkdir_creates_directory(self, mock_run_command):
-#         mock_arun = AsyncMock(return_value="")
-#         mock_run_command.return_value._arun = mock_arun
-#
-#         mkdir_tool = Mkdir()
-#         result = await mkdir_tool._arun("test_dir")
-#
-#         assert result == ""
-#         mock_arun.assert_called_once_with(
-#             "mkdir", arguments=["./test_dir"], flags=["-p"]
-#         )
-#
-#     @pytest.mark.asyncio
-#     @patch("duo_workflow_service.tools.filesystem.RunCommand", autospec=True)
-#     async def test_mkdir_creates_nested_directories(self, mock_run_command):
-#         mock_arun = AsyncMock(return_value="")
-#         mock_run_command.return_value._arun = mock_arun
-#
-#         mkdir_tool = Mkdir()
-#         result = await mkdir_tool._arun("./test_dir/nested/dir")
-#
-#         assert result == ""
-#         mock_arun.assert_called_once_with(
-#             "mkdir", arguments=["./test_dir/nested/dir"], flags=["-p"]
-#         )
-#
-#     @pytest.mark.asyncio
-#     async def test_mkdir_validates_path(self):
-#         mkdir_tool = Mkdir()
-#         result = await mkdir_tool._arun("../test_dir")
-#
-#         assert (
-#             result == "Creating directories above the current directory is not allowed"
-#         )
+class TestMkdir:
+    @pytest.mark.asyncio
+    async def test_mkdir_creates_directory(self):
+        mock_outbox = MagicMock()
+        mock_outbox.put = AsyncMock()
+
+        mock_inbox = MagicMock()
+        mock_inbox.get = AsyncMock(
+            return_value=contract_pb2.ClientEvent(
+                actionResponse=contract_pb2.ActionResponse(response="")
+            )
+        )
+
+        metadata = {"outbox": mock_outbox, "inbox": mock_inbox}
+
+        mkdir_tool = Mkdir()
+        mkdir_tool.metadata = metadata
+        result = await mkdir_tool._arun("./test_dir")
+
+        assert result == ""
+
+        # Verify the action sent to outbox
+        mock_outbox.put.assert_called_once()
+        action = mock_outbox.put.call_args[0][0]
+        assert action.mkdir.directory_path == "./test_dir"
+
+    @pytest.mark.asyncio
+    async def test_mkdir_creates_nested_directories(self):
+        # Set up mock outbox and inbox following the pattern from other tests
+        mock_outbox = MagicMock()
+        mock_outbox.put = AsyncMock()
+
+        mock_inbox = MagicMock()
+        mock_inbox.get = AsyncMock(
+            return_value=contract_pb2.ClientEvent(
+                actionResponse=contract_pb2.ActionResponse(response="")
+            )
+        )
+
+        metadata = {"outbox": mock_outbox, "inbox": mock_inbox}
+
+        # Create the tool and set its metadata
+        mkdir_tool = Mkdir()
+        mkdir_tool.metadata = metadata
+
+        # Call the method being tested
+        result = await mkdir_tool._arun("./test_dir/nested/dir")
+
+        # Assert the result
+        assert result == ""
+
+        # Verify the outbox was called correctly
+        mock_outbox.put.assert_called_once()
+
+        # Verify the action details
+        action = mock_outbox.put.call_args[0][0]
+        assert action.mkdir.directory_path == "./test_dir/nested/dir"
+
+    @pytest.mark.asyncio
+    async def test_mkdir_validates_path(self):
+        mkdir_tool = Mkdir()
+        result = await mkdir_tool._arun("../test_dir")
+
+        assert (
+            result == "Creating directories above the current directory is not allowed"
+        )
 
 
 class TestEditFile:
@@ -332,15 +363,15 @@ def test_find_files_format_display_message():
     assert message == expected_message
 
 
-# def test_mkdir_format_display_message():
-#     tool = Mkdir(description="Mkdir description")
-#
-#     input_data = MkdirInput(directory_path="./src/new_directory")
-#
-#     message = tool.format_display_message(input_data)
-#
-#     expected_message = "Create directory './src/new_directory'"
-#     assert message == expected_message
+def test_mkdir_format_display_message():
+    tool = Mkdir(description="Mkdir description")
+
+    input_data = MkdirInput(directory_path="./src/new_directory")
+
+    message = tool.format_display_message(input_data)
+
+    expected_message = "Create directory './src/new_directory'"
+    assert message == expected_message
 
 
 def test_edit_file_format_display_message():
