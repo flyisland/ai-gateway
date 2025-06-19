@@ -4,7 +4,7 @@ from unittest.mock import MagicMock, Mock, call, patch
 
 import pytest
 from cef.datasets.base import PromptConfig
-from cef.datasets.generator import DatasetGenerator, ModelConfig
+from cef.datasets.generator import DatasetGenerator, ModelConfig, LangGraphAdapter
 from cef.datasets.serializers import JsonFileSerializer, LangSmithSerializer
 from langsmith import Client
 
@@ -277,6 +277,7 @@ class TestRun:
             mock_container.config = mock_config
             yield mock_container
 
+    @patch("eval.generate_dataset.LangGraphAdapter")
     @patch("eval.generate_dataset.DatasetGenerator")
     @patch("eval.generate_dataset.JsonFileSerializer")
     @patch("eval.generate_dataset.PromptConfig")
@@ -293,6 +294,7 @@ class TestRun:
         mock_prompt_config_class,
         mock_json_serializer_class,
         mock_dataset_generator_class,
+        mock_langgraph_adapter_class,
         mock_container_application,
     ):
         prompt_id = "chat/explain_code"
@@ -312,6 +314,9 @@ class TestRun:
         mock_json_serializer = Mock(spec=JsonFileSerializer)
         mock_json_serializer.output_path = Path("/path/to/output/dataset.json")
         mock_json_serializer_class.return_value = mock_json_serializer
+
+        mock_adapter = Mock(spec=LangGraphAdapter)
+        mock_langgraph_adapter_class.from_model_config.return_value = mock_adapter
 
         mock_generator = Mock(spec=DatasetGenerator)
         mock_dataset_generator_class.return_value = mock_generator
@@ -333,9 +338,10 @@ class TestRun:
         mock_prompt_config_class.from_source.assert_called_once_with(mock_prompt_source)
         mock_model_config_class.assert_called_once_with(temperature=0.7)
         mock_json_serializer_class.assert_called_once_with(dataset_name, Path.cwd())
+        mock_langgraph_adapter_class.from_model_config.assert_called_once_with(mock_model_config)
         mock_dataset_generator_class.assert_called_once_with(
             prompt_config=mock_prompt_config,
-            model_config=mock_model_config,
+            generator_adapter=mock_adapter,
             serializers=[mock_json_serializer],
         )
         mock_generator.generate.assert_called_once_with(num_examples=10)
@@ -345,6 +351,7 @@ class TestRun:
             call("Dataset generated successfully: /path/to/output/dataset.json"),
         ]
 
+    @patch("eval.generate_dataset.LangGraphAdapter")
     @patch("eval.generate_dataset.DatasetGenerator")
     @patch("eval.generate_dataset.LangSmithSerializer")
     @patch("eval.generate_dataset.JsonFileSerializer")
@@ -363,6 +370,7 @@ class TestRun:
         mock_json_serializer_class,
         mock_langsmith_serializer_class,
         mock_dataset_generator_class,
+        mock_langgraph_adapter_class,
     ):
         prompt_id = "chat/explain_code"
         prompt_version = "1.0.0"
@@ -389,6 +397,9 @@ class TestRun:
         mock_langsmith_serializer = Mock(spec=LangSmithSerializer)
         mock_langsmith_serializer_class.return_value = mock_langsmith_serializer
 
+        mock_adapter = Mock(spec=LangGraphAdapter)
+        mock_langgraph_adapter_class.from_model_config.return_value = mock_adapter
+
         mock_generator = Mock(spec=DatasetGenerator)
         mock_dataset_generator_class.return_value = mock_generator
 
@@ -412,9 +423,10 @@ class TestRun:
             dataset_name=dataset_name,
             dataset_description=description,
         )
+        mock_langgraph_adapter_class.from_model_config.assert_called_once_with(mock_model_config)
         mock_dataset_generator_class.assert_called_once_with(
             prompt_config=mock_prompt_config,
-            model_config=mock_model_config,
+            generator_adapter=mock_adapter,
             serializers=[mock_json_serializer, mock_langsmith_serializer],
         )
         mock_generator.generate.assert_called_once_with(num_examples=5)
