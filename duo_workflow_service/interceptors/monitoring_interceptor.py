@@ -3,7 +3,7 @@ import traceback
 from contextlib import contextmanager
 from datetime import datetime, timezone
 from enum import StrEnum
-from typing import Awaitable, Callable, Optional
+from typing import Awaitable, Callable, Generator, Optional
 
 import grpc
 import structlog
@@ -30,7 +30,7 @@ class GRPCMethodType(StrEnum):
 
 
 class MonitoringInterceptor(ServerInterceptor):
-    def __init__(self, registry=REGISTRY):
+    def __init__(self, registry=REGISTRY) -> None:
         self._requests_counter: Counter = Counter(
             "grpc_server_handled_total",
             "Total number of RPCs completed on the server, regardless of success or failure.",
@@ -142,7 +142,7 @@ class MonitoringInterceptor(ServerInterceptor):
         grpc_method_name,
         servicer_context,
         invocation_metadata,
-    ):
+    ) -> Generator[None, None, None]:
         exception_fields = {}
 
         start_time_total = time.perf_counter()

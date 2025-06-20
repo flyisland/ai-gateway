@@ -47,7 +47,7 @@ langchainhub = "^0.1.20"
 langchain-community = "^0.3.5"
 langchain-litellm = "^0.2.1"
 boto3 = "^1.35.37"
-python-gitlab = "^5.1.0"
+python-gitlab = { extras = ["graphql"], version = ">=5.1.0,<7" }
 gitpython = "^3.1.43"
 unique-names-generator = "^1.0.2"
 langchain-google-vertexai = "^2.0.8"
@@ -76,8 +76,8 @@ priority = "supplemental"
 optional = true
 
 [tool.poetry.group.eval.dependencies]
-eli5 = { version = "^0.3.2", source = "prompt_library" }
-typer = "^0.15.4"
+cef = { git = "https://gitlab.com/gitlab-org/modelops/applied-ml/code-suggestions/prompt-library.git", rev = "676e26c5" }
+typer = "^0.16.0"
 
 [tool.poetry.group.test]
 optional = true
