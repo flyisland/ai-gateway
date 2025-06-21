@@ -1,7 +1,7 @@
 from datetime import datetime, timezone
 from typing import Any
 
-from langchain_core.messages import HumanMessage
+from langchain_core.messages import HumanMessage, SystemMessage
 from langgraph.checkpoint.memory import BaseCheckpointSaver
 from langgraph.graph import END, StateGraph
 
@@ -53,7 +53,12 @@ class Workflow(AbstractWorkflow):
 
         # Send the prompt to the LLM
         message = HumanMessage(content=prompt)
-        response = await model.ainvoke([message])
+        messages = [
+            SystemMessage(content="Answer in a jokey/comedic fashion"),
+            message,
+        ]
+
+        response = await model.ainvoke(messages)
 
         # Create a UI chat log entry for the response
         ui_log = UiChatLog(
