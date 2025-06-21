@@ -1,15 +1,13 @@
 from datetime import datetime, timezone
-from enum import StrEnum
 from typing import Any
 
-from langchain_core.messages import HumanMessage, SystemMessage
+from langchain_core.messages import HumanMessage
 from langgraph.checkpoint.memory import BaseCheckpointSaver
 from langgraph.graph import END, StateGraph
 
-from duo_workflow_service.agents import Agent, HandoverAgent, RunToolNode, ToolsExecutor
+from duo_workflow_service.agents import HandoverAgent
 from duo_workflow_service.components import ToolsRegistry
 from duo_workflow_service.entities import (
-    MAX_CONTEXT_TOKENS,
     MessageTypeEnum,
     Plan,
     ToolStatus,
@@ -17,142 +15,64 @@ from duo_workflow_service.entities import (
     WorkflowState,
     WorkflowStatusEnum,
 )
-from duo_workflow_service.internal_events.event_enum import CategoryEnum
-from duo_workflow_service.llm_factory import create_chat_model
-from duo_workflow_service.token_counter.approximate_token_counter import (
-    ApproximateTokenCounter,
-)
+from duo_workflow_service.llm_factory import create_chat_model, AnthropicConfig
+from ai_gateway.models import KindAnthropicModel
 from duo_workflow_service.tracking import log_exception
 from duo_workflow_service.workflows.abstract_workflow import (
     MAX_TOKENS_TO_SAMPLE,
     RECURSION_LIMIT,
     AbstractWorkflow,
 )
-from duo_workflow_service.workflows.convert_to_gitlab_ci.prompts import (
-    CI_PIPELINES_MANAGER_FILE_USER_MESSAGE,
-    CI_PIPELINES_MANAGER_SYSTEM_MESSAGE,
-    CI_PIPELINES_MANAGER_USER_GUIDELINES,
-)
 
-AGENT_NAME = "ci_pipelines_manager_agent"
+AGENT_NAME = "simple_llm_agent"
 
 
-# ROUTERS
-class Routes(StrEnum):
-    CONTINUE = "continue"
-    END = "end"
-    AGENT = "agent"
-    COMMIT_CHANGES = "commit_changes"
+class Workflow(AbstractWorkflow):
+    async def _send_llm_prompt(self, state: WorkflowState) -> dict:
+        """Send a simple prompt to the LLM and return the response."""
+        # Get the prompt from the goal (stored in last_human_input)
+        prompt = state.get("last_human_input", "Hello, how can you help me?")
 
+        # Debug: Log the model config
+        self.log.info(f"Model config type: {type(self._model_config)}")
+        self.log.info(f"Model config: {self._model_config}")
 
-def _router(state: WorkflowState) -> str:
-    if state["status"] == WorkflowStatusEnum.CANCELLED:
-        return Routes.END
-
-    agent_messages = state["conversation_history"].get(AGENT_NAME, [])
-    if not agent_messages or len(agent_messages) < 2:
-        return Routes.END
-
-    tool_calls = getattr(agent_messages[-2], "tool_calls", [])
-    if len(tool_calls) == 0:
-        return Routes.END
-
-    if tool_calls and tool_calls[0].get("name") == "read_file":
-        return Routes.AGENT
-
-    if tool_calls[0].get("name") == "create_file_with_contents":
-        return Routes.COMMIT_CHANGES
-
-    return Routes.END
-
-
-def _tools_execution_requested(state: WorkflowState) -> str:
-    if state["status"] == WorkflowStatusEnum.CANCELLED:
-        return Routes.END
-
-    agent_messages = state["conversation_history"].get(AGENT_NAME, [])
-    if agent_messages and getattr(agent_messages[-1], "tool_calls", []):
-        return Routes.CONTINUE
-
-    return Routes.END
-
-
-def _load_file_contents(file_contents: list[str], state: WorkflowState):
-    if (
-        not file_contents
-        or "Error running tool: unable to open file:" in file_contents[0]
-    ):
-        raise RuntimeError("Failed to load file contents, ensure that file is present")
-
-    logs: list[UiChatLog] = []
-
-    system_prompt = CI_PIPELINES_MANAGER_SYSTEM_MESSAGE
-    human_guidelines = CI_PIPELINES_MANAGER_USER_GUIDELINES
-
-    human_prompt = CI_PIPELINES_MANAGER_FILE_USER_MESSAGE.format(
-        file_content=file_contents[0],
-    )
-    messages = [
-        SystemMessage(content=system_prompt),
-        HumanMessage(content=human_guidelines),
-        HumanMessage(content=human_prompt),
-    ]
-
-    if ApproximateTokenCounter(AGENT_NAME).count_tokens(messages) > MAX_CONTEXT_TOKENS:
-        messages = []
-        logs.append(
-            UiChatLog(
-                message_type=MessageTypeEnum.TOOL,
-                message_sub_type=None,
-                content="File too large, skipping.",
-                timestamp=datetime.now(timezone.utc).isoformat(),
-                status=ToolStatus.FAILURE,
-                correlation_id=None,
-                tool_info=None,
-                context_elements=None,
+        # Create the LLM model using the workflow's model config
+        # Add fallback in case model config is still None
+        model_config = self._model_config
+        if model_config is None:
+            self.log.warning("Model config is None, using fallback AnthropicConfig")
+            model_config = AnthropicConfig(
+                model_name=KindAnthropicModel.CLAUDE_SONNET_4.value
             )
-        )
-    else:
-        logs.append(
-            UiChatLog(
-                message_type=MessageTypeEnum.TOOL,
-                message_sub_type=None,
-                content="Loaded Jenkins file",
-                timestamp=datetime.now(timezone.utc).isoformat(),
-                status=ToolStatus.SUCCESS,
-                correlation_id=None,
-                tool_info=None,
-                context_elements=None,
-            )
+
+        model = create_chat_model(
+            max_tokens=MAX_TOKENS_TO_SAMPLE,
+            config=model_config,
         )
 
-    return {
-        "conversation_history": {AGENT_NAME: messages},
-        "ui_chat_log": logs,
-        "status": WorkflowStatusEnum.EXECUTION,
-    }
+        # Send the prompt to the LLM
+        message = HumanMessage(content=prompt)
+        response = await model.ainvoke([message])
 
-
-def _git_output(command_output: list[str], state: WorkflowState):
-    logs: list[UiChatLog] = [
-        UiChatLog(
+        # Create a UI chat log entry for the response
+        ui_log = UiChatLog(
             message_type=MessageTypeEnum.TOOL,
             message_sub_type=None,
-            content=f"{command_output[-1]}",
+            content=f"LLM Response: {response.content}",
             timestamp=datetime.now(timezone.utc).isoformat(),
             status=ToolStatus.SUCCESS,
             correlation_id=None,
             tool_info=None,
             context_elements=None,
         )
-    ]
 
-    return {
-        "ui_chat_log": logs,
-    }
+        return {
+            "conversation_history": {AGENT_NAME: [message, response]},
+            "ui_chat_log": [ui_log],
+            "status": WorkflowStatusEnum.EXECUTION,
+        }
 
-
-class Workflow(AbstractWorkflow):
     async def _handle_workflow_failure(
         self, error: BaseException, compiled_graph: Any, graph_config: Any
     ):
@@ -169,95 +89,22 @@ class Workflow(AbstractWorkflow):
     ):
         graph = StateGraph(WorkflowState)
 
-        # Setup workflow graph
-        graph = self._setup_workflow_graph(
-            graph,
-            tools_registry,
-            goal,
-        )
+        # Setup simple workflow graph
+        graph = self._setup_simple_workflow_graph(graph, goal)
 
         return graph.compile(checkpointer=checkpointer)
 
-    def _setup_translator_nodes(self, tools_registry: ToolsRegistry):
-        translation_tools = ["create_file_with_contents", "read_file"]
-        agents_toolset = tools_registry.toolset(translation_tools)
-        translator_agent = Agent(
-            goal="N/A",
-            system_prompt="N/A",
-            name=AGENT_NAME,
-            model=create_chat_model(
-                max_tokens=MAX_TOKENS_TO_SAMPLE,
-                config=self._model_config,
-            ),
-            toolset=agents_toolset,
-            http_client=self._http_client,
-            workflow_id=self._workflow_id,
-            workflow_type=CategoryEnum.WORKFLOW_CONVERT_TO_GITLAB_CI,
-        )
+    def _setup_simple_workflow_graph(self, graph: StateGraph, goal: str):
+        """Setup a simple workflow that just sends a prompt to LLM and completes."""
+        self.log.info("Starting simple LLM workflow graph compilation")
 
-        return {
-            "agent": translator_agent,
-            "tools": translation_tools,
-            "tools_executor": ToolsExecutor(
-                tools_agent_name=AGENT_NAME,
-                toolset=agents_toolset,
-                workflow_id=self._workflow_id,
-                workflow_type=CategoryEnum.WORKFLOW_CONVERT_TO_GITLAB_CI,
-            ),
-            "start_node": "request_translation",
-        }
+        # Set entry point
+        graph.set_entry_point("send_prompt")
 
-    def _setup_workflow_graph(
-        self,
-        graph: StateGraph,
-        tools_registry,
-        ci_config_file_path,
-    ):
-        translator_components = self._setup_translator_nodes(tools_registry)
+        # Add node to send prompt to LLM
+        graph.add_node("send_prompt", self._send_llm_prompt)
 
-        self.log.info("Starting %s workflow graph compilation", self._workflow_type)
-        graph.set_entry_point("load_files")
-        # Load jenkins file contents
-        graph.add_node(
-            "load_files",
-            RunToolNode[WorkflowState](
-                tool=tools_registry.get("read_file"),  # type: ignore
-                input_parser=lambda _: [{"file_path": ci_config_file_path}],
-                output_parser=_load_file_contents,  # type: ignore
-            ).run,
-        )
-        # translator nodes
-        graph.add_node(
-            translator_components["start_node"], translator_components["agent"].run
-        )
-        graph.add_node("execution_tools", translator_components["tools_executor"].run)
-
-        # deterministic git actions
-        graph.add_node(
-            "git_actions",
-            RunToolNode[WorkflowState](
-                tool=tools_registry.get("run_git_command"),  # type: ignore
-                input_parser=lambda _: [
-                    {
-                        "repository_url": self._project["http_url_to_repo"],
-                        "command": "add",
-                        "args": "-A",
-                    },
-                    {
-                        "repository_url": self._project["http_url_to_repo"],
-                        "command": "commit",
-                        "args": "-m 'Duo Workflow: Convert to GitLab CI'",
-                    },
-                    {
-                        "repository_url": self._project["http_url_to_repo"],
-                        "command": "push",
-                        "args": "-o merge_request.create",
-                    },
-                ],
-                output_parser=_git_output,  # type: ignore
-            ).run,
-        )
-
+        # Add completion node
         graph.add_node(
             "complete",
             HandoverAgent(
@@ -265,34 +112,17 @@ class Workflow(AbstractWorkflow):
             ).run,
         )
 
-        graph.add_edge("load_files", translator_components["start_node"])
-        graph.add_conditional_edges(
-            translator_components["start_node"],
-            _tools_execution_requested,
-            {
-                Routes.CONTINUE: "execution_tools",
-                Routes.END: "complete",
-            },
-        )
-        graph.add_conditional_edges(
-            "execution_tools",
-            _router,
-            {
-                Routes.AGENT: translator_components["start_node"],
-                Routes.END: "complete",
-                Routes.COMMIT_CHANGES: "git_actions",
-            },
-        )
-        graph.add_edge("git_actions", "complete")
+        # Add edges
+        graph.add_edge("send_prompt", "complete")
         graph.add_edge("complete", END)
+
         return graph
 
     def get_workflow_state(self, goal: str) -> WorkflowState:
-        target_file = goal
         initial_ui_chat_log = UiChatLog(
             message_type=MessageTypeEnum.TOOL,
             message_sub_type=None,
-            content=f"Starting Jenkinsfile translation workflow from file: {target_file}",
+            content=f"Starting simple LLM workflow with prompt: {goal}",
             timestamp=datetime.now(timezone.utc).isoformat(),
             status=ToolStatus.SUCCESS,
             correlation_id=None,
@@ -306,6 +136,6 @@ class Workflow(AbstractWorkflow):
             conversation_history={},
             plan=Plan(steps=[]),
             handover=[],
-            last_human_input=None,
+            last_human_input=goal,  # Store the prompt in last_human_input
             files_changed=[],
         )
