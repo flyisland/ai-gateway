@@ -159,7 +159,7 @@ class Workflow(AbstractWorkflow):
                 return None
 
     @inject
-    def _compile(
+    async def _compile(
         self,
         goal: str,
         tools_registry: ToolsRegistry,

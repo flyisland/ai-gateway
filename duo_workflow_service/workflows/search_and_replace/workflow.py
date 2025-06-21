@@ -364,7 +364,7 @@ class Workflow(AbstractWorkflow):
     def _recursion_limit(self):
         return RECURSION_LIMIT
 
-    def _compile(
+    async def _compile(
         self,
         goal: str,
         tools_registry: ToolsRegistry,

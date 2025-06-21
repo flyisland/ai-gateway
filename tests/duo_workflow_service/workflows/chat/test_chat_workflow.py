@@ -331,6 +331,7 @@ async def test_workflow_run(
         assert mock_user_interface_instance.send_event.call_count == 1
 
 
+@pytest.mark.asyncio
 @pytest.mark.parametrize(
     ("feature_flags", "workflow_config", "expected_tools"),
     [
@@ -357,7 +358,7 @@ async def test_workflow_run(
     ],
 )
 @patch("duo_workflow_service.components.tools_registry.ToolsRegistry.toolset")
-def test_tools_registry_interaction(
+async def test_tools_registry_interaction(
     mock_toolset,
     feature_flags,
     workflow_config,
@@ -374,7 +375,7 @@ def test_tools_registry_interaction(
     tools_registry = MagicMock(spec=ToolsRegistry)
     checkpointer = MagicMock()
 
-    workflow._compile("Test goal", tools_registry, checkpointer)
+    await workflow._compile("Test goal", tools_registry, checkpointer)
 
     assert tools_registry.toolset.called
 

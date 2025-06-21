@@ -21,7 +21,7 @@ class MockGraph:
 
 
 class MockWorkflow(AbstractWorkflow):
-    def _compile(self, goal, tools_registry, checkpointer):
+    async def _compile(self, goal, tools_registry, checkpointer):
         return MockGraph()
 
     def get_workflow_state(self, goal):

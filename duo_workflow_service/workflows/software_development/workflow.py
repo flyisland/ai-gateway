@@ -154,7 +154,6 @@ class Routes(StrEnum):
     BUILD_CONTEXT = "build_context"
     STOP = "stop"
     CHAT = "chat"
-    WAIT_FOR_HUMAN_INPUT = "wait_for_human_input"
 
 
 def _router(
@@ -293,7 +292,7 @@ class Workflow(AbstractWorkflow):
 
         return graph
 
-    def _compile(
+    async def _compile(
         self,
         goal: str,
         tools_registry: ToolsRegistry,

@@ -184,7 +184,7 @@ async def test_workflow_compilation(
     )
 
     # Compile the workflow graph
-    compiled_graph = workflow._compile(
+    compiled_graph = await workflow._compile(
         goal="/test/path",
         tools_registry=mock_tools_registry,
         checkpointer=mock_checkpointer,

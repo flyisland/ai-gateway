@@ -148,7 +148,7 @@ class AbstractWorkflow(ABC):
         pass
 
     @abstractmethod
-    def _compile(
+    async def _compile(
         self,
         goal: str,
         tools_registry: ToolsRegistry,
@@ -239,7 +239,7 @@ class AbstractWorkflow(ABC):
                         "" if checkpoint_tuple else WorkflowStatusEventEnum.START
                     )
 
-                compiled_graph = self._compile(goal, tools_registry, checkpointer)
+                compiled_graph = await self._compile(goal, tools_registry, checkpointer)
                 graph_input = await self.get_graph_input(goal, status_event)
 
                 async for type, state in compiled_graph.astream(
