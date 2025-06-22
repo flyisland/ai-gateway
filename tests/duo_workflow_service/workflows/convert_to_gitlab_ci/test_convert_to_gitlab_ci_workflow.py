@@ -314,54 +314,53 @@ async def test_workflow_run(
 
 
 @pytest.mark.asyncio
-@patch("duo_workflow_service.workflows.abstract_workflow.ToolsRegistry", autospec=True)
-@patch("duo_workflow_service.workflows.convert_to_gitlab_ci.workflow.Agent")
-@patch("duo_workflow_service.workflows.convert_to_gitlab_ci.workflow.RunToolNode")
 @patch(
     "duo_workflow_service.workflows.abstract_workflow.fetch_project_data_with_workflow_id"
 )
 @patch("duo_workflow_service.workflows.abstract_workflow.fetch_workflow_config")
-@patch("duo_workflow_service.workflows.convert_to_gitlab_ci.workflow.create_chat_model")
-@patch("duo_workflow_service.workflows.abstract_workflow.GitLabWorkflow", autospec=True)
-@patch("duo_workflow_service.workflows.abstract_workflow.UserInterface", autospec=True)
 @patch("duo_workflow_service.workflows.convert_to_gitlab_ci.workflow.log_exception")
+@patch("duo_workflow_service.workflows.convert_to_gitlab_ci.workflow.RunToolNode")
+@patch("duo_workflow_service.executor.action.asyncio.Queue", autospec=True)
+@patch(
+    "duo_workflow_service.status_updater.gitlab_status_updater.GitLabStatusUpdater.update_workflow_status"
+)
+@patch("duo_workflow_service.workflows.abstract_workflow.GitLabWorkflow.aput")
+@patch(
+    "duo_workflow_service.workflows.abstract_workflow.GitLabWorkflow.aget_tuple",
+    new_callable=AsyncMock,
+)
+@patch(
+    "duo_workflow_service.workflows.abstract_workflow.UserInterface.send_event",
+    autospec=True,
+)
 async def test_workflow_run_with_file_not_found(
-    mock_log_exception,
-    mock_checkpoint_notifier,
-    mock_gitlab_workflow,
-    mock_chat_client,
-    mock_fetch_workflow_config,
-    mock_fetch_project_data_with_workflow_id,
+    mock_checkpoint_notifier_send_event,
+    mock_gitlab_workflow_aget_tuple,
+    mock_gitlab_workflow_aput,
+    mock_update_workflow_status,
+    mock_action_queue,
     mock_run_tool_node_generic_class,
-    mock_agent,
-    mock_tools_registry_cls,
-    mock_state,
+    mock_log_exception,
+    mock_fetch_project_data_with_workflow_id,
+    mock_fetch_workflow_config,
 ):
-    mock_checkpoint_notifier_instance = mock_checkpoint_notifier.return_value
-    mock_tools_registry = MagicMock(spec=ToolsRegistry)
-    mock_tools_registry_cls.configure = AsyncMock(return_value=mock_tools_registry)
+    mock_update_workflow_status.return_value = None
+
     mock_fetch_project_data_with_workflow_id.return_value = {
         "id": 1,
         "name": "test-project",
         "description": "This is a test project",
         "http_url_to_repo": "https://example.com/project",
         "web_url": "https://example.com/project",
+        "agent_privileges_names": [],
+    }
+    mock_fetch_workflow_config.return_value = {
+        "id": 1,
+        "project_id": 1,
+        "web_url": "https://example.com/project",
     }
 
-    mock_git_lab_workflow_instance = mock_gitlab_workflow.return_value
-    mock_git_lab_workflow_instance.__aenter__.return_value = (
-        mock_git_lab_workflow_instance
-    )
-    mock_git_lab_workflow_instance.__aexit__.return_value = None
-    mock_git_lab_workflow_instance._offline_mode = False
-    mock_git_lab_workflow_instance.aget_tuple = AsyncMock(return_value=None)
-    mock_git_lab_workflow_instance.alist = AsyncMock(return_value=[])
-    mock_git_lab_workflow_instance.aput = AsyncMock(
-        return_value={
-            "configurable": {"thread_id": "123", "checkpoint_id": "checkpoint1"}
-        }
-    )
-    mock_git_lab_workflow_instance.get_next_version = MagicMock(return_value=1)
+    mock_gitlab_workflow_aget_tuple.return_value = None
 
     mock_run_tool_node_class = mock_run_tool_node_generic_class.__getitem__.return_value
     mock_run_tool_node_class.return_value.run = MagicMock(
@@ -375,16 +374,18 @@ async def test_workflow_run_with_file_not_found(
         {},
         workflow_type=CategoryEnum.WORKFLOW_CONVERT_TO_GITLAB_CI,
     )
+
     await workflow.run("test-file-path")
 
     assert mock_log_exception.call_count == 1
+
     assert mock_run_tool_node_class.call_count == 2
     assert mock_run_tool_node_class.return_value.run.call_count == 1
 
-    assert mock_git_lab_workflow_instance.aput.call_count == 2
-    assert mock_git_lab_workflow_instance.aget_tuple.call_count == 2
+    assert mock_gitlab_workflow_aput.call_count == 2
+    assert mock_gitlab_workflow_aget_tuple.call_count == 2
 
-    assert mock_checkpoint_notifier_instance.send_event.call_count == 1
+    assert mock_checkpoint_notifier_send_event.call_count == 1
 
     assert workflow.is_done
 
