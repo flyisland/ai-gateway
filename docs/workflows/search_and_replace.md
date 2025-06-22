@@ -62,9 +62,9 @@ replacement_rules:
 ## How to Use
 
 1. **Create config file** with your rules
-2. **Test on a few files first** to verify patterns
-3. **Review all changes** before committing
-4. **Run tests** to ensure functionality
+1. **Test on a few files first** to verify patterns
+1. **Review all changes** before committing
+1. **Run tests** to ensure functionality
 
 ## Best Practices
 

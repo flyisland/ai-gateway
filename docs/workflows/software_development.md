@@ -23,14 +23,14 @@ it's connected to your GitLab project, it can directly solve issues from your Gi
    middleware for protected routes, and proper error handling
    ```
 
-2. **Provide context**
+1. **Provide context**
    - Tech stack (for example, Node.js, Express, PostgreSQL)
    - Coding standards or patterns to follow
    - Existing code examples if applicable
 
-3. **Review the plan** before execution
+1. **Review the plan** before execution
 
-4. **Test thoroughly** after completion
+1. **Test thoroughly** after completion
 
 ## Examples
 
@@ -79,5 +79,4 @@ Make the code better
 ## Best Practices
 
 1. **Break down complex tasks** into smaller, focused requests
-2. **Include examples** of existing patterns you want followed
-3. **Specify test requirements** upfront
+1. **Include examples** of existing patterns you want followed

@@ -2,7 +2,7 @@
 
 ## What It Does
 
-Automatically converts Jenkins pipelines (Jenkinsfile) to GitLab CI/CD configurations (.gitlab-ci.yaml).
+Automatically converts Jenkins pipelines (Jenkinsfile) to GitLab CI/CD configurations.
 
 ## When to Use
 
@@ -93,26 +93,16 @@ deploy:
 ## How to Use
 
 1. **Ensure Jenkinsfile is current** and working
-2. **Run the workflow** on your project
-3. **Review generated**`.gitlab-ci.yml`
-4. **Test in development** environment
-5. **Adjust** environment-specific settings
-6. **Deploy** to production
-
-## Key Mappings
-
-| Jenkins      | GitLab CI                 |
-|--------------|---------------------------|
-| `agent`      | `image` or `tags`         |
-| `when`       | `rules` or `only/except`  |
-| `parallel`   | Multiple jobs, same stage |
-| `parameters` | CI/CD variables           |
-| `post`       | `after_script`            |
+1. **Run the workflow** on your project
+1. **Review generated**`.gitlab-ci.yml`
+1. **Test in development** environment
+1. **Adjust** environment-specific settings
+1. **Deploy** to production
 
 ## Best Practices
 
 1. **Document dependencies** before migration
-2. **List all credentials** that need migration
-3. **Run both systems** in parallel initially
-4. **Compare outputs** to ensure accuracy
-5. **Update documentation** and train team
+1. **List all credentials** that need migration
+1. **Run both systems** in parallel initially
+1. **Compare outputs** to ensure accuracy
+1. **Update documentation** and train team

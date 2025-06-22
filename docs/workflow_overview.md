@@ -34,15 +34,15 @@ Get interactive help with coding, debugging, and GitLab project management.
 ## Quick Start
 
 1. Navigate to your GitLab project
-2. Access Duo Workflows from your project interface
-3. Choose between:
-   - **Chat Workflow—** For interactive assistance (no configuration needed)
-   - **Other Workflows—** For automated tasks (requires configuration)
-4. For non-chat workflows:
+1. Access Duo Workflows from your project interface
+1. Choose between:
+   - **Chat Workflow** - For interactive assistance (no configuration needed)
+   - **Other Workflows** - For automated tasks (requires configuration)
+1. For non-chat workflows:
    - Select the specific workflow type
    - Ensure required configuration files exist
    - Provide task requirements
-5. Review and approve any proposed changes
+1. Review and approve any proposed changes
 
 ## Best Practices
 
