@@ -2,7 +2,7 @@
 
 ## What It Does
 
-Automatically converts Jenkins pipelines (Jenkinsfile) to GitLab CI/CD configurations (.gitlab-ci.yml).
+Automatically converts Jenkins pipelines (Jenkinsfile) to GitLab CI/CD configurations (.gitlab-ci.yaml).
 
 ## When to Use
 
