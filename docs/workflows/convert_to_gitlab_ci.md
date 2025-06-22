@@ -116,20 +116,3 @@ deploy:
 3. **Run both systems** in parallel initially
 4. **Compare outputs** to ensure accuracy
 5. **Update documentation** and train team
-
-## Common Issues
-
-**Credentials not working?**
-
-- Migrate to GitLab CI/CD variables
-- Update references in scripts
-
-**Complex Groovy scripts?**
-
-- May need manual translation
-- Consider simplifying logic
-
-**Missing plugin equivalent?**
-
-- Find GitLab-native alternatives
-- Check GitLab marketplace

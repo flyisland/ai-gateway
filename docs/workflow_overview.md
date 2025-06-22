@@ -36,7 +36,6 @@ Get interactive help with coding, debugging, and GitLab project management.
 - Be specific in your requirements
 - Review all changes before committing
 - Test in development first
-- Use version control branches
 
 ## Support
 

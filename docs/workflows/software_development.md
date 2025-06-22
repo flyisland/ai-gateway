@@ -75,19 +75,9 @@ Make the code better
 
 - Access external APIs during execution
 - Run or debug code directly
-- Handle extremely large files (token limits apply)
 
 ## Best Practices
 
 1. **Break down complex tasks** into smaller, focused requests
 2. **Include examples** of existing patterns you want followed
 3. **Specify test requirements** upfront
-4. **Mention constraints** (performance, security, compatibility)
-
-## Tips for Success
-
-- Start with clear requirements
-- Provide code style preferences
-- Include success criteria
-- Review changes carefully
-- Run all tests before merging
