@@ -18,7 +18,7 @@ it's connected to your GitLab project, it can directly solve issues from your Gi
 
 1. **Describe your task clearly**
 
-   ```text
+   ```plaintext
    Implement user authentication with JWT tokens, including login/logout endpoints,
    middleware for protected routes, and proper error handling
    ```
@@ -36,7 +36,7 @@ it's connected to your GitLab project, it can directly solve issues from your Gi
 
 ### Good Request
 
-```text
+```plaintext
 Add input validation to the user registration endpoint:
 - Validate email format
 - Ensure password meets security requirements (8+ chars, uppercase, number)
@@ -47,13 +47,13 @@ Add input validation to the user registration endpoint:
 
 ### GitLab Issue Request
 
-```text
+```plaintext
 Implement the fix for issue #342 - users can't upload files larger than 5MB
 ```
 
 ### Too Vague
 
-```text
+```plaintext
 Fix the login bug
 Make the code better
 ```

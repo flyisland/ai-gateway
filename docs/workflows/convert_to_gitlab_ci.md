@@ -61,7 +61,7 @@ pipeline {
 
 ### GitLab Output
 
-```yaml
+```YAML
 stages:
   - build
   - test

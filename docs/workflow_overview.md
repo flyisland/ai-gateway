@@ -7,35 +7,49 @@ workflow for your task:
 
 ## Available Workflows
 
-### 1. [Software Development](./workflows/software_development.md)
+### 1. Software Development
 
 Build features, fix bugs, and refactor code with AI assistance.
 
-### 2. [Search and Replace](./workflows/search_and_replace.md)
+[View Software Development guide](./workflows/software_development.md)
+
+### 2. Search and Replace
 
 Make intelligent code changes across multiple files using pattern-based rules.
 
-### 3. [Convert to GitLab CI](./workflows/convert_to_gitlab_ci.md)
+[View Search and Replace guide](./workflows/search_and_replace.md)
+
+### 3. Convert to GitLab CI
 
 Automatically convert Jenkins pipelines to GitLab CI/CD configurations.
 
-### 4. [Chat](./workflows/duo_chat.md)
+[View Convert to GitLab CI guide](./workflows/convert_to_gitlab_ci.md)
+
+### 4. Chat
 
 Get interactive help with coding, debugging, and GitLab project management.
+
+[View Chat guide](./workflows/duo_chat.md)
 
 ## Quick Start
 
 1. Navigate to your GitLab project
 2. Access Duo Workflows from your project interface
-3. Select the appropriate workflow
-4. Provide clear requirements
-5. Review and approve changes
+3. Choose between:
+   - **Chat Workflow—** For interactive assistance (no configuration needed)
+   - **Other Workflows—** For automated tasks (requires configuration)
+4. For non-chat workflows:
+   - Select the specific workflow type
+   - Ensure required configuration files exist
+   - Provide task requirements
+5. Review and approve any proposed changes
 
 ## Best Practices
 
 - Be specific in your requirements
 - Review all changes before committing
 - Test in development first
+- Use version control branches
 
 ## Support
 
