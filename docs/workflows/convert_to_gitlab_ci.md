@@ -94,7 +94,7 @@ deploy:
 
 1. **Ensure Jenkinsfile is current** and working
 2. **Run the workflow** on your project
-3. **Review generated** `.gitlab-ci.yml`
+3. **Review generated**`.gitlab-ci.yml`
 4. **Test in development** environment
 5. **Adjust** environment-specific settings
 6. **Deploy** to production

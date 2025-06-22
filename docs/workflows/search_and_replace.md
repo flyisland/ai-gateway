@@ -7,11 +7,11 @@ functionality.
 
 ## Prerequisites
 
-Create configuration file: `.duo_workflow/search_and_replace_config.yml`
+Create configuration file: `.duo_workflow/search_and_replace_config.yaml`
 
 ## Configuration Format
 
-```yaml
+```YAML
 domain_speciality: "Frontend Development"
 assignment_description: "Add accessibility attributes to UI components"
 file_types:
@@ -28,7 +28,7 @@ replacement_rules:
 
 ### Accessibility Compliance
 
-```yaml
+```YAML
 domain_speciality: "React Frontend"
 assignment_description: "Implement WCAG 2.1 AA standards"
 file_types: [ "*.jsx", "*.tsx" ]
@@ -39,7 +39,7 @@ replacement_rules:
 
 ### API Migration
 
-```yaml
+```YAML
 domain_speciality: "Backend Services"
 assignment_description: "Update API from v1 to v2"
 file_types: [ "*.js", "*.ts" ]
@@ -50,7 +50,7 @@ replacement_rules:
 
 ### Security Updates
 
-```yaml
+```YAML
 domain_speciality: "Full Stack"
 assignment_description: "Fix XSS vulnerabilities"
 file_types: [ "*.jsx", "*.ejs" ]
