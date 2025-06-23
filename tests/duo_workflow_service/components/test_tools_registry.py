@@ -146,6 +146,7 @@ _outbox = MagicMock(spec=asyncio.Queue)
                 "list_commits",
                 "get_commit_diff",
                 "get_commit_comments",
+                "create_commit",
             },
         ),
         (
@@ -177,7 +178,7 @@ _outbox = MagicMock(spec=asyncio.Queue)
                 "list_dir",
                 "find_files",
                 "grep",
-                "mkdir",
+                # "mkdir",
                 "handover_tool",
                 "request_user_clarification_tool",
             },
@@ -258,7 +259,7 @@ def test_registry_initialization_initialises_tools_with_correct_attributes(
         "edit_file": tools.EditFile(metadata=tool_metadata),
         "find_files": tools.FindFiles(metadata=tool_metadata),
         "grep": tools.Grep(metadata=tool_metadata),
-        "mkdir": tools.Mkdir(metadata=tool_metadata),
+        # "mkdir": tools.Mkdir(metadata=tool_metadata),
         "run_git_command": tools.git.Command(metadata=tool_metadata),
         "handover_tool": tools.HandoverTool,
         "request_user_clarification_tool": tools.RequestUserClarificationTool,
@@ -280,6 +281,7 @@ def test_registry_initialization_initialises_tools_with_correct_attributes(
         "list_commits": tools.ListCommits(metadata=tool_metadata),
         "get_commit_diff": tools.GetCommitDiff(metadata=tool_metadata),
         "get_commit_comments": tools.GetCommitComments(metadata=tool_metadata),
+        "create_commit": tools.CreateCommit(metadata=tool_metadata),
     }
 
     assert registry._enabled_tools == expected_tools
@@ -316,6 +318,7 @@ async def test_registry_configuration(gl_http_client):
         "request_user_clarification_tool",
         "extra_tool",
     }
+    assert registry.approval_required("extra_tool") == True
 
 
 @pytest.mark.parametrize(
@@ -425,7 +428,7 @@ def test_preapproved_tools_initialization(tool_metadata):
         "list_dir",
         "find_files",
         "grep",
-        "mkdir",
+        # "mkdir",
     }
 
     assert registry._preapproved_tool_names == default_tools.union(read_write_tools)
@@ -478,7 +481,7 @@ async def test_registry_configuration_with_preapproved_tools(gl_http_client):
         "list_dir",
         "find_files",
         "grep",
-        "mkdir",
+        # "mkdir",
     }
     expected_preapproved = always_enabled_tools.union(read_write_tools)
 
