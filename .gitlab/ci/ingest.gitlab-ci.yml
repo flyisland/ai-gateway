@@ -66,6 +66,7 @@ ingest:prod:trigger:
 ingest:dry-run:
   stage: ingest
   extends: [.ingest-base]
+  needs: [build:ingest-image]
   variables:
     GCP_PROJECT_NAME: dummy
   script:

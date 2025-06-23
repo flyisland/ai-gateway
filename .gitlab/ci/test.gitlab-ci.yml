@@ -2,7 +2,7 @@ include:
   - local: .gitlab/ci/dws-dependencies.yml
 
 tests:unit:
-  extends: .poetry
+  extends: [.poetry]
   stage: test
   needs:
     - install
@@ -25,7 +25,7 @@ tests:unit:
     PYTHONASYNCIODEBUG: "True"
 
 tests:integration:
-  extends: .poetry
+  extends: [.poetry]
   stage: test
   needs:
     - build-docker-model-gateway
@@ -44,7 +44,7 @@ tests:integration:
     - make test-integration
 
 tests:evaluation:
-  extends: .poetry
+  extends: [.poetry]
   stage: test
   needs:
     - install
@@ -66,10 +66,12 @@ tests:evaluation:
   SWEBENCH_START: "true"
 
 check-dws-dependencies:
-  extends: .poetry
+  extends: [.poetry]
   stage: test
   needs:
-    - install
+    - job: install
+      optional: true
+
   script:
     - make duo-workflow-service-dependencies
     - |
@@ -167,7 +169,7 @@ check-proto-node:
         - clients/node/package-lock.json
 
 check-duo-workflow-docs:
-  extends: .poetry
+  extends: [.poetry]
   stage: test
   needs:
     - install

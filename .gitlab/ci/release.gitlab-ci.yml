@@ -5,7 +5,7 @@
     - npm install -g semantic-release @semantic-release/gitlab
 
 publish:
-  extends: .semantic-release
+  extends: [.semantic-release]
   script:
     - semantic-release
   rules:
@@ -15,7 +15,7 @@ publish:
       allow_failure: true
 
 publish-dryrun:
-  extends: .semantic-release
+  extends: [.semantic-release]
   script:
     # Overriding the variable that semantic-release runs on.
     # https://github.com/pvdlg/env-ci/blob/master/services/gitlab.js
@@ -30,7 +30,7 @@ publish-dryrun:
   needs: []
 
 .docker-release:
-  extends: .docker
+  extends: [.docker]
   script:
     - docker pull "${TARGET_IMAGE}"
     - docker tag "${TARGET_IMAGE}" "${RELEASE_VERSION}"
@@ -38,7 +38,7 @@ publish-dryrun:
 
 release-docker-image:latest:
   stage: release
-  extends: .docker-release
+  extends: [.docker-release]
   variables:
     RELEASE_VERSION: "$DOCKER_MODEL_GATEWAY:latest"
   rules:
@@ -46,7 +46,7 @@ release-docker-image:latest:
 
 release-docker-image:tag:
   stage: release
-  extends: .docker-release
+  extends: [.docker-release]
   variables:
     RELEASE_VERSION: "$DOCKER_MODEL_GATEWAY:$CI_COMMIT_TAG"
   rules:
@@ -54,7 +54,7 @@ release-docker-image:tag:
 
 release-docker-hub-image:self-managed-tag:
   stage: release
-  extends: .docker-release
+  extends: [.docker-release]
   variables:
     RELEASE_VERSION: "$DOCKERHUB_MODEL_GATEWAY_IMAGE"
     REGISTRY_USER: "$DOCKERHUB_USERNAME"
@@ -69,7 +69,7 @@ release-docker-hub-image:self-managed-tag:
 
 release-docker-hub-image:self-managed-nightly:
   stage: release
-  extends: .docker-release
+  extends: [.docker-release]
   variables:
     RELEASE_VERSION: "$DOCKERHUB_MODEL_GATEWAY_SELF_HOSTED_IMAGE"
     REGISTRY_USER: "$DOCKERHUB_USERNAME"

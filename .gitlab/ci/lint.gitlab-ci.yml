@@ -1,5 +1,5 @@
 lint:
-  extends: .poetry
+  extends: [.poetry]
   stage: test
   needs:
     - install
@@ -17,7 +17,7 @@ lint:
 
 lint:model_config_files:
   stage: test
-  extends: .poetry
+  extends: [.poetry]
   needs:
     - install
   rules:

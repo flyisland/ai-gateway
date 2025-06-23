@@ -1,29 +1,30 @@
 install:
-  extends: .poetry
+  extends: [.poetry]
   stage: build
   script:
     - poetry install
 
 build-docker-model-gateway:
   stage: build
-  extends:
-    - .kaniko_base
+  extends: [.kaniko_base]
   variables:
     KANIKO_BUILD_FILE: Dockerfile
     KANIKO_DESTINATION: "${TARGET_IMAGE}"
 
 build:ingest-image:
   stage: build
-  extends:
-    - .kaniko_base
+  extends: [.kaniko_base]
   variables:
     KANIKO_BUILD_FILE: scripts/ingest/Dockerfile
     KANIKO_DESTINATION: "${INGEST_IMAGE}"
+  rules:
+    - if: $CI_PIPELINE_SOURCE == "merge_request_event"
+    - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
+    - if: $CI_PIPELINE_SOURCE == "schedule" && $SCHEDULE_TYPE == "ingest"
 
 build:self-hosted-ai-gateway-image:
   stage: build
-  extends:
-    - .kaniko_base
+  extends: [.kaniko_base]
   variables:
     KANIKO_BUILD_FILE: docker/self_hosted/Dockerfile
     KANIKO_DESTINATION: "${TARGET_IMAGE}"
@@ -37,8 +38,7 @@ build:self-hosted-ai-gateway-image:
 
 build:self-hosted-ai-gateway-latest-image:
   stage: build
-  extends:
-    - .kaniko_base
+  extends: [.kaniko_base]
   variables:
     KANIKO_BUILD_FILE: docker/self_hosted/Dockerfile
     KANIKO_DESTINATION: "${SELF_HOSTED_TARGET_IMAGE}"
