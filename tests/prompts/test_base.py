@@ -188,7 +188,7 @@ class TestPrompt:
                     ),
                 ),
                 InternalEventAdditionalProperties(
-                    label="cache_creation_details",
+                    label="cache_details",
                     property=None,
                     value=None,
                     extra={
@@ -235,7 +235,7 @@ class TestPrompt:
                     ),
                 ),
                 InternalEventAdditionalProperties(
-                    label="cache_creation_details",
+                    label="cache_details",
                     property=None,
                     value=None,
                     extra={
@@ -285,7 +285,7 @@ class TestPrompt:
                     ),
                 ),
                 InternalEventAdditionalProperties(
-                    label="cache_creation_details",
+                    label="cache_details",
                     property=None,
                     value=None,
                     extra={

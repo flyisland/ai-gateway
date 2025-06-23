@@ -224,7 +224,7 @@ class Prompt(RunnableBinding[Input, Output]):
                 cache_read = input_token_details.get("cache_read", 0)
 
                 additional_properties = InternalEventAdditionalProperties(
-                    label="cache_creation_details",
+                    label="cache_details",
                     extra={
                         "cache_read": cache_read,
                         "cache_creation": cache_creation,
