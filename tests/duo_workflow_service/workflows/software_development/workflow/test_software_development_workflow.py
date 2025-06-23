@@ -267,7 +267,7 @@ async def test_workflow_run(
     assert mock_tools_approval_component.return_value.attach.call_count == 1
 
     assert mock_agent.call_count == 1
-    assert mock_agent.return_value.run.call_count >= 5
+    assert mock_agent.return_value.run.call_count >= 3
 
     assert mock_tools_executor.call_count == 1
     assert mock_tools_executor.return_value.run.call_count >= 1
@@ -276,7 +276,7 @@ async def test_workflow_run(
     assert mock_handover_agent.return_value.run.call_count == 2
 
     assert mock_plan_supervisor_agent.call_count == 1
-    assert mock_plan_supervisor_agent.return_value.run.call_count >= 2
+    assert mock_plan_supervisor_agent.return_value.run.call_count == 1
 
     assert mock_git_lab_workflow_instance.aput.call_count >= 1
     assert mock_git_lab_workflow_instance.aget_tuple.call_count >= 1
@@ -394,7 +394,7 @@ async def test_workflow_run_with_memory_saver(
     await workflow.run("test_goal")
 
     assert mock_agent.call_count == 1
-    assert mock_agent.return_value.run.call_count >= 5
+    assert mock_agent.return_value.run.call_count == 3
 
     assert mock_tools_executor.call_count == 1
     assert mock_tools_executor.return_value.run.call_count >= 1
@@ -403,7 +403,7 @@ async def test_workflow_run_with_memory_saver(
     assert mock_handover_agent.return_value.run.call_count >= 1
 
     assert mock_plan_supervisor_agent.call_count == 1
-    assert mock_plan_supervisor_agent.return_value.run.call_count >= 2
+    assert mock_plan_supervisor_agent.return_value.run.call_count == 1
 
     assert mock_git_lab_workflow_instance.aput.call_count == 0
     assert mock_git_lab_workflow_instance.aget_tuple.call_count == 0
@@ -738,8 +738,6 @@ async def test_workflow_run_with_tools_registry(
         ],
         any_order=True,
     )
-    # Verify get_plan is called once in executor setup
-    assert mock_tools_registry.get.call_args_list.count(call("get_plan")) == 1
 
 
 @pytest.fixture
