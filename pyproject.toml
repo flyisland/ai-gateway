@@ -68,7 +68,7 @@ url = "https://gitlab.com/api/v4/projects/58733651/packages/pypi/simple"
 priority = "supplemental"
 
 [[tool.poetry.source]]
-name = "prompt_library"
+name = "cef"
 url = "https://gitlab.com/api/v4/projects/46678122/packages/pypi/simple"
 priority = "supplemental"
 
@@ -76,7 +76,7 @@ priority = "supplemental"
 optional = true
 
 [tool.poetry.group.eval.dependencies]
-cef = { git = "https://gitlab.com/gitlab-org/modelops/applied-ml/code-suggestions/prompt-library.git", rev = "676e26c5" }
+cef = { version = "^0.4.1", source = "cef" }
 typer = "^0.16.0"
 
 [tool.poetry.group.test]
