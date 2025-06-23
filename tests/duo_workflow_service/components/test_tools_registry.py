@@ -1,12 +1,16 @@
 import asyncio
+from typing import Type
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 from gitlab_cloud_connector import CloudConnectorUser
 from langchain.tools import BaseTool
+from pydantic import BaseModel
 
+from ai_gateway.code_suggestions.language_server import LanguageServerVersion
 from duo_workflow_service import tools
 from duo_workflow_service.components.tools_registry import (
+    _AGENT_PRIVILEGES,
     _DEFAULT_TOOLS,
     NO_OP_TOOLS,
     Toolset,
@@ -644,3 +648,79 @@ def test_work_item_tools_feature_flag(
     assert (
         "get_work_item_notes" in registry._enabled_tools
     ) == should_include_work_item_tools
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    "lsp_version",
+    [
+        "0.0.1",
+        "7.42.999",
+    ],
+)
+async def test_registry_configuration_with_restricted_language_server_client(
+    gl_http_client, lsp_version
+):
+    workflow_config = {
+        "id": "test_workflow",
+        "agent_privileges_names": list(_AGENT_PRIVILEGES.keys()),
+        "pre_approved_agent_privileges_names": list(_AGENT_PRIVILEGES.keys()),
+    }
+    registry = await ToolsRegistry.configure(
+        workflow_config=workflow_config,
+        gl_http_client=gl_http_client,
+        outbox=_outbox,
+        inbox=_inbox,
+        gitlab_host="gitlab.example.com",
+        language_server_version=LanguageServerVersion.from_string(lsp_version),
+    )
+
+    expected_tools = [
+        *[tool_cls().name for tool_cls in _DEFAULT_TOOLS],
+        *[tool_cls.tool_title for tool_cls in NO_OP_TOOLS],
+        *[tool_cls().name for tool_cls in _AGENT_PRIVILEGES["read_only_gitlab"]],
+    ]
+    assert set(registry._enabled_tools.keys()).issubset(expected_tools)
+
+    ignored_tools = [
+        tool_cls().name
+        for privilege in _AGENT_PRIVILEGES.keys()
+        for tool_cls in _AGENT_PRIVILEGES[privilege]
+        if privilege != "read_only_gitlab"
+    ]
+    assert set(registry._enabled_tools.keys()).intersection(ignored_tools) == set()
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    "lsp_version",
+    [
+        None,
+        "7.43.0",
+        "7.43.1",
+        "8.0.0",
+    ],
+)
+async def test_registry_configuration_with_unrestricted_language_server_client(
+    gl_http_client, lsp_version
+):
+    workflow_config = {
+        "id": "test_workflow",
+        "agent_privileges_names": list(_AGENT_PRIVILEGES.keys()),
+        "pre_approved_agent_privileges_names": list(_AGENT_PRIVILEGES.keys()),
+    }
+    registry = await ToolsRegistry.configure(
+        workflow_config=workflow_config,
+        gl_http_client=gl_http_client,
+        outbox=_outbox,
+        inbox=_inbox,
+        gitlab_host="gitlab.example.com",
+        language_server_version=(
+            LanguageServerVersion.from_string(lsp_version) if lsp_version else None
+        ),
+    )
+
+    enabled_tools = set(registry._enabled_tools.keys())
+    for privilege in _AGENT_PRIVILEGES.keys():
+        for tool_cls in _AGENT_PRIVILEGES[privilege]:
+            assert tool_cls().name in enabled_tools
