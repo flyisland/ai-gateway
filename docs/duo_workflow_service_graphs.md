@@ -197,18 +197,18 @@ config:
 ---
 graph TD;
     __start__([<p>__start__</p>]):::first
-    parse_sast_finding(parse_sast_finding)
-    request_analysis(request_analysis)
-    execution_tools(execution_tools)
-    complete(complete)
+    start(start)
+    sast_analyzer(sast_analyzer)
+    sast_tools(sast_tools)
+    sast_complete(sast_complete)
     __end__([<p>__end__</p>]):::last
-    __start__ --> parse_sast_finding;
-    complete --> __end__;
-    parse_sast_finding --> request_analysis;
-    request_analysis -. &nbsp;continue&nbsp; .-> execution_tools;
-    request_analysis -. &nbsp;end&nbsp; .-> complete;
-    execution_tools -. &nbsp;agent&nbsp; .-> request_analysis;
-    execution_tools -. &nbsp;end&nbsp; .-> complete;
+    __start__ --> start;
+    sast_complete --> __end__;
+    start --> sast_analyzer;
+    sast_analyzer -. &nbsp;continue&nbsp; .-> sast_tools;
+    sast_analyzer -. &nbsp;end&nbsp; .-> sast_complete;
+    sast_tools -. &nbsp;agent&nbsp; .-> sast_analyzer;
+    sast_tools -. &nbsp;end&nbsp; .-> sast_complete;
     classDef default fill:#f2f0ff,line-height:1.2
     classDef first fill-opacity:0
     classDef last fill:#bfb6fc
