@@ -58,6 +58,7 @@ MAX_MESSAGES_TO_DISPLAY = 5
 MAX_MESSAGE_LENGTH = 200
 
 EXECUTOR_TOOLS = [
+    "ci_linter",
     "create_issue",
     "list_issues",
     "get_issue",
