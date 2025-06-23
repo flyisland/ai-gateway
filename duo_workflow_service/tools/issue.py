@@ -540,7 +540,16 @@ class GetIssueNote(IssueBaseTool):
                 path=f"/api/v4/projects/{project_id}/issues/{issue_iid}/notes/{note_id}",
                 parse_json=False,
             )
-            return json.dumps({"note": response})
+            try:
+                if isinstance(response, str):
+                    response = json.loads(response)
+                response = PromptSecurity.apply_security(response, self.name)
+
+                return json.dumps({"note": response})
+
+            except SecurityException as e:
+                return json.dumps({"error": str(e)})
+
         except Exception as e:
             return json.dumps({"error": str(e)})
 
