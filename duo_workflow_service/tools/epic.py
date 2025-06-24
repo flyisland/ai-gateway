@@ -6,10 +6,7 @@ from pydantic import BaseModel, Field
 
 from duo_workflow_service.gitlab.url_parser import GitLabUrlParseError, GitLabUrlParser
 from duo_workflow_service.tools.duo_base_tool import DuoBaseTool
-from duo_workflow_service.tools.queries.epics import (
-    GET_EPIC_NOTE_QUERY,
-    GET_EPIC_NOTES_QUERY,
-)
+from duo_workflow_service.tools.queries.epics import GET_EPIC_NOTES_QUERY
 
 DESCRIPTION_CHARACTER_LIMIT = 1_048_576
 
@@ -524,35 +521,3 @@ class ListEpicNotes(EpicBaseTool):
         if args.url:
             return f"Read comments on epic {args.url}"
         return f"Read comments on epic #{args.epic_iid} in group {args.group_id}"
-
-
-class GetEpicNoteInput(EpicResourceInput):
-    note_id: int = Field(description="The ID of the note")
-
-
-class GetEpicNote(DuoBaseTool):
-    name: str = "get_epic_note"
-    description: str = """Get a single note (comment) from GitLab by its note ID.
-
-    For example:
-    - To get note ID 5, the tool call would be:
-        get_epic_note(note_id=5)
-    """
-
-    args_schema: Type[BaseModel] = GetEpicNoteInput
-
-    async def _arun(self, note_id: int, **kwargs: Any) -> str:
-        note_gid = f"gid://gitlab/Note/{note_id}"
-        variables = {"id": note_gid}
-
-        try:
-            response = await self.gitlab_client.graphql(GET_EPIC_NOTE_QUERY, variables)
-            note = response.get("note")
-            if note:
-                return json.dumps({"note": note}, indent=2)
-            return json.dumps({"error": f"Note with ID {note_id} not found."})
-        except Exception as e:
-            return json.dumps({"error": str(e)})
-
-    def format_display_message(self, args: GetEpicNoteInput) -> str:
-        return f"Read comment with ID {args.note_id}"

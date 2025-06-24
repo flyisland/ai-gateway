@@ -7,8 +7,6 @@ from duo_workflow_service.tools.epic import (
     CreateEpic,
     EpicResourceInput,
     GetEpic,
-    GetEpicNote,
-    GetEpicNoteInput,
     ListEpicNotes,
     ListEpicNotesInput,
     ListEpics,
@@ -1236,102 +1234,5 @@ async def test_list_epic_notes_with_url_error(gitlab_client_mock, metadata):
 )
 def test_list_epic_notes_format_display_message_with_url(input_data, expected_message):
     tool = ListEpicNotes(description="List epic notes description")
-    message = tool.format_display_message(input_data)
-    assert message == expected_message
-
-
-@pytest.fixture
-def note_data():
-    return {
-        "note": {
-            "id": "gid://gitlab/Note/1",
-            "body": "Test epic note",
-            "author": {"username": "Test User"},
-            "createdAt": "2025-01-01T12:00:00Z",
-        }
-    }
-
-
-@pytest.mark.asyncio
-async def test_get_epic_note(gitlab_client_mock, metadata, note_data):
-    mock_response = {
-        "note": {
-            "id": "gid://gitlab/Note/1",
-            "body": "Test epic note",
-            "author": {"username": "Test User"},
-            "createdAt": "2025-01-01T12:00:00Z",
-        }
-    }
-
-    gitlab_client_mock.graphql = AsyncMock(return_value=mock_response)
-
-    tool = GetEpicNote(description="get epic note description", metadata=metadata)
-
-    response = await tool._arun(note_id=1)
-
-    expected_response = json.dumps(note_data, indent=2)
-    assert response == expected_response
-
-    gitlab_client_mock.graphql.assert_called_once()
-    call_args = gitlab_client_mock.graphql.call_args
-    assert call_args[0][1] == {"id": "gid://gitlab/Note/1"}
-    assert "query GetEpicNote" in call_args[0][0]
-
-
-@pytest.mark.asyncio
-async def test_get_epic_note_error(gitlab_client_mock, metadata):
-    gitlab_client_mock.graphql = AsyncMock(side_effect=Exception("Note not found"))
-
-    tool = GetEpicNote(description="get epic note description", metadata=metadata)
-
-    response = await tool._arun(note_id=999)
-
-    expected_response = json.dumps({"error": "Note not found"})
-    assert response == expected_response
-
-    gitlab_client_mock.graphql.assert_called_once()
-    call_args = gitlab_client_mock.graphql.call_args
-    assert call_args[0][1] == {"id": "gid://gitlab/Note/999"}
-
-
-def test_get_epic_note_format_display_message():
-    input_data = GetEpicNoteInput(note_id=789)
-    expected_message = "Read comment with ID 789"
-
-    tool = GetEpicNote(description="Get epic note description")
-    message = tool.format_display_message(input_data)
-    assert message == expected_message
-
-
-@pytest.mark.asyncio
-async def test_get_epic_note_not_found(gitlab_client_mock, metadata):
-    # Test for when note is not found
-    mock_response = {"note": None}
-
-    gitlab_client_mock.graphql = AsyncMock(return_value=mock_response)
-
-    tool = GetEpicNote(description="get epic note description", metadata=metadata)
-
-    response = await tool._arun(note_id=42)
-
-    expected_response = json.dumps({"error": "Note with ID 42 not found."})
-    assert response == expected_response
-
-    gitlab_client_mock.graphql.assert_called_once()
-    call_args = gitlab_client_mock.graphql.call_args
-    assert call_args[0][1] == {"id": "gid://gitlab/Note/42"}
-
-
-@pytest.mark.parametrize(
-    "input_data,expected_message",
-    [
-        (
-            GetEpicNoteInput(note_id=789),
-            "Read comment with ID 789",
-        ),
-    ],
-)
-def test_get_epic_note_format_display_message_with_params(input_data, expected_message):
-    tool = GetEpicNote(description="Get epic note description")
     message = tool.format_display_message(input_data)
     assert message == expected_message
