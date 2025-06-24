@@ -132,6 +132,6 @@ class PromptSecurity:
                 f"&lt;/{replacement}&gt;",
                 text,
                 flags=re.IGNORECASE,
-            )  # noqa: W605
+            )
 
         return text
