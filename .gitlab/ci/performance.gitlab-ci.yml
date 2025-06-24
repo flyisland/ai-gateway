@@ -47,6 +47,7 @@ tests:performance:
     PARENT_PIPELINE_SOURCE: $CI_PIPELINE_SOURCE
     COMPONENT_MR_CI_COMMIT_SHA: $CI_COMMIT_SHORT_SHA
     COMPONENT_SERVICE_NAME: "ai-gateway-influx"
+    GITLAB_HELM_CHART_REF: "6cdb0e1cd4ceb7c9fd01ffa2f62c4a7a4c77a23b"
     RUN_ON_CNG: true
   rules:
     - if: $CI_PROJECT_NAMESPACE =~ /^gitlab-org\/security.*/
