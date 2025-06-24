@@ -7,8 +7,6 @@ from typing import Any
 class SecurityException(Exception):
     """Custom exception raised when security validation fails."""
 
-    pass
-
 
 class SecurityFunction(Enum):
     """Available security functions."""
@@ -88,12 +86,15 @@ class PromptSecurity:
         """Recursively encode all dangerous tags."""
         if isinstance(data, str):
             return PromptSecurity._encode_tags(data)
-        elif isinstance(data, dict):
+
+        if isinstance(data, dict):
             return {
                 k: PromptSecurity._encode_tags_recursive(v) for k, v in data.items()
             }
-        elif isinstance(data, list):
+
+        if isinstance(data, list):
             return [PromptSecurity._encode_tags_recursive(item) for item in data]
+
         return data
 
     @staticmethod
