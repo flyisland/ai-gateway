@@ -36,7 +36,9 @@ class OutputParserProtocol(Protocol[WorkflowStateT_contra]):
     ) -> dict[str, Any]: ...
 
 
-WorkflowStateT = TypeVar("WorkflowStateT", SearchAndReplaceWorkflowState, WorkflowState, PoCWorkflowState)
+WorkflowStateT = TypeVar(
+    "WorkflowStateT", SearchAndReplaceWorkflowState, WorkflowState, PoCWorkflowState
+)
 
 
 class RunToolNode(Generic[WorkflowStateT]):
