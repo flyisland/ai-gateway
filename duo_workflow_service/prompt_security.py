@@ -1,3 +1,4 @@
+# flake8: noqa: W605
 import re
 from enum import Enum
 from typing import Any
@@ -112,12 +113,13 @@ class PromptSecurity:
 
         # Process all tag variations
         for tag_name, replacement in all_variations:
-            # Create a pattern that allows spaces between each character
+            # Create pattern that allows spaces between each character
             tag_pattern = r"\s*".join(f"[{c.upper()}{c.lower()}]" for c in tag_name)
 
             # Opening tag with optional spaces around the tag name
+
             text = re.sub(
-                r"<\s*{tag_pattern}\s*>",
+                f"<\s*{tag_pattern}\s*>",
                 f"&lt;{replacement}&gt;",
                 text,
                 flags=re.IGNORECASE,
@@ -125,10 +127,10 @@ class PromptSecurity:
 
             # Closing tag - note the space between < and / is optional!
             text = re.sub(
-                r"<\s*/\s*{tag_pattern}\s*>",
+                f"<\s*/\s*{tag_pattern}\s*>",
                 f"&lt;/{replacement}&gt;",
                 text,
                 flags=re.IGNORECASE,
-            )
+            )  # noqa: W605
 
         return text
