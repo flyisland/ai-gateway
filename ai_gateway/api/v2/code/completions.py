@@ -412,22 +412,13 @@ def _resolve_code_completions_litellm(
     completions_agent_factory: Factory[CodeCompletions],
     completions_litellm_factory: Factory[CodeCompletions],
 ) -> CodeCompletions:
-    if payload.prompt_version == 2 and payload.prompt:
-        return completions_litellm_factory(
-            model__name=payload.model_name,
-            model__endpoint=payload.model_endpoint,
-            model__api_key=payload.model_api_key,
-            model__provider=payload.model_provider,
-            model__using_cache=use_llm_prompt_caching,
-        )
-
-    model_metadata = ModelMetadata(
-        name=payload.model_name,
-        endpoint=payload.model_endpoint,
-        api_key=payload.model_api_key,
-        identifier=payload.model_identifier,
-        provider=payload.model_provider or "text-completion-openai",
-    )
+    model_metadata = create_model_metadata({
+        "provider": payload.model_provider or "text-completion-openai",
+        "name": payload.model_name,
+        "endpoint": payload.model_endpoint,
+        "api_key": payload.model_api_key,
+        "identifier": payload.model_identifier,
+    })
 
     return _resolve_agent_code_completions(
         model_metadata=model_metadata,
@@ -476,38 +467,25 @@ def _build_code_completions(
 
         if model_metadata.provider == KindModelProvider.ANTHROPIC:
             AnthropicHandler(payload, request, kwargs).update_completion_params()
-
-            anthropic_model_metadata = ModelMetadata(
-                name=payload.model_name,
-                engine=KindModelProvider.ANTHROPIC.value,
-                provider=KindModelProvider.ANTHROPIC,
-            )
-
             code_completions = _resolve_agent_code_completions(
-                model_metadata=anthropic_model_metadata,
+                model_metadata=model_metadata,
                 current_user=current_user,
                 prompt_registry=prompt_registry,
                 completions_agent_factory=completions_agent_factory,
             )
+
         elif model_metadata.provider == KindModelProvider.FIREWORKS:
             FireworksHandler(payload, request, kwargs).update_completion_params()
-            code_completions = _resolve_code_completions_litellm(
-                payload=payload,
+            code_completions = _resolve_agent_code_completions(
+                model_metadata=model_metadata,
                 current_user=current_user,
                 prompt_registry=prompt_registry,
-                use_llm_prompt_caching=use_llm_prompt_caching,
                 completions_agent_factory=completions_agent_factory,
-                completions_litellm_factory=completions_fireworks_factory,
-            )
-        elif model_metadata.provider == KindModelProvider.VERTEX_AI:
-            vertex_model_metadata = ModelMetadata(
-                name=payload.model_name,
-                engine=KindModelProvider.VERTEX_AI.value,
-                provider=KindModelProvider.VERTEX_AI,
             )
 
+        elif model_metadata.provider == KindModelProvider.VERTEX_AI:
             code_completions = _resolve_agent_code_completions(
-                model_metadata=vertex_model_metadata,
+                model_metadata=model_metadata,
                 current_user=current_user,
                 prompt_registry=prompt_registry,
                 completions_agent_factory=completions_agent_factory,
@@ -527,12 +505,13 @@ def _build_code_completions(
 
     elif payload.model_provider == KindModelProvider.ANTHROPIC:
         AnthropicHandler(payload, request, kwargs).update_completion_params()
-
-        anthropic_model_metadata = ModelMetadata(
-            name=payload.model_name,
-            engine=KindModelProvider.ANTHROPIC.value,
-            provider=KindModelProvider.ANTHROPIC,
-        )
+        anthropic_model_metadata = create_model_metadata({
+            "provider": "anthropic",
+            "name": payload.model_name,
+            "endpoint": payload.model_endpoint,
+            "api_key": payload.model_api_key,
+            "identifier": payload.model_identifier,
+        })
 
         code_completions = _resolve_agent_code_completions(
             model_metadata=anthropic_model_metadata,
@@ -582,14 +561,8 @@ def _build_code_completions(
 
         return code_completions, kwargs
     else:
-        vertex_model_metadata = ModelMetadata(
-            name="codestral-2501",
-            engine=KindModelProvider.VERTEX_AI.value,
-            provider=KindModelProvider.VERTEX_AI,
-        )
-
-        code_completions = _resolve_agent_code_completions(
-            model_metadata=vertex_model_metadata,
+        code_completions = _resolve_code_completions_vertex_codestral(
+            payload=payload,
             current_user=current_user,
             prompt_registry=prompt_registry,
             completions_agent_factory=completions_agent_factory,
@@ -621,6 +594,34 @@ def _build_code_completions(
     _track_code_suggestions_event(tracking_event, internal_event_client)
 
     return code_completions, kwargs
+
+
+def _resolve_code_completions_vertex_codestral(
+    payload: SuggestionsRequest,
+    current_user: StarletteUser,
+    prompt_registry: BasePromptRegistry,
+    completions_agent_factory: Factory[CodeCompletions],
+) -> CodeCompletions:
+    if payload.prompt_version == 2 and payload.prompt is not None:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="You cannot specify a prompt with the given provider and model combination",
+        )
+
+    vertex_model_metadata = create_model_metadata({
+        "provider": "vertex-ai",
+        "name": payload.model_name or "codestral-2501",
+        "endpoint": payload.model_endpoint,
+        "api_key": payload.model_api_key,
+        "identifier": payload.model_identifier,
+    })
+
+    return _resolve_agent_code_completions(
+        model_metadata=vertex_model_metadata,
+        current_user=current_user,
+        prompt_registry=prompt_registry,
+        completions_agent_factory=completions_agent_factory,
+    )
 
 
 def _resolve_agent_code_completions(

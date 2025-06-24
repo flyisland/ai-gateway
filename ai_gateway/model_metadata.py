@@ -109,6 +109,30 @@ def create_model_metadata(data: Dict[str, Any]) -> Optional[TypeModelMetadata]:
             return AmazonQModelMetadata(**data)
         case "gitlab":
             return ModelMetadata(**parameters_for_gitlab_provider(data))
+        case "anthropic":
+            return ModelMetadata(
+                name=data.get("name"),
+                provider="anthropic",
+                endpoint=data.get("endpoint"),
+                api_key=data.get("api_key"),
+                identifier=data.get("identifier"),
+            )
+        case "vertex-ai" | "vertex_ai":
+            return ModelMetadata(
+                name=data.get("name") or "codestral-2501",
+                provider="vertex-ai",
+                endpoint=data.get("endpoint"),
+                api_key=data.get("api_key"),
+                identifier=data.get("identifier"),
+            )
+        case "fireworks_ai":
+            return ModelMetadata(
+                name=data.get("name"),
+                provider="fireworks_ai",
+                endpoint=data.get("endpoint"),
+                api_key=data.get("api_key"),
+                identifier=data.get("identifier"),
+            )
 
     return ModelMetadata(**data)
 
