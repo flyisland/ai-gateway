@@ -60,13 +60,15 @@ class TestDuoChatToolRegistry:
         [
             ([GitLabUnitPrimitive.DOCUMENTATION_SEARCH], {GitlabDocumentation}),
             ([GitLabUnitPrimitive.ASK_EPIC], {EpicReader}),
-            ([GitLabUnitPrimitive.ASK_ISSUE], {IssueReader, WorkItemReader}),
+            ([GitLabUnitPrimitive.ASK_ISSUE], {IssueReader}),
+            ([GitLabUnitPrimitive.ASK_WORK_ITEM], {WorkItemReader}),
             (
                 [
                     GitLabUnitPrimitive.DUO_CHAT,
                     GitLabUnitPrimitive.DOCUMENTATION_SEARCH,
                     GitLabUnitPrimitive.ASK_EPIC,
                     GitLabUnitPrimitive.ASK_ISSUE,
+                    GitLabUnitPrimitive.ASK_WORK_ITEM,
                 ],
                 {
                     GitlabDocumentation,
