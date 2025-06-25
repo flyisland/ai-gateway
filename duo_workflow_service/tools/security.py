@@ -119,3 +119,85 @@ class ListVulnerabilities(DuoBaseTool):
 
     def format_display_message(self, args: ListVulnerabilitiesInput) -> str:
         return f"List vulnerabilities in project {args.project_full_path}"
+
+
+class GetVulnerabilityInput(BaseModel):
+    vulnerability_id: str = Field(
+        description="The ID of the vulnerability to retrieve (e.g., 'gid://gitlab/Vulnerability/123')",
+    )
+
+
+class GetVulnerability(DuoBaseTool):
+    name: str = "get_vulnerability"
+    description: str = """Get detailed information about a specific security vulnerability by its ID.
+
+    This tool retrieves comprehensive details about a single vulnerability including its title, 
+    severity, report type, location, description, and other metadata.
+
+    For example:
+    - Get vulnerability details:
+        get_vulnerability(vulnerability_id="gid://gitlab/Vulnerability/123")
+    """
+    args_schema: Type[BaseModel] = GetVulnerabilityInput  # type: ignore
+
+    async def _arun(self, **kwargs: Any) -> str:
+        vulnerability_id = kwargs.pop("vulnerability_id")
+
+        # Build GraphQL query
+        query = """
+        query GetVulnerability($vulnerabilityId: VulnerabilityID!) {
+          vulnerability(id: $vulnerabilityId) {
+            id
+            title
+            description
+            severity
+            state
+            reportType
+            updatedAt
+            resolvedOnDefaultBranch
+            confirmedAt
+            dismissedAt
+            dismissedBy {
+              username
+            }
+            project {
+              fullPath
+            }
+            scanner {
+              name
+            }
+            location {
+              __typename
+              ... on VulnerabilityLocationSast {
+                file
+                startLine
+              }
+            }
+            identifiers {
+              name
+            }
+          }
+        }
+        """
+
+        try:
+            variables = {
+                "vulnerabilityId": vulnerability_id,
+            }
+
+            response = await self.gitlab_client.apost(
+                path="/api/graphql",
+                body=json.dumps({"query": query, "variables": variables}),
+            )
+
+            vulnerability = response["data"]["vulnerability"]
+            
+            if not vulnerability:
+                return json.dumps({"error": f"Vulnerability with ID {vulnerability_id} not found"})
+
+            return json.dumps({"vulnerability": vulnerability})
+        except Exception as e:
+            return json.dumps({"error": str(e)})
+
+    def format_display_message(self, args: GetVulnerabilityInput) -> str:
+        return f"Get vulnerability details for ID {args.vulnerability_id}"
