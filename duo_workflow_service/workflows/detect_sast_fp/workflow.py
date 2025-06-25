@@ -299,23 +299,7 @@ class Workflow(AbstractWorkflow):
     ):
         analyzer_components = self._setup_analyzer_nodes(tools_registry)
         self.log.info("Starting %s workflow graph compilation", self._workflow_type)
-        graph.set_entry_point("parse_vulnerability_id")
-
-        def parse_vulnerability_id_with_goal(
-            state: DetectSastFpWorkflowState,
-        ) -> DetectSastFpWorkflowState:
-            vulnerability_id = _extract_vulnerability_id(goal)
-            # Only log the start, don't prepare agent messages yet
-            logs = [_create_ui_log(f"Loaded vulnerability ID: {vulnerability_id}")]
-            return DetectSastFpWorkflowState(
-                status=WorkflowStatusEnum.EXECUTION,
-                ui_chat_log=state.get("ui_chat_log", []) + logs,
-                conversation_history={},
-                vulnerability_id=vulnerability_id,
-                vulnerability={},
-                plan=Plan(steps=[]),
-                files_changed=[],
-            )
+        graph.set_entry_point("fetch_vulnerability_details")
 
         # Deterministic node to fetch vulnerability details
         fetch_vuln_details_node = _fetch_vulnerability_details_node(
@@ -356,7 +340,6 @@ class Workflow(AbstractWorkflow):
             return state
 
         # Add all nodes to the graph
-        graph.add_node("parse_vulnerability_id", parse_vulnerability_id_with_goal)
         graph.add_node("fetch_vulnerability_details", fetch_vuln_details_node)
         graph.add_node("prepare_agent_messages", prepare_agent_messages_node)
         graph.add_node(
@@ -371,7 +354,6 @@ class Workflow(AbstractWorkflow):
         )
 
         # Add edges to connect the workflow
-        graph.add_edge("parse_vulnerability_id", "fetch_vulnerability_details")
         graph.add_edge("fetch_vulnerability_details", "prepare_agent_messages")
         graph.add_edge("prepare_agent_messages", analyzer_components["start_node"])
         graph.add_conditional_edges(
