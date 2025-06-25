@@ -44,7 +44,7 @@ export default function () {
 
 
 
-  const res = http.post(url, payload, params);
+  const res = http.post(url, params);
 
   console.log(`Request ${__ITER}: ${res.request.method} ${res.request.url} - Status ${res.status} - Duration ${res.timings.duration}ms`);
 
