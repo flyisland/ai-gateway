@@ -7,7 +7,7 @@ from langgraph.checkpoint.memory import BaseCheckpointSaver
 from langgraph.graph import END, StateGraph
 from pydantic import BaseModel, Field
 
-from duo_workflow_service.agent_registry.components.base import AgentComponent, LambdaComponent, attach_components_to_graph
+from duo_workflow_service.agent_registry.components.base import AgentComponent, EndComponent, LambdaComponent, Router, attach_components_to_graph
 from duo_workflow_service.checkpointer.gitlab_workflow import WorkflowStatusEventEnum
 from duo_workflow_service.components.tools_registry import ToolsRegistry
 from duo_workflow_service.entities.state import (
@@ -118,12 +118,34 @@ class Workflow(AbstractWorkflow):
         )
 
         graph = StateGraph(PoCWorkflowState)
-        graph = attach_components_to_graph(
-            graph,
-            [agent_component, lambda_component_1, lambda_component_2],
-            start=agent_component.name,
-            end=[lambda_component_2.name],
-        )
+        
+        Router(
+            from_component=agent_component,
+            to_component=lambda_component_1,
+        ).attach(graph)
+
+        Router(
+            from_component=lambda_component_1,
+            to_component=lambda_component_2,
+        ).attach(graph)
+
+        Router(
+            from_component=lambda_component_2,
+            to_component=EndComponent(
+                name="end",
+                inputs=[],          
+                workflow_id=self._workflow_id,
+                workflow_type=self._workflow_type,
+            ),
+        ).attach(graph)
+
+        graph.set_entry_point(agent_component.__entry_hook__())
+        # graph = attach_components_to_graph(
+        #     graph,
+        #     [agent_component, lambda_component_1, lambda_component_2],
+        #     start=agent_component.name,
+        #     end=[lambda_component_2.name],
+        # )
 
         return graph.compile(checkpointer=checkpointer)
 

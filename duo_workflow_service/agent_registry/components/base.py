@@ -1,7 +1,7 @@
 from abc import ABC, abstractmethod
 from enum import StrEnum
 from functools import partial
-from typing import Optional, Annotated, Type, Self, Any, TypedDict, Callable
+from typing import Literal, Optional, Annotated, Type, Self, Any, TypedDict, Callable
 
 from dependency_injector.wiring import Provide, inject
 from langchain_core.messages import ToolMessage, BaseMessage, AIMessage
@@ -71,9 +71,65 @@ class BaseComponent(BaseModel, ABC):
 
     @abstractmethod
     def attach(
-        self, graph: StateGraph, exit_node: str
+        self, graph: StateGraph, router: Any
     ) -> Annotated[str, "Entry node name"]:
         pass
+
+    @abstractmethod
+    def __entry_hook__(
+        self
+    ) -> Annotated[str, "Entry node name"]:
+        pass
+
+class EndComponent(BaseComponent):
+    def __entry_hook__(self):
+        return END
+
+    def attach(self, graph: StateGraph, router: Any) -> str:
+        return END
+
+ConditionPredicateType = str | int
+
+class Router[T: HasBaseStateFields](BaseModel):
+    input: Optional[str] = None
+    from_component: BaseComponent
+    to_component: BaseComponent | dict[ConditionPredicateType, BaseComponent]
+
+    # validate that if input is None, then conditions is a BaseComponent
+    @model_validator(mode="after")
+    def validate_router_fields(self) -> Self:
+        if self.input is None and not isinstance(self.to_component, BaseComponent):
+            raise ValueError(
+                "If input is None, then conditions must be a BaseComponent"
+            )
+        return self
+    
+    # validate that if input is not None, then conditions is a dict
+    @model_validator(mode="after")
+    def validate_router_fields_dict(self) -> Self:
+        if self.input is not None and not isinstance(self.to_component, dict):
+            raise ValueError(
+                "If input is not None, then conditions must be a dict"
+            )
+        return self
+
+    def attach(
+            self, 
+            graph: StateGraph,
+        ):
+        self.from_component.attach(graph, self)
+      
+    def route(self, state: T) -> str:
+        if self.input is None:
+            return self.to_component.__entry_hook__()
+
+        route_value = get_vars_from_context(self.input, state["context"])
+
+        if route_value in self.to_component:
+            return self.to_component[route_value].__entry_hook__()
+
+        raise KeyError(f"Route key {route_value} not found in conditions {self.to_component}")
+
 
 
 class AgentNode[T: HasBaseStateFields](BaseModel):
@@ -184,9 +240,9 @@ class AgentComponent[T: HasBaseStateFields](BaseComponent):
 
         return self
 
-    def _are_tools_called(self, state: T, component_name: str) -> Routes:
+    def _are_tools_called(self, state: T, component_name: str, router: Router) -> str:
         if state["status"] in [WorkflowStatusEnum.CANCELLED, WorkflowStatusEnum.ERROR]:
-            return Routes.STOP
+            return router.route(state)
 
         history: list[BaseMessage] = state["conversation_history"][component_name]
         last_message = history[-1]
@@ -195,14 +251,17 @@ class AgentComponent[T: HasBaseStateFields](BaseComponent):
                 self.output_type
                 and last_message.tool_calls[0]["name"] == self.output_type.__name__
             ):
-                return Routes.STOP
+                return router.route(state)
 
-            return Routes.TOOL_USE
+            return f"{self.name}#tools"
 
-        return Routes.STOP
-
+        return router.route(state)
+    
+    def __entry_hook__(self):
+        return f"{self.name}#agent"
+    
     def attach(
-        self, graph: StateGraph, exit_node: str
+        self, graph: StateGraph, router: Router[T]
     ) -> Annotated[str, "Entry node name"]:
         tools = self.toolset.bindable
         tool_choice = None
@@ -215,7 +274,7 @@ class AgentComponent[T: HasBaseStateFields](BaseComponent):
         )
 
         node_agent = AgentNode(
-            name=f"{self.name}#agent",
+            name=self.__entry_hook__(),
             component_name=self.name,
             prompt=prompt,
             inputs=self.inputs,
@@ -226,17 +285,16 @@ class AgentComponent[T: HasBaseStateFields](BaseComponent):
             name=f"{self.name}#tools", component_name=self.name, toolset=self.toolset
         )
 
-        graph.add_node(node_agent.name, node_agent.run)
+        graph.add_node(self.__entry_hook__(), node_agent.run)
         graph.add_node(node_tools.name, node_tools.run)
 
         graph.add_conditional_edges(
-            node_agent.name,
-            partial(self._are_tools_called, component_name=self.name),
-            {Routes.TOOL_USE: node_tools.name, Routes.STOP: exit_node},
+            self.__entry_hook__(),
+            partial(self._are_tools_called, component_name=self.name, router=router)
         )
         graph.add_edge(node_tools.name, node_agent.name)
 
-        return node_agent.name
+        return self.__entry_hook__()
 
 
 class LambdaComponent[T: HasBaseStateFields](BaseComponent):
@@ -258,15 +316,20 @@ class LambdaComponent[T: HasBaseStateFields](BaseComponent):
                 self.name: context
             }
         }
+    
+    def __entry_hook__(self):
+        return f"{self.name}#lambda"
 
-    def attach(self, graph: StateGraph, exit_node: str) -> Annotated[str, "Entry node name"]:
-        lambda_node_name = f"{self.name}#lambda"
+    def attach(self, graph: StateGraph, router: Router) -> Annotated[str, "Entry node name"]:
+        self.__entry_hook__()
 
-        graph.add_node(lambda_node_name, self._run_lambda)
-        graph.add_edge(lambda_node_name, exit_node)
+        graph.add_node(self.__entry_hook__(), self._run_lambda)
+        graph.add_conditional_edges(
+            self.__entry_hook__(),
+            router.route
+        )
 
-        return lambda_node_name
-
+        return self.__entry_hook__()
 
 def attach_components_to_graph(graph, components, start, end):
     """Generic function to attach a list of components to a graph in a linear or tree structure."""
