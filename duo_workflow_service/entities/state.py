@@ -315,8 +315,23 @@ class ChatWorkflowState(TypedDict):
     cancel_tool_message: str | None
 
 
+class DetectSastFpWorkflowState(TypedDict):
+    status: WorkflowStatusEnum
+    conversation_history: Annotated[
+        Dict[str, List[BaseMessage]], _conversation_history_reducer
+    ]
+    ui_chat_log: Annotated[List[UiChatLog], _ui_chat_log_reducer]
+    vulnerability_id: str
+    vulnerability: dict[str, Any]
+    plan: Plan
+    files_changed: Annotated[List[FileChanges], add]
+
+
 DuoWorkflowStateType = Union[
-    WorkflowState, SearchAndReplaceWorkflowState, ChatWorkflowState
+    WorkflowState,
+    SearchAndReplaceWorkflowState,
+    ChatWorkflowState,
+    DetectSastFpWorkflowState,
 ]
 
 

@@ -197,14 +197,18 @@ config:
 ---
 graph TD;
     __start__([<p>__start__</p>]):::first
-    parse_sast_finding(parse_sast_finding)
+    parse_vulnerability_id(parse_vulnerability_id)
+    fetch_vulnerability_details(fetch_vulnerability_details)
+    prepare_agent_messages(prepare_agent_messages)
     request_analysis(request_analysis)
     execution_tools(execution_tools)
     complete(complete)
     __end__([<p>__end__</p>]):::last
-    __start__ --> parse_sast_finding;
+    __start__ --> parse_vulnerability_id;
     complete --> __end__;
-    parse_sast_finding --> request_analysis;
+    fetch_vulnerability_details --> prepare_agent_messages;
+    parse_vulnerability_id --> fetch_vulnerability_details;
+    prepare_agent_messages --> request_analysis;
     request_analysis -. &nbsp;continue&nbsp; .-> execution_tools;
     request_analysis -. &nbsp;end&nbsp; .-> complete;
     execution_tools -. &nbsp;agent&nbsp; .-> request_analysis;

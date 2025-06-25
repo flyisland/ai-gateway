@@ -5,20 +5,22 @@ This module implements a workflow for analyzing Static Application Security Test
 findings to determine whether they represent legitimate security vulnerabilities or false positives.
 
 The workflow uses an AI agent to:
-1. Parse SAST finding data from JSON input
-2. Analyze the code context around reported vulnerabilities
-3. Examine security controls and mitigations
-4. Evaluate exploitability and risk
-5. Generate a detailed analysis report
+1. Parse vulnerability ID from input
+2. Fetch vulnerability details using get_vulnerability tool
+3. Analyze the code context around reported vulnerabilities
+4. Examine security controls and mitigations
+5. Evaluate exploitability and risk
+6. Generate a detailed analysis report
 
-The agent has access to tools for reading source code files, finding related files,
-and creating analysis result files.
+The agent has access to tools for fetching vulnerability details, reading source code files,
+finding related files, and creating analysis result files.
 """
 
 from datetime import datetime, timezone
 from enum import StrEnum
 from typing import Any
 import json
+import asyncio
 
 from langchain_core.messages import HumanMessage, SystemMessage
 from langgraph.checkpoint.memory import BaseCheckpointSaver
@@ -32,7 +34,7 @@ from duo_workflow_service.entities import (
     Plan,
     ToolStatus,
     UiChatLog,
-    WorkflowState,
+    DetectSastFpWorkflowState,
     WorkflowStatusEnum,
 )
 from duo_workflow_service.internal_events.event_enum import CategoryEnum
@@ -55,22 +57,25 @@ from duo_workflow_service.workflows.detect_sast_fp.prompts import (
 AGENT_NAME = "sast_analyzer_agent"
 
 # Tool names used by the SAST analyzer
+GET_VULNERABILITY_TOOL = "get_vulnerability"
 READ_FILE_TOOL = "read_file"
 CREATE_FILE_TOOL = "create_file_with_contents"
 FIND_FILES_TOOL = "find_files"
 
-# Analysis tools list
+# Analysis tools list (agent tools - excludes get_vulnerability since it's called deterministically)
 ANALYSIS_TOOLS = [READ_FILE_TOOL, CREATE_FILE_TOOL, FIND_FILES_TOOL]
+
 
 # ROUTERS
 class Routes(StrEnum):
     """Workflow routing decisions."""
+
     CONTINUE = "continue"
     END = "end"
     AGENT = "agent"
 
 
-def _router(state: WorkflowState) -> str:
+def _router(state: DetectSastFpWorkflowState) -> str:
     """Route workflow based on agent's tool calls and workflow status."""
     if state["status"] == WorkflowStatusEnum.CANCELLED:
         return Routes.END
@@ -84,7 +89,7 @@ def _router(state: WorkflowState) -> str:
         return Routes.END
 
     tool_name = tool_calls[0].get("name")
-    
+
     # If the agent created the analysis result file, workflow is complete
     if tool_name == CREATE_FILE_TOOL:
         return Routes.END
@@ -92,11 +97,11 @@ def _router(state: WorkflowState) -> str:
     # If the agent is reading files or finding files, continue analysis
     if tool_name in [READ_FILE_TOOL, FIND_FILES_TOOL]:
         return Routes.AGENT
-    
+
     return Routes.END
 
 
-def _tools_execution_requested(state: WorkflowState) -> str:
+def _tools_execution_requested(state: DetectSastFpWorkflowState) -> str:
     """Check if the agent has requested tool execution."""
     if state["status"] == WorkflowStatusEnum.CANCELLED:
         return Routes.END
@@ -108,56 +113,19 @@ def _tools_execution_requested(state: WorkflowState) -> str:
     return Routes.END
 
 
-def _extract_basic_finding_info(goal: str) -> tuple[str, str, str]:
-    """Extract basic finding information from the goal for logging purposes."""
+def _extract_vulnerability_id(goal: str) -> str:
+    """Extract vulnerability ID from the goal for logging purposes."""
     try:
-        finding_data = json.loads(goal)
-        title = finding_data.get("title", "Unknown")
-        file_path = finding_data.get("finding", {}).get("location", {}).get("file", "Unknown")
-        line_number = finding_data.get("finding", {}).get("location", {}).get("start_line", "Unknown")
-        return title, file_path, line_number
-    except (json.JSONDecodeError, KeyError):
-        return "Unknown", "Unknown", "Unknown"
+        # The goal should be a simple vulnerability ID string
+        vulnerability_id = goal.strip()
+        if not vulnerability_id:
+            raise ValueError("Empty vulnerability ID")
+        return vulnerability_id
+    except Exception:
+        return "Unknown"
 
 
-def _parse_sast_finding_data(goal: str) -> dict[str, Any]:
-    """Parse SAST finding data from the goal JSON string."""
-    if not goal:
-        raise RuntimeError("No goal provided")
-        
-    finding_data = json.loads(goal)
-    
-    # Extract key information with safe defaults
-    title = finding_data.get("title", "")
-    file_path = finding_data.get("finding", {}).get("location", {}).get("file", "")
-    line_number = finding_data.get("finding", {}).get("location", {}).get("start_line", "")
-    severity = finding_data.get("severity", "")
-    description = finding_data.get("finding", {}).get("description", "")
-    raw_metadata = finding_data.get("finding", {}).get("raw_metadata", "")
-    
-    # Parse raw metadata if available
-    metadata = {}
-    if raw_metadata:
-        try:
-            metadata = json.loads(raw_metadata)
-        except json.JSONDecodeError:
-            pass
-    
-    return {
-        "title": title,
-        "file_path": file_path,
-        "line_number": line_number,
-        "severity": severity,
-        "description": description,
-        "metadata": metadata,
-        "raw_finding": finding_data
-    }
-
-
-def _create_ui_log(
-    content: str, 
-    status: ToolStatus = ToolStatus.SUCCESS
-) -> UiChatLog:
+def _create_ui_log(content: str, status: ToolStatus = ToolStatus.SUCCESS) -> UiChatLog:
     """Create a UI chat log entry with current timestamp."""
     return UiChatLog(
         message_type=MessageTypeEnum.TOOL,
@@ -171,48 +139,108 @@ def _create_ui_log(
     )
 
 
-def _prepare_agent_messages(goal: str) -> tuple[list, list[UiChatLog]]:
-    """Prepare agent messages and logs from the SAST finding goal."""
-    finding_info = _parse_sast_finding_data(goal)
-    
+def _fetch_vulnerability_details_node(tools_registry, vulnerability_id):
+    """Node that deterministically fetches vulnerability details using the get_vulnerability tool."""
+
+    async def fetch_vulnerability_details(
+        state: DetectSastFpWorkflowState,
+    ) -> DetectSastFpWorkflowState:
+        try:
+            get_vuln_tool = tools_registry.get(GET_VULNERABILITY_TOOL)
+            if not get_vuln_tool:
+                raise RuntimeError(
+                    f"Tool {GET_VULNERABILITY_TOOL} not found in tools registry"
+                )
+
+            # Call the tool asynchronously with tool_input as a dictionary
+            result = await get_vuln_tool.arun({"vulnerability_id": vulnerability_id})
+
+            try:
+                vuln_data = json.loads(result)
+            except json.JSONDecodeError as e:
+                vuln_data = {"error": f"Failed to parse vulnerability details: {e}"}
+
+            # Store in state
+            state = dict(state)
+            state["vulnerability"] = vuln_data.get("vulnerability") or vuln_data
+
+            # Add UI log
+            if "error" in vuln_data:
+                ui_log = _create_ui_log(
+                    f"Error fetching vulnerability details: {vuln_data['error']}",
+                    status=ToolStatus.FAILURE,
+                )
+            else:
+                ui_log = _create_ui_log(
+                    f"Successfully fetched vulnerability details for ID: {vulnerability_id}",
+                    status=ToolStatus.SUCCESS,
+                )
+
+            state["ui_chat_log"] = state.get("ui_chat_log", []) + [ui_log]
+            return state
+
+        except Exception as e:
+            # Ensure workflow continues even if there's an error
+            state = dict(state)
+            state["vulnerability"] = {
+                "error": f"Exception during fetch: {str(e)}"
+            }
+            error_log = _create_ui_log(
+                f"Exception while fetching vulnerability details: {str(e)}",
+                status=ToolStatus.FAILURE,
+            )
+            state["ui_chat_log"] = state.get("ui_chat_log", []) + [error_log]
+            return state
+
+    return fetch_vulnerability_details
+
+
+def _prepare_agent_messages_from_details(
+    vuln_details: dict,
+) -> tuple[list, list[UiChatLog]]:
+    """Prepare agent messages and logs for vulnerability analysis using details."""
     logs: list[UiChatLog] = []
-    
     # Prepare messages for the agent
     human_prompt = SAST_ANALYZER_FILE_USER_MESSAGE.format(
-        finding_data=json.dumps(finding_info, indent=2),
+        finding_data=json.dumps(vuln_details, indent=2),
     )
     messages = [
         SystemMessage(content=SAST_ANALYZER_SYSTEM_MESSAGE),
         HumanMessage(content=SAST_ANALYZER_USER_GUIDELINES),
         HumanMessage(content=human_prompt),
     ]
-    
     # Check token limit
     if ApproximateTokenCounter(AGENT_NAME).count_tokens(messages) > MAX_CONTEXT_TOKENS:
         messages = []
-        logs.append(_create_ui_log(
-            "SAST finding data too large, skipping analysis.",
-            status=ToolStatus.FAILURE
-        ))
+        logs.append(
+            _create_ui_log(
+                "Vulnerability details too large, skipping analysis.",
+                status=ToolStatus.FAILURE,
+            )
+        )
     else:
-        title = finding_info["title"]
-        file_path = finding_info["file_path"]
-        line_number = finding_info["line_number"]
-        logs.append(_create_ui_log(
-            f"Loaded SAST finding: {title} in {file_path}:{line_number}"
-        ))
-    
+        title = vuln_details.get("title", "Unknown")
+        file_path = vuln_details.get("location", {}).get("file", "Unknown")
+        line_number = vuln_details.get("location", {}).get("startLine", "Unknown")
+        logs.append(
+            _create_ui_log(
+                f"Loaded vulnerability: {title} in {file_path}:{line_number}"
+            )
+        )
     return messages, logs
 
 
 class Workflow(AbstractWorkflow):
     """SAST False Positive Detection Workflow.
-    
+
     This workflow analyzes SAST findings to determine if they are legitimate
     security vulnerabilities or false positives. It uses an AI agent to examine
     the code context and provide detailed analysis.
+
+    The workflow takes a vulnerability ID as input and fetches the vulnerability
+    details using the get_vulnerability tool before proceeding with analysis.
     """
-    
+
     async def _handle_workflow_failure(
         self, error: BaseException, compiled_graph: Any, graph_config: Any
     ):
@@ -230,7 +258,7 @@ class Workflow(AbstractWorkflow):
         checkpointer: BaseCheckpointSaver,
     ):
         """Compile the workflow graph."""
-        graph = StateGraph(WorkflowState)
+        graph = StateGraph(DetectSastFpWorkflowState)
         graph = self._setup_workflow_graph(graph, tools_registry, goal)
         return graph.compile(checkpointer=checkpointer)
 
@@ -269,39 +297,83 @@ class Workflow(AbstractWorkflow):
         tools_registry: ToolsRegistry,
         goal: str,
     ):
-        """Setup the complete workflow graph with all nodes and edges."""
         analyzer_components = self._setup_analyzer_nodes(tools_registry)
-
         self.log.info("Starting %s workflow graph compilation", self._workflow_type)
-        graph.set_entry_point("parse_sast_finding")
-        
-        # Parse SAST finding from goal JSON using a custom node
-        def parse_sast_finding_with_goal(state: WorkflowState) -> WorkflowState:
-            messages, logs = _prepare_agent_messages(goal)
-            return WorkflowState(
+        graph.set_entry_point("parse_vulnerability_id")
+
+        def parse_vulnerability_id_with_goal(
+            state: DetectSastFpWorkflowState,
+        ) -> DetectSastFpWorkflowState:
+            vulnerability_id = _extract_vulnerability_id(goal)
+            # Only log the start, don't prepare agent messages yet
+            logs = [_create_ui_log(f"Loaded vulnerability ID: {vulnerability_id}")]
+            return DetectSastFpWorkflowState(
                 status=WorkflowStatusEnum.EXECUTION,
                 ui_chat_log=state.get("ui_chat_log", []) + logs,
-                conversation_history={AGENT_NAME: messages},
+                conversation_history={},
+                vulnerability_id=vulnerability_id,
+                vulnerability={},
                 plan=Plan(steps=[]),
-                handover=[],
-                last_human_input=None,
                 files_changed=[],
             )
-        
+
+        # Deterministic node to fetch vulnerability details
+        fetch_vuln_details_node = _fetch_vulnerability_details_node(
+            tools_registry, _extract_vulnerability_id(goal)
+        )
+
+        async def prepare_agent_messages_node(
+            state: DetectSastFpWorkflowState,
+        ) -> DetectSastFpWorkflowState:
+            vuln_details = state.get("vulnerability", {})
+
+            # Add a log to indicate we're preparing agent messages
+            state = dict(state)
+            state["ui_chat_log"] = state.get("ui_chat_log", []) + [
+                _create_ui_log("Preparing agent messages with vulnerability details")
+            ]
+
+            try:
+                messages, logs = _prepare_agent_messages_from_details(vuln_details)
+                state["conversation_history"] = {AGENT_NAME: messages}
+                state["ui_chat_log"] = state.get("ui_chat_log", []) + logs
+
+                # Add a log to indicate agent is about to start
+                state["ui_chat_log"].append(
+                    _create_ui_log("Agent messages prepared, starting analysis")
+                )
+
+            except Exception as e:
+                # Handle any errors in message preparation
+                error_log = _create_ui_log(
+                    f"Error preparing agent messages: {str(e)}",
+                    status=ToolStatus.FAILURE,
+                )
+                state["ui_chat_log"].append(error_log)
+                # Still set empty conversation history so workflow can continue
+                state["conversation_history"] = {AGENT_NAME: []}
+
+            return state
+
         # Add all nodes to the graph
-        graph.add_node("parse_sast_finding", parse_sast_finding_with_goal)
-        graph.add_node(analyzer_components["start_node"], analyzer_components["agent"].run)
+        graph.add_node("parse_vulnerability_id", parse_vulnerability_id_with_goal)
+        graph.add_node("fetch_vulnerability_details", fetch_vuln_details_node)
+        graph.add_node("prepare_agent_messages", prepare_agent_messages_node)
+        graph.add_node(
+            analyzer_components["start_node"], analyzer_components["agent"].run
+        )
         graph.add_node("execution_tools", analyzer_components["tools_executor"].run)
         graph.add_node(
             "complete",
             HandoverAgent(
-                new_status=WorkflowStatusEnum.COMPLETED, 
-                handover_from=AGENT_NAME
+                new_status=WorkflowStatusEnum.COMPLETED, handover_from=AGENT_NAME
             ).run,
         )
 
         # Add edges to connect the workflow
-        graph.add_edge("parse_sast_finding", analyzer_components["start_node"])
+        graph.add_edge("parse_vulnerability_id", "fetch_vulnerability_details")
+        graph.add_edge("fetch_vulnerability_details", "prepare_agent_messages")
+        graph.add_edge("prepare_agent_messages", analyzer_components["start_node"])
         graph.add_conditional_edges(
             analyzer_components["start_node"],
             _tools_execution_requested,
@@ -319,17 +391,16 @@ class Workflow(AbstractWorkflow):
             },
         )
         graph.add_edge("complete", END)
-        
         return graph
 
-    def get_workflow_state(self, goal: str) -> WorkflowState:
+    def get_workflow_state(self, goal: str) -> DetectSastFpWorkflowState:
         """Create the initial workflow state with the starting log message."""
-        title, file_path, line_number = _extract_basic_finding_info(goal)
-            
+        vulnerability_id = _extract_vulnerability_id(goal)
+
         initial_ui_chat_log = UiChatLog(
             message_type=MessageTypeEnum.TOOL,
             message_sub_type=None,
-            content=f"Starting SAST false positive detection workflow for: {title} in {file_path}:{line_number}",
+            content=f"Starting SAST false positive detection workflow for vulnerability ID: {vulnerability_id}",
             timestamp=datetime.now(timezone.utc).isoformat(),
             status=ToolStatus.SUCCESS,
             correlation_id=None,
@@ -337,12 +408,12 @@ class Workflow(AbstractWorkflow):
             context_elements=None,
         )
 
-        return WorkflowState(
+        return DetectSastFpWorkflowState(
             status=WorkflowStatusEnum.NOT_STARTED,
             ui_chat_log=[initial_ui_chat_log],
             conversation_history={},
+            vulnerability_id=vulnerability_id,
+            vulnerability={},
             plan=Plan(steps=[]),
-            handover=[],
-            last_human_input=None,
             files_changed=[],
         )

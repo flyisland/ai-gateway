@@ -191,9 +191,11 @@ class GetVulnerability(DuoBaseTool):
             )
 
             vulnerability = response["data"]["vulnerability"]
-            
+
             if not vulnerability:
-                return json.dumps({"error": f"Vulnerability with ID {vulnerability_id} not found"})
+                return json.dumps(
+                    {"error": f"Vulnerability with ID {vulnerability_id} not found"}
+                )
 
             return json.dumps({"vulnerability": vulnerability})
         except Exception as e:

@@ -94,7 +94,7 @@ When analyzing SAST findings for false positive detection, follow these comprehe
 """
 
 SAST_ANALYZER_FILE_USER_MESSAGE = """
-Analyze the following SAST finding for false positive detection:
+Analyze the following vulnerability for false positive detection:
 
 <finding_data>
 {finding_data}
