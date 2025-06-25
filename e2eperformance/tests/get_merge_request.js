@@ -38,7 +38,7 @@ scenarios:  {
 };
 
 export default function () {
-  const url = `http://gitlab.${__ENV.AI_GATEWAY_IP}/api/v4/projects/65906441/merge_requests`; // Replace with your API endpoint
+  const url = `http://gitlab.${__ENV.AI_GATEWAY_IP}.nip.io/api/v4/projects/65906441/merge_requests`; // Replace with your API endpoint
  
   let params = { headers: { "Accept": "application/json", "PRIVATE-TOKEN": `${__ENV.GITLAB_QA_ACCESS_TOKEN}` } };
 
