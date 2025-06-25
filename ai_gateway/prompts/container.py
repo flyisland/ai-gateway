@@ -16,6 +16,8 @@ class ContainerPrompts(containers.DeclarativeContainer):
     models = providers.DependenciesContainer()
     internal_event = providers.DependenciesContainer()
 
+    # tgao
+    # import pdb;pdb.set_trace()
     prompt_registry = providers.Singleton(
         LocalPromptRegistry.from_local_yaml,
         class_overrides={

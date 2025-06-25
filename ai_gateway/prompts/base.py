@@ -94,6 +94,8 @@ class Prompt(RunnableBinding[Input, Output]):
         disable_streaming: bool = False,
         tools: Optional[List[BaseTool]] = None,
     ):
+        # tgao
+        import pdb;pdb.set_trace()
         model_override = None
         model_provider = config.model.params.model_class_provider
         model_kwargs = self._build_model_kwargs(config.params, model_metadata)
@@ -303,6 +305,8 @@ class BasePromptRegistry(ABC):
         model_metadata: Optional[TypeModelMetadata] = None,
         internal_event_category=__name__,
     ) -> Prompt:
+        # tgao
+        import pdb;pdb.set_trace()
         if not model_metadata:
             model_metadata = current_model_metadata_context.get()
 
