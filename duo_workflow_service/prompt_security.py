@@ -100,36 +100,10 @@ class PromptSecurity:
     @staticmethod
     def _encode_tags(text: str) -> str:
         """Encode all dangerous tags in text."""
-        # Create a list of all tag variations with their replacements
-        all_variations = []
-
-        for tag, replacement in PromptSecurity.DANGEROUS_TAGS.items():
-            all_variations.append((tag, replacement))
-            # Add the replacement itself if it's different
-            if tag != replacement and replacement not in [t[0] for t in all_variations]:
-                all_variations.append((replacement, replacement))
-
-        # Sort by length (longest first) to avoid partial matches
-        all_variations.sort(key=lambda x: len(x[0]), reverse=True)
-
-        # Process all tag variations
-        for tag_name, replacement in all_variations:
-            # Create pattern that allows spaces between each character
-            tag_pattern = r"\s*".join(f"[{c.upper()}{c.lower()}]" for c in tag_name)
-
-            # Opening tag with optional spaces around the tag name
-
+        for tag_name, replacement in PromptSecurity.DANGEROUS_TAGS.items():
             text = re.sub(
-                f"<\s*{tag_pattern}\s*>",
-                f"&lt;{replacement}&gt;",
-                text,
-                flags=re.IGNORECASE,
-            )
-
-            # Closing tag - note the space between < and / is optional!
-            text = re.sub(
-                f"<\s*/\s*{tag_pattern}\s*>",
-                f"&lt;/{replacement}&gt;",
+                f"<\s*(/?)\s*{tag_name}\s*>",
+                f"&lt;\\1{replacement}&gt;",
                 text,
                 flags=re.IGNORECASE,
             )
