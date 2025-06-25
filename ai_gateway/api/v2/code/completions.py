@@ -412,13 +412,15 @@ def _resolve_code_completions_litellm(
     completions_agent_factory: Factory[CodeCompletions],
     completions_litellm_factory: Factory[CodeCompletions],
 ) -> CodeCompletions:
-    model_metadata = create_model_metadata({
-        "provider": payload.model_provider or "text-completion-openai",
-        "name": payload.model_name,
-        "endpoint": payload.model_endpoint,
-        "api_key": payload.model_api_key,
-        "identifier": payload.model_identifier,
-    })
+    model_metadata = create_model_metadata(
+        {
+            "provider": payload.model_provider or "text-completion-openai",
+            "name": payload.model_name,
+            "endpoint": payload.model_endpoint,
+            "api_key": payload.model_api_key,
+            "identifier": payload.model_identifier,
+        }
+    )
 
     return _resolve_agent_code_completions(
         model_metadata=model_metadata,
@@ -505,13 +507,15 @@ def _build_code_completions(
 
     elif payload.model_provider == KindModelProvider.ANTHROPIC:
         AnthropicHandler(payload, request, kwargs).update_completion_params()
-        anthropic_model_metadata = create_model_metadata({
-            "provider": "anthropic",
-            "name": payload.model_name,
-            "endpoint": payload.model_endpoint,
-            "api_key": payload.model_api_key,
-            "identifier": payload.model_identifier,
-        })
+        anthropic_model_metadata = create_model_metadata(
+            {
+                "provider": "anthropic",
+                "name": payload.model_name,
+                "endpoint": payload.model_endpoint,
+                "api_key": payload.model_api_key,
+                "identifier": payload.model_identifier,
+            }
+        )
 
         code_completions = _resolve_agent_code_completions(
             model_metadata=anthropic_model_metadata,
@@ -608,13 +612,15 @@ def _resolve_code_completions_vertex_codestral(
             detail="You cannot specify a prompt with the given provider and model combination",
         )
 
-    vertex_model_metadata = create_model_metadata({
-        "provider": "vertex-ai",
-        "name": payload.model_name or "codestral-2501",
-        "endpoint": payload.model_endpoint,
-        "api_key": payload.model_api_key,
-        "identifier": payload.model_identifier,
-    })
+    vertex_model_metadata = create_model_metadata(
+        {
+            "provider": "vertex-ai",
+            "name": payload.model_name,
+            "endpoint": payload.model_endpoint,
+            "api_key": payload.model_api_key,
+            "identifier": payload.model_identifier,
+        }
+    )
 
     return _resolve_agent_code_completions(
         model_metadata=vertex_model_metadata,
