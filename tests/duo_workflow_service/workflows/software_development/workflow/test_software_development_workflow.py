@@ -157,30 +157,35 @@ def _agent_responses(status: WorkflowStatusEnum, agent_name: str):
 @patch("duo_workflow_service.workflows.abstract_workflow.fetch_workflow_config")
 @patch("duo_workflow_service.workflows.software_development.workflow.create_chat_model")
 # @patch("duo_workflow_service.workflows.abstract_workflow.GitLabWorkflow", autospec=True)
-@patch(
-    "duo_workflow_service.workflows.software_development.workflow.ExecutorComponent",
-    autospec=True,
-)
-@patch(
-    "duo_workflow_service.workflows.software_development.workflow.PlannerComponent",
-    autospec=True,
-)
-@patch(
-    "duo_workflow_service.workflows.software_development.workflow.ToolsApprovalComponent",
-    autospec=True,
-)
-@patch(
-    "duo_workflow_service.workflows.software_development.workflow.GoalDisambiguationComponent",
-    autospec=True,
-)
+# @patch(
+#     "duo_workflow_service.workflows.software_development.workflow.ExecutorComponent",
+#     autospec=True,
+# )
+# @patch(
+#     "duo_workflow_service.workflows.software_development.workflow.PlannerComponent",
+#     autospec=True,
+# )
+# @patch(
+#     "duo_workflow_service.workflows.software_development.workflow.ToolsApprovalComponent",
+#     autospec=True,
+# )
+# @patch(
+#     "duo_workflow_service.workflows.software_development.workflow.GoalDisambiguationComponent",
+#     autospec=True,
+# )
+# @patch(
+#     "duo_workflow_service.workflows.abstract_workflow.UserInterface.send_event",
+#     autospec=True,
+# )
 @patch("duo_workflow_service.workflows.abstract_workflow.UserInterface", autospec=True)
 @patch.dict(os.environ, {"DW_INTERNAL_EVENT__ENABLED": "true"})
 async def test_workflow_run(
     mock_checkpoint_notifier,
-    mock_goal_disambiguator_component,
-    mock_tools_approval_component,
-    mock_planner_component,
-    mock_executor_component,
+    # mock_checkpoint_notifier_send_event,
+    # mock_goal_disambiguator_component,
+    # mock_tools_approval_component,
+    # mock_planner_component,
+    # mock_executor_component,
     # mock_gitlab_workflow,
     mock_chat_client,
     mock_fetch_workflow_config,
@@ -193,13 +198,14 @@ async def test_workflow_run(
     mock_status_updater,
     # mock_tools_registry_cls,
     mock_tools_approval_required,
-    checkpoint_tuple,
+    # checkpoint_tuple,
 ):
     mock_gitlab_workflow_aget_tuple.return_value = None
-    mock_tools_approval_required.return_value = False
+    # mock_tools_approval_required.return_value = False
     # mock_executor_component.return_value.attach.return_value = END
 
     mock_user_interface_instance = mock_checkpoint_notifier.return_value
+
     # mock_tools_registry = MagicMock(spec=ToolsRegistry)
     # mock_tools_registry_cls.configure = AsyncMock(return_value=mock_tools_registry)
     # mock_tools_registry.approval_required.return_value = False
@@ -233,30 +239,69 @@ async def test_workflow_run(
     # )
     # mock_git_lab_workflow_instance.get_next_version = MagicMock(return_value=1)
 
-    mock_tools_executor_run.side_effect = [
-        {
-            "plan": Plan(steps=[]),
-            "status": WorkflowStatusEnum.PLANNING,
-            "conversation_history": {},
-        },
-        {
-            "plan": Plan(steps=[]),
-            "status": WorkflowStatusEnum.PLANNING,
-            "conversation_history": {},
-        },
-    ]
-
-    mock_handover_agent_run.return_value = {
+    # mock_tools_executor_run.side_effect = [
+    #     {
+    #         "plan": Plan(steps=[]),
+    #         "status": WorkflowStatusEnum.PLANNING,
+    #         "conversation_history": {},
+    #     },
+    #     {
+    #         "plan": Plan(steps=[]),
+    #         "status": WorkflowStatusEnum.PLANNING,
+    #         "conversation_history": {},
+    #     },
+    # ]
+    mock_tools_executor_run.return_value = {
         "plan": Plan(steps=[]),
-        "status": WorkflowStatusEnum.COMPLETED,
+        "status": WorkflowStatusEnum.PLANNING,
         "conversation_history": {},
     }
 
-    mock_agent_run.side_effect = [
-        *_agent_responses(
-            WorkflowStatusEnum.PLANNING, "context_builder"
-        ),  # context builder responses
+    # def handover_func(*args, **kwargs):
+    #     import pdb; pdb.set_trace()
+    #     return {
+    #         "plan": Plan(steps=[]),
+    #         "status": WorkflowStatusEnum.COMPLETED,
+    #         "conversation_history": {},
+    #     }
+    # mock_handover_agent_run.side_effect = handover_func
+
+    mock_handover_agent_run.side_effect = [
+        *(_agent_responses(WorkflowStatusEnum.PLANNING, "executor"))
     ]
+
+    # mock_handover_agent_run.side_effect = [
+    #     *(_agent_responses(WorkflowStatusEnum.PLANNING, "context_builder"))
+    # ]
+    # "executor"
+
+    # Steps:
+    # "build_context_handover"
+    # 'set_status_to_execution'
+    # 'execution_handover'
+
+    # mock_handover_agent_run.return_value = {
+    #     "plan": Plan(steps=[]),
+    #     "status": WorkflowStatusEnum.COMPLETED,
+    #     "conversation_history": {},
+    # }
+
+    # def mock_agent_run_func(*args, **kwargs):
+    #     i = 0
+    #     import pdb; pdb.set_trace()
+    #     return _agent_responses(WorkflowStatusEnum.PLANNING, "context_builder")[i]
+    # mock_agent_run.side_effect = mock_agent_run_func
+
+    mock_agent_run.side_effect = [
+        *(_agent_responses(WorkflowStatusEnum.PLANNING, "context_builder") +
+          _agent_responses(WorkflowStatusEnum.PLANNING, "planner") +
+          _agent_responses(WorkflowStatusEnum.PLANNING, "executor"))
+    ]
+    # mock_agent_run.side_effect = [
+    #     *_agent_responses(
+    #         WorkflowStatusEnum.PLANNING, "context_builder"
+    #     ),  # context builder responses
+    # ]
 
     mock_plan_supervisor_agent_run.return_value = {
         "plan": Plan(steps=[]),
@@ -264,15 +309,17 @@ async def test_workflow_run(
         "conversation_history": {},
     }
 
-    mock_goal_disambiguator_component.return_value.attach.return_value = (
-        "set_status_to_execution"
-    )
-    mock_executor_component.return_value.attach.return_value = END
-    mock_planner_component.return_value.attach.return_value = "set_status_to_execution"
-    mock_tools_approval_component.return_value.attach.side_effect = [
-        "build_context_tools",
-        "execution_tools",
-    ]
+    # ???
+    # mock_goal_disambiguator_component.return_value.attach.return_value = (
+    #     "set_status_to_execution"
+    # )
+    # mock_executor_component.return_value.attach.return_value = END # SKIP OVER execution component
+    # mock_planner_component.return_value.attach.return_value = "set_status_to_execution" # Skip over planner component
+    # mock_tools_approval_component.return_value.attach.side_effect = [
+    #     "build_context_tools",
+    #     "execution_tools",
+    # ]
+
 
     workflow = Workflow(
         "123",
@@ -286,6 +333,7 @@ async def test_workflow_run(
     # graph = workflow._compile("", tools_reg, MemorySaver())
     # print(graph.get_graph().draw_mermaid())
     # import pdb; pdb. set_trace()
+
     await workflow.run("test_goal")
 
     assert mock_goal_disambiguator_component.return_value.attach.call_count == 1
