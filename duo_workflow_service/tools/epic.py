@@ -6,7 +6,9 @@ from pydantic import BaseModel, Field
 
 from duo_workflow_service.gitlab.url_parser import GitLabUrlParseError, GitLabUrlParser
 from duo_workflow_service.tools.duo_base_tool import DuoBaseTool
-from duo_workflow_service.tools.queries.epics import GET_EPIC_NOTES_QUERY
+from duo_workflow_service.tools.queries.work_items import (
+    GET_GROUP_WORK_ITEM_NOTES_QUERY,
+)
 
 DESCRIPTION_CHARACTER_LIMIT = 1_048_576
 
@@ -495,25 +497,26 @@ class ListEpicNotes(EpicBaseTool):
 
         variables = {
             "fullPath": validation_result.group_id,
-            "epicIid": str(validation_result.epic_iid),
+            "workItemIid": str(validation_result.epic_iid),
         }
 
         try:
-            response = await self.gitlab_client.graphql(GET_EPIC_NOTES_QUERY, variables)
-            widgets = (
-                response.get("namespace", {}).get("workItem", {}).get("widgets", [])
+            response = await self.gitlab_client.graphql(
+                GET_GROUP_WORK_ITEM_NOTES_QUERY, variables
             )
-            if not widgets:
-                return json.dumps({"error": "No widgets found in the response."})
+            nodes = response.get("namespace", {}).get("workItems", {}).get("nodes", [])
 
-            notes = []
+            if not nodes:
+                return json.dumps({"error": "No work item found."})
+
+            widgets = nodes[0].get("widgets", [])
 
             for widget in widgets:
                 if "notes" in widget:
-                    notes_nodes = widget.get("notes", {}).get("nodes", [])
-                    notes.extend(notes_nodes)
+                    notes = widget.get("notes", {}).get("nodes", [])
+                    return json.dumps({"notes": notes}, indent=2)
 
-            return json.dumps({"notes": notes}, indent=2)
+            return json.dumps({"error": "No notes found on the epic."})
         except Exception as e:
             return json.dumps({"error": str(e)})
 
