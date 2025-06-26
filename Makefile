@@ -167,7 +167,7 @@ format: codespell black isort docformatter
 lint: lint-code lint-doc
 
 .PHONY: lint-code
-lint-code: flake8 check-black check-isort check-pylint check-mypy check-codespell check-docformatter
+lint-code: flake8 check-black check-isort check-pylint check-mypy check-codespell check-docformatter check-editorconfig
 
 .PHONY: lint-commit
 lint-commit:
@@ -213,6 +213,11 @@ check-codespell: install-lint-deps
 check-docformatter: install-lint-deps
 	@echo "Running docformatter check..."
 	@poetry run docformatter -c -r ${LINT_WORKING_DIR}
+
+.PHONY: check-editorconfig
+check-editorconfig: install-lint-deps
+	@echo "Running editorconfig check..."
+	@poetry run ec
 
 .PHONY: install-test-deps
 install-test-deps:
