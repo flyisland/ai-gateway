@@ -7,9 +7,10 @@ from typing import Any
 
 from langgraph.checkpoint.memory import BaseCheckpointSaver
 from langgraph.graph import END, StateGraph
+from langgraph.types import Command
 from pydantic import BaseModel, Field
 
-from duo_workflow_service.agent_registry.components.base import AgentComponent, EndComponent, LambdaComponent, Router, attach_components_to_graph
+from duo_workflow_service.agent_registry.components.base import AgentComponent, EndComponent, HiltComponent, LambdaComponent, Router, attach_components_to_graph
 from duo_workflow_service.checkpointer.gitlab_workflow import WorkflowStatusEventEnum
 from duo_workflow_service.components.tools_registry import ToolsRegistry
 from duo_workflow_service.entities.state import (
@@ -21,7 +22,7 @@ from duo_workflow_service.entities.state import (
 )
 from duo_workflow_service.tracking.errors import log_exception
 from duo_workflow_service.workflows.abstract_workflow import AbstractWorkflow
-from duo_workflow_service.workflows.chat.workflow import CHAT_READ_ONLY_TOOLS
+from duo_workflow_service.workflows.chat.workflow import CHAT_READ_ONLY_TOOLS, CHAT_MUTATION_TOOLS
 
 MAX_TOKENS_TO_SAMPLE = 8192
 DEBUG = os.getenv("DEBUG")
@@ -78,6 +79,8 @@ class Workflow(AbstractWorkflow):
         match status_event:
             case WorkflowStatusEventEnum.START:
                 return self.get_workflow_state(goal)
+            case WorkflowStatusEventEnum.RESUME:
+                return Command(resume=goal)
             case _:
                 return None
 
@@ -93,7 +96,7 @@ class Workflow(AbstractWorkflow):
             goal=goal,
         )
 
-        agents_toolset = tools_registry.toolset(CHAT_READ_ONLY_TOOLS)
+        agents_toolset = tools_registry.toolset(CHAT_READ_ONLY_TOOLS + CHAT_MUTATION_TOOLS)
         agent_component = AgentComponent(
             name="agent",
             prompt_id="agents/awesome",
@@ -106,14 +109,22 @@ class Workflow(AbstractWorkflow):
             output="answer"
         )
 
-        randomizer = LambdaComponent(
-            name="chose_random_path",
-            fn=lambda text: random.choice(["joke", "haiku"]),
-            inputs=["agent.answer.text"],
-            output="path",
+        hilt_component = HiltComponent(
+            name="hilt",
             workflow_id=self._workflow_id,
             workflow_type=self._workflow_type,
+            human_prompt="Now I can either write a joke or write a haiku. Which do you prefer? Answer with 'joke' or 'haiku'.",
+            output="path"
         )
+
+        # randomizer = LambdaComponent(
+        #     name="chose_random_path",
+        #     fn=lambda text: random.choice(["joke", "haiku"]),
+        #     inputs=["agent.answer.text"],
+        #     output="path",
+        #     workflow_id=self._workflow_id,
+        #     workflow_type=self._workflow_type,
+        # )
 
         joker_component = AgentComponent(
             name="joker",
@@ -158,12 +169,12 @@ class Workflow(AbstractWorkflow):
         
         Router(
             from_component=agent_component,
-            to_component=randomizer,
+            to_component=hilt_component,
         ).attach(graph)
 
         Router(
-            from_component=randomizer,
-            input="chose_random_path.path",
+            from_component=hilt_component,
+            input="hilt.path",
             to_component={
                 "joke": joker_component,
                 "haiku": poet_component,

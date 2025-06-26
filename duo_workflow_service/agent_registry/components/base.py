@@ -1,4 +1,5 @@
 from abc import ABC, abstractmethod
+from datetime import datetime, timezone
 from enum import StrEnum
 from functools import partial
 from typing import Literal, Optional, Annotated, Type, Self, Any, TypedDict, Callable
@@ -6,6 +7,7 @@ from typing import Literal, Optional, Annotated, Type, Self, Any, TypedDict, Cal
 from dependency_injector.wiring import Provide, inject
 from langchain_core.messages import ToolMessage, BaseMessage, AIMessage
 from langchain_core.output_parsers import PydanticToolsParser
+from langgraph.types import interrupt
 from langgraph.constants import END
 from langgraph.graph import StateGraph
 from pydantic import BaseModel, Field, ConfigDict, model_validator
@@ -13,6 +15,7 @@ from pydantic import BaseModel, Field, ConfigDict, model_validator
 from ai_gateway.container import ContainerApplication
 from ai_gateway.prompts import Prompt, LocalPromptRegistry
 from duo_workflow_service.entities import WorkflowStatusEnum
+from duo_workflow_service.entities.state import MessageTypeEnum, ToolStatus, UiChatLog
 from duo_workflow_service.tools import Toolset
 
 __all__ = ["BaseComponent", "AgentComponent"]
@@ -45,6 +48,7 @@ class HasBaseStateFields(TypedDict):
 class Routes(StrEnum):
     TOOL_USE = "tool_use"
     STOP = "stop"
+
 
 
 class BaseComponent(BaseModel, ABC):
@@ -299,6 +303,48 @@ class AgentComponent[T: HasBaseStateFields](BaseComponent):
 
         return self.__entry_hook__()
 
+class HiltComponent(BaseComponent):
+    human_prompt: str
+
+    def __entry_hook__(self):
+        return f"{self.name}#hilt"
+
+    def attach(self, graph: StateGraph, router: Any) -> str:
+        graph.add_node(self.__entry_hook__(), self._prompt_human)
+        graph.add_edge(self.__entry_hook__(), f"{self.name}#check")
+        graph.add_node(f"{self.name}#check", self._fetch_human_input)
+        graph.add_conditional_edges(
+            f"{self.name}#check",
+            router.route
+        )
+
+        return self.__entry_hook__()
+
+    def _prompt_human(self, _state):
+        ui_log = UiChatLog(
+            message_type=MessageTypeEnum.REQUEST,
+            content=self.human_prompt,
+            timestamp=datetime.now(timezone.utc).isoformat(),
+            status=ToolStatus.SUCCESS,
+            tool_info=None,
+            context_elements=None,
+        )
+        return {
+            "status": WorkflowStatusEnum.INPUT_REQUIRED,
+            "ui_chat_log": [ui_log]
+        }
+
+    def _fetch_human_input(self, state):
+        human_input: str = interrupt("Workflow interrupted")
+        context = state["context"].get(self.name, {})
+        context[self.output] = human_input
+
+        return {
+            "status": WorkflowStatusEnum.EXECUTION,
+            "context": {
+                self.name: context
+            }
+        }
 
 class LambdaComponent[T: HasBaseStateFields](BaseComponent):
     fn: Callable[[...], Optional[Any]]
