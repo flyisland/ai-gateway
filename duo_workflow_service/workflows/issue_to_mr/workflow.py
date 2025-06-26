@@ -1,6 +1,8 @@
+import math
 import os
 from datetime import datetime, timezone
 from enum import StrEnum
+import random
 from typing import Any
 
 from langgraph.checkpoint.memory import BaseCheckpointSaver
@@ -65,6 +67,10 @@ class Workflow(AbstractWorkflow):
                 "first": {
                     "task": goal,
                 },
+                "paths": {
+                    "joke":  { "task": "Write a funny AI programming joke to joke.md in the repository root" },
+                    "haiku": { "task": "Write a haiku about AI coding to haiku.md in the repository root" },
+                }
             }
         )
 
@@ -100,19 +106,50 @@ class Workflow(AbstractWorkflow):
             output="answer"
         )
 
-        lambda_component_1 = LambdaComponent(
-            name="postprocessing_1",
-            fn=lambda text: text + " HEY",
+        randomizer = LambdaComponent(
+            name="chose_random_path",
+            fn=lambda text: random.choice(["joke", "haiku"]),
             inputs=["agent.answer.text"],
-            output="new_answer",
+            output="path",
             workflow_id=self._workflow_id,
             workflow_type=self._workflow_type,
         )
 
-        lambda_component_2 = LambdaComponent(
-            name="postprocessing_2",
-            fn=lambda new_answer, text: print(new_answer + text),
-            inputs=["postprocessing_1.new_answer", "agent.answer.text"],
+        joker_component = AgentComponent(
+            name="joker",
+            prompt_id="agents/awesome",
+            prompt_version="^1.0.0",
+            workflow_id=self._workflow_id,
+            workflow_type=self._workflow_type,
+            toolset=agents_toolset,
+            inputs=["paths.joke.task"],
+            output_type=AgentFinalOutput,
+            output="joke"
+        )
+
+        poet_component = AgentComponent(
+            name="poet",
+            prompt_id="agents/awesome",
+            prompt_version="^1.0.0",
+            workflow_id=self._workflow_id,
+            workflow_type=self._workflow_type,
+            toolset=agents_toolset,
+            inputs=["paths.haiku.task"],
+            output_type=AgentFinalOutput,
+            output="haiku"
+        )
+
+        # lambda_component_2 = LambdaComponent(
+        #     name="postprocessing_2",
+        #     fn=lambda new_answer, text: print(new_answer + text),
+        #     inputs=["postprocessing_1.new_answer", "agent.answer.text"],
+        #     workflow_id=self._workflow_id,
+        #     workflow_type=self._workflow_type,
+        # )
+
+        end_component = EndComponent(
+            name="end",
+            inputs=[],
             workflow_id=self._workflow_id,
             workflow_type=self._workflow_type,
         )
@@ -121,22 +158,26 @@ class Workflow(AbstractWorkflow):
         
         Router(
             from_component=agent_component,
-            to_component=lambda_component_1,
+            to_component=randomizer,
         ).attach(graph)
 
         Router(
-            from_component=lambda_component_1,
-            to_component=lambda_component_2,
+            from_component=randomizer,
+            input="chose_random_path.path",
+            to_component={
+                "joke": joker_component,
+                "haiku": poet_component,
+            },
         ).attach(graph)
 
         Router(
-            from_component=lambda_component_2,
-            to_component=EndComponent(
-                name="end",
-                inputs=[],          
-                workflow_id=self._workflow_id,
-                workflow_type=self._workflow_type,
-            ),
+            from_component=joker_component,
+            to_component=end_component,
+        ).attach(graph)
+
+        Router(
+            from_component=poet_component,
+            to_component=end_component,
         ).attach(graph)
 
         graph.set_entry_point(agent_component.__entry_hook__())

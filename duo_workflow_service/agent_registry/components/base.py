@@ -118,12 +118,13 @@ class Router[T: HasBaseStateFields](BaseModel):
             graph: StateGraph,
         ):
         self.from_component.attach(graph, self)
-      
+
     def route(self, state: T) -> str:
         if self.input is None:
             return self.to_component.__entry_hook__()
 
-        route_value = get_vars_from_context(self.input, state["context"])
+        route_value = get_vars_from_context([self.input], state["context"])
+        route_value = route_value[self.input.split(".")[-1]]
 
         if route_value in self.to_component:
             return self.to_component[route_value].__entry_hook__()
@@ -182,6 +183,8 @@ class ToolNode[T: HasBaseStateFields](BaseModel):
             self.component_name, []
         )
         context = state["context"].get(self.component_name, {"tool_calls": []})
+        if 'tool_calls' not in context:
+            context['tool_calls'] = []
 
         last_message = conversation_history[-1]
         tool_calls = getattr(last_message, "tool_calls", [])
