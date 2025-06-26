@@ -57,58 +57,26 @@ import string
 from pydantic import BaseModel, Field
 import uuid
 
-PROMPT_TEMPLATE = [(
+DEFAULT_PROMPT_TEMPLATE = [
+    (
 "system",
 """
-You are software engieer working on issue triage. 
-Your task is to annalyse issue description and discussion 
-in the issue coments, then base on that information create
-an implementation plan. 
+You are software engieer working on issue triage. Your task is to annalyse issue description and discussion in the issue coments.
 """
-),
-(
+    ),
+    (
 "human",
 """
-Create a comment on an issue provided in <issue> tag,
-the comment should outline implementation plan for the issue provided in <issue> tag.
-After you will have create the comment on the issue
-call handover_tool to finish your work.
+{user_prompt}
+
+Make sure to write a clear and professional comment on an issue provided in <issue> tag and call handover_tool to finish your work.
 
 <issue>
 {issue}
 </issue>
 """
-),
+    ),
 ]
-
-DEVELOPER_PROMPT_TEMPLATE = [(
-"system",
-"""
-You are software engieer working on issue triage. 
-Your task is to implement new featrues.
-"""
-),
-(
-"human",
-"""
-Implement new featrure desribed in issue provided in <implementation plan> tag.
-After you will have implemented the feature,
-call handover_tool to finish your work.
-Parent issue is provided in <issue> tag.
-
-<issue>
-{issue}
-</issue>
-
-<implementation plan>
-{create_issue_note__body}
-</implementation plan>
-
-Implement changes according to the implementation plan provided above.
-"""
-),
-]
-
 
 
 class AgentNode:
@@ -345,6 +313,23 @@ class RunToolComponent(BaseComponent):
 class Workflow(AbstractWorkflow):
     _agent: ChatAgent
 
+    def _get_issue_id_from_metadata(self):
+        return self._workflow_metadata.get("issue_iid", "")
+
+    
+    def _build_dynamic_prompt_template(self, default_template, goal):
+        prompts = dict(default_template)
+        
+        if "human" in prompts:
+            prompts["human"] = prompts["human"].format(user_prompt=goal, issue="{issue}")
+        
+        return [
+            ("system", prompts.get("system")),
+            ("human", prompts.get("human"))
+        ]
+
+
+
     def _assemble(self, components: list[BaseComponent], graph_input):
         graph = StateGraph(PoCWorkflowState)
         outputs = []
@@ -373,15 +358,16 @@ class Workflow(AbstractWorkflow):
             tool_info=None,
             context_elements=contextElements,
         )
-
+        issue_iid = self._get_issue_id_from_metadata()
+        project_id = self._project.get('id')   
         return PoCWorkflowState(
             status=WorkflowStatusEnum.NOT_STARTED,
             conversation_history={
             },
             ui_chat_log=[initial_ui_chat_log],
             context={
-                'issue_iid': 1,
-                'project_id': self._project.get('id'),
+                'issue_iid': issue_iid,
+                'project_id': project_id,
             }
         )
 
@@ -413,7 +399,7 @@ class Workflow(AbstractWorkflow):
         ]
         agents_toolset = tools_registry.toolset(tools)
         deterministic_toolset = tools_registry.toolset(['get_issue'])
-
+        dynamic_prompt_template = self._build_dynamic_prompt_template(DEFAULT_PROMPT_TEMPLATE, goal)
         components = [
             RunToolComponent(
                 deterministic_toolset['get_issue'],
@@ -421,20 +407,11 @@ class Workflow(AbstractWorkflow):
                 output='issue'
             ),
             AgentComponent(
-                prompt_template=PROMPT_TEMPLATE,
+                prompt_template=dynamic_prompt_template,
                 inputs=['issue'],
                 output='create_issue_note__body',
                 model=create_chat_model(self._model_config),
                 toolset=agents_toolset,
-                workflow_id=self._workflow_id,
-                workflow_type=self._workflow_type
-            ),
-            AgentComponent(
-                prompt_template=DEVELOPER_PROMPT_TEMPLATE,
-                inputs=['issue', 'create_issue_note__body'],
-                output=None,
-                model=create_chat_model(self._model_config),
-                toolset=tools_registry.toolset(['read_file', 'create_file_with_contents', 'edit_file', 'mkdir', 'list_dir', 'handover_tool']),
                 workflow_id=self._workflow_id,
                 workflow_type=self._workflow_type
             )
