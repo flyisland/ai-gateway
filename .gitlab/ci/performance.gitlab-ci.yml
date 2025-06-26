@@ -33,7 +33,7 @@ tests:performance:
       artifacts: true
   trigger:
     project: gitlab-org/quality/component-performance-testing
-    branch: vp/add-cng-to-cpt
+    branch: main
     strategy: depend
     forward:
       pipeline_variables: true
