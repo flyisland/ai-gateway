@@ -5,7 +5,7 @@ from functools import partial
 from typing import Literal, Optional, Annotated, Type, Self, Any, TypedDict, Callable
 
 from dependency_injector.wiring import Provide, inject
-from langchain_core.messages import ToolMessage, BaseMessage, AIMessage
+from langchain_core.messages import ToolMessage, BaseMessage, AIMessage, HumanMessage
 from langchain_core.output_parsers import PydanticToolsParser
 from langgraph.types import interrupt
 from langgraph.constants import END
@@ -94,6 +94,8 @@ class EndComponent(BaseComponent):
 
 ConditionPredicateType = str | int
 
+DEFAULT_ROUTE = "default_route"
+
 class Router[T: HasBaseStateFields](BaseModel):
     input: Optional[str] = None
     from_component: BaseComponent
@@ -127,11 +129,14 @@ class Router[T: HasBaseStateFields](BaseModel):
         if self.input is None:
             return self.to_component.__entry_hook__()
 
-        route_value = get_vars_from_context([self.input], state["context"])
+        route_value = get_vars_from_context([self.input], state)
         route_value = route_value[self.input.split(".")[-1]]
 
         if route_value in self.to_component:
             return self.to_component[route_value].__entry_hook__()
+
+        if DEFAULT_ROUTE in self.to_component:
+            return self.to_component[DEFAULT_ROUTE].__entry_hook__()
 
         raise KeyError(f"Route key {route_value} not found in conditions {self.to_component}")
 
@@ -168,6 +173,7 @@ class AgentNode[T: HasBaseStateFields](BaseModel):
             )
             parsed_completion: BaseModel = await output_parser.ainvoke(completion)
             context[self.output] = parsed_completion.model_dump(mode="json")
+            completion = AIMessage(content=parsed_completion.content)
 
         return {
             "context": {self.component_name: context},
@@ -345,6 +351,39 @@ class HiltComponent(BaseComponent):
                 self.name: context
             }
         }
+
+class HiltChatBackComponent(BaseComponent):
+
+    def __entry_hook__(self):
+        return f"{self.name}#hiltChatBack"
+
+    def attach(self, graph: StateGraph, router: Any) -> str:
+        graph.add_node(self.__entry_hook__(), self._prompt_human)
+        graph.add_edge(self.__entry_hook__(), f"{self.name}#hiltChatBackFetchResponse")
+        graph.add_node(f"{self.name}#hiltChatBackFetchResponse", self._fetch_human_input)
+        graph.add_conditional_edges(
+            f"{self.name}#hiltChatBackFetchResponse",
+            router.route
+        )
+
+        return self.__entry_hook__()
+
+    def _prompt_human(self, _state):
+        return {
+            "status": WorkflowStatusEnum.INPUT_REQUIRED,
+        }
+
+    def _fetch_human_input(self, state):
+        human_input: str = interrupt("Workflow interrupted")
+        context = state["context"].get(self.name, {})
+        context[self.output] = human_input
+        return {
+            "status": WorkflowStatusEnum.EXECUTION,
+            "conversation_history": {
+                 self.output: [*state['conversation_history'][self.output], HumanMessage(content=human_input)],
+            },
+        }
+
 
 class LambdaComponent[T: HasBaseStateFields](BaseComponent):
     fn: Callable[[...], Optional[Any]]

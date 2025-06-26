@@ -10,7 +10,7 @@ from langgraph.graph import END, StateGraph
 from langgraph.types import Command
 from pydantic import BaseModel, Field
 
-from duo_workflow_service.agent_registry.components.base import AgentComponent, EndComponent, HiltComponent, LambdaComponent, Router, attach_components_to_graph
+from duo_workflow_service.agent_registry.components.base import AgentComponent, EndComponent, HiltChatBackComponent, Router, DEFAULT_ROUTE, attach_components_to_graph
 from duo_workflow_service.checkpointer.gitlab_workflow import WorkflowStatusEventEnum
 from duo_workflow_service.components.tools_registry import ToolsRegistry
 from duo_workflow_service.entities.state import (
@@ -43,6 +43,10 @@ class AgentFinalOutput(BaseModel):
     Always use this tool if no other tools are appropriate.
     """
     text: str = Field(description="text")
+
+    @property
+    def content(self) -> str:
+        return self.text
 
 
 class Workflow(AbstractWorkflow):
@@ -109,54 +113,14 @@ class Workflow(AbstractWorkflow):
             output="answer"
         )
 
-        hilt_component = HiltComponent(
+        hilt_component = HiltChatBackComponent(
             name="hilt",
             workflow_id=self._workflow_id,
             workflow_type=self._workflow_type,
-            human_prompt="Now I can either write a joke or write a haiku. Which do you prefer? Answer with 'joke' or 'haiku'.",
-            output="path"
+            inputs=[f"conversation_history.{agent_component.name}"],
+            output=agent_component.name
         )
 
-        # randomizer = LambdaComponent(
-        #     name="chose_random_path",
-        #     fn=lambda text: random.choice(["joke", "haiku"]),
-        #     inputs=["agent.answer.text"],
-        #     output="path",
-        #     workflow_id=self._workflow_id,
-        #     workflow_type=self._workflow_type,
-        # )
-
-        joker_component = AgentComponent(
-            name="joker",
-            prompt_id="agents/awesome",
-            prompt_version="^1.0.0",
-            workflow_id=self._workflow_id,
-            workflow_type=self._workflow_type,
-            toolset=agents_toolset,
-            inputs=["paths.joke.task"],
-            output_type=AgentFinalOutput,
-            output="joke"
-        )
-
-        poet_component = AgentComponent(
-            name="poet",
-            prompt_id="agents/awesome",
-            prompt_version="^1.0.0",
-            workflow_id=self._workflow_id,
-            workflow_type=self._workflow_type,
-            toolset=agents_toolset,
-            inputs=["paths.haiku.task"],
-            output_type=AgentFinalOutput,
-            output="haiku"
-        )
-
-        # lambda_component_2 = LambdaComponent(
-        #     name="postprocessing_2",
-        #     fn=lambda new_answer, text: print(new_answer + text),
-        #     inputs=["postprocessing_1.new_answer", "agent.answer.text"],
-        #     workflow_id=self._workflow_id,
-        #     workflow_type=self._workflow_type,
-        # )
 
         end_component = EndComponent(
             name="end",
@@ -174,21 +138,11 @@ class Workflow(AbstractWorkflow):
 
         Router(
             from_component=hilt_component,
-            input="hilt.path",
+            input="status",
             to_component={
-                "joke": joker_component,
-                "haiku": poet_component,
+                WorkflowStatusEnum.EXECUTION: agent_component,
+                DEFAULT_ROUTE: end_component
             },
-        ).attach(graph)
-
-        Router(
-            from_component=joker_component,
-            to_component=end_component,
-        ).attach(graph)
-
-        Router(
-            from_component=poet_component,
-            to_component=end_component,
         ).attach(graph)
 
         graph.set_entry_point(agent_component.__entry_hook__())
