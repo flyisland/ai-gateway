@@ -53,7 +53,7 @@ poetry run generate-dataset \
   duo_chat.explain_code.1
 ```
 
-Generate a dataset with 20 examples using batch size of 5 to avoid rate limits:
+Generate a dataset with 20 examples using batch size of 5. Smaller batch size helps prevent issues with rate limits and ensures complete outputs without exceeding token constraints.
 
 ```shell
 poetry run generate-dataset \
@@ -61,7 +61,7 @@ poetry run generate-dataset \
   1.0.0 \
   duo_chat.explain_code.large \
   --num-examples 20 \
-  --batch-size 5 \
+  --batch-size 5
 ```
 
 Generate a larger dataset with different temperature:

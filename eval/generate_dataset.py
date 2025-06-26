@@ -140,7 +140,7 @@ def run(
             "-b",
             help="Number of examples to generate per batch",
             min=1,
-            max=50,
+            max=5,
         ),
     ] = 5,
     temperature: Annotated[
