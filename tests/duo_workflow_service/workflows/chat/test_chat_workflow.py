@@ -41,6 +41,7 @@ def mock_state():
         "ui_chat_log": [],
         "last_human_input": None,
         "context_elements": [],
+        "project_languages": "Unknown",
     }
 
 
@@ -117,6 +118,7 @@ def workflow_with_project(
     workflow._http_client = MagicMock()
     workflow._context_elements = []
     workflow._agent = prompt
+    workflow._project_languages = {}
     return workflow
 
 
@@ -156,6 +158,7 @@ async def test_workflow_initialization(workflow_with_project):
     assert initial_state["ui_chat_log"][0]["additional_context"][0].category == "file"
     assert initial_state["context_elements"] == []
     assert initial_state["project"]["name"] == "test-project"
+    assert initial_state["project_languages"] == {}
 
 
 @pytest.mark.asyncio
@@ -210,6 +213,7 @@ async def test_execute_agent(workflow_with_project):
         ui_chat_log=[],
         last_human_input=None,
         context_elements=[],
+        project_languages={},
     )
 
     result = await workflow_with_project._agent.run(state)
@@ -243,6 +247,7 @@ class TestExecuteAgentWithTools:
             ui_chat_log=[],
             last_human_input=None,
             context_elements=[],
+            project_languages={},
         )
 
         result = await workflow_with_project._agent.run(state)
@@ -288,6 +293,7 @@ def test_are_tools_called_with_various_content(
         "context_elements": [],
         "project": None,
         "approval": None,
+        "project_languages": {},
     }
     assert workflow._are_tools_called(state) == expected_result
 
@@ -322,6 +328,7 @@ def test_are_tools_called_with_tool_use(workflow_with_project):
         "context_elements": [],
         "project": None,
         "approval": None,
+        "project_languages": {},
     }
     assert workflow._are_tools_called(state) == Routes.TOOL_USE
 
@@ -329,12 +336,14 @@ def test_are_tools_called_with_tool_use(workflow_with_project):
 @pytest.mark.asyncio
 @patch("duo_workflow_service.workflows.abstract_workflow.ToolsRegistry")
 @patch("duo_workflow_service.workflows.abstract_workflow.GitLabWorkflow", autospec=True)
-@patch(
-    "duo_workflow_service.workflows.abstract_workflow.fetch_project_data_with_workflow_id"
-)
+@patch("duo_workflow_service.workflows.abstract_workflow.fetch_project_data")
+@patch("duo_workflow_service.workflows.abstract_workflow.fetch_workflow_config")
+@patch("duo_workflow_service.workflows.chat.workflow.fetch_project_languages")
 @patch("duo_workflow_service.workflows.abstract_workflow.UserInterface", autospec=True)
 async def test_workflow_run(
     mock_user_interface,
+    mock_fetch_project_languages,
+    mock_fetch_workflow_config,
     mock_fetch_project_data,
     mock_gitlab_workflow,
     mock_tools_registry,
@@ -344,16 +353,15 @@ async def test_workflow_run(
     mock_tools_registry.configure = AsyncMock(
         return_value=MagicMock(spec=ToolsRegistry)
     )
-    mock_fetch_project_data.return_value = (
-        {
-            "id": 1,
-            "name": "test-project",
-            "description": "Test project",
-            "http_url_to_repo": "https://example.com/project",
-            "web_url": "https://example.com/project",
-        },
-        {"project_id": 1},
-    )
+    mock_fetch_workflow_config.return_value = {"project_id": 1}
+    mock_fetch_project_data.return_value = {
+        "id": 1,
+        "name": "test-project",
+        "description": "Test project",
+        "http_url_to_repo": "https://example.com/project",
+        "web_url": "https://example.com/project",
+    }
+    mock_fetch_project_languages.return_value = {}
 
     mock_git_lab_workflow_instance = mock_gitlab_workflow.return_value
     mock_git_lab_workflow_instance.__aenter__.return_value = (
