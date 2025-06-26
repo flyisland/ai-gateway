@@ -1,12 +1,17 @@
-import json
 from typing import List, Optional, Type
 
-from langchain_core.messages import ToolMessage
-from langgraph.types import Command as LangGraphCommand
+from langchain.tools import BaseTool
 from pydantic import BaseModel, Field
 
-from duo_workflow_service.entities.state import Plan, Task, TaskStatus
-from duo_workflow_service.tools.duo_base_tool import DuoBaseTool
+
+class Task(BaseModel):
+    id: str = Field(description="A unique identifier for the task")
+    description: str = Field(description="A description of what the task is")
+    status: str = Field(
+        description="""The status of the task.
+                        The status can be `Not Started`, `In Progress`,
+                        `Completed` or `Cancelled`"""
+    )
 
 
 def format_task_number(task_id: str) -> str:
@@ -38,56 +43,11 @@ def format_short_task_description(
     )
 
 
-class PlannerTool(DuoBaseTool):
-    # The intended mechanism to get the tool_call_id is to use `InjectedToolCallId`, but at the moment it doesn't play
-    # nicely with custom tool input schemas, so we set it manually.
-    # See https://github.com/langchain-ai/langgraph/issues/5072
-    tool_call_id: str | None = None
-    _plan: Plan | None = None
-    _tools_agent_name: str | None = None
-
-    @property
-    def plan(self) -> Plan:
-        if not self._plan:
-            raise RuntimeError("plan is not set")
-        return self._plan
-
-    @plan.setter
-    def plan(self, plan: Plan):
-        self._plan = plan
-
-    @property
-    def tools_agent_name(self) -> str:
-        if not self._tools_agent_name:
-            raise RuntimeError("tools_agent_name is not set")
-        return self._tools_agent_name
-
-    @tools_agent_name.setter
-    def tools_agent_name(self, tools_agent_name: str):
-        self._tools_agent_name = tools_agent_name
-
-    def _command(self, tool_message: str):
-        return LangGraphCommand(
-            update={
-                "conversation_history": {
-                    self.tools_agent_name: [
-                        ToolMessage(
-                            content=tool_message,
-                            name=self.name,
-                            tool_call_id=self.tool_call_id,
-                        )
-                    ],
-                },
-                "plan": self.plan,
-            }
-        )
-
-
 class AddNewTaskInput(BaseModel):
     description: str = Field(description="The description of the new task to add")
 
 
-class AddNewTask(PlannerTool):
+class AddNewTask(BaseTool):
     name: str = "add_new_task"
     description: str = """Add a task to a plan for a workflow.
     A plan consists of a list of tasks and the status of each task.
@@ -95,15 +55,8 @@ class AddNewTask(PlannerTool):
 
     args_schema: Type[BaseModel] = AddNewTaskInput
 
-    def _run(self, description: str) -> LangGraphCommand:
-        new_task = Task(
-            id=f"task-{len(self.plan['steps'])}",
-            description=description,
-            status=TaskStatus.NOT_STARTED,
-        )
-        self.plan["steps"].append(new_task)
-
-        return self._command(f"Step added: {new_task['id']}")
+    def _run(self, description: str) -> str:  # pylint: disable=unused-argument
+        return "New task added"
 
     def format_display_message(self, args: AddNewTaskInput) -> str:
         return f"Add new task to the plan: {format_short_task_description(args.description, char_limit=100)}"
@@ -114,7 +67,7 @@ class RemoveTaskInput(BaseModel):
     description: str = Field(description="The description of the task to remove")
 
 
-class RemoveTask(PlannerTool):
+class RemoveTask(BaseTool):
     name: str = "remove_task"
     description: str = """Remove a task from a plan based on its ID.
     A plan consists of a list of tasks and the status of each task.
@@ -123,12 +76,8 @@ class RemoveTask(PlannerTool):
 
     def _run(
         self, task_id: str, description: str  # pylint: disable=unused-argument
-    ) -> LangGraphCommand:
-        self.plan["steps"] = [
-            step for step in self.plan["steps"] if step["id"] != task_id
-        ]
-
-        return self._command(f"Task removed: {task_id}")
+    ) -> str:
+        return f"Task with ID {task_id} removed"
 
     def format_display_message(self, args: RemoveTaskInput) -> str:
         short_description = format_short_task_description(
@@ -142,21 +91,15 @@ class UpdateTaskDescriptionInput(BaseModel):
     new_description: str = Field(description="The new description for the task")
 
 
-class UpdateTaskDescription(PlannerTool):
+class UpdateTaskDescription(BaseTool):
     name: str = "update_task_description"
     description: str = """Update the description of a task in the plan.
     A plan consists of a list of tasks and the status of each task.
     This tool updates the description of a task but should never update the status of a task."""
     args_schema: Type[BaseModel] = UpdateTaskDescriptionInput
 
-    def _run(self, task_id: str, new_description: str) -> LangGraphCommand | str:
-        for step in self.plan["steps"]:
-            if step["id"] == task_id:
-                if new_description:
-                    step["description"] = new_description
-                    return self._command(f"Task updated: {task_id}")
-
-        return f"Task not found: {task_id}"
+    def _run(self, task_id: str, new_description: str) -> str:
+        return f"Task with ID {task_id} updated with description: {new_description}"
 
     def format_display_message(self, args: UpdateTaskDescriptionInput) -> str:
         short_new_description = format_short_task_description(
@@ -165,13 +108,13 @@ class UpdateTaskDescription(PlannerTool):
         return f"Update description for task '{short_new_description}'"
 
 
-class GetPlan(PlannerTool):
+class GetPlan(BaseTool):
     name: str = "get_plan"
     description: str = """Fetch a list of tasks for a workflow.
     A plan consists of a list of tasks and the status of each task."""
 
     def _run(self) -> str:
-        return json.dumps(self.plan["steps"])
+        return "Done"
 
 
 class SetTaskStatusInput(BaseModel):
@@ -184,7 +127,7 @@ class SetTaskStatusInput(BaseModel):
     description: str = Field(description="A description of the task for context")
 
 
-class SetTaskStatus(PlannerTool):
+class SetTaskStatus(BaseTool):
     name: str = "set_task_status"
     description: str = "Set the status of a single task in the plan"
     args_schema: Type[BaseModel] = SetTaskStatusInput
@@ -194,13 +137,8 @@ class SetTaskStatus(PlannerTool):
         task_id: str,
         status: str,
         description: str,  # pylint: disable=unused-argument
-    ) -> LangGraphCommand | str:
-        for step in self.plan["steps"]:
-            if step["id"] == task_id:
-                step["status"] = TaskStatus(status)
-                return self._command(f"Task status set: {task_id} - {status}")
-
-        return f"Task not found: {task_id}"
+    ) -> str:
+        return f"Status of task with ID {task_id} set to {status}"
 
     def format_display_message(self, args: SetTaskStatusInput) -> str:
         task_description = format_short_task_description(
@@ -219,7 +157,7 @@ class CreatePlanInput(BaseModel):
     )
 
 
-class CreatePlan(PlannerTool):
+class CreatePlan(BaseTool):
     name: str = "create_plan"
     description: str = """Create a list of tasks for the plan.
     The tasks you provide here will set the tasks in the current plan.
@@ -229,20 +167,9 @@ class CreatePlan(PlannerTool):
 
     args_schema: Type[BaseModel] = CreatePlanInput
 
-    def _run(self, tasks: List[str]) -> LangGraphCommand:
-        steps: List[Task] = []
-        for i, task_description in enumerate(tasks):
-            steps.append(
-                Task(
-                    id=f"task-{i}",
-                    description=task_description,
-                    status=TaskStatus.NOT_STARTED,
-                )
-            )
-        # pylint: disable=unsupported-assignment-operation
-        self.plan = Plan(steps=steps)
-
-        return self._command("Plan created")
+    def _run(self, tasks: List[str]) -> str:  # pylint: disable=unused-argument
+        return "Plan created successfully"
 
     def format_display_message(self, args: CreatePlanInput) -> str:
-        return f"Create plan with {len(args.tasks)} tasks"
+        tasks_display = ", ".join(args.tasks[:3])
+        return f"Create a plan: {tasks_display}..."
