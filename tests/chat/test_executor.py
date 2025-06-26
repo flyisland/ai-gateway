@@ -129,7 +129,6 @@ class TestGLAgentRemoteExecutor:
             else:
                 assert context.get("duo_chat.agent_available_tools") == [
                     "issue_reader",
-                    "work_item_reader",
                 ]
 
         agent.astream.assert_called_once_with(inputs)
@@ -160,8 +159,22 @@ class TestGLAgentRemoteExecutorToolAction:
                 ReActAgentInputs(messages=[Message(role=Role.USER, content="Hi")]),
                 None,
                 [AgentToolAction(thought="", tool="issue_reader", tool_input="")],
-                ["issue_reader", "work_item_reader"],
+                ["issue_reader"],
                 [call("request_ask_issue", category="ai_gateway.chat.executor")],
+            ),
+            (
+                StarletteUser(
+                    CloudConnectorUser(
+                        authenticated=True,
+                        claims=UserClaims(scopes=["ask_work_item"]),
+                    )
+                ),
+                "17.2.0",
+                ReActAgentInputs(messages=[Message(role=Role.USER, content="Hi")]),
+                None,
+                [AgentToolAction(thought="", tool="work_item_reader", tool_input="")],
+                ["work_item_reader"],
+                [call("request_ask_work_item", category="ai_gateway.chat.executor")],
             ),
             (
                 StarletteUser(

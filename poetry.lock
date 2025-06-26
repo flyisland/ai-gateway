@@ -6472,4 +6472,8 @@ cffi = ["cffi (>=1.11)"]
 [metadata]
 lock-version = "2.1"
 python-versions = "~3.12.0"
+<<<<<<< HEAD
 content-hash = "05383aa2aa2022d5b8884b454a0f9eb9fc530a24cc8f852dcb6473d70c153bf6"
+=======
+content-hash = "6b70e2154de0ef617f6ed87ea6b2af3b5d9658931b7234cc19f2d1b877d8e370"
+>>>>>>> 96232961 (feat: accommodate ask_work_item unit primitive)

@@ -60,7 +60,7 @@ class IssueReader(BaseRemoteTool):
 class WorkItemReader(BaseRemoteTool):
     name: str = "work_item_reader"
     resource: str = "work_items"
-    unit_primitive: GitLabUnitPrimitive = GitLabUnitPrimitive.ASK_ISSUE
+    unit_primitive: GitLabUnitPrimitive = GitLabUnitPrimitive.ASK_WORK_ITEM
     min_required_gl_version: Optional[str] = None
 
     description: str = dedent(
