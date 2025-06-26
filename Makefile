@@ -46,22 +46,22 @@ PROTOC_GEN_GO_GRPC_VERSION := v1.5.1
 
 UNAME_S := $(shell uname -s)
 ifeq ($(UNAME_S),Linux)
-    OS := linux
+	OS := linux
 else ifeq ($(UNAME_S),Darwin)
-    OS := osx
+	OS := osx
 else
-    $(error Unsupported operating system: $(UNAME_S))
+	$(error Unsupported operating system: $(UNAME_S))
 endif
 
 UNAME_M := $(shell uname -m)
 ifeq ($(UNAME_M),x86_64)
-    ARCH := x86_64
+	ARCH := x86_64
 else ifeq ($(UNAME_M),arm64) # macOS aarch64
-    ARCH := aarch_64
+	ARCH := aarch_64
 else ifeq ($(UNAME_M),aarch64) # linux aarch64
-    ARCH := aarch_64
+	ARCH := aarch_64
 else
-    $(error Unsupported architecture: $(UNAME_M))
+	$(error Unsupported architecture: $(UNAME_M))
 endif
 
 .PHONY: gen-proto
@@ -286,9 +286,9 @@ duo-workflow-docs:
 .PHONY: duo-workflow-service-reload
 duo-workflow-service-reload:
 	poetry run watchmedo auto-restart \
-    --directory=./duo_workflow_service \
-    --pattern="*.py" \
-    --recursive  -- duo-workflow-service
+		--directory=./duo_workflow_service \
+		--pattern="*.py" \
+		--recursive -- duo-workflow-service
 
 .PHONY: duo-workflow-service-dependencies
 duo-workflow-service-dependencies:
