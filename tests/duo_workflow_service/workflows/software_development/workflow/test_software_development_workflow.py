@@ -138,7 +138,10 @@ def _agent_responses(status: WorkflowStatusEnum, agent_name: str):
 
 
 @pytest.mark.asyncio
-@patch("duo_workflow_service.checkpointer.gitlab_workflow.GitLabStatusUpdater", autospec=True)
+@patch(
+    "duo_workflow_service.checkpointer.gitlab_workflow.GitLabStatusUpdater",
+    autospec=True,
+)
 @patch(
     "duo_workflow_service.workflows.abstract_workflow.GitLabWorkflow.aget_tuple",
     new_callable=AsyncMock,
@@ -151,22 +154,29 @@ def _agent_responses(status: WorkflowStatusEnum, agent_name: str):
     "duo_workflow_service.workflows.abstract_workflow.GitLabWorkflow.aput",
     new_callable=AsyncMock,
 )
-@patch("duo_workflow_service.workflows.software_development.workflow.Agent.run", new_callable=AsyncMock)
-@patch("duo_workflow_service.workflows.software_development.workflow.HandoverAgent.run", new_callable=AsyncMock)
+@patch(
+    "duo_workflow_service.workflows.software_development.workflow.Agent.run",
+    new_callable=AsyncMock,
+)
+@patch(
+    "duo_workflow_service.workflows.software_development.workflow.HandoverAgent.run",
+    new_callable=AsyncMock,
+)
 @patch(
     "duo_workflow_service.workflows.software_development.workflow.PlanSupervisorAgent.run"
 )
-@patch("duo_workflow_service.workflows.software_development.workflow.ToolsExecutor.run", new_callable=AsyncMock)
+@patch(
+    "duo_workflow_service.workflows.software_development.workflow.ToolsExecutor.run",
+    new_callable=AsyncMock,
+)
 @patch(
     "duo_workflow_service.workflows.abstract_workflow.fetch_project_data_with_workflow_id"
 )
 @patch("duo_workflow_service.workflows.abstract_workflow.fetch_workflow_config")
-@patch("duo_workflow_service.workflows.software_development.workflow.create_chat_model")
 @patch("duo_workflow_service.workflows.abstract_workflow.UserInterface", autospec=True)
 @patch.dict(os.environ, {"DW_INTERNAL_EVENT__ENABLED": "true"})
 async def test_workflow_run(
     mock_checkpoint_notifier,
-    mock_chat_client,
     mock_fetch_workflow_config,
     mock_fetch_project_data_with_workflow_id,
     mock_tools_executor_run,
@@ -198,8 +208,7 @@ async def test_workflow_run(
         "id": 1,
         "project_id": 1,
         "web_url": "https://example.com/project",
-        "agent_privileges_names": ["read_write_files", "run_commands"],
-        "pre_approved_agent_privileges_names": ["read_write_files", "run_commands"],
+        "agent_privileges_names": [],
     }
 
     mock_tools_executor_run.return_value = {
@@ -213,29 +222,25 @@ async def test_workflow_run(
             "plan": Plan(steps=[]),
             "status": WorkflowStatusEnum.PLANNING,
             "conversation_history": {},
-        }, # build_context_handover
+        },  # build_context_handover
         {
             "plan": Plan(steps=[]),
             "status": WorkflowStatusEnum.PLANNING,
             "conversation_history": {},
-        }, # set_status_to_execution
+        },  # set_status_to_execution
         {
             "plan": Plan(steps=[]),
             "status": WorkflowStatusEnum.COMPLETED,
-            "handover": [
-                AIMessage(
-                    id = 1,
-                    content="HandoverTool call is present, route to the next agent"
-                ),
-            ],
-            "ui_chat_log": []
-        } # execution_handover
+            "conversation_history": {},
+        },  # execution_handover
     ]
 
     mock_agent_run.side_effect = [
-        *(_agent_responses(WorkflowStatusEnum.PLANNING, "context_builder") +
-          _agent_responses(WorkflowStatusEnum.PLANNING, "planner") +
-          _agent_responses(WorkflowStatusEnum.PLANNING, "executor"))
+        *(
+            _agent_responses(WorkflowStatusEnum.PLANNING, "context_builder")
+            + _agent_responses(WorkflowStatusEnum.PLANNING, "planner")
+            + _agent_responses(WorkflowStatusEnum.PLANNING, "executor")
+        )
     ]
 
     mock_plan_supervisor_agent_run.return_value = {
@@ -507,10 +512,14 @@ async def test_workflow_run_when_exception(
 )
 @patch("duo_workflow_service.workflows.abstract_workflow.fetch_workflow_config")
 @patch("duo_workflow_service.executor.action.asyncio.Queue", autospec=True)
-@patch(    "duo_workflow_service.workflows.abstract_workflow.GitLabWorkflow.aget_tuple",
+@patch(
+    "duo_workflow_service.workflows.abstract_workflow.GitLabWorkflow.aget_tuple",
     new_callable=AsyncMock,
 )
-@patch("duo_workflow_service.checkpointer.gitlab_workflow.GitLabStatusUpdater", autospec=True)
+@patch(
+    "duo_workflow_service.checkpointer.gitlab_workflow.GitLabStatusUpdater",
+    autospec=True,
+)
 @patch(
     "duo_workflow_service.workflows.software_development.workflow.GoalDisambiguationComponent",
     autospec=True,
@@ -542,7 +551,7 @@ async def test_workflow_run_with_error_state(
         "name": "test-project",
         "description": "This is a test project",
         "http_url_to_repo": "https://example.com/project",
-        "web_url": "https://example.com/project"
+        "web_url": "https://example.com/project",
     }
     mock_fetch_workflow_config.return_value = {
         "id": 1,
