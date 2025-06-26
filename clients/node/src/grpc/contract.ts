@@ -102,6 +102,7 @@ export interface StartWorkflowRequest {
   mcpTools: McpTool[];
   additionalContext: AdditionalContext[];
   approval?: Approval | undefined;
+  additionalTools: Tool[];
 }
 
 export interface ActionResponse {
@@ -142,6 +143,7 @@ export interface Action {
   findFiles?: FindFiles | undefined;
   runMCPTool?: RunMCPTool | undefined;
   mkdir?: Mkdir | undefined;
+  runTool?: RunTool | undefined;
 }
 
 export interface RunCommandAction {
@@ -220,6 +222,18 @@ export interface McpTool {
 }
 
 export interface RunMCPTool {
+  name: string;
+  args: string;
+}
+
+export interface Tool {
+  name: string;
+  source: string;
+  description: string;
+  inputSchema: string;
+}
+
+export interface RunTool {
   name: string;
   args: string;
 }
@@ -339,6 +353,7 @@ function createBaseStartWorkflowRequest(): StartWorkflowRequest {
     mcpTools: [],
     additionalContext: [],
     approval: undefined,
+    additionalTools: [],
   };
 }
 
@@ -373,6 +388,9 @@ export const StartWorkflowRequest: MessageFns<StartWorkflowRequest> = {
     }
     if (message.approval !== undefined) {
       Approval.encode(message.approval, writer.uint32(82).fork()).join();
+    }
+    for (const v of message.additionalTools) {
+      Tool.encode(v!, writer.uint32(90).fork()).join();
     }
     return writer;
   },
@@ -464,6 +482,14 @@ export const StartWorkflowRequest: MessageFns<StartWorkflowRequest> = {
           message.approval = Approval.decode(reader, reader.uint32());
           continue;
         }
+        case 11: {
+          if (tag !== 90) {
+            break;
+          }
+
+          message.additionalTools.push(Tool.decode(reader, reader.uint32()));
+          continue;
+        }
       }
       if ((tag & 7) === 4 || tag === 0) {
         break;
@@ -491,6 +517,9 @@ export const StartWorkflowRequest: MessageFns<StartWorkflowRequest> = {
         ? object.additionalContext.map((e: any) => AdditionalContext.fromJSON(e))
         : [],
       approval: isSet(object.approval) ? Approval.fromJSON(object.approval) : undefined,
+      additionalTools: globalThis.Array.isArray(object?.additionalTools)
+        ? object.additionalTools.map((e: any) => Tool.fromJSON(e))
+        : [],
     };
   },
 
@@ -526,6 +555,9 @@ export const StartWorkflowRequest: MessageFns<StartWorkflowRequest> = {
     if (message.approval !== undefined) {
       obj.approval = Approval.toJSON(message.approval);
     }
+    if (message.additionalTools?.length) {
+      obj.additionalTools = message.additionalTools.map((e) => Tool.toJSON(e));
+    }
     return obj;
   },
 
@@ -546,6 +578,7 @@ export const StartWorkflowRequest: MessageFns<StartWorkflowRequest> = {
     message.approval = (object.approval !== undefined && object.approval !== null)
       ? Approval.fromPartial(object.approval)
       : undefined;
+    message.additionalTools = object.additionalTools?.map((e) => Tool.fromPartial(e)) || [];
     return message;
   },
 };
@@ -958,6 +991,7 @@ function createBaseAction(): Action {
     findFiles: undefined,
     runMCPTool: undefined,
     mkdir: undefined,
+    runTool: undefined,
   };
 }
 
@@ -1001,6 +1035,9 @@ export const Action: MessageFns<Action> = {
     }
     if (message.mkdir !== undefined) {
       Mkdir.encode(message.mkdir, writer.uint32(106).fork()).join();
+    }
+    if (message.runTool !== undefined) {
+      RunTool.encode(message.runTool, writer.uint32(114).fork()).join();
     }
     return writer;
   },
@@ -1116,6 +1153,14 @@ export const Action: MessageFns<Action> = {
           message.mkdir = Mkdir.decode(reader, reader.uint32());
           continue;
         }
+        case 14: {
+          if (tag !== 114) {
+            break;
+          }
+
+          message.runTool = RunTool.decode(reader, reader.uint32());
+          continue;
+        }
       }
       if ((tag & 7) === 4 || tag === 0) {
         break;
@@ -1140,6 +1185,7 @@ export const Action: MessageFns<Action> = {
       findFiles: isSet(object.findFiles) ? FindFiles.fromJSON(object.findFiles) : undefined,
       runMCPTool: isSet(object.runMCPTool) ? RunMCPTool.fromJSON(object.runMCPTool) : undefined,
       mkdir: isSet(object.mkdir) ? Mkdir.fromJSON(object.mkdir) : undefined,
+      runTool: isSet(object.runTool) ? RunTool.fromJSON(object.runTool) : undefined,
     };
   },
 
@@ -1184,6 +1230,9 @@ export const Action: MessageFns<Action> = {
     if (message.mkdir !== undefined) {
       obj.mkdir = Mkdir.toJSON(message.mkdir);
     }
+    if (message.runTool !== undefined) {
+      obj.runTool = RunTool.toJSON(message.runTool);
+    }
     return obj;
   },
 
@@ -1225,6 +1274,9 @@ export const Action: MessageFns<Action> = {
       ? RunMCPTool.fromPartial(object.runMCPTool)
       : undefined;
     message.mkdir = (object.mkdir !== undefined && object.mkdir !== null) ? Mkdir.fromPartial(object.mkdir) : undefined;
+    message.runTool = (object.runTool !== undefined && object.runTool !== null)
+      ? RunTool.fromPartial(object.runTool)
+      : undefined;
     return message;
   },
 };
@@ -2422,6 +2474,190 @@ export const RunMCPTool: MessageFns<RunMCPTool> = {
   },
   fromPartial<I extends Exact<DeepPartial<RunMCPTool>, I>>(object: I): RunMCPTool {
     const message = createBaseRunMCPTool();
+    message.name = object.name ?? "";
+    message.args = object.args ?? "";
+    return message;
+  },
+};
+
+function createBaseTool(): Tool {
+  return { name: "", source: "", description: "", inputSchema: "" };
+}
+
+export const Tool: MessageFns<Tool> = {
+  encode(message: Tool, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
+    if (message.name !== "") {
+      writer.uint32(10).string(message.name);
+    }
+    if (message.source !== "") {
+      writer.uint32(18).string(message.source);
+    }
+    if (message.description !== "") {
+      writer.uint32(26).string(message.description);
+    }
+    if (message.inputSchema !== "") {
+      writer.uint32(34).string(message.inputSchema);
+    }
+    return writer;
+  },
+
+  decode(input: BinaryReader | Uint8Array, length?: number): Tool {
+    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+    const end = length === undefined ? reader.len : reader.pos + length;
+    const message = createBaseTool();
+    while (reader.pos < end) {
+      const tag = reader.uint32();
+      switch (tag >>> 3) {
+        case 1: {
+          if (tag !== 10) {
+            break;
+          }
+
+          message.name = reader.string();
+          continue;
+        }
+        case 2: {
+          if (tag !== 18) {
+            break;
+          }
+
+          message.source = reader.string();
+          continue;
+        }
+        case 3: {
+          if (tag !== 26) {
+            break;
+          }
+
+          message.description = reader.string();
+          continue;
+        }
+        case 4: {
+          if (tag !== 34) {
+            break;
+          }
+
+          message.inputSchema = reader.string();
+          continue;
+        }
+      }
+      if ((tag & 7) === 4 || tag === 0) {
+        break;
+      }
+      reader.skip(tag & 7);
+    }
+    return message;
+  },
+
+  fromJSON(object: any): Tool {
+    return {
+      name: isSet(object.name) ? globalThis.String(object.name) : "",
+      source: isSet(object.source) ? globalThis.String(object.source) : "",
+      description: isSet(object.description) ? globalThis.String(object.description) : "",
+      inputSchema: isSet(object.inputSchema) ? globalThis.String(object.inputSchema) : "",
+    };
+  },
+
+  toJSON(message: Tool): unknown {
+    const obj: any = {};
+    if (message.name !== "") {
+      obj.name = message.name;
+    }
+    if (message.source !== "") {
+      obj.source = message.source;
+    }
+    if (message.description !== "") {
+      obj.description = message.description;
+    }
+    if (message.inputSchema !== "") {
+      obj.inputSchema = message.inputSchema;
+    }
+    return obj;
+  },
+
+  create<I extends Exact<DeepPartial<Tool>, I>>(base?: I): Tool {
+    return Tool.fromPartial(base ?? ({} as any));
+  },
+  fromPartial<I extends Exact<DeepPartial<Tool>, I>>(object: I): Tool {
+    const message = createBaseTool();
+    message.name = object.name ?? "";
+    message.source = object.source ?? "";
+    message.description = object.description ?? "";
+    message.inputSchema = object.inputSchema ?? "";
+    return message;
+  },
+};
+
+function createBaseRunTool(): RunTool {
+  return { name: "", args: "" };
+}
+
+export const RunTool: MessageFns<RunTool> = {
+  encode(message: RunTool, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
+    if (message.name !== "") {
+      writer.uint32(10).string(message.name);
+    }
+    if (message.args !== "") {
+      writer.uint32(18).string(message.args);
+    }
+    return writer;
+  },
+
+  decode(input: BinaryReader | Uint8Array, length?: number): RunTool {
+    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+    const end = length === undefined ? reader.len : reader.pos + length;
+    const message = createBaseRunTool();
+    while (reader.pos < end) {
+      const tag = reader.uint32();
+      switch (tag >>> 3) {
+        case 1: {
+          if (tag !== 10) {
+            break;
+          }
+
+          message.name = reader.string();
+          continue;
+        }
+        case 2: {
+          if (tag !== 18) {
+            break;
+          }
+
+          message.args = reader.string();
+          continue;
+        }
+      }
+      if ((tag & 7) === 4 || tag === 0) {
+        break;
+      }
+      reader.skip(tag & 7);
+    }
+    return message;
+  },
+
+  fromJSON(object: any): RunTool {
+    return {
+      name: isSet(object.name) ? globalThis.String(object.name) : "",
+      args: isSet(object.args) ? globalThis.String(object.args) : "",
+    };
+  },
+
+  toJSON(message: RunTool): unknown {
+    const obj: any = {};
+    if (message.name !== "") {
+      obj.name = message.name;
+    }
+    if (message.args !== "") {
+      obj.args = message.args;
+    }
+    return obj;
+  },
+
+  create<I extends Exact<DeepPartial<RunTool>, I>>(base?: I): RunTool {
+    return RunTool.fromPartial(base ?? ({} as any));
+  },
+  fromPartial<I extends Exact<DeepPartial<RunTool>, I>>(object: I): RunTool {
+    const message = createBaseRunTool();
     message.name = object.name ?? "";
     message.args = object.args ?? "";
     return message;

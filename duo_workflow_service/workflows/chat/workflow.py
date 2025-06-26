@@ -23,6 +23,7 @@ from duo_workflow_service.entities.state import (
     UiChatLog,
     WorkflowStatusEnum,
 )
+from duo_workflow_service.tools.additional_tools import AdditionalTool
 from duo_workflow_service.tracking.errors import log_exception
 from duo_workflow_service.workflows.abstract_workflow import AbstractWorkflow
 from lib.feature_flags.context import FeatureFlag, is_feature_enabled
@@ -234,6 +235,12 @@ class Workflow(AbstractWorkflow):
         mcp_enabled = self._workflow_config.get("mcp_enabled", False)
         if is_feature_enabled(FeatureFlag.DUO_WORKFLOW_MCP_SUPPORT) and mcp_enabled:
             available_tools += [tool.name for tool in self._additional_tools]
+        else:
+            available_tools += [
+                tool.name
+                for tool in self._additional_tools
+                if isinstance(tool, AdditionalTool)
+            ]
 
         return available_tools
 

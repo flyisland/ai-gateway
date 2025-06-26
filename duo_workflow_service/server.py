@@ -113,7 +113,7 @@ class DuoWorkflowService(contract_pb2_grpc.DuoWorkflowServicer):
                         f"Unauthorized to access {unit_primitive}",
                     )
 
-    # pylint: disable=invalid-overridden-method
+    # pylint: disable=invalid-overridden-method,too-many-statements
     async def ExecuteWorkflow(
         self,
         request_iterator: AsyncIterable[contract_pb2.ClientEvent],
@@ -175,6 +175,10 @@ class DuoWorkflowService(contract_pb2_grpc.DuoWorkflowServicer):
         if start_workflow_request.startRequest.mcpTools:
             mcp_tools = list(start_workflow_request.startRequest.mcpTools)
 
+        additional_tools = []
+        if start_workflow_request.startRequest.additionalTools:
+            additional_tools = list(start_workflow_request.startRequest.additionalTools)
+
         workflow_type = string_to_category_enum(workflow_definition)
         workflow_class: TypeWorkflow = resolve_workflow_class(workflow_definition)
 
@@ -186,6 +190,7 @@ class DuoWorkflowService(contract_pb2_grpc.DuoWorkflowServicer):
             workflow_type=workflow_type,
             user=user,
             mcp_tools=mcp_tools,
+            additional_tools=additional_tools,
             additional_context=additional_context,
             context_elements=context_elements,
             invocation_metadata={

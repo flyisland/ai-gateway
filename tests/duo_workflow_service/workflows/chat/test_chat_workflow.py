@@ -80,6 +80,11 @@ def workflow_with_project(
         workflow_type=CategoryEnum.WORKFLOW_CHAT,
         context_elements=[context_element],
         mcp_tools=[contract_pb2.McpTool(name="extra_tool", description="Extra tool")],
+        additional_tools=[
+            contract_pb2.Tool(
+                name="additional_tool", source="source", description="Additional tool"
+            )
+        ],
     )
     workflow._project = {
         "id": 123,
@@ -340,27 +345,32 @@ async def test_workflow_run(
         (
             [],
             {},
-            CHAT_READ_ONLY_TOOLS + CHAT_MUTATION_TOOLS,
+            CHAT_READ_ONLY_TOOLS + CHAT_MUTATION_TOOLS + ["additional_tool"],
         ),
         (
             ["duo_workflow_web_chat_mutation_tools"],
             {},
-            CHAT_READ_ONLY_TOOLS + CHAT_MUTATION_TOOLS + CHAT_GITLAB_MUTATION_TOOLS,
+            CHAT_READ_ONLY_TOOLS
+            + CHAT_MUTATION_TOOLS
+            + CHAT_GITLAB_MUTATION_TOOLS
+            + ["additional_tool"],
         ),
         (
             [],
             {"mcp_enabled": True},
-            CHAT_READ_ONLY_TOOLS + CHAT_MUTATION_TOOLS,
+            CHAT_READ_ONLY_TOOLS + CHAT_MUTATION_TOOLS + ["additional_tool"],
         ),
         (
             ["duo_workflow_mcp_support"],
             {},
-            CHAT_READ_ONLY_TOOLS + CHAT_MUTATION_TOOLS,
+            CHAT_READ_ONLY_TOOLS + CHAT_MUTATION_TOOLS + ["additional_tool"],
         ),
         (
             ["duo_workflow_mcp_support"],
             {"mcp_enabled": True},
-            CHAT_READ_ONLY_TOOLS + CHAT_MUTATION_TOOLS + ["extra_tool"],
+            CHAT_READ_ONLY_TOOLS
+            + CHAT_MUTATION_TOOLS
+            + ["extra_tool", "additional_tool"],
         ),
     ],
 )

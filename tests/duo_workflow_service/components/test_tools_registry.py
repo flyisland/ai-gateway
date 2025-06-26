@@ -13,6 +13,8 @@ from duo_workflow_service.components.tools_registry import (
     ToolsRegistry,
 )
 from duo_workflow_service.gitlab.http_client import GitlabHttpClient
+from duo_workflow_service.tools.additional_tools import AdditionalTool
+from duo_workflow_service.tools.mcp_tools import McpTool
 
 
 @pytest.fixture
@@ -301,8 +303,11 @@ async def test_registry_configuration(gl_http_client):
         "id": "test_workflow",
         "agent_privileges_names": ["run_commands"],
     }
-    extra_tool = MagicMock(spec=BaseTool)
-    extra_tool.name = "extra_tool"
+    extra_mcp_tool = MagicMock(spec=BaseTool)
+    extra_mcp_tool.name = "extra_mcp_tool"
+
+    extra_additional_tool = MagicMock(spec=BaseTool)
+    extra_additional_tool.name = "extra_additional_tool"
 
     registry = await ToolsRegistry.configure(
         workflow_config=workflow_config,
@@ -310,7 +315,7 @@ async def test_registry_configuration(gl_http_client):
         outbox=_outbox,
         inbox=_inbox,
         gitlab_host="gitlab.example.com",
-        additional_tools=[extra_tool],
+        additional_tools=[extra_mcp_tool, extra_additional_tool],
     )
 
     # Verify configured tools based on privileges
@@ -324,9 +329,12 @@ async def test_registry_configuration(gl_http_client):
         "run_command",
         "handover_tool",
         "request_user_clarification_tool",
-        "extra_tool",
+        "extra_mcp_tool",
+        "extra_additional_tool",
     }
-    assert registry.approval_required("extra_tool") == True
+
+    assert registry.approval_required("extra_mcp_tool") == True
+    assert registry.approval_required("extra_additional_tool") == True
 
 
 @pytest.mark.parametrize(
