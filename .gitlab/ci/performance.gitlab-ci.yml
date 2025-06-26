@@ -33,7 +33,7 @@ tests:performance:
       artifacts: true
   trigger:
     project: gitlab-org/quality/component-performance-testing
-    branch: jmd/fix-instance-already-exists-error
+    branch: vp/pull-latest-for-gitlab-repo
     strategy: depend
     forward:
       pipeline_variables: true
