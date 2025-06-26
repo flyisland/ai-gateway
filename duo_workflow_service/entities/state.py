@@ -57,6 +57,7 @@ class WorkflowStatusEnum(StrEnum):
     TOOL_CALL_APPROVAL_REQUIRED = "tool_call_approval_required"
     APPROVAL_ERROR = "approval_error"
 
+
 class MessageTypeEnum(StrEnum):
     AGENT = "agent"
     USER = "user"
@@ -349,9 +350,12 @@ def merge_nested_dict(existing: dict[str, Any], new: dict[str, Any]) -> dict[str
     return result
 
 
-def merge_nested_dict_reducer(left: dict[str, Any], right: dict[str, Any]) -> dict[str, Any]:
+def merge_nested_dict_reducer(
+    left: dict[str, Any], right: dict[str, Any]
+) -> dict[str, Any]:
     """Reducer specifically for nested dictionary fields."""
     return merge_nested_dict(left or {}, right or {})
+
 
 class PoCWorkflowState(TypedDict):
     status: WorkflowStatusEnum

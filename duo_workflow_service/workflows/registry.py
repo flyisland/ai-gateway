@@ -5,9 +5,9 @@ from typing import Optional
 from duo_workflow_service.workflows import (
     chat,
     convert_to_gitlab_ci,
+    issue_to_mr,
     search_and_replace,
     software_development,
-    issue_to_mr,
 )
 
 from .abstract_workflow import TypeWorkflow

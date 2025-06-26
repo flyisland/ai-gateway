@@ -1,22 +1,30 @@
+import re
 from abc import ABC, abstractmethod
 from datetime import datetime, timezone
 from enum import StrEnum
 from functools import partial
-from typing import Annotated, Any, Callable, Literal, Optional, Self, Type, TypedDict
+from typing import Annotated, Any, Callable, Optional, Protocol, Self, Type, TypedDict, NamedTuple
 
 from dependency_injector.wiring import Provide, inject
-from langchain_core.messages import AIMessage, BaseMessage, HumanMessage, ToolMessage
-from langchain_core.output_parsers import PydanticToolsParser
+from langchain_core.messages import AIMessage, BaseMessage, ToolMessage
+from langchain_core.output_parsers import PydanticToolsParser, StrOutputParser
+from langchain_core.tools import BaseTool
 from langgraph.constants import END
 from langgraph.graph import StateGraph
-from langgraph.types import interrupt
-from pydantic import BaseModel, ConfigDict, Field, model_validator
+from pydantic import BaseModel, ConfigDict, Field, PrivateAttr, model_validator, RootModel
+from pydantic_core import ValidationError
+from typing_extensions import Pattern
 
 from ai_gateway.container import ContainerApplication
 from ai_gateway.prompts import LocalPromptRegistry, Prompt
-from duo_workflow_service.entities import WorkflowStatusEnum
-from duo_workflow_service.entities.state import MessageTypeEnum, ToolStatus, UiChatLog
-from duo_workflow_service.tools import Toolset
+from duo_workflow_service.entities import (
+    MessageTypeEnum,
+    ToolInfo,
+    ToolStatus,
+    UiChatLog,
+    WorkflowStatusEnum,
+)
+from duo_workflow_service.tools import PipelineException, Toolset, DuoBaseTool
 
 __all__ = ["BaseComponent", "AgentComponent"]
 
@@ -25,12 +33,16 @@ InjectedValue = None
 
 
 def get_vars_from_context(
-    inputs: list[str], context: dict[str, Any], splitter: str = "."
+    inputs: list[str], context: dict[str, Any], splitter: Optional[Pattern] = None
 ) -> dict[str, Any]:
     variables = {}
+
+    if not splitter:
+        splitter = re.compile(r"[\.#]")
+
     for inp in inputs:
         current = context
-        keys = inp.split(splitter)
+        keys = splitter.split(inp)
 
         for parent_key in keys:
             current = current[parent_key]
@@ -43,12 +55,12 @@ def get_vars_from_context(
 class HasBaseStateFields(TypedDict):
     conversation_history: dict[str, dict[str, list[BaseMessage]]]
     context: dict[str, Any]
+    ui_chat_log: list[UiChatLog]
 
 
 class Routes(StrEnum):
     TOOL_USE = "tool_use"
     STOP = "stop"
-
 
 class AgentFinalOutput(BaseModel):
     """Always use this tool if no other tools are appropriate."""
@@ -58,6 +70,179 @@ class AgentFinalOutput(BaseModel):
     @property
     def content(self) -> str:
         return self.text
+
+
+class LogEntry(NamedTuple):
+    record: UiChatLog
+    event: StrEnum
+
+
+class UILogCallback(Protocol):
+    def __call__(self, log_entry: LogEntry) -> None: ...
+
+
+class BaseUILogWriter(ABC):
+    def __init__(self, log_callback: UILogCallback):
+        self._log_callback = log_callback
+
+    def success(self, *args, **kwargs) -> None:
+        event = kwargs.pop("event")
+        record = self._create_success_log(*args, **kwargs)
+        self._log_callback(LogEntry(record=record, event=event))
+
+    def error(self, *args, **kwargs) -> None:
+        event = kwargs.pop("event")
+        record = self._create_error_log(*args, **kwargs)
+        self._log_callback(LogEntry(record=record, event=event))
+
+    def _create_success_log(self, *args, **kwargs) -> UiChatLog:
+        raise NotImplementedError
+
+    def _create_error_log(self, *args, **kwargs) -> UiChatLog:
+        raise NotImplementedError
+
+
+class UIHistory[W: BaseUILogWriter](BaseModel):
+    model_config = ConfigDict(arbitrary_types_allowed=True)
+
+    writer: Type[W]
+    config: bool | list[StrEnum]
+    _logs: list[LogEntry] = PrivateAttr(default_factory=list)
+
+    def _add_log(self, log_entry: LogEntry) -> None:
+        """Callback function for writers."""
+        self._logs.append(log_entry)
+
+    @property
+    def log(self) -> W:
+        return self.writer(self._add_log)
+
+    @property
+    def state(self) -> dict[str, Any]:
+        logs = []
+        if self.config and isinstance(self.config, bool):
+            # All events are enabled to be logged
+            logs.extend([log.record for log in self._logs])
+        elif isinstance(self.config, list):
+            # Log only specified events
+            logs.extend([
+                log.record
+                for log in self._logs
+                if log.event in self.config
+            ])
+
+        return {"ui_chat_log": logs}
+
+
+class UIHistoryAgentConfig(BaseModel):
+    class EventsLLM(StrEnum):
+        ON_FINAL_ANSWER = "on_final_answer"
+
+    class EventsTool(StrEnum):
+        ON_EXECUTION_SUCCESS = "on_execution_success"
+        ON_EXECUTION_FAILED = "on_execution_failed"
+
+    llm: bool | list[EventsLLM] = Field(default=True)
+    tools: bool | list[EventsTool] = Field(default=True)
+
+
+class UIHistoryLambdaConfig(RootModel):
+    class Events(StrEnum):
+        ON_EXECUTION_SUCCESS = "on_execution_success"
+
+    root: bool | list[Events] = Field(default=False)
+
+
+class UILogWriterAgentLLM(BaseUILogWriter):
+    def _create_success_log(
+        self,
+        message: str,
+        **kwargs
+    ) -> UiChatLog:
+        return UiChatLog(
+            message_type=MessageTypeEnum.AGENT,
+            content=str(message),
+            timestamp=datetime.now(timezone.utc).isoformat(),
+            status=ToolStatus.SUCCESS,
+            correlation_id=kwargs.get("correlation_id"),
+            tool_info=None,
+            context_elements=kwargs.get("context_elements", []),
+        )
+
+
+class UILogWriterAgentTools(BaseUILogWriter):
+    def _create_success_log(
+        self,
+        tool: BaseTool,
+        tool_call_args: dict[str, Any],
+        **kwargs
+    ) -> UiChatLog:
+        return UiChatLog(
+            message_type=MessageTypeEnum.TOOL,
+            content=self._format_message(tool, tool_call_args),
+            timestamp=datetime.now(timezone.utc).isoformat(),
+            status=ToolStatus.SUCCESS,
+            correlation_id=kwargs.get("correlation_id"),
+            tool_info=ToolInfo(name=tool.name, args=tool_call_args),
+            context_elements=kwargs.get("context_elements", []),
+        )
+
+    def _create_error_log(
+        self,
+        message: str,
+        tool: BaseTool,
+        tool_call_args: dict[str, Any],
+        **kwargs
+    ) -> UiChatLog:
+        content = (
+            f"Failed: {self._format_message(tool, tool_call_args)} - {message}"
+        )
+
+        return UiChatLog(
+            message_type=MessageTypeEnum.TOOL,
+            content=content,
+            timestamp=datetime.now(timezone.utc).isoformat(),
+            status=ToolStatus.FAILURE,
+            correlation_id=kwargs.get("correlation_id"),
+            tool_info=ToolInfo(name=tool.name, args=tool_call_args),
+            context_elements=kwargs.get("context_elements", []),
+        )
+
+    @staticmethod
+    def _format_message(tool: BaseTool, tool_call_args: dict[str, Any]) -> str:
+        if not hasattr(tool, "format_display_message"):
+            args_str = ", ".join(f"{k}={str(v)}" for k, v in tool_call_args.items())
+            return f"Using {tool.name}: {args_str}"
+
+        try:
+            schema = getattr(tool, "args_schema", None)
+            if isinstance(schema, type) and issubclass(schema, BaseModel):
+                # type: ignore[arg-type]
+                parsed = schema(**tool_call_args)
+                return tool.format_display_message(parsed)
+        except Exception:
+            return tool.format_display_message(DuoBaseTool, tool_call_args)
+
+        return tool.format_display_message(tool_call_args)
+
+
+class UILogWriterLambda(BaseUILogWriter):
+    def _create_success_log(
+        self,
+        message: str,
+        *,
+        role: MessageTypeEnum,
+        **kwargs
+    ) -> UiChatLog:
+        return UiChatLog(
+            message_type=role,
+            content=message,
+            timestamp=datetime.now(timezone.utc).isoformat(),
+            status=ToolStatus.SUCCESS,
+            correlation_id=kwargs.get("correlation_id"),
+            tool_info=None,
+            context_elements=kwargs.get("context_elements", []),
+        )
 
 
 class BaseComponent(BaseModel, ABC):
@@ -163,6 +348,44 @@ class AgentNode[T: HasBaseStateFields](BaseModel):
     output_type: Optional[Type[BaseModel]]
     output: Optional[str]
 
+    ui_history: UIHistory[UILogWriterAgentLLM]
+
+    async def _try_parse_structured_response(
+        self, completion: AIMessage
+    ) -> Optional[dict[str, Any]]:
+        if (
+            self.output_type
+            and len(completion.tool_calls) > 0
+            and completion.tool_calls[0]["name"] == self.output_type.__name__
+        ):
+            output_parser = PydanticToolsParser(
+                tools=[self.output_type], first_tool_only=True
+            )
+            parsed = await output_parser.ainvoke(completion)
+
+            return parsed.model_dump(mode="json")
+
+        return None
+
+    async def _try_parse_raw_response(self, completion: AIMessage) -> Optional[str]:
+        if not self.output_type and len(completion.tool_calls) == 0:
+            output_parser = StrOutputParser()
+            return await output_parser.ainvoke(completion)
+
+        return None
+
+    async def _process_final_response(self, completion: AIMessage) -> Any:
+        parsers = [
+            self._try_parse_structured_response,
+            self._try_parse_raw_response,
+        ]
+
+        for parser in parsers:
+            if response := await parser(completion):
+                return response
+
+        return None
+
     async def run(self, state: T) -> dict:
         history = state["conversation_history"].get(self.component_name, [])
         context = state["context"].get(self.component_name, {})
@@ -172,19 +395,21 @@ class AgentNode[T: HasBaseStateFields](BaseModel):
             input={**variables, "history": history}
         )
 
-        if (
-            self.output_type
-            and len(completion.tool_calls) > 0
-            and completion.tool_calls[0]["name"] == self.output_type.__name__
-        ):
-            output_parser = PydanticToolsParser(
-                tools=[self.output_type], first_tool_only=True
+        if final_response := await self._process_final_response(completion):
+            if self.output:
+                context[self.output] = final_response
+
+            self.ui_history.log.success(
+                final_response,
+                event=UIHistoryAgentConfig.EventsLLM.ON_FINAL_ANSWER
             )
-            parsed_completion: BaseModel = await output_parser.ainvoke(completion)
-            context[self.output] = parsed_completion.model_dump(mode="json")
-            completion = AIMessage(content=parsed_completion.content)
+
+        # parsed_completion: BaseModel = await output_parser.ainvoke(completion)
+        # context[self.output] = parsed_completion.model_dump(mode="json")
+        # completion = AIMessage(content=parsed_completion.content)
 
         return {
+            **self.ui_history.state,
             "context": {self.component_name: context},
             "conversation_history": {self.component_name: [*history, completion]},
         }
@@ -197,13 +422,14 @@ class ToolNode[T: HasBaseStateFields](BaseModel):
     component_name: str
     toolset: Toolset
 
+    ui_history: UIHistory[UILogWriterAgentTools]
+
     async def run(self, state: T) -> dict:
         conversation_history = state["conversation_history"].get(
             self.component_name, []
         )
-        context = state["context"].get(self.component_name, {"tool_calls": []})
-        if "tool_calls" not in context:
-            context["tool_calls"] = []
+        context = state["context"].get(self.component_name, {})
+        context.setdefault("tool_calls", [])
 
         last_message = conversation_history[-1]
         tool_calls = getattr(last_message, "tool_calls", [])
@@ -211,27 +437,102 @@ class ToolNode[T: HasBaseStateFields](BaseModel):
 
         for tool_call in tool_calls:
             tool_name = tool_call["name"]
-            tool_args = tool_call.get("args", {})
+            tool_call_args = tool_call.get("args", {})
             tool_call_id = tool_call.get("id")
 
             context["tool_calls"].append(
-                {"id": tool_call_id, "name": tool_name, "args": tool_args}
+                {"id": tool_call_id, "name": tool_name, "args": tool_call_args}
             )
 
-            tool_response = f"Tool {tool_name} not found"
-            if tool_name in self.toolset:
-                tool_response = await self.toolset[tool_name].arun(tool_args)
+            if tool_name not in self.toolset:
+                response = ToolMessage(
+                    content=f"Tool {tool_name} not found", tool_call_id=tool_call_id
+                )
+            else:
+                tool = self.toolset[tool_name]
+                response = await self._execute_tool(tool_call_id, tool_call_args, tool)
 
-            tools_responses.append(
-                ToolMessage(content=tool_response, tool_call_id=tool_call_id)
-            )
+            tools_responses.append(response)
 
         return {
+            **self.ui_history.state,
             "conversation_history": {
                 self.component_name: [*conversation_history, *tools_responses],
             },
             "context": {self.component_name: context},
         }
+
+    async def _execute_tool(
+        self, tool_call_id: str, tool_call_args: dict[str, Any], tool: BaseTool
+    ) -> ToolMessage:
+        # Several utility log functions to avoid boilerplate code
+        log_success = partial(self.ui_history.log.success, tool=tool, tool_call_args=tool_call_args)
+        log_error = partial(self.ui_history.log.error, tool=tool, tool_call_args=tool_call_args)
+
+        try:
+            tool_call_result = await tool.arun(tool_call_args)
+            response = ToolMessage(content=tool_call_result, tool_call_id=tool_call_id)
+            log_success(event=UIHistoryAgentConfig.EventsTool.ON_EXECUTION_SUCCESS)
+        except TypeError as e:
+            response = self._handle_type_error(tool_call_id, tool, e)
+            log_error(
+                "Invalid arguments",
+                event=UIHistoryAgentConfig.EventsTool.ON_EXECUTION_FAILED
+            )
+        except ValidationError as e:
+            response = self._handle_validation_error(tool_call_id, tool, e)
+            log_error(
+                "Validation error",
+                event=UIHistoryAgentConfig.EventsTool.ON_EXECUTION_FAILED
+            )
+        except PipelineException as e:
+            response = self._handle_pipeline_error(tool_call_id, tool, e)
+            log_error(
+                f"Pipeline error: {str(e)}",
+                event=UIHistoryAgentConfig.EventsTool.ON_EXECUTION_FAILED
+            )
+
+        return response
+
+    @staticmethod
+    def _handle_type_error(
+        tool_call_id: str, tool: BaseTool, _e: TypeError
+    ) -> ToolMessage:
+        schema = (
+            f"The schema is: {tool.args_schema.model_json_schema()}"
+            if tool.args_schema
+            else "The tool does not accept any argument"
+        )
+
+        response = (
+            f"Tool {tool.name} execution failed due to wrong arguments."
+            f" You must adhere to the tool args schema! {schema}"
+        )
+
+        return ToolMessage(
+            content=response,
+            tool_call_id=tool_call_id,
+        )
+
+    @staticmethod
+    def _handle_validation_error(
+        tool_call_id: str,
+        tool: BaseTool,
+        e: ValidationError,
+    ) -> ToolMessage:
+        response = f"Tool {tool.name} raised validation error {str(e)}"
+
+        return ToolMessage(content=response, tool_call_id=tool_call_id)
+
+    @staticmethod
+    def _handle_pipeline_error(
+        tool_call_id: str,
+        _tool: BaseTool,
+        e: PipelineException,
+    ) -> ToolMessage:
+        response = f"Pipeline exception due to {str(e)}"
+
+        return ToolMessage(content=response, tool_call_id=tool_call_id)
 
 
 @inject
@@ -241,6 +542,7 @@ class AgentComponent[T: HasBaseStateFields](BaseComponent):
     toolset: Toolset
 
     output_type: Optional[Type[BaseModel]] = None
+    ui_history_config: UIHistoryAgentConfig = Field(default_factory=UIHistoryAgentConfig)
 
     prompt_registry: Annotated[
         LocalPromptRegistry, Provide[ContainerApplication.pkg_prompts.prompt_registry]
@@ -302,9 +604,19 @@ class AgentComponent[T: HasBaseStateFields](BaseComponent):
             inputs=self.inputs,
             output_type=self.output_type,
             output=self.output,
+            ui_history=UIHistory(
+                config=self.ui_history_config.llm,
+                writer=UILogWriterAgentLLM
+            ),
         )
         node_tools = ToolNode(
-            name=f"{self.name}#tools", component_name=self.name, toolset=self.toolset
+            name=f"{self.name}#tools",
+            component_name=self.name,
+            toolset=self.toolset,
+            ui_history=UIHistory(
+                config=self.ui_history_config.tools,
+                writer=UILogWriterAgentTools
+            ),
         )
 
         graph.add_node(self.__entry_hook__(), node_agent.run)
@@ -390,7 +702,18 @@ class HiltChatBackComponent(BaseComponent):
 
 
 class LambdaComponent[T: HasBaseStateFields](BaseComponent):
-    fn: Callable[[...], Optional[Any]]
+    fn: Callable
+
+    ui_role: MessageTypeEnum = Field(default=MessageTypeEnum.TOOL)
+    ui_history_config: UIHistoryLambdaConfig = Field(default_factory=UIHistoryLambdaConfig)
+
+    _ui_history: UIHistory[UILogWriterLambda] = PrivateAttr()
+
+    @model_validator(mode="after")
+    def init_component(self) -> Self:
+        self._ui_history = UIHistory(config=self.ui_history_config.root, writer=UILogWriterLambda)
+
+        return self
 
     def _run_lambda(self, state: T) -> dict[str, Any]:
         variables = get_vars_from_context(self.inputs, state["context"])
@@ -402,10 +725,20 @@ class LambdaComponent[T: HasBaseStateFields](BaseComponent):
                 "The lambda function returns a non-empty object, however the 'output' key was empty"
             )
 
-        if self.output:
-            context[self.output] = updates
+        if updates:
+            self._ui_history.log.success(
+                str(updates),
+                event=UIHistoryLambdaConfig.Events.ON_EXECUTION_SUCCESS,
+                role=self.ui_role,
+            )
 
-        return {"context": {self.name: context}}
+            if self.output:
+                context[self.output] = updates
+
+        return {
+            **self._ui_history.state,
+            "context": {self.name: context}
+        }
 
     def __entry_hook__(self):
         return f"{self.name}#lambda"
@@ -440,7 +773,7 @@ def attach_components_to_graph(graph, components, start, end):
     for comp in components:
         deps = []
         for input_path in comp.inputs:
-            dep_name, _, _ = input_path.partition(".")
+            dep_name, _, _ = input_path.partition("#")
             if dep_name in component_map and dep_name != comp.name:
                 deps.append(dep_name)
         dependencies[comp.name] = deps
