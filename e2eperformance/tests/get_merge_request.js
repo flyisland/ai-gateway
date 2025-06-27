@@ -3,7 +3,7 @@ import { check, sleep } from 'k6';
 import { textSummary } from 'https://jslib.k6.io/k6-summary/0.0.1/index.js';
 export const TTFB_THRESHOLD= 25;
 export const RPS_THRESHOLD= 2;
-export const TEST_NAME='v2_code_completions'
+export const TEST_NAME='get_merge_request'
 export const LOAD_TEST_VUS = 2;
 export const LOAD_TEST_DURATION = '40s';
 export const WARMUP_TEST_VUS = 1;
@@ -38,30 +38,13 @@ scenarios:  {
 };
 
 export default function () {
-  const url = `http://${__ENV.AI_GATEWAY_IP}:5052/v2/code/completions`; // Replace with your API endpoint
-  const payload = JSON.stringify({
-    "project_path": "string",
-    "project_id": 0,
-    "current_file": {
-      "file_name": "test",
-      "language_identifier": "string",
-      "content_above_cursor": "func hello_world(){\n\t",
-      "content_below_cursor": "\n}"
-    },
-    "stream": true,
-    "choices_count": 0,
-    "context": [],
-    "prompt_id": "code_suggestions/generations",
-    "prompt_version": 2
-  });
+  const url = `http://gitlab.${__ENV.AI_GATEWAY_IP}.nip.io/api/v4/users`; // Replace with your API endpoint
+ 
+  let params = { headers: { "Accept": "application/json", "PRIVATE-TOKEN": `${__ENV.GITLAB_QA_ADMIN_ACCESS_TOKEN}` } };
 
-  const params = {
-    headers: {
-      'Content-Type': 'application/json',
-    },
-  };
 
-  const res = http.post(url, payload, params);
+
+  const res = http.get(url, params);
 
   console.log(`Request ${__ITER}: ${res.request.method} ${res.request.url} - Status ${res.status} - Duration ${res.timings.duration}ms`);
 

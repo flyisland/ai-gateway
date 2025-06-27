@@ -11,7 +11,7 @@ dotenv-vars:
     - cat variables.env
   artifacts:
     paths:
-      - performance_tests
+      - e2eperformance
       - variables.env
     expire_in: 5d
     reports:
@@ -33,7 +33,7 @@ tests:performance:
       artifacts: true
   trigger:
     project: gitlab-org/quality/component-performance-testing
-    branch: main
+    branch: vp/pull-latest-for-gitlab-repo
     strategy: depend
     forward:
       pipeline_variables: true
@@ -47,6 +47,10 @@ tests:performance:
     PARENT_PIPELINE_SOURCE: $CI_PIPELINE_SOURCE
     COMPONENT_MR_CI_COMMIT_SHA: $CI_COMMIT_SHORT_SHA
     COMPONENT_SERVICE_NAME: "ai-gateway-influx"
+    GITLAB_HELM_CHART_REF: "6cdb0e1cd4ceb7c9fd01ffa2f62c4a7a4c77a23b"
+    TEST_FILE_LOCATION: "e2eperformance/tests"
+    # DOCKER_COMPOSE_FILE_LOCATION: "performance_tests/setup"
+    RUN_ON_CNG: true
   rules:
     - if: $CI_PROJECT_NAMESPACE =~ /^gitlab-org\/security.*/
       when: never
