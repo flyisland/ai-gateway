@@ -2,18 +2,18 @@ from abc import ABC, abstractmethod
 from datetime import datetime, timezone
 from enum import StrEnum
 from functools import partial
-from typing import Literal, Optional, Annotated, Type, Self, Any, TypedDict, Callable
+from typing import Annotated, Any, Callable, Literal, Optional, Self, Type, TypedDict
 
 from dependency_injector.wiring import Provide, inject
-from langchain_core.messages import ToolMessage, BaseMessage, AIMessage, HumanMessage
+from langchain_core.messages import AIMessage, BaseMessage, HumanMessage, ToolMessage
 from langchain_core.output_parsers import PydanticToolsParser
-from langgraph.types import interrupt
 from langgraph.constants import END
 from langgraph.graph import StateGraph
-from pydantic import BaseModel, Field, ConfigDict, model_validator
+from langgraph.types import interrupt
+from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 from ai_gateway.container import ContainerApplication
-from ai_gateway.prompts import Prompt, LocalPromptRegistry
+from ai_gateway.prompts import LocalPromptRegistry, Prompt
 from duo_workflow_service.entities import WorkflowStatusEnum
 from duo_workflow_service.entities.state import MessageTypeEnum, ToolStatus, UiChatLog
 from duo_workflow_service.tools import Toolset
@@ -50,6 +50,15 @@ class Routes(StrEnum):
     STOP = "stop"
 
 
+class AgentFinalOutput(BaseModel):
+    """Always use this tool if no other tools are appropriate."""
+
+    text: str = Field(description="text")
+
+    @property
+    def content(self) -> str:
+        return self.text
+
 
 class BaseComponent(BaseModel, ABC):
     model_config = ConfigDict(arbitrary_types_allowed=True, frozen=True)
@@ -80,10 +89,9 @@ class BaseComponent(BaseModel, ABC):
         pass
 
     @abstractmethod
-    def __entry_hook__(
-        self
-    ) -> Annotated[str, "Entry node name"]:
+    def __entry_hook__(self) -> Annotated[str, "Entry node name"]:
         pass
+
 
 class EndComponent(BaseComponent):
     def __entry_hook__(self):
@@ -92,9 +100,11 @@ class EndComponent(BaseComponent):
     def attach(self, graph: StateGraph, router: Any) -> str:
         return END
 
+
 ConditionPredicateType = str | int
 
 DEFAULT_ROUTE = "default_route"
+
 
 class Router[T: HasBaseStateFields](BaseModel):
     input: Optional[str] = None
@@ -109,20 +119,18 @@ class Router[T: HasBaseStateFields](BaseModel):
                 "If input is None, then conditions must be a BaseComponent"
             )
         return self
-    
+
     # validate that if input is not None, then conditions is a dict
     @model_validator(mode="after")
     def validate_router_fields_dict(self) -> Self:
         if self.input is not None and not isinstance(self.to_component, dict):
-            raise ValueError(
-                "If input is not None, then conditions must be a dict"
-            )
+            raise ValueError("If input is not None, then conditions must be a dict")
         return self
 
     def attach(
-            self, 
-            graph: StateGraph,
-        ):
+        self,
+        graph: StateGraph,
+    ):
         self.from_component.attach(graph, self)
 
     def route(self, state: T) -> str:
@@ -130,7 +138,7 @@ class Router[T: HasBaseStateFields](BaseModel):
             return self.to_component.__entry_hook__()
 
         route_value = get_vars_from_context([self.input], state)
-        route_value = route_value[self.input.split(".")[-1]]
+        route_value = str(route_value[self.input.split(".")[-1]])
 
         if route_value in self.to_component:
             return self.to_component[route_value].__entry_hook__()
@@ -138,8 +146,9 @@ class Router[T: HasBaseStateFields](BaseModel):
         if DEFAULT_ROUTE in self.to_component:
             return self.to_component[DEFAULT_ROUTE].__entry_hook__()
 
-        raise KeyError(f"Route key {route_value} not found in conditions {self.to_component}")
-
+        raise KeyError(
+            f"Route key {route_value} not found in conditions {self.to_component}"
+        )
 
 
 class AgentNode[T: HasBaseStateFields](BaseModel):
@@ -193,8 +202,8 @@ class ToolNode[T: HasBaseStateFields](BaseModel):
             self.component_name, []
         )
         context = state["context"].get(self.component_name, {"tool_calls": []})
-        if 'tool_calls' not in context:
-            context['tool_calls'] = []
+        if "tool_calls" not in context:
+            context["tool_calls"] = []
 
         last_message = conversation_history[-1]
         tool_calls = getattr(last_message, "tool_calls", [])
@@ -269,10 +278,10 @@ class AgentComponent[T: HasBaseStateFields](BaseComponent):
             return f"{self.name}#tools"
 
         return router.route(state)
-    
+
     def __entry_hook__(self):
         return f"{self.name}#agent"
-    
+
     def attach(
         self, graph: StateGraph, router: Router[T]
     ) -> Annotated[str, "Entry node name"]:
@@ -303,11 +312,12 @@ class AgentComponent[T: HasBaseStateFields](BaseComponent):
 
         graph.add_conditional_edges(
             self.__entry_hook__(),
-            partial(self._are_tools_called, component_name=self.name, router=router)
+            partial(self._are_tools_called, component_name=self.name, router=router),
         )
         graph.add_edge(node_tools.name, node_agent.name)
 
         return self.__entry_hook__()
+
 
 class HiltComponent(BaseComponent):
     human_prompt: str
@@ -319,10 +329,7 @@ class HiltComponent(BaseComponent):
         graph.add_node(self.__entry_hook__(), self._prompt_human)
         graph.add_edge(self.__entry_hook__(), f"{self.name}#check")
         graph.add_node(f"{self.name}#check", self._fetch_human_input)
-        graph.add_conditional_edges(
-            f"{self.name}#check",
-            router.route
-        )
+        graph.add_conditional_edges(f"{self.name}#check", router.route)
 
         return self.__entry_hook__()
 
@@ -335,22 +342,15 @@ class HiltComponent(BaseComponent):
             tool_info=None,
             context_elements=None,
         )
-        return {
-            "status": WorkflowStatusEnum.INPUT_REQUIRED,
-            "ui_chat_log": [ui_log]
-        }
+        return {"status": WorkflowStatusEnum.INPUT_REQUIRED, "ui_chat_log": [ui_log]}
 
     def _fetch_human_input(self, state):
         human_input: str = interrupt("Workflow interrupted")
         context = state["context"].get(self.name, {})
         context[self.output] = human_input
 
-        return {
-            "status": WorkflowStatusEnum.EXECUTION,
-            "context": {
-                self.name: context
-            }
-        }
+        return {"status": WorkflowStatusEnum.EXECUTION, "context": {self.name: context}}
+
 
 class HiltChatBackComponent(BaseComponent):
 
@@ -360,10 +360,11 @@ class HiltChatBackComponent(BaseComponent):
     def attach(self, graph: StateGraph, router: Any) -> str:
         graph.add_node(self.__entry_hook__(), self._prompt_human)
         graph.add_edge(self.__entry_hook__(), f"{self.name}#hiltChatBackFetchResponse")
-        graph.add_node(f"{self.name}#hiltChatBackFetchResponse", self._fetch_human_input)
+        graph.add_node(
+            f"{self.name}#hiltChatBackFetchResponse", self._fetch_human_input
+        )
         graph.add_conditional_edges(
-            f"{self.name}#hiltChatBackFetchResponse",
-            router.route
+            f"{self.name}#hiltChatBackFetchResponse", router.route
         )
 
         return self.__entry_hook__()
@@ -380,7 +381,10 @@ class HiltChatBackComponent(BaseComponent):
         return {
             "status": WorkflowStatusEnum.EXECUTION,
             "conversation_history": {
-                 self.output: [*state['conversation_history'][self.output], HumanMessage(content=human_input)],
+                self.output: [
+                    *state["conversation_history"][self.output],
+                    HumanMessage(content=human_input),
+                ],
             },
         }
 
@@ -394,30 +398,28 @@ class LambdaComponent[T: HasBaseStateFields](BaseComponent):
 
         updates = self.fn(**variables)
         if updates and not self.output:
-            raise Warning("The lambda function returns a non-empty object, however the 'output' key was empty")
+            raise Warning(
+                "The lambda function returns a non-empty object, however the 'output' key was empty"
+            )
 
         if self.output:
             context[self.output] = updates
 
-        return {
-            "context": {
-                self.name: context
-            }
-        }
-    
+        return {"context": {self.name: context}}
+
     def __entry_hook__(self):
         return f"{self.name}#lambda"
 
-    def attach(self, graph: StateGraph, router: Router) -> Annotated[str, "Entry node name"]:
+    def attach(
+        self, graph: StateGraph, router: Router
+    ) -> Annotated[str, "Entry node name"]:
         self.__entry_hook__()
 
         graph.add_node(self.__entry_hook__(), self._run_lambda)
-        graph.add_conditional_edges(
-            self.__entry_hook__(),
-            router.route
-        )
+        graph.add_conditional_edges(self.__entry_hook__(), router.route)
 
         return self.__entry_hook__()
+
 
 def attach_components_to_graph(graph, components, start, end):
     """Generic function to attach a list of components to a graph in a linear or tree structure."""
@@ -487,8 +489,7 @@ def attach_components_to_graph(graph, components, start, end):
         else:
             # Find the next component in the chain
             next_components = [
-                name for name, deps in dependencies.items()
-                if comp_name in deps
+                name for name, deps in dependencies.items() if comp_name in deps
             ]
 
             if next_components:
