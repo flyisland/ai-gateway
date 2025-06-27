@@ -351,6 +351,7 @@ async def test_execute_workflow_missing_workflow_metadata(
         context_elements=[],
         invocation_metadata={"base_url": "", "gitlab_token": ""},
         mcp_tools=[],
+        additional_tools=[],
         approval=contract_pb2.Approval(),
     )
 
@@ -369,6 +370,13 @@ async def test_execute_workflow_valid_workflow_metadata(
     mcp_tools = [
         contract_pb2.McpTool(name="get_issue", description="Tool to get issue")
     ]
+    additional_tools = [
+        contract_pb2.Tool(
+            name="get_merge_request",
+            source="source",
+            description="Tool to get merge request",
+        )
+    ]
     approval = contract_pb2.Approval(approval=contract_pb2.Approval.Approved())
 
     async def mock_request_iterator() -> AsyncIterable[contract_pb2.ClientEvent]:
@@ -377,6 +385,7 @@ async def test_execute_workflow_valid_workflow_metadata(
                 workflowID="123",
                 workflowMetadata=json.dumps({"key": "value"}),
                 mcpTools=mcp_tools,
+                additionalTools=additional_tools,
                 approval=approval,
             )
         )
@@ -403,6 +412,7 @@ async def test_execute_workflow_valid_workflow_metadata(
         context_elements=[],
         invocation_metadata={"base_url": "http://test.url", "gitlab_token": "123"},
         mcp_tools=mcp_tools,
+        additional_tools=additional_tools,
         approval=approval,
     )
 

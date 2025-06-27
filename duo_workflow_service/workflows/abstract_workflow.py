@@ -40,7 +40,10 @@ from duo_workflow_service.internal_events import (
 from duo_workflow_service.internal_events.event_enum import CategoryEnum, EventEnum
 from duo_workflow_service.llm_factory import AnthropicConfig, VertexConfig
 from duo_workflow_service.monitoring import duo_workflow_metrics
-from duo_workflow_service.tools import convert_mcp_tools_to_langchain_tools
+from duo_workflow_service.tools import (
+    convert_additional_tools_to_langchain_tools,
+    convert_mcp_tools_to_langchain_tools,
+)
 from duo_workflow_service.tracking import log_exception
 from duo_workflow_service.workflows.type_definitions import AdditionalContext
 
@@ -92,6 +95,7 @@ class AbstractWorkflow(ABC):
             "gitlab_token": "",
         },
         mcp_tools: list[contract_pb2.McpTool] = [],
+        additional_tools: list[contract_pb2.Tool] = [],
         user: Optional[CloudConnectorUser] = None,
         additional_context: Optional[list[AdditionalContext]] = None,
         approval: Optional[contract_pb2.Approval] = None,
@@ -112,7 +116,9 @@ class AbstractWorkflow(ABC):
         )
         self._workflow_type = workflow_type
         self._additional_context = additional_context
-        self._additional_tools = self._build_additional_tools(mcp_tools)
+        self._additional_tools = self._build_additional_tools(
+            mcp_tools, additional_tools
+        )
         self._workflow_config = {}
         self._model_config = self._get_model_config()
         self._approval = approval
@@ -340,11 +346,19 @@ class AbstractWorkflow(ABC):
     def _build_additional_tools(
         self,
         mcp_tools: list[contract_pb2.McpTool],
+        additional_tools: list[contract_pb2.Tool],
     ):
         metadata = {"inbox": self._inbox, "outbox": self._outbox}
-        return convert_mcp_tools_to_langchain_tools(
+
+        converted_mcp_tools = convert_mcp_tools_to_langchain_tools(
             metadata=metadata, mcp_tools=mcp_tools
         )
+
+        converted_additional_tools = convert_additional_tools_to_langchain_tools(
+            metadata=metadata, tools=additional_tools
+        )
+
+        return converted_mcp_tools + converted_additional_tools
 
     def _get_model_config(self) -> Union[AnthropicConfig, VertexConfig]:
         """Determine the appropriate model configuration based on deployment environment.

@@ -26,6 +26,7 @@ message StartWorkflowRequest {
     repeated McpTool mcpTools = 8;
     repeated AdditionalContext additional_context = 9;
     optional Approval approval = 10;
+    repeated Tool additionalTools = 11;
 }
 
 message ActionResponse {
@@ -64,6 +65,7 @@ message Action {
         FindFiles findFiles = 11;
         RunMCPTool runMCPTool = 12;
         Mkdir mkdir = 13;
+        RunTool runTool = 14;
     };
 }
 
@@ -154,6 +156,18 @@ message McpTool {
 }
 
 message RunMCPTool {
+    string name = 1;
+    string args = 2;
+}
+
+message Tool {
+    string name = 1;
+    string source = 2;
+    string description = 3;
+    string inputSchema = 4;
+}
+
+message RunTool {
     string name = 1;
     string args = 2;
 }

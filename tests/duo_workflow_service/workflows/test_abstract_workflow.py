@@ -67,6 +67,13 @@ async def test_init():
     mcp_tools = [
         contract_pb2.McpTool(name="get_issue", description="Tool to get issue")
     ]
+    additional_tools = [
+        contract_pb2.Tool(
+            name="get_merge_request",
+            source="source",
+            description="Tool to get merge request",
+        )
+    ]
     user = MagicMock()
     workflow = MockWorkflow(
         workflow_id,
@@ -75,6 +82,7 @@ async def test_init():
         context_elements,
         {},
         mcp_tools,
+        additional_tools,
         user,
     )
 
@@ -84,10 +92,13 @@ async def test_init():
     assert workflow.is_done is False
     assert workflow._outbox.maxsize == 1
     assert workflow._inbox.maxsize == 1
-    assert len(workflow._additional_tools) == 1
-    tool = workflow._additional_tools[0]
-    assert tool.name == "get_issue"
-    assert tool.description == "Tool to get issue"
+    assert len(workflow._additional_tools) == 2
+    mcp_tool = workflow._additional_tools[0]
+    assert mcp_tool.name == "get_issue"
+    assert mcp_tool.description == "Tool to get issue"
+    additional_tool = workflow._additional_tools[1]
+    assert additional_tool.name == "get_merge_request"
+    assert additional_tool.description == "Tool to get merge request"
     assert workflow._user == user
 
 
