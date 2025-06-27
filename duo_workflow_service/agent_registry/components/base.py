@@ -3,7 +3,17 @@ from abc import ABC, abstractmethod
 from datetime import datetime, timezone
 from enum import StrEnum
 from functools import partial
-from typing import Annotated, Any, Callable, Optional, Protocol, Self, Type, TypedDict, NamedTuple
+from typing import (
+    Annotated,
+    Any,
+    Callable,
+    NamedTuple,
+    Optional,
+    Protocol,
+    Self,
+    Type,
+    TypedDict,
+)
 
 from dependency_injector.wiring import Provide, inject
 from langchain_core.messages import AIMessage, BaseMessage, ToolMessage
@@ -11,7 +21,14 @@ from langchain_core.output_parsers import PydanticToolsParser, StrOutputParser
 from langchain_core.tools import BaseTool
 from langgraph.constants import END
 from langgraph.graph import StateGraph
-from pydantic import BaseModel, ConfigDict, Field, PrivateAttr, model_validator, RootModel
+from pydantic import (
+    BaseModel,
+    ConfigDict,
+    Field,
+    PrivateAttr,
+    RootModel,
+    model_validator,
+)
 from pydantic_core import ValidationError
 from typing_extensions import Pattern
 
@@ -24,7 +41,7 @@ from duo_workflow_service.entities import (
     UiChatLog,
     WorkflowStatusEnum,
 )
-from duo_workflow_service.tools import PipelineException, Toolset, DuoBaseTool
+from duo_workflow_service.tools import DuoBaseTool, PipelineException, Toolset
 
 __all__ = ["BaseComponent", "AgentComponent"]
 
@@ -72,13 +89,30 @@ class AgentFinalOutput(BaseModel):
         return self.text
 
 
-class LogEntry(NamedTuple):
+##############################################################
+########### Logging (Start)
+##############################################################
+
+
+class UILogEventsLLM(StrEnum):
+    ON_FINAL_ANSWER = "on_final_answer"
+
+
+class UILogEventsTool(StrEnum):
+    ON_EXECUTION_SUCCESS = "on_execution_success"
+    ON_EXECUTION_FAILED = "on_execution_failed"
+
+
+UILogEvents = UILogEventsLLM | UILogEventsTool
+
+
+class UILogEntry(NamedTuple):
     record: UiChatLog
-    event: StrEnum
+    event: UILogEvents
 
 
 class UILogCallback(Protocol):
-    def __call__(self, log_entry: LogEntry) -> None: ...
+    def __call__(self, log_entry: UILogEntry) -> None: ...
 
 
 class BaseUILogWriter(ABC):
@@ -86,14 +120,14 @@ class BaseUILogWriter(ABC):
         self._log_callback = log_callback
 
     def success(self, *args, **kwargs) -> None:
-        event = kwargs.pop("event")
+        event: UILogEvents = kwargs.pop("event")
         record = self._create_success_log(*args, **kwargs)
-        self._log_callback(LogEntry(record=record, event=event))
+        self._log_callback(UILogEntry(record=record, event=event))
 
     def error(self, *args, **kwargs) -> None:
-        event = kwargs.pop("event")
+        event: UILogEvents = kwargs.pop("event")
         record = self._create_error_log(*args, **kwargs)
-        self._log_callback(LogEntry(record=record, event=event))
+        self._log_callback(UILogEntry(record=record, event=event))
 
     def _create_success_log(self, *args, **kwargs) -> UiChatLog:
         raise NotImplementedError
@@ -106,10 +140,10 @@ class UIHistory[W: BaseUILogWriter](BaseModel):
     model_config = ConfigDict(arbitrary_types_allowed=True)
 
     writer: Type[W]
-    config: bool | list[StrEnum]
-    _logs: list[LogEntry] = PrivateAttr(default_factory=list)
+    events: bool | list[UILogEvents]
+    _logs: list[UILogEntry] = PrivateAttr(default_factory=list)
 
-    def _add_log(self, log_entry: LogEntry) -> None:
+    def _add_log(self, log_entry: UILogEntry) -> None:
         """Callback function for writers."""
         self._logs.append(log_entry)
 
@@ -120,45 +154,23 @@ class UIHistory[W: BaseUILogWriter](BaseModel):
     @property
     def state(self) -> dict[str, Any]:
         logs = []
-        if self.config and isinstance(self.config, bool):
+        if self.events and isinstance(self.events, bool):
             # All events are enabled to be logged
             logs.extend([log.record for log in self._logs])
-        elif isinstance(self.config, list):
+        elif isinstance(self.events, list):
             # Log only specified events
-            logs.extend([
-                log.record
-                for log in self._logs
-                if log.event in self.config
-            ])
+            logs.extend([log.record for log in self._logs if log.event in self.events])
 
         return {"ui_chat_log": logs}
 
 
-class UIHistoryAgentConfig(BaseModel):
-    class EventsLLM(StrEnum):
-        ON_FINAL_ANSWER = "on_final_answer"
-
-    class EventsTool(StrEnum):
-        ON_EXECUTION_SUCCESS = "on_execution_success"
-        ON_EXECUTION_FAILED = "on_execution_failed"
-
-    llm: bool | list[EventsLLM] = Field(default=True)
-    tools: bool | list[EventsTool] = Field(default=True)
-
-
-class UIHistoryLambdaConfig(RootModel):
-    class Events(StrEnum):
-        ON_EXECUTION_SUCCESS = "on_execution_success"
-
-    root: bool | list[Events] = Field(default=False)
+class UILogAgentEvents(BaseModel):
+    llm: bool | list[UILogEventsLLM] = Field(default=True)
+    tools: bool | list[UILogEventsTool] = Field(default=True)
 
 
 class UILogWriterAgentLLM(BaseUILogWriter):
-    def _create_success_log(
-        self,
-        message: str,
-        **kwargs
-    ) -> UiChatLog:
+    def _create_success_log(self, message: str, **kwargs) -> UiChatLog:
         return UiChatLog(
             message_type=MessageTypeEnum.AGENT,
             content=str(message),
@@ -167,15 +179,13 @@ class UILogWriterAgentLLM(BaseUILogWriter):
             correlation_id=kwargs.get("correlation_id"),
             tool_info=None,
             context_elements=kwargs.get("context_elements", []),
+            message_sub_type=None,
         )
 
 
 class UILogWriterAgentTools(BaseUILogWriter):
     def _create_success_log(
-        self,
-        tool: BaseTool,
-        tool_call_args: dict[str, Any],
-        **kwargs
+        self, tool: BaseTool, tool_call_args: dict[str, Any], **kwargs
     ) -> UiChatLog:
         return UiChatLog(
             message_type=MessageTypeEnum.TOOL,
@@ -185,18 +195,13 @@ class UILogWriterAgentTools(BaseUILogWriter):
             correlation_id=kwargs.get("correlation_id"),
             tool_info=ToolInfo(name=tool.name, args=tool_call_args),
             context_elements=kwargs.get("context_elements", []),
+            message_sub_type=None,
         )
 
     def _create_error_log(
-        self,
-        message: str,
-        tool: BaseTool,
-        tool_call_args: dict[str, Any],
-        **kwargs
+        self, message: str, tool: BaseTool, tool_call_args: dict[str, Any], **kwargs
     ) -> UiChatLog:
-        content = (
-            f"Failed: {self._format_message(tool, tool_call_args)} - {message}"
-        )
+        content = f"Failed: {self._format_message(tool, tool_call_args)} - {message}"
 
         return UiChatLog(
             message_type=MessageTypeEnum.TOOL,
@@ -206,6 +211,7 @@ class UILogWriterAgentTools(BaseUILogWriter):
             correlation_id=kwargs.get("correlation_id"),
             tool_info=ToolInfo(name=tool.name, args=tool_call_args),
             context_elements=kwargs.get("context_elements", []),
+            message_sub_type=None,
         )
 
     @staticmethod
@@ -228,11 +234,7 @@ class UILogWriterAgentTools(BaseUILogWriter):
 
 class UILogWriterLambda(BaseUILogWriter):
     def _create_success_log(
-        self,
-        message: str,
-        *,
-        role: MessageTypeEnum,
-        **kwargs
+        self, message: str, *, role: MessageTypeEnum, **kwargs
     ) -> UiChatLog:
         return UiChatLog(
             message_type=role,
@@ -242,7 +244,13 @@ class UILogWriterLambda(BaseUILogWriter):
             correlation_id=kwargs.get("correlation_id"),
             tool_info=None,
             context_elements=kwargs.get("context_elements", []),
+            message_sub_type=None,
         )
+
+
+##############################################################
+########### Logging (End)
+##############################################################
 
 
 class BaseComponent(BaseModel, ABC):
@@ -400,8 +408,7 @@ class AgentNode[T: HasBaseStateFields](BaseModel):
                 context[self.output] = final_response
 
             self.ui_history.log.success(
-                final_response,
-                event=UIHistoryAgentConfig.EventsLLM.ON_FINAL_ANSWER
+                final_response, event=UILogEventsLLM.ON_FINAL_ANSWER
             )
 
         # parsed_completion: BaseModel = await output_parser.ainvoke(completion)
@@ -466,30 +473,27 @@ class ToolNode[T: HasBaseStateFields](BaseModel):
         self, tool_call_id: str, tool_call_args: dict[str, Any], tool: BaseTool
     ) -> ToolMessage:
         # Several utility log functions to avoid boilerplate code
-        log_success = partial(self.ui_history.log.success, tool=tool, tool_call_args=tool_call_args)
-        log_error = partial(self.ui_history.log.error, tool=tool, tool_call_args=tool_call_args)
+        log_success = partial(
+            self.ui_history.log.success, tool=tool, tool_call_args=tool_call_args
+        )
+        log_error = partial(
+            self.ui_history.log.error, tool=tool, tool_call_args=tool_call_args
+        )
 
         try:
             tool_call_result = await tool.arun(tool_call_args)
             response = ToolMessage(content=tool_call_result, tool_call_id=tool_call_id)
-            log_success(event=UIHistoryAgentConfig.EventsTool.ON_EXECUTION_SUCCESS)
+            log_success(event=UILogEventsTool.ON_EXECUTION_SUCCESS)
         except TypeError as e:
             response = self._handle_type_error(tool_call_id, tool, e)
-            log_error(
-                "Invalid arguments",
-                event=UIHistoryAgentConfig.EventsTool.ON_EXECUTION_FAILED
-            )
+            log_error("Invalid arguments", event=UILogEventsTool.ON_EXECUTION_FAILED)
         except ValidationError as e:
             response = self._handle_validation_error(tool_call_id, tool, e)
-            log_error(
-                "Validation error",
-                event=UIHistoryAgentConfig.EventsTool.ON_EXECUTION_FAILED
-            )
+            log_error("Validation error", event=UILogEventsTool.ON_EXECUTION_FAILED)
         except PipelineException as e:
             response = self._handle_pipeline_error(tool_call_id, tool, e)
             log_error(
-                f"Pipeline error: {str(e)}",
-                event=UIHistoryAgentConfig.EventsTool.ON_EXECUTION_FAILED
+                f"Pipeline error: {str(e)}", event=UILogEventsTool.ON_EXECUTION_FAILED
             )
 
         return response
@@ -542,7 +546,7 @@ class AgentComponent[T: HasBaseStateFields](BaseComponent):
     toolset: Toolset
 
     output_type: Optional[Type[BaseModel]] = None
-    ui_history_config: UIHistoryAgentConfig = Field(default_factory=UIHistoryAgentConfig)
+    ui_log_events: UILogAgentEvents = Field(default_factory=UILogAgentEvents)
 
     prompt_registry: Annotated[
         LocalPromptRegistry, Provide[ContainerApplication.pkg_prompts.prompt_registry]
@@ -605,8 +609,7 @@ class AgentComponent[T: HasBaseStateFields](BaseComponent):
             output_type=self.output_type,
             output=self.output,
             ui_history=UIHistory(
-                config=self.ui_history_config.llm,
-                writer=UILogWriterAgentLLM
+                events=self.ui_log_events.llm, writer=UILogWriterAgentLLM
             ),
         )
         node_tools = ToolNode(
@@ -614,8 +617,7 @@ class AgentComponent[T: HasBaseStateFields](BaseComponent):
             component_name=self.name,
             toolset=self.toolset,
             ui_history=UIHistory(
-                config=self.ui_history_config.tools,
-                writer=UILogWriterAgentTools
+                events=self.ui_log_events.tools, writer=UILogWriterAgentTools
             ),
         )
 
@@ -705,13 +707,15 @@ class LambdaComponent[T: HasBaseStateFields](BaseComponent):
     fn: Callable
 
     ui_role: MessageTypeEnum = Field(default=MessageTypeEnum.TOOL)
-    ui_history_config: UIHistoryLambdaConfig = Field(default_factory=UIHistoryLambdaConfig)
+    ui_log_events: bool | list[UILogEventsTool] = Field(default=False)
 
     _ui_history: UIHistory[UILogWriterLambda] = PrivateAttr()
 
     @model_validator(mode="after")
     def init_component(self) -> Self:
-        self._ui_history = UIHistory(config=self.ui_history_config.root, writer=UILogWriterLambda)
+        self._ui_history = UIHistory(
+            events=self.ui_log_events, writer=UILogWriterLambda
+        )
 
         return self
 
@@ -728,17 +732,14 @@ class LambdaComponent[T: HasBaseStateFields](BaseComponent):
         if updates:
             self._ui_history.log.success(
                 str(updates),
-                event=UIHistoryLambdaConfig.Events.ON_EXECUTION_SUCCESS,
+                event=UILogEventsTool.ON_EXECUTION_SUCCESS,
                 role=self.ui_role,
             )
 
             if self.output:
                 context[self.output] = updates
 
-        return {
-            **self._ui_history.state,
-            "context": {self.name: context}
-        }
+        return {**self._ui_history.state, "context": {self.name: context}}
 
     def __entry_hook__(self):
         return f"{self.name}#lambda"
