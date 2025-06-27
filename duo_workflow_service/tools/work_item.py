@@ -166,7 +166,7 @@ class ParentResourceInput(BaseModel):
 class ListWorkItemsInput(ParentResourceInput):
     state: Optional[str] = Field(
         default=None,
-        description="Filter by work item state (e.g., 'opened', 'closed', 'all'). Default is 'all'.",
+        description="Filter by work item state (e.g., 'opened', 'closed', 'all'). If not set, all states are included.",
     )
     search: Optional[str] = Field(
         default=None, description="Search for work items by title or description."
@@ -406,7 +406,7 @@ class GetWorkItemNotes(WorkItemBaseTool):
                     notes = widget.get("notes", {}).get("nodes", [])
                     return json.dumps({"notes": notes}, indent=2)
 
-            return json.dumps({"error": "No notes found on the work item."})
+            return json.dumps({"notes": []})
         except Exception as e:
             return json.dumps({"error": str(e)})
 

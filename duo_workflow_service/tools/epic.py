@@ -516,7 +516,7 @@ class ListEpicNotes(EpicBaseTool):
                     notes = widget.get("notes", {}).get("nodes", [])
                     return json.dumps({"notes": notes}, indent=2)
 
-            return json.dumps({"error": "No notes found on the epic."})
+            return json.dumps({"notes": []})
         except Exception as e:
             return json.dumps({"error": str(e)})
 

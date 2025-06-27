@@ -648,7 +648,7 @@ async def test_get_work_item_notes_with_no_widgets(gitlab_client_mock, metadata)
 
     response = await tool._arun(project_id="namespace/project", work_item_iid=42)
 
-    expected_response = json.dumps({"error": "No notes found on the work item."})
+    expected_response = json.dumps({"notes": []})
     assert response == expected_response
 
     gitlab_client_mock.graphql.assert_called_once()

@@ -1125,6 +1125,24 @@ async def test_list_epic_notes(
 
 
 @pytest.mark.asyncio
+async def test_list_epic_notes_with_no_widgets(gitlab_client_mock, metadata):
+    graphql_response = {"namespace": {"workItems": {"nodes": [{"widgets": []}]}}}
+
+    gitlab_client_mock.graphql = AsyncMock(return_value=graphql_response)
+
+    tool = ListEpicNotes(description="list epic notes description", metadata=metadata)
+
+    response = await tool._arun(group_id="namespace%2Fgroup", epic_iid=42)
+
+    expected_response = json.dumps({"notes": []})
+    assert response == expected_response
+
+    gitlab_client_mock.graphql.assert_called_once()
+    call_args = gitlab_client_mock.graphql.call_args
+    assert call_args[0][1] == {"fullPath": "namespace%2Fgroup", "workItemIid": "42"}
+
+
+@pytest.mark.asyncio
 async def test_list_epic_notes_error(gitlab_client_mock, metadata):
     gitlab_client_mock.graphql = AsyncMock(side_effect=Exception("Epic not found"))
 
