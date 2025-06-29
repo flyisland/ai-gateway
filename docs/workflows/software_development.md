@@ -24,9 +24,10 @@ it's connected to your GitLab project, it can directly solve issues from your Gi
    ```
 
 1. **Provide context**
-   - Tech stack (for example, Node.js, Express, PostgreSQL)
-   - Coding standards or patterns to follow
-   - Existing code examples if applicable
+
+- Tech stack (for example, Node.js, Express, PostgreSQL)
+- Coding standards or patterns to follow
+- Existing code examples if applicable
 
 1. **Review the plan** before execution
 
@@ -45,7 +46,7 @@ Add input validation to the user registration endpoint:
 - Follow our existing validation pattern from auth.validator.js
 ```
 
-### GitLab Issue Request
+### GitLab Issue Request (Good example)
 
 ```plaintext
 Implement the fix for issue #342 - users can't upload files larger than 5MB
@@ -57,6 +58,15 @@ Implement the fix for issue #342 - users can't upload files larger than 5MB
 Fix the login bug
 Make the code better
 ```
+
+## Tools Permissions and Approval System
+
+The workflow system includes a tool approval mechanism to manage risk when agents use different tools. Tools are
+organized into privilege buckets, allowing users to control which tools are available and require approval before
+execution. This system helps prevent unintended access to confidential data or execution of potentially harmful
+commands.
+For detailed information about the tools permissions and approval system, see
+the [GitLab Architecture Design Document](https://handbook.gitlab.com/handbook/engineering/architecture/design-documents/duo_workflow/#tools-permissions-and-approval-system).
 
 ## Capabilities
 
@@ -70,11 +80,11 @@ Make the code better
 - Performance optimizations
 - Read and implement GitLab issues directly
 - Access project context and existing code
+- Run or debug code directly (with command approval)
 
 ### Cannot Do
 
 - Access external APIs during execution
-- Run or debug code directly
 
 ## Best Practices
 

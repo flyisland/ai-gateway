@@ -7,9 +7,6 @@ Automatically converts Jenkins pipelines (Jenkinsfile) to GitLab CI/CD configura
 ## When to Use
 
 - Migrating from Jenkins to GitLab
-- Modernizing CI/CD pipelines
-- Standardizing pipeline configurations
-- Consolidating DevOps tools
 
 ## Supported Features
 
@@ -22,13 +19,6 @@ Automatically converts Jenkins pipelines (Jenkinsfile) to GitLab CI/CD configura
 - Parallel execution
 - Conditional logic
 - Post-build actions
-
-### Maps Common Plugins
-
-- Git → GitLab native
-- Docker → GitLab Docker executor
-- JUnit → GitLab test reports
-- Credentials → CI/CD variables
 
 ## Example Conversion
 

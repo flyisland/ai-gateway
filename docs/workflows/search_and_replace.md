@@ -71,7 +71,7 @@ replacement_rules:
 ### Do
 
 - Write specific, actionable rules
-- Test patterns on small subsets first
+- Test patterns from `element` attributes on small subsets first
 - Use version control
 - Be explicit about edge cases
 

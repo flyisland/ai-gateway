@@ -1,6 +1,6 @@
 # Duo Workflows Overview
 
-## About Duo Workflows
+## About Flows in the Duo Agent Platform
 
 Duo Workflows are AI-powered automation tools that help development teams work more efficiently. Choose the right
 workflow for your task:
@@ -36,12 +36,16 @@ Get interactive help with coding, debugging, and GitLab project management.
 1. Navigate to your GitLab project
 1. Access Duo Workflows from your project interface
 1. Choose between:
-   - **Chat Workflow** - For interactive assistance (no configuration needed)
-   - **Other Workflows** - For automated tasks (requires configuration)
+
+- **Chat Workflow** - For interactive assistance (no configuration needed)
+- **Other Workflows** - For automated tasks (requires configuration)
+
 1. For non-chat workflows:
-   - Select the specific workflow type
-   - Ensure required configuration files exist
-   - Provide task requirements
+
+- Select the specific workflow type
+- Ensure required configuration files exist
+- Provide task requirements
+
 1. Review and approve any proposed changes
 
 ## Best Practices
