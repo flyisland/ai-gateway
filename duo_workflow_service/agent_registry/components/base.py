@@ -1,5 +1,6 @@
 import re
 from abc import ABC, abstractmethod
+from collections import defaultdict
 from datetime import datetime, timezone
 from enum import StrEnum
 from functools import partial
@@ -7,6 +8,7 @@ from typing import (
     Annotated,
     Any,
     Callable,
+    ClassVar,
     NamedTuple,
     Optional,
     Protocol,
@@ -16,19 +18,13 @@ from typing import (
 )
 
 from dependency_injector.wiring import Provide, inject
-from langchain_core.messages import AIMessage, BaseMessage, ToolMessage
+from langchain_core.messages import AIMessage, BaseMessage, HumanMessage, ToolMessage
 from langchain_core.output_parsers import PydanticToolsParser, StrOutputParser
 from langchain_core.tools import BaseTool
 from langgraph.constants import END
 from langgraph.graph import StateGraph
-from pydantic import (
-    BaseModel,
-    ConfigDict,
-    Field,
-    PrivateAttr,
-    RootModel,
-    model_validator,
-)
+from langgraph.types import interrupt
+from pydantic import BaseModel, ConfigDict, Field, PrivateAttr, model_validator
 from pydantic_core import ValidationError
 from typing_extensions import Pattern
 
@@ -49,24 +45,29 @@ __all__ = ["BaseComponent", "AgentComponent"]
 InjectedValue = None
 
 
-def get_vars_from_context(
-    inputs: list[str], context: dict[str, Any], splitter: Optional[Pattern] = None
-) -> dict[str, Any]:
-    variables = {}
+class IOKey(NamedTuple):
+    target: str
+    subkeys: list[str]
 
-    if not splitter:
-        splitter = re.compile(r"[\.#]")
 
-    for inp in inputs:
-        current = context
-        keys = splitter.split(inp)
+def parse_io_keys(keys: list[str]) -> list[IOKey]:
+    io_keys = []
+    for key in keys:
+        target, _, remaining = key.partition(":")
+        if not remaining:
+            subkeys = []
+        else:
+            subkeys = remaining.split(".")
 
-        for parent_key in keys:
-            current = current[parent_key]
+        io_keys.append(IOKey(target=target, subkeys=subkeys))
 
-        variables[keys[-1]] = current
+    return io_keys
 
-    return variables
+
+def parse_single_key(key: str) -> IOKey:
+    io_keys = parse_io_keys([key])
+
+    return io_keys[0]
 
 
 class HasBaseStateFields(TypedDict):
@@ -74,10 +75,6 @@ class HasBaseStateFields(TypedDict):
     context: dict[str, Any]
     ui_chat_log: list[UiChatLog]
 
-
-class Routes(StrEnum):
-    TOOL_USE = "tool_use"
-    STOP = "stop"
 
 class AgentFinalOutput(BaseModel):
     """Always use this tool if no other tools are appropriate."""
@@ -87,6 +84,42 @@ class AgentFinalOutput(BaseModel):
     @property
     def content(self) -> str:
         return self.text
+
+
+def get_vars_from_state[T: HasBaseStateFields](
+    inputs: list[IOKey], state: T
+) -> dict[str, Any]:
+    variables = {}
+
+    for inp in inputs:
+        current = state[inp.target]
+        for key in inp.subkeys:
+            current = current[key]
+
+        if inp.subkeys:
+            variables[inp.subkeys[-1]] = current
+        else:
+            variables[inp.target] = current
+
+    return variables
+
+
+def create_nested_dict(keys: list[str], value: Any) -> dict[str, Any]:
+    if not keys:
+        return {}
+
+    result = {}
+    current = result
+
+    # Navigate through all keys except the last one
+    for key in keys[:-1]:
+        current[key] = {}
+        current = current[key]
+
+    # Set the value at the last key
+    current[keys[-1]] = value
+
+    return result
 
 
 ##############################################################
@@ -253,31 +286,71 @@ class UILogWriterLambda(BaseUILogWriter):
 ##############################################################
 
 
-class BaseComponent(BaseModel, ABC):
+class BaseRouter[R: HasBaseStateFields](BaseModel, ABC):
+    DEFAULT_ROUTE: ClassVar[str] = "default_route"
+
+    _allowed_input_targets: list[str] = []
+
+    @model_validator(mode="after")
+    def validate_input_field(self) -> Self:
+        if self.input and self.input.target not in self._allowed_input_targets:
+            raise ValueError(
+                f"The '{self.__class__.__name__}' router doesn't support the input target '{self.input.target}'."
+            )
+
+        return self
+
+    @abstractmethod
+    def attach(self, graph: StateGraph):
+        pass
+
+    @abstractmethod
+    def route(self, state: R) -> Annotated[str, "Next node"]:
+        pass
+
+
+class BaseComponent[T: HasBaseStateFields](BaseModel, ABC):
     model_config = ConfigDict(arbitrary_types_allowed=True, frozen=True)
 
     name: str
     workflow_id: str | int
     workflow_type: str
 
-    inputs: list[str] = Field(default_factory=list)
-    output: Optional[str] = None
+    inputs: list[IOKey] = Field(default_factory=list)
+    output: Optional[IOKey] = None
+
+    _allowed_input_targets: list[str] = []
+    _allowed_output_targets: list[str] = []
+
+    @model_validator(mode="before")
+    @classmethod
+    def build_base_component(cls, data: dict[str, Any]) -> dict[str, Any]:
+        if "inputs" in data:
+            data["inputs"] = parse_io_keys(data["inputs"])
+
+        if "output" in data:
+            data["output"] = parse_single_key(data["output"])
+
+        return data
 
     @model_validator(mode="after")
     def validate_base_fields(self) -> Self:
-        if self.output and "." in self.output:
+        for inp in self.inputs:
+            if inp.target not in self._allowed_input_targets:
+                raise ValueError(
+                    f"The '{self.__class__.__name__}' component doesn't support the input target '{inp.target}'."
+                )
+
+        if self.output and self.output.target not in self._allowed_output_targets:
             raise ValueError(
-                f"Invalid output key: '{self.output}'."
-                " Output keys cannot contain dots (nested keys not supported)."
-                " Use a simple key like 'result' instead of 'data.result'."
-                f" Value will be stored in component '{self.name}' context."
+                f"The '{self.__class__.__name__}' component doesn't support the output target '{self.output.target}'."
             )
 
         return self
 
     @abstractmethod
     def attach(
-        self, graph: StateGraph, router: Any
+        self, graph: StateGraph, router: BaseRouter[T]
     ) -> Annotated[str, "Entry node name"]:
         pass
 
@@ -286,62 +359,64 @@ class BaseComponent(BaseModel, ABC):
         pass
 
 
-class EndComponent(BaseComponent):
-    def __entry_hook__(self):
-        return END
-
-    def attach(self, graph: StateGraph, router: Any) -> str:
-        return END
-
-
-ConditionPredicateType = str | int
-
-DEFAULT_ROUTE = "default_route"
-
-
-class Router[T: HasBaseStateFields](BaseModel):
-    input: Optional[str] = None
+class Router[R](BaseRouter[R]):
+    input: Optional[IOKey] = None
     from_component: BaseComponent
-    to_component: BaseComponent | dict[ConditionPredicateType, BaseComponent]
+    to_component: BaseComponent | dict[str | int, BaseComponent]
 
-    # validate that if input is None, then conditions is a BaseComponent
+    _allowed_input_targets: list[str] = ["context", "status"]
+
+    @model_validator(mode="before")
+    @classmethod
+    def build_router(cls, data: dict[str, Any]) -> dict[str, Any]:
+        if "input" in data:
+            data["input"] = parse_single_key(data["input"])
+
+        return data
+
     @model_validator(mode="after")
     def validate_router_fields(self) -> Self:
+        """Validate that if input is None, then conditions is a BaseComponent."""
         if self.input is None and not isinstance(self.to_component, BaseComponent):
             raise ValueError(
                 "If input is None, then conditions must be a BaseComponent"
             )
         return self
 
-    # validate that if input is not None, then conditions is a dict
     @model_validator(mode="after")
     def validate_router_fields_dict(self) -> Self:
+        """Validate that if input is not None, then conditions is a dict."""
         if self.input is not None and not isinstance(self.to_component, dict):
             raise ValueError("If input is not None, then conditions must be a dict")
         return self
 
-    def attach(
-        self,
-        graph: StateGraph,
-    ):
+    def attach(self, graph: StateGraph):
         self.from_component.attach(graph, self)
 
-    def route(self, state: T) -> str:
+    def route(self, state) -> Annotated[str, "Next node"]:
         if self.input is None:
             return self.to_component.__entry_hook__()
 
-        route_value = get_vars_from_context([self.input], state)
-        route_value = str(route_value[self.input.split(".")[-1]])
+        variables = get_vars_from_state([self.input], state)
+        route_value = str(next(iter(variables.values()))) if variables else None
 
-        if route_value in self.to_component:
+        if route_value and route_value in self.to_component:
             return self.to_component[route_value].__entry_hook__()
 
-        if DEFAULT_ROUTE in self.to_component:
-            return self.to_component[DEFAULT_ROUTE].__entry_hook__()
+        if Router.DEFAULT_ROUTE in self.to_component:
+            return self.to_component[Router.DEFAULT_ROUTE].__entry_hook__()
 
         raise KeyError(
-            f"Route key {route_value} not found in conditions {self.to_component}"
+            f"Route key {self.input} not found in conditions {self.to_component}"
         )
+
+
+class EndComponent(BaseComponent):
+    def __entry_hook__(self):
+        return END
+
+    def attach(self, graph: StateGraph, router: BaseRouter) -> str:
+        return END
 
 
 class AgentNode[T: HasBaseStateFields](BaseModel):
@@ -352,15 +427,36 @@ class AgentNode[T: HasBaseStateFields](BaseModel):
     prompt: Prompt
     check_events: bool = True
 
-    inputs: list[str]
+    inputs: list[IOKey]
     output_type: Optional[Type[BaseModel]]
-    output: Optional[str]
+    output: Optional[IOKey]
 
     ui_history: UIHistory[UILogWriterAgentLLM]
 
+    class _FinalResponse(NamedTuple):
+        payload: str | BaseModel
+        tool_call_id: Optional[str] = None
+
+        @property
+        def is_structured(self) -> bool:
+            return self.tool_call_id and isinstance(self.payload, BaseModel)
+
+        @property
+        def content(self) -> str | dict[str, Any]:
+            if self.is_structured:
+                return self.payload.model_dump(mode="json")
+
+            return self.payload
+
+        def create_tool_message(self) -> Optional[ToolMessage]:
+            if self.is_structured:
+                return ToolMessage(content="", tool_call_id=self.tool_call_id)
+
+            return None
+
     async def _try_parse_structured_response(
         self, completion: AIMessage
-    ) -> Optional[dict[str, Any]]:
+    ) -> Optional[_FinalResponse]:
         if (
             self.output_type
             and len(completion.tool_calls) > 0
@@ -371,18 +467,27 @@ class AgentNode[T: HasBaseStateFields](BaseModel):
             )
             parsed = await output_parser.ainvoke(completion)
 
-            return parsed.model_dump(mode="json")
+            return AgentNode._FinalResponse(
+                tool_call_id=completion.tool_calls[0].get("id"),
+                payload=parsed,
+            )
 
         return None
 
-    async def _try_parse_raw_response(self, completion: AIMessage) -> Optional[str]:
+    async def _try_parse_raw_response(
+        self, completion: AIMessage
+    ) -> Optional[_FinalResponse]:
         if not self.output_type and len(completion.tool_calls) == 0:
             output_parser = StrOutputParser()
-            return await output_parser.ainvoke(completion)
+            parsed = await output_parser.ainvoke(completion)
+
+            return AgentNode._FinalResponse(payload=parsed)
 
         return None
 
-    async def _process_final_response(self, completion: AIMessage) -> Any:
+    async def _process_final_response(
+        self, completion: AIMessage
+    ) -> Optional[_FinalResponse]:
         parsers = [
             self._try_parse_structured_response,
             self._try_parse_raw_response,
@@ -395,30 +500,34 @@ class AgentNode[T: HasBaseStateFields](BaseModel):
         return None
 
     async def run(self, state: T) -> dict:
+        serialized = {}
         history = state["conversation_history"].get(self.component_name, [])
-        context = state["context"].get(self.component_name, {})
 
-        variables = get_vars_from_context(self.inputs, state["context"])
+        variables = get_vars_from_state(self.inputs, state)
         completion: AIMessage = await self.prompt.ainvoke(
             input={**variables, "history": history}
         )
 
-        if final_response := await self._process_final_response(completion):
+        completions: list[BaseMessage] = [completion]
+        final_response = await self._process_final_response(completion)
+
+        if final_response:
             if self.output:
-                context[self.output] = final_response
+                serialized[self.output.target] = create_nested_dict(
+                    self.output.subkeys, final_response.content
+                )
 
             self.ui_history.log.success(
-                final_response, event=UILogEventsLLM.ON_FINAL_ANSWER
+                final_response.content, event=UILogEventsLLM.ON_FINAL_ANSWER
             )
 
-        # parsed_completion: BaseModel = await output_parser.ainvoke(completion)
-        # context[self.output] = parsed_completion.model_dump(mode="json")
-        # completion = AIMessage(content=parsed_completion.content)
+            if final_response.is_structured:
+                completions.append(final_response.create_tool_message())
 
         return {
             **self.ui_history.state,
-            "context": {self.component_name: context},
-            "conversation_history": {self.component_name: [*history, completion]},
+            **serialized,
+            "conversation_history": {self.component_name: completions},
         }
 
 
@@ -464,7 +573,7 @@ class ToolNode[T: HasBaseStateFields](BaseModel):
         return {
             **self.ui_history.state,
             "conversation_history": {
-                self.component_name: [*conversation_history, *tools_responses],
+                self.component_name: tools_responses,
             },
             "context": {self.component_name: context},
         }
@@ -540,7 +649,7 @@ class ToolNode[T: HasBaseStateFields](BaseModel):
 
 
 @inject
-class AgentComponent[T: HasBaseStateFields](BaseComponent):
+class AgentComponent[T](BaseComponent[T]):
     prompt_id: str
     prompt_version: str
     toolset: Toolset
@@ -551,6 +660,9 @@ class AgentComponent[T: HasBaseStateFields](BaseComponent):
     prompt_registry: Annotated[
         LocalPromptRegistry, Provide[ContainerApplication.pkg_prompts.prompt_registry]
     ] = InjectedValue
+
+    _allowed_input_targets: list[str] = ["context"]
+    _allowed_output_targets: list[str] = ["context"]
 
     @model_validator(mode="after")
     def validate_agent_fields(self) -> Self:
@@ -568,28 +680,24 @@ class AgentComponent[T: HasBaseStateFields](BaseComponent):
 
         return self
 
-    def _are_tools_called(self, state: T, component_name: str, router: Router) -> str:
+    def _are_tools_called(
+        self, state: T, component_name: str, router: BaseRouter[T]
+    ) -> str:
         if state["status"] in [WorkflowStatusEnum.CANCELLED, WorkflowStatusEnum.ERROR]:
             return router.route(state)
 
         history: list[BaseMessage] = state["conversation_history"][component_name]
         last_message = history[-1]
         if isinstance(last_message, AIMessage) and len(last_message.tool_calls) > 0:
-            if (
-                self.output_type
-                and last_message.tool_calls[0]["name"] == self.output_type.__name__
-            ):
-                return router.route(state)
-
             return f"{self.name}#tools"
 
         return router.route(state)
 
-    def __entry_hook__(self):
+    def __entry_hook__(self) -> Annotated[str, "Entry node name"]:
         return f"{self.name}#agent"
 
     def attach(
-        self, graph: StateGraph, router: Router[T]
+        self, graph: StateGraph, router: BaseRouter[T]
     ) -> Annotated[str, "Entry node name"]:
         tools = self.toolset.bindable
         tool_choice = None
@@ -633,83 +741,58 @@ class AgentComponent[T: HasBaseStateFields](BaseComponent):
         return self.__entry_hook__()
 
 
-class HiltComponent(BaseComponent):
-    human_prompt: str
+class HiltChatBackComponent[T](BaseComponent[T]):
+    _allowed_output_targets: list[str] = ["context", "conversation_history"]
 
-    def __entry_hook__(self):
-        return f"{self.name}#hilt"
-
-    def attach(self, graph: StateGraph, router: Any) -> str:
-        graph.add_node(self.__entry_hook__(), self._prompt_human)
-        graph.add_edge(self.__entry_hook__(), f"{self.name}#check")
-        graph.add_node(f"{self.name}#check", self._fetch_human_input)
-        graph.add_conditional_edges(f"{self.name}#check", router.route)
-
-        return self.__entry_hook__()
-
-    def _prompt_human(self, _state):
-        ui_log = UiChatLog(
-            message_type=MessageTypeEnum.REQUEST,
-            content=self.human_prompt,
-            timestamp=datetime.now(timezone.utc).isoformat(),
-            status=ToolStatus.SUCCESS,
-            tool_info=None,
-            context_elements=None,
-        )
-        return {"status": WorkflowStatusEnum.INPUT_REQUIRED, "ui_chat_log": [ui_log]}
-
-    def _fetch_human_input(self, state):
-        human_input: str = interrupt("Workflow interrupted")
-        context = state["context"].get(self.name, {})
-        context[self.output] = human_input
-
-        return {"status": WorkflowStatusEnum.EXECUTION, "context": {self.name: context}}
-
-
-class HiltChatBackComponent(BaseComponent):
-
-    def __entry_hook__(self):
+    def __entry_hook__(self) -> Annotated[str, "Entry node name"]:
         return f"{self.name}#hiltChatBack"
 
-    def attach(self, graph: StateGraph, router: Any) -> str:
-        graph.add_node(self.__entry_hook__(), self._prompt_human)
-        graph.add_edge(self.__entry_hook__(), f"{self.name}#hiltChatBackFetchResponse")
+    def attach(self, graph: StateGraph, router: BaseRouter[T]) -> str:
+        graph.add_node(self.__entry_hook__(), self._request_human_prompt)
         graph.add_node(
             f"{self.name}#hiltChatBackFetchResponse", self._fetch_human_input
         )
+
+        graph.add_edge(self.__entry_hook__(), f"{self.name}#hiltChatBackFetchResponse")
         graph.add_conditional_edges(
             f"{self.name}#hiltChatBackFetchResponse", router.route
         )
 
         return self.__entry_hook__()
 
-    def _prompt_human(self, _state):
-        return {
-            "status": WorkflowStatusEnum.INPUT_REQUIRED,
-        }
+    def _request_human_prompt(self, _state: T) -> dict[str, Any]:
+        return {"status": WorkflowStatusEnum.INPUT_REQUIRED}
 
-    def _fetch_human_input(self, state):
+    def _fetch_human_input(self, _state: T) -> dict[str, Any]:
         human_input: str = interrupt("Workflow interrupted")
-        context = state["context"].get(self.name, {})
-        context[self.output] = human_input
-        return {
-            "status": WorkflowStatusEnum.EXECUTION,
-            "conversation_history": {
-                self.output: [
-                    *state["conversation_history"][self.output],
+
+        serialized = {}
+        if self.output and self.output.target == "context":
+            serialized["context"] = create_nested_dict(self.output.subkeys, human_input)
+
+        elif self.output and self.output.target == "conversation_history":
+            serialized["conversation_history"] = create_nested_dict(
+                self.output.subkeys,
+                [
                     HumanMessage(content=human_input),
                 ],
-            },
+            )
+
+        return {
+            **serialized,
+            "status": WorkflowStatusEnum.EXECUTION,
         }
 
 
-class LambdaComponent[T: HasBaseStateFields](BaseComponent):
+class LambdaComponent[T](BaseComponent[T]):
     fn: Callable
 
     ui_role: MessageTypeEnum = Field(default=MessageTypeEnum.TOOL)
     ui_log_events: bool | list[UILogEventsTool] = Field(default=False)
 
     _ui_history: UIHistory[UILogWriterLambda] = PrivateAttr()
+    _allowed_input_targets: list[str] = ["context"]
+    _allowed_output_targets: list[str] = ["context"]
 
     @model_validator(mode="after")
     def init_component(self) -> Self:
@@ -720,7 +803,7 @@ class LambdaComponent[T: HasBaseStateFields](BaseComponent):
         return self
 
     def _run_lambda(self, state: T) -> dict[str, Any]:
-        variables = get_vars_from_context(self.inputs, state["context"])
+        variables = get_vars_from_state(self.inputs, state["context"])
         context = state["context"].get(self.name, {})
 
         updates = self.fn(**variables)
@@ -745,7 +828,7 @@ class LambdaComponent[T: HasBaseStateFields](BaseComponent):
         return f"{self.name}#lambda"
 
     def attach(
-        self, graph: StateGraph, router: Router
+        self, graph: StateGraph, router: BaseRouter[T]
     ) -> Annotated[str, "Entry node name"]:
         self.__entry_hook__()
 
@@ -753,97 +836,3 @@ class LambdaComponent[T: HasBaseStateFields](BaseComponent):
         graph.add_conditional_edges(self.__entry_hook__(), router.route)
 
         return self.__entry_hook__()
-
-
-def attach_components_to_graph(graph, components, start, end):
-    """Generic function to attach a list of components to a graph in a linear or tree structure."""
-
-    # Create a mapping of component names to component instances
-    component_map = {comp.name: comp for comp in components}
-
-    # Validate input parameters
-    if start not in component_map:
-        raise ValueError(f"Input component '{start}' not found in components list")
-
-    for _end in end:
-        if _end not in component_map:
-            raise ValueError(f"Output component '{_end}' not found in components list")
-
-    # Build dependency graph based on component inputs
-    dependencies = {}
-    for comp in components:
-        deps = []
-        for input_path in comp.inputs:
-            dep_name, _, _ = input_path.partition("#")
-            if dep_name in component_map and dep_name != comp.name:
-                deps.append(dep_name)
-        dependencies[comp.name] = deps
-
-    # Topological sort to determine correct attachment order
-    def topological_sort():
-        # Kahn's algorithm for topological sorting
-        in_degree = {name: 0 for name in component_map.keys()}
-
-        # Calculate in-degrees
-        for comp_name, deps in dependencies.items():
-            for dep in deps:
-                in_degree[comp_name] += 1
-
-        # Start with components that have no dependencies
-        queue = [name for name, degree in in_degree.items() if degree == 0]
-        sorted_order = []
-
-        while queue:
-            current = queue.pop(0)
-            sorted_order.append(current)
-
-            # Reduce in-degree for dependent components
-            for comp_name, deps in dependencies.items():
-                if current in deps:
-                    in_degree[comp_name] -= 1
-                    if in_degree[comp_name] == 0:
-                        queue.append(comp_name)
-
-        return sorted_order
-
-    # Get the correct order for attachment (reverse of dependency order)
-    execution_order = topological_sort()
-    attachment_order = execution_order[::-1]  # Reverse for attachment
-
-    # Track attached nodes
-    attached_nodes = {}
-
-    # Attach components in reverse dependency order
-    for comp_name in attachment_order:
-        component = component_map[comp_name]
-
-        if comp_name in end:
-            # Output components connect to END
-            entry_node = component.attach(graph, END)
-        else:
-            # Find the next component in the chain
-            next_components = [
-                name for name, deps in dependencies.items() if comp_name in deps
-            ]
-
-            if next_components:
-                # Connect to the first dependent component's entry node
-                next_comp_name = next_components[0]
-                if next_comp_name in attached_nodes:
-                    exit_node = attached_nodes[next_comp_name]
-                else:
-                    # This shouldn't happen with proper topological sort
-                    exit_node = END
-            else:
-                # No dependents, connect to END
-                exit_node = END
-
-            entry_node = component.attach(graph, exit_node)
-
-        attached_nodes[comp_name] = entry_node
-
-    # Set the entry point and return it
-    entry_point = attached_nodes[start]
-    graph.set_entry_point(entry_point)
-
-    return graph

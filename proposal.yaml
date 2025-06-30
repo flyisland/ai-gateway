@@ -29,17 +29,17 @@ components:
   # ================================================================
   # AgentComponent Configuration
   # ================================================================
-  # Maps to: AgentComponent(name, workflow_id, workflow_type, prompt_id, 
+  # Maps to: AgentComponent(name, workflow_id, workflow_type, prompt_id,
   #                        prompt_version, toolset, inputs?, output?, output_type?)
-  
+
   - name: "agent"
     type: AgentComponent
-    
+
     # Required fields
     prompt_id: "agents/awesome"               # Prompt identifier for the LLM
     prompt_version: "^1.0.0"                 # Semantic version constraint
     toolset: "chat_tools"                    # Reference to toolset (defined separately)
-    
+
     # Optional fields
     inputs:                                 # List of input context paths
       - "first.task"                        # Context path: context["first"]["task"]
@@ -77,17 +77,17 @@ components:
       - "create_file_with_contents"
       - "edit_file"
       - "mkdir"
-    
+
     # Validation: if output_type is specified, output must also be specified
 
   # ================================================================
-  # HiltChatBackComponent Configuration  
+  # HiltChatBackComponent Configuration
   # ================================================================
   # Maps to: HiltChatBackComponent(name, workflow_id, workflow_type, inputs?, output?)
-  
+
   - name: "hilt"
     type: HiltChatBackComponent
-    
+
     # Optional fields
     inputs:
       - "conversation_history.agent"        # Reference to agent's conversation history
@@ -97,7 +97,7 @@ components:
   # EndComponent Configuration
   # ================================================================
   # Maps to: EndComponent(name, workflow_id, workflow_type, inputs?, output?)
-  
+
   - name: "end"
     type: EndComponent
     # No additional configuration needed - inherits base fields only
@@ -106,13 +106,13 @@ components:
   # HiltComponent Configuration (Example)
   # ================================================================
   # Maps to: HiltComponent(name, workflow_id, workflow_type, human_prompt, inputs?, output?)
-  
+
   - name: "human_input_example"
     type: HiltComponent
-    
+
     # Required fields
     human_prompt: "Please provide additional information:"
-    
+
     # Optional fields
     inputs:
       - "agent.answer"
@@ -129,17 +129,17 @@ routers:
   # Simple Unconditional Router
   # ================================================================
   # Maps to: Router(from_component=agent_component, to_component=hilt_component)
-  
+
   - from: "agent"
     to: "hilt"
     # No 'condition' field means unconditional routing
 
   # ================================================================
   # Conditional Router with Status-based Routing
-  # ================================================================  
-  # Maps to: Router(from_component=hilt_component, input="status", 
+  # ================================================================
+  # Maps to: Router(from_component=hilt_component, input="status",
   #                to_component={EXECUTION: agent_component, DEFAULT_ROUTE: end_component})
-  
+
   - from: "hilt"
     condition:
       input: "status"                       # Context path to evaluate for routing
@@ -156,7 +156,7 @@ routers:
 
 flow:
   entry_point: "agent"                      # Component to start workflow execution
-  
+
 
 # ====================================================================
 # EXAMPLE: Complete Issue-to-MR Workflow Configuration
@@ -169,10 +169,12 @@ example_issue_to_mr_workflow:
       type: AgentComponent
       prompt_id: "agents/awesome"
       prompt_version: "^1.0.0"
-      toolset: "chat_combined_tools"
-      inputs: ["first.task"]
+      inputs: ["context:task"]
       output_type: "AgentFinalOutput"
-      output: "answer"
+      output: "context:agent.answer"
+      ui_log_events:
+        llm: true
+        tools: ["on_execution_success"]
       toolset:
         - "list_issues"
         - "get_issue"
@@ -203,26 +205,24 @@ example_issue_to_mr_workflow:
         - "create_file_with_contents"
         - "edit_file"
         - "mkdir"
-        
-      
+
     - name: "hilt"
       type: HiltChatBackComponent
-      inputs: ["conversation_history.agent"]
-      output: "agent" # TODO, turn to: "conversation_history.agent"
-      
+      output: "conversation_history:agent"
+
     - name: "end"
       type: EndComponent
-  
+
   routers:
     - from: "agent"
       to: "hilt"
-      
+
     - from: "hilt"
       condition:
         input: "status"
         routes:
           "Execution": "agent"
           "default_route": "end"
-  
+
   flow:
     entry_point: "agent"

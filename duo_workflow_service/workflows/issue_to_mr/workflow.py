@@ -1,27 +1,18 @@
-import math
 import os
-import random
 from datetime import datetime, timezone
-from enum import StrEnum
-from typing import Any
+from typing import Any, Type
 
 import yaml
-from langgraph.checkpoint.memory import BaseCheckpointSaver
-from langgraph.graph import END, StateGraph
+from langgraph.graph import StateGraph
 from langgraph.types import Command
-from pydantic import BaseModel, Field
 
 from duo_workflow_service.agent_registry.components.base import (
-    DEFAULT_ROUTE,
     AgentComponent,
-    AgentFinalOutput,
     EndComponent,
     HiltChatBackComponent,
     Router,
-    attach_components_to_graph,
 )
 from duo_workflow_service.checkpointer.gitlab_workflow import WorkflowStatusEventEnum
-from duo_workflow_service.components.tools_registry import ToolsRegistry
 from duo_workflow_service.entities.state import (
     MessageTypeEnum,
     PoCWorkflowState,
@@ -31,10 +22,6 @@ from duo_workflow_service.entities.state import (
 )
 from duo_workflow_service.tracking.errors import log_exception
 from duo_workflow_service.workflows.abstract_workflow import AbstractWorkflow
-from duo_workflow_service.workflows.chat.workflow import (
-    CHAT_MUTATION_TOOLS,
-    CHAT_READ_ONLY_TOOLS,
-)
 
 MAX_TOKENS_TO_SAMPLE = 8192
 DEBUG = os.getenv("DEBUG")
@@ -42,84 +29,76 @@ MAX_MESSAGE_LENGTH = 200
 RECURSION_LIMIT = 500
 
 
-class Routes(StrEnum):
-    CONTINUE = "continue"
-    NO_CONVERSATION_HISTORY = "no_conversation_history"
-    SHOW_AGENT_MESSAGE = "show_agent_message"
-    TOOL_USE = "tool_use"
-    STOP = "stop"
+def load_yaml_config(config_key: str = "example_issue_to_mr_workflow") -> dict:
+    """Load YAML configuration from proposal.yaml file.
+
+    Args:
+        config_key: The key to extract from the YAML file (default: "example_issue_to_mr_workflow")
+
+    Returns:
+        dict: The configuration dictionary for the specified key
+
+    Raises:
+        FileNotFoundError: If proposal.yaml is not found
+        KeyError: If the specified config_key is not found in the YAML
+        yaml.YAMLError: If there's an error parsing the YAML file
+    """
+    try:
+        # Get the path to proposal.yaml relative to the project root
+        current_dir = os.path.dirname(os.path.abspath(__file__))
+        project_root = os.path.join(current_dir, "..", "..", "..")
+        yaml_path = os.path.join(project_root, "proposal.yaml")
+
+        with open(yaml_path, "r", encoding="utf-8") as file:
+            yaml_content = yaml.safe_load(file)
+
+        if config_key not in yaml_content:
+            raise KeyError(
+                f"Configuration key '{config_key}' not found in proposal.yaml"
+            )
+
+        return yaml_content[config_key]
+
+    except FileNotFoundError:
+        raise FileNotFoundError("proposal.yaml file not found in project root")
+    except yaml.YAMLError as e:
+        raise yaml.YAMLError(f"Error parsing YAML file: {e}")
+
+
+def load_output_model_class(output_type_name: str) -> Type:
+    """Load output model class from duo_workflow_service.agent_registry.components.base.
+
+    Args:
+        output_type_name: The name of the output model class (e.g., "AgentFinalOutput")
+
+    Returns:
+        Type: The output model class
+
+    Raises:
+        AttributeError: If the specified output_type_name is not found in the base module
+    """
+    # Import the base module to get available classes
+    from duo_workflow_service.agent_registry.components import base
+
+    # Check if the class exists in the base module
+    if not hasattr(base, output_type_name):
+        raise AttributeError(
+            f"Output model class '{output_type_name}' not found in duo_workflow_service.agent_registry.components.base"
+        )
+
+    # Get and return the class
+    output_class = getattr(base, output_type_name)
+
+    # Verify it's a class (not a function or other object)
+    if not isinstance(output_class, type):
+        raise TypeError(
+            f"'{output_type_name}' is not a class in duo_workflow_service.agent_registry.components.base"
+        )
+
+    return output_class
 
 
 class Workflow(AbstractWorkflow):
-    def load_yaml_config(
-        self, config_key: str = "example_issue_to_mr_workflow"
-    ) -> dict:
-        """Load YAML configuration from proposal.yaml file.
-
-        Args:
-            config_key: The key to extract from the YAML file (default: "example_issue_to_mr_workflow")
-
-        Returns:
-            dict: The configuration dictionary for the specified key
-
-        Raises:
-            FileNotFoundError: If proposal.yaml is not found
-            KeyError: If the specified config_key is not found in the YAML
-            yaml.YAMLError: If there's an error parsing the YAML file
-        """
-        try:
-            # Get the path to proposal.yaml relative to the project root
-            current_dir = os.path.dirname(os.path.abspath(__file__))
-            project_root = os.path.join(current_dir, "..", "..", "..")
-            yaml_path = os.path.join(project_root, "proposal.yaml")
-
-            with open(yaml_path, "r", encoding="utf-8") as file:
-                yaml_content = yaml.safe_load(file)
-
-            if config_key not in yaml_content:
-                raise KeyError(
-                    f"Configuration key '{config_key}' not found in proposal.yaml"
-                )
-
-            return yaml_content[config_key]
-
-        except FileNotFoundError:
-            raise FileNotFoundError("proposal.yaml file not found in project root")
-        except yaml.YAMLError as e:
-            raise yaml.YAMLError(f"Error parsing YAML file: {e}")
-
-    def load_output_model_class(self, output_type_name: str):
-        """Load output model class from duo_workflow_service.agent_registry.components.base.
-
-        Args:
-            output_type_name: The name of the output model class (e.g., "AgentFinalOutput")
-
-        Returns:
-            Type: The output model class
-
-        Raises:
-            AttributeError: If the specified output_type_name is not found in the base module
-        """
-        # Import the base module to get available classes
-        from duo_workflow_service.agent_registry.components import base
-
-        # Check if the class exists in the base module
-        if not hasattr(base, output_type_name):
-            raise AttributeError(
-                f"Output model class '{output_type_name}' not found in duo_workflow_service.agent_registry.components.base"
-            )
-
-        # Get and return the class
-        output_class = getattr(base, output_type_name)
-
-        # Verify it's a class (not a function or other object)
-        if not isinstance(output_class, type):
-            raise TypeError(
-                f"'{output_type_name}' is not a class in duo_workflow_service.agent_registry.components.base"
-            )
-
-        return output_class
-
     def get_workflow_state(self, goal: str) -> PoCWorkflowState:
         context_elements = self._context_elements or []
 
@@ -139,9 +118,7 @@ class Workflow(AbstractWorkflow):
             ui_chat_log=[initial_ui_chat_log],
             context={
                 "project_id": self._project.get("id"),
-                "first": {
-                    "task": goal,
-                },
+                "task": goal,
             },
         )
 
@@ -156,7 +133,7 @@ class Workflow(AbstractWorkflow):
 
     def _compile(self, goal, tools_registry, checkpointer):
         # Load YAML configuration for the example_issue_to_mr_workflow
-        config = self.load_yaml_config("example_issue_to_mr_workflow")
+        config = load_yaml_config("example_issue_to_mr_workflow")
 
         # TODO: Implement workflow graph building using the loaded config
         component_classes = {
@@ -192,7 +169,7 @@ class Workflow(AbstractWorkflow):
 
             # Handle output_type by loading the class from base module
             if "output_type" in comp_params:
-                comp_params["output_type"] = self.load_output_model_class(
+                comp_params["output_type"] = load_output_model_class(
                     comp_params["output_type"]
                 )
 

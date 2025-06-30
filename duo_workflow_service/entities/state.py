@@ -359,6 +359,8 @@ def merge_nested_dict_reducer(
 
 class PoCWorkflowState(TypedDict):
     status: WorkflowStatusEnum
-    conversation_history: Dict[str, List[BaseMessage]]
-    ui_chat_log: Annotated[List[UiChatLog], _ui_chat_log_reducer]
+    conversation_history: Annotated[
+        dict[str, list[BaseMessage]], _conversation_history_reducer
+    ]
+    ui_chat_log: Annotated[list[UiChatLog], _ui_chat_log_reducer]
     context: Annotated[dict[str, Any], merge_nested_dict_reducer]
