@@ -121,9 +121,7 @@ def _build_expected_substrings_from_kwargs(
     generate_params: MappingProxyType[str, inspect.Parameter],
     kwargs: dict,
 ) -> List[str]:
-    """
-    Builds expected substrings from messages and kwargs for a model function.
-    """
+    """Builds expected substrings from messages and kwargs for a model function."""
     expected_strings = [
         json.dumps(kwargs.pop(key)) for key in generate_params if key in kwargs
     ]
