@@ -89,8 +89,8 @@ async def test_init():
     assert workflow.is_done is False
     assert workflow._outbox.maxsize == 1
     assert workflow._inbox.maxsize == 1
-    assert len(workflow._additional_tools) == 1
-    tool = workflow._additional_tools[0]
+    assert len(workflow._mcp_tools) == 1
+    tool = workflow._mcp_tools[0](metadata={})
     assert tool.name == "get_issue"
     assert tool.description == "Tool to get issue"
     assert workflow._user == user
