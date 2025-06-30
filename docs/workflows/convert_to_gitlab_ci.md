@@ -1,4 +1,4 @@
-# Convert to GitLab CI Workflow
+# Convert to GitLab CI Flow
 
 ## What It Does
 
@@ -83,7 +83,7 @@ deploy:
 ## How to Use
 
 1. **Ensure Jenkinsfile is current** and working
-1. **Run the workflow** on your project
+1. **Run the flow** on your project
 1. **Review generated**`.gitlab-ci.yml`
 1. **Test in development** environment
 1. **Adjust** environment-specific settings

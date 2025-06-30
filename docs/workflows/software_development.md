@@ -1,4 +1,4 @@
-# Software Development Workflow
+# Software Development Flow
 
 ## What It Does
 
@@ -61,7 +61,7 @@ Make the code better
 
 ## Tools Permissions and Approval System
 
-The workflow system includes a tool approval mechanism to manage risk when agents use different tools. Tools are
+Duo Agent Plaform system includes a tool approval mechanism to manage risk when agents use different tools. Tools are
 organized into privilege buckets, allowing users to control which tools are available and require approval before
 execution. This system helps prevent unintended access to confidential data or execution of potentially harmful
 commands.

@@ -1,11 +1,11 @@
-# Duo Workflows Overview
+# Duo Agent Platform's Flows Overview
 
 ## About Flows in the Duo Agent Platform
 
-Duo Workflows are AI-powered automation tools that help development teams work more efficiently. Choose the right
-workflow for your task:
+Agent Flows are AI-powered automation tools that help development teams work more efficiently. Choose the right
+flow for your task:
 
-## Available Workflows
+## Available Agent Flows
 
 ### 1. Software Development
 
@@ -34,15 +34,15 @@ Get interactive help with coding, debugging, and GitLab project management.
 ## Quick Start
 
 1. Navigate to your GitLab project
-1. Access Duo Workflows from your project interface
+1. Access Duo Agent Platform from your project interface
 1. Choose between:
 
-- **Chat Workflow** - For interactive assistance (no configuration needed)
-- **Other Workflows** - For automated tasks (requires configuration)
+- **Chat Flow** - For interactive assistance (no configuration needed)
+- **Other Flows** - For automated tasks (requires configuration)
 
-1. For non-chat workflows:
+1. For non-chat flows:
 
-- Select the specific workflow type
+- Select the specific flow type
 - Ensure required configuration files exist
 - Provide task requirements
 
@@ -57,6 +57,6 @@ Get interactive help with coding, debugging, and GitLab project management.
 
 ## Support
 
-- Check individual workflow guides for detailed instructions
+- Check individual flow guides for detailed instructions
 - Review execution logs for troubleshooting
 - Report issues through your GitLab project
