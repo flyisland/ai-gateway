@@ -32,15 +32,14 @@ from duo_workflow_service.gitlab.http_client import GitlabHttpClient
 from duo_workflow_service.tools.request_user_clarification import (
     RequestUserClarificationTool,
 )
-
-from ...internal_events.event_enum import CategoryEnum
-from ...tools import HandoverTool
 from .prompts import (
     ASSIGNMENT_PROMPT,
     CLARITY_JUDGE_RESPONSE_TEMPLATE,
     PROMPT,
     SYS_PROMPT,
 )
+from ...internal_events.event_enum import CategoryEnum
+from ...tools import HandoverTool
 
 _AGENT_NAME = "clarity_judge"
 

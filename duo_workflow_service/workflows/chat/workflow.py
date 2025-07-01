@@ -158,7 +158,9 @@ class Workflow(AbstractWorkflow):
                     case "approval":
                         next_step = "run_tools"
                     case "rejection":
-                        state_update["approval"] = ApprovalStateRejection(message=self._approval.rejection.message)  # type: ignore
+                        state_update["approval"] = ApprovalStateRejection(
+                            message=self._approval.rejection.message
+                        )  # type: ignore
                     case _:
                         state_update["conversation_history"] = {
                             self._agent.name: [

@@ -7,7 +7,6 @@ import structlog
 from gitlab_cloud_connector import CloudConnectorUser
 from langchain.tools import BaseTool
 from langchain_core.runnables import RunnableConfig
-
 # pylint disable are going to be fixed via
 # https://gitlab.com/gitlab-org/duo-workflow/duo-workflow-service/-/issues/78
 from langgraph.checkpoint.base import (  # pylint: disable=no-langgraph-langchain-imports

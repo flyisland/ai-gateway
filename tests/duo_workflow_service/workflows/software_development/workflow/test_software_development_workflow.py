@@ -1,6 +1,6 @@
 import asyncio
 import os
-from unittest.mock import ANY, AsyncMock, MagicMock, Mock, call, patch
+from unittest.mock import ANY, AsyncMock, MagicMock, call, patch
 from uuid import uuid4
 
 import pytest
@@ -18,7 +18,6 @@ from duo_workflow_service.components.tools_registry import (
 from duo_workflow_service.entities import Plan, WorkflowStatusEnum
 from duo_workflow_service.internal_events.event_enum import CategoryEnum
 from duo_workflow_service.llm_factory import AnthropicConfig, VertexConfig
-from duo_workflow_service.tools.toolset import Toolset
 from duo_workflow_service.workflows.software_development.workflow import (
     CONTEXT_BUILDER_TOOLS,
     EXECUTOR_TOOLS,
@@ -1330,9 +1329,6 @@ def test_software_development_workflow_model_config(
     expected_model,
 ):
     """Test that software development workflow uses correct model based on feature flags."""
-    from duo_workflow_service.interceptors.feature_flag_interceptor import (
-        current_feature_flag_context,
-    )
 
     with patch.dict(os.environ, env_vars, clear=True):
         workflow = Workflow(

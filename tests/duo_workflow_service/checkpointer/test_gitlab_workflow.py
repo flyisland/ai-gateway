@@ -1,4 +1,3 @@
-import base64
 import json
 from typing import Any, Optional, Sequence, TypedDict
 from unittest.mock import AsyncMock, call, patch

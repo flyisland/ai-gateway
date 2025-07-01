@@ -11,8 +11,6 @@ from langchain_core.messages import (
 )
 
 from duo_workflow_service.entities.state import (
-    MAX_CONTEXT_TOKENS,
-    MAX_SINGLE_MESSAGE_TOKENS,
     MessageTypeEnum,
     UiChatLog,
     _conversation_history_reducer,
