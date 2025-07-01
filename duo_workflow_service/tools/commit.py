@@ -8,6 +8,7 @@ from duo_workflow_service.gitlab.url_parser import GitLabUrlParseError, GitLabUr
 from duo_workflow_service.tools.duo_base_tool import DuoBaseTool
 from duo_workflow_service.tools.gitlab_resource_input import ProjectResourceInput
 
+# editorconfig-checker-disable
 PROJECT_IDENTIFICATION_DESCRIPTION = """To identify the project you must provide either:
 - project_id parameter, or
 - A GitLab URL like:
@@ -23,6 +24,7 @@ COMMIT_IDENTIFICATION_DESCRIPTION = """To identify a commit you must provide eit
   - https://gitlab.com/namespace/project/-/commit/6104942438c14ec7bd21c6cd5bd995272b3faff6
   - https://gitlab.com/group/subgroup/project/-/commit/6104942438c14ec7bd21c6cd5bd995272b3faff6
 """
+# editorconfig-checker-enable
 
 
 class CommitResourceInput(ProjectResourceInput):
@@ -95,7 +97,7 @@ class CommitBaseTool(DuoBaseTool):
 class ListCommitsInput(ProjectResourceInput):
     all: Optional[bool] = Field(
         default=False,
-        description="Retrieve every commit from the repository. Default is false.",
+        description="When set to true the ref_name parameter is ignored. Default is false.",
     )
     author: Optional[str] = Field(
         default=None,
@@ -120,7 +122,8 @@ class ListCommitsInput(ProjectResourceInput):
     )
     since: Optional[str] = Field(
         default=None,
-        description="Only commits after or on this date are returned in ISO 8601 format (YYYY-MM-DDTHH:MM:SSZ).",
+        description="Only commits after or on this date are returned."
+        "Use ISO 8601 format when specifying the date (YYYY-MM-DDTHH:MM:SSZ).",
     )
     trailers: Optional[bool] = Field(
         default=False,
@@ -128,17 +131,25 @@ class ListCommitsInput(ProjectResourceInput):
     )
     until: Optional[str] = Field(
         default=None,
-        description="Only commits before or on this date are returned in ISO 8601 format (YYYY-MM-DDTHH:MM:SSZ).",
+        description="Only commits before or on this date are returned."
+        "Use ISO 8601 format when specifying the date (YYYY-MM-DDTHH:MM:SSZ).",
     )
     with_stats: Optional[bool] = Field(
         default=False,
         description="Include commit stats. Default is false.",
     )
+    page: Optional[int] = Field(
+        default=1,
+        description="Page number. Default is 1.",
+    )
 
 
 class ListCommits(CommitBaseTool):
     name: str = "list_commits"
+
+    # editorconfig-checker-disable
     description: str = f"""List commits in a GitLab project repository.
+    By default, only returns the first 20 commits - use page parameter to get complete results.
 
     {PROJECT_IDENTIFICATION_DESCRIPTION}
 
@@ -148,6 +159,7 @@ class ListCommits(CommitBaseTool):
     - Given the URL https://gitlab.com/namespace/project, the tool call would be:
         list_commits(url="https://gitlab.com/namespace/project")
     """
+    # editorconfig-checker-enable
     args_schema: Type[BaseModel] = ListCommitsInput  # type: ignore
 
     async def _arun(self, **kwargs: Any) -> str:
@@ -368,6 +380,8 @@ class CreateCommit(DuoBaseTool):
     """Tool to create a commit with multiple file actions in a GitLab repository."""
 
     name: str = "create_commit"
+
+    # editorconfig-checker-disable
     description: str = """Create a commit with multiple file actions in a GitLab repository.
 
     To identify the project you must provide either:
@@ -387,6 +401,8 @@ class CreateCommit(DuoBaseTool):
     - Deleting a file requires 'action': 'delete' and 'file_path'
     - Moving a file requires 'action': 'move', 'file_path', and 'previous_path'
     """
+    # editorconfig-checker-enable
+
     args_schema: Type[BaseModel] = CreateCommitInput  # type: ignore
 
     async def _arun(

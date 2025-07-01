@@ -64,12 +64,12 @@ _READ_ONLY_GITLAB_TOOLS: list[Type[BaseTool]] = [
     tools.GetIssueNote,
     tools.GetRepositoryFile,
     tools.ListEpicNotes,
-    tools.GetEpicNote,
     tools.GetCommit,
     tools.ListCommits,
     tools.GetCommitDiff,
     tools.GetCommitComments,
     tools.GetWorkflowContext,
+    tools.ListVulnerabilities,
     tools.CiLinter,
 ]
 

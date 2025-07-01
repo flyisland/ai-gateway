@@ -7,7 +7,6 @@ import structlog
 from gitlab_cloud_connector import CloudConnectorUser
 from langchain.tools import BaseTool
 from langchain_core.runnables import RunnableConfig
-
 # pylint disable are going to be fixed via
 # https://gitlab.com/gitlab-org/duo-workflow/duo-workflow-service/-/issues/78
 from langgraph.checkpoint.base import (  # pylint: disable=no-langgraph-langchain-imports
@@ -30,7 +29,6 @@ from duo_workflow_service.gitlab.gitlab_project import (
     Project,
     fetch_project_data_with_workflow_id,
 )
-from duo_workflow_service.gitlab.gitlab_workflow_params import fetch_workflow_config
 from duo_workflow_service.gitlab.http_client import GitlabHttpClient
 from duo_workflow_service.gitlab.http_client_factory import get_http_client
 from duo_workflow_service.gitlab.url_parser import GitLabUrlParser
@@ -186,10 +184,11 @@ class AbstractWorkflow(ABC):
         }
         compiled_graph = None
         try:
-            # Fetch GitLab project information to inject into prompts
-            self._project = await fetch_project_data_with_workflow_id(
-                client=self._http_client,
-                workflow_id=self._workflow_id,
+            self._project, self._workflow_config = (
+                await fetch_project_data_with_workflow_id(
+                    client=self._http_client,
+                    workflow_id=self._workflow_id,
+                )
             )
 
             if "web_url" not in self._project:
@@ -205,10 +204,6 @@ class AbstractWorkflow(ABC):
                 raise RuntimeError(
                     f"Failed to extract gitlab host from web_url for workflow {self._workflow_id}"
                 )
-
-            self._workflow_config = await fetch_workflow_config(
-                self._http_client, self._workflow_id
-            )
 
             user_for_registry = (
                 self._user

@@ -646,6 +646,7 @@ def ui_chat_log() -> list[UiChatLog]:
             "tool_info": None,
             "context_elements": None,
             "message_sub_type": None,
+            "additional_context": None,
         }
     ]
 
@@ -659,7 +660,6 @@ def workflow_state(ui_chat_log: list[UiChatLog]):
         handover=[],
         last_human_input=None,
         ui_chat_log=ui_chat_log,
-        files_changed=[],
     )
 
 

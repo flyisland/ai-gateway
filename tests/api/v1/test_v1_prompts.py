@@ -1,13 +1,9 @@
-from datetime import datetime
-from typing import Any, List, Optional, Type
+from typing import Any, List, Optional
 from unittest.mock import patch
 
 import pytest
 from fastapi import HTTPException
-from gitlab_cloud_connector import CloudConnectorUser, GitLabUnitPrimitive, UserClaims
-from langchain_core.callbacks import CallbackManagerForLLMRun
-from langchain_core.language_models.chat_models import SimpleChatModel
-from langchain_core.messages import BaseMessage
+from gitlab_cloud_connector import CloudConnectorUser, UserClaims
 from pydantic import AnyUrl
 
 from ai_gateway.api.v1 import api_router
@@ -19,94 +15,9 @@ from ai_gateway.model_metadata import (
 from ai_gateway.prompts import Prompt
 
 
-class FakeModel(SimpleChatModel):
-    expected_message: str
-    response: str
-
-    @property
-    def _llm_type(self) -> str:
-        return "fake-provider"
-
-    @property
-    def _identifying_params(self) -> dict[str, Any]:
-        return {"model": "fake-model"}
-
-    def _call(
-        self,
-        messages: List[BaseMessage],
-        stop: Optional[List[str]] = None,
-        run_manager: Optional[CallbackManagerForLLMRun] = None,
-        **kwargs: Any,
-    ) -> str:
-        assert self.expected_message == messages[0].content
-
-        return self.response
-
-
-@pytest.fixture
-def model_factory():
-    return lambda model, **kwargs: FakeModel(
-        expected_message="Hi, I'm John and I'm 20 years old. It's now July 12, 2025.",
-        response="Hi John!",
-    )
-
-
-@pytest.fixture
-def prompt_template():
-    return {
-        "system": "Hi, I'm {{name}} and I'm {{age}} years old. It's now {{current_date}}."
-    }
-
-
-@pytest.fixture
-def compatible_versions():
-    return ["1.0.0"]
-
-
-@pytest.fixture
-def mock_registry_get(
-    request,
-    prompt_class: Optional[Type[Prompt]],
-    compatible_versions: Optional[List[str]],
-):
-    with patch("ai_gateway.prompts.registry.LocalPromptRegistry.get") as mock:
-        if prompt_class and not compatible_versions:
-            mock.side_effect = ValueError("No prompt version found matching the query:")
-        elif (
-            prompt_class
-            and compatible_versions is not None
-            and len(compatible_versions) > 0
-        ):
-            mock.return_value = request.getfixturevalue("prompt")
-        else:
-            mock.side_effect = KeyError()
-
-        yield mock
-
-
-@pytest.fixture
-def frozen_datetime_now():
-    frozen = datetime(2025, 7, 12, 12, 0, 0)
-    with patch("ai_gateway.api.v1.prompts.invoke.datetime") as mock_datetime:
-        mock_datetime.now.return_value = frozen
-        yield mock_datetime
-
-
 @pytest.fixture(scope="class")
 def fast_api_router():
     return api_router
-
-
-@pytest.fixture
-def unit_primitives():
-    return ["explain_vulnerability"]
-
-
-@pytest.fixture
-def auth_user(unit_primitives: list[GitLabUnitPrimitive]):
-    return CloudConnectorUser(
-        authenticated=True, claims=UserClaims(scopes=unit_primitives)
-    )
 
 
 class TestPrompt:

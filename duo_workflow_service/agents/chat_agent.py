@@ -17,6 +17,7 @@ from ai_gateway.prompts import Prompt, jinja2_formatter
 from ai_gateway.prompts.config import ModelConfig
 from duo_workflow_service.components.tools_registry import ToolsRegistry
 from duo_workflow_service.entities.state import (
+    ApprovalStateRejection,
     ChatWorkflowState,
     MessageTypeEnum,
     ToolInfo,
@@ -45,15 +46,23 @@ class ChatAgentPromptTemplate(Runnable[ChatWorkflowState, PromptValue]):
         agent_name = _kwargs["agent_name"]
         project: Project | None = input.get("project")
 
-        if "system" in self.prompt_template:
-            content = jinja2_formatter(
-                self.prompt_template["system"],
+        # Handle system messages with static and dynamic parts
+        # Create separate system messages for static and dynamic parts
+        if "system_static" in self.prompt_template:
+            # Static content doesn't need Jinja2 processing
+            messages.append(
+                SystemMessage(content=self.prompt_template["system_static"])
+            )
+
+        if "system_dynamic" in self.prompt_template:
+            dynamic_content = jinja2_formatter(
+                self.prompt_template["system_dynamic"],
                 current_date=datetime.now().strftime("%Y-%m-%d"),
                 current_time=datetime.now().strftime("%H:%M:%S"),
                 current_timezone=datetime.now().astimezone().tzname(),
                 project=project,
             )
-            messages.append(SystemMessage(content=content))
+            messages.append(SystemMessage(content=dynamic_content))
 
         for m in input["conversation_history"][agent_name]:
             if isinstance(m, HumanMessage):
@@ -109,6 +118,7 @@ class ChatAgent(Prompt[ChatWorkflowState, BaseMessage]):
                         correlation_id=None,
                         tool_info=ToolInfo(name=call["name"], args=call["args"]),
                         context_elements=[],
+                        additional_context=None,
                     )
                 )
 
@@ -116,12 +126,19 @@ class ChatAgent(Prompt[ChatWorkflowState, BaseMessage]):
 
     async def run(self, input: ChatWorkflowState) -> Dict[str, Any]:
         new_messages = []
+        approval_state = input.get("approval", None)
 
-        if input.get("cancel_tool_message", False):
+        if isinstance(approval_state, ApprovalStateRejection):
             last_message = input["conversation_history"][self.name][-1]
+
+            if approval_state.message:
+                tool_message = f"Tool is cancelled temporarily as user has a comment. Comment: {approval_state.message}"
+            else:
+                tool_message = "Tool is cancelled by user."
+
             messages: list[BaseMessage] = [
                 ToolMessage(
-                    content=f"Tool cancelled temporarily as user has a comment. Comment: {input['cancel_tool_message']}",
+                    content=tool_message,
                     tool_call_id=tool_call.get("id"),
                 )
                 for tool_call in getattr(last_message, "tool_calls", [])
@@ -161,6 +178,7 @@ class ChatAgent(Prompt[ChatWorkflowState, BaseMessage]):
                         correlation_id=None,
                         tool_info=None,
                         context_elements=[],
+                        additional_context=None,
                     )
                 ]
                 result["status"] = WorkflowStatusEnum.INPUT_REQUIRED
@@ -192,6 +210,7 @@ class ChatAgent(Prompt[ChatWorkflowState, BaseMessage]):
                         correlation_id=None,
                         tool_info=None,
                         context_elements=[],
+                        additional_context=None,
                     )
                 ],
             }

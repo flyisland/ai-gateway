@@ -16,6 +16,7 @@ from duo_workflow_service.agents.tools_executor import ToolsExecutor
 from duo_workflow_service.checkpointer.gitlab_workflow import WorkflowStatusEventEnum
 from duo_workflow_service.components.tools_registry import ToolsRegistry
 from duo_workflow_service.entities.state import (
+    ApprovalStateRejection,
     ChatWorkflowState,
     MessageTypeEnum,
     ToolStatus,
@@ -56,6 +57,7 @@ CHAT_READ_ONLY_TOOLS = [
     "gitlab_merge_request_search",
     "gitlab_documentation_search",
     "read_file",
+    "get_repository_file",
     "list_dir",
     "find_files",
     "grep",
@@ -63,11 +65,11 @@ CHAT_READ_ONLY_TOOLS = [
     "list_epics",
     "scan_directory_tree",
     "list_epic_notes",
-    "get_epic_note",
     "get_commit",
     "list_commits",
     "get_commit_comments",
     "get_commit_diff",
+    "list_vulnerabilities",
 ]
 
 
@@ -113,14 +115,15 @@ class Workflow(AbstractWorkflow):
         contextElements = self._context_elements or []
 
         initial_ui_chat_log = UiChatLog(
-            message_type=MessageTypeEnum.TOOL,
             message_sub_type=None,
-            content=f"Starting chat: {goal}",
+            message_type=MessageTypeEnum.USER,
+            content=goal,
             timestamp=datetime.now(timezone.utc).isoformat(),
             status=ToolStatus.SUCCESS,
             correlation_id=None,
             tool_info=None,
             context_elements=contextElements,
+            additional_context=self._additional_context,
         )
 
         return ChatWorkflowState(
@@ -140,7 +143,7 @@ class Workflow(AbstractWorkflow):
             last_human_input=None,
             context_elements=contextElements,
             project=self._project,
-            cancel_tool_message=None,
+            approval=None,
         )
 
     async def get_graph_input(self, goal: str, status_event: str) -> Any:
@@ -155,7 +158,9 @@ class Workflow(AbstractWorkflow):
                     case "approval":
                         next_step = "run_tools"
                     case "rejection":
-                        state_update["cancel_tool_message"] = self._approval.rejection.message  # type: ignore
+                        state_update["approval"] = ApprovalStateRejection(
+                            message=self._approval.rejection.message
+                        )  # type: ignore
                     case _:
                         state_update["conversation_history"] = {
                             self._agent.name: [
@@ -167,6 +172,19 @@ class Workflow(AbstractWorkflow):
                                 )
                             ]
                         }
+
+                new_message_chat_log = UiChatLog(
+                    message_type=MessageTypeEnum.USER,
+                    message_sub_type=None,
+                    content=goal,
+                    timestamp=datetime.now(timezone.utc).isoformat(),
+                    status=ToolStatus.SUCCESS,
+                    correlation_id=None,
+                    tool_info=None,
+                    context_elements=None,
+                    additional_context=self._additional_context,
+                )
+                state_update["ui_chat_log"] = [new_message_chat_log]
 
                 return Command(goto=next_step, update=state_update)
             case _:
@@ -228,8 +246,7 @@ class Workflow(AbstractWorkflow):
         if is_feature_enabled(FeatureFlag.DUO_WORKFLOW_WEB_CHAT_MUTATION_TOOLS):
             available_tools += CHAT_GITLAB_MUTATION_TOOLS
 
-        mcp_enabled = self._workflow_config.get("mcp_enabled", False)
-        if is_feature_enabled(FeatureFlag.DUO_WORKFLOW_MCP_SUPPORT) and mcp_enabled:
+        if self._workflow_config.get("mcp_enabled", False):
             available_tools += [tool.name for tool in self._additional_tools]
 
         return available_tools

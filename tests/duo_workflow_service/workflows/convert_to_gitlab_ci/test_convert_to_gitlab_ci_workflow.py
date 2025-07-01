@@ -1,4 +1,5 @@
 import asyncio
+import json
 from unittest.mock import AsyncMock, MagicMock, Mock, patch
 
 import pytest
@@ -22,7 +23,9 @@ from duo_workflow_service.workflows.convert_to_gitlab_ci.prompts import (
     CI_PIPELINES_MANAGER_USER_GUIDELINES,
 )
 from duo_workflow_service.workflows.convert_to_gitlab_ci.workflow import (
+    Routes,
     _load_file_contents,
+    _router,
 )
 
 
@@ -214,7 +217,6 @@ async def test_workflow_compilation(
 @patch(
     "duo_workflow_service.workflows.abstract_workflow.fetch_project_data_with_workflow_id"
 )
-@patch("duo_workflow_service.workflows.abstract_workflow.fetch_workflow_config")
 @patch("duo_workflow_service.workflows.convert_to_gitlab_ci.workflow.create_chat_model")
 @patch("duo_workflow_service.workflows.abstract_workflow.GitLabWorkflow", autospec=True)
 @patch("duo_workflow_service.workflows.abstract_workflow.UserInterface", autospec=True)
@@ -222,7 +224,6 @@ async def test_workflow_run(
     mock_checkpoint_notifier,
     mock_gitlab_workflow,
     mock_chat_client,
-    mock_fetch_workflow_config,
     mock_fetch_project_data_with_workflow_id,
     mock_run_tool_node_generic_class,
     mock_tools_executor,
@@ -235,13 +236,16 @@ async def test_workflow_run(
     mock_checkpoint_notifier_instance = mock_checkpoint_notifier.return_value
     mock_tools_registry = MagicMock(spec=ToolsRegistry)
     mock_tools_registry_cls.configure = AsyncMock(return_value=mock_tools_registry)
-    mock_fetch_project_data_with_workflow_id.return_value = {
-        "id": 1,
-        "name": "test-project",
-        "description": "This is a test project",
-        "http_url_to_repo": "https://example.com/project",
-        "web_url": "https://example.com/project",
-    }
+    mock_fetch_project_data_with_workflow_id.return_value = (
+        {
+            "id": 1,
+            "name": "test-project",
+            "description": "This is a test project",
+            "http_url_to_repo": "https://example.com/project",
+            "web_url": "https://example.com/project",
+        },
+        {"project_id": 1},
+    )
 
     mock_git_lab_workflow_instance = mock_gitlab_workflow.return_value
     mock_git_lab_workflow_instance.__aenter__.return_value = (
@@ -320,7 +324,6 @@ async def test_workflow_run(
 @patch(
     "duo_workflow_service.workflows.abstract_workflow.fetch_project_data_with_workflow_id"
 )
-@patch("duo_workflow_service.workflows.abstract_workflow.fetch_workflow_config")
 @patch("duo_workflow_service.workflows.convert_to_gitlab_ci.workflow.create_chat_model")
 @patch("duo_workflow_service.workflows.abstract_workflow.GitLabWorkflow", autospec=True)
 @patch("duo_workflow_service.workflows.abstract_workflow.UserInterface", autospec=True)
@@ -330,7 +333,6 @@ async def test_workflow_run_with_file_not_found(
     mock_checkpoint_notifier,
     mock_gitlab_workflow,
     mock_chat_client,
-    mock_fetch_workflow_config,
     mock_fetch_project_data_with_workflow_id,
     mock_run_tool_node_generic_class,
     mock_agent,
@@ -340,13 +342,16 @@ async def test_workflow_run_with_file_not_found(
     mock_checkpoint_notifier_instance = mock_checkpoint_notifier.return_value
     mock_tools_registry = MagicMock(spec=ToolsRegistry)
     mock_tools_registry_cls.configure = AsyncMock(return_value=mock_tools_registry)
-    mock_fetch_project_data_with_workflow_id.return_value = {
-        "id": 1,
-        "name": "test-project",
-        "description": "This is a test project",
-        "http_url_to_repo": "https://example.com/project",
-        "web_url": "https://example.com/project",
-    }
+    mock_fetch_project_data_with_workflow_id.return_value = (
+        {
+            "id": 1,
+            "name": "test-project",
+            "description": "This is a test project",
+            "http_url_to_repo": "https://example.com/project",
+            "web_url": "https://example.com/project",
+        },
+        {"project_id": 1},
+    )
 
     mock_git_lab_workflow_instance = mock_gitlab_workflow.return_value
     mock_git_lab_workflow_instance.__aenter__.return_value = (
@@ -394,26 +399,27 @@ async def test_workflow_run_with_file_not_found(
 @patch(
     "duo_workflow_service.workflows.abstract_workflow.fetch_project_data_with_workflow_id"
 )
-@patch("duo_workflow_service.workflows.abstract_workflow.fetch_workflow_config")
 @patch("duo_workflow_service.workflows.convert_to_gitlab_ci.workflow.create_chat_model")
 @patch("duo_workflow_service.workflows.abstract_workflow.GitLabWorkflow", autospec=True)
 async def test_workflow_run_with_exception(
     mock_gitlab_workflow,
     mock_chat_client,
-    mock_fetch_workflow_config,
     mock_fetch_project_data_with_workflow_id,
     mock_tools_registry_cls,
     mock_state,
 ):
     mock_tools_registry = MagicMock(spec=ToolsRegistry)
     mock_tools_registry_cls.configure = AsyncMock(return_value=mock_tools_registry)
-    mock_fetch_project_data_with_workflow_id.return_value = {
-        "id": 1,
-        "name": "test-project",
-        "description": "This is a test project",
-        "http_url_to_repo": "https://example.com/project",
-        "web_url": "https://example.com/project",
-    }
+    mock_fetch_project_data_with_workflow_id.return_value = (
+        {
+            "id": 1,
+            "name": "test-project",
+            "description": "This is a test project",
+            "http_url_to_repo": "https://example.com/project",
+            "web_url": "https://example.com/project",
+        },
+        {"project_id": 1},
+    )
 
     mock_git_lab_workflow_instance = mock_gitlab_workflow.return_value
     mock_git_lab_workflow_instance.__aenter__.return_value = (
@@ -428,7 +434,6 @@ async def test_workflow_run_with_exception(
             "configurable": {"thread_id": "123", "checkpoint_id": "checkpoint1"}
         }
     )
-    mock_git_lab_workflow_instance.get_next_version = MagicMock(return_value=1)
 
     class AsyncIterator:
         def __init__(self):
@@ -456,3 +461,191 @@ async def test_workflow_run_with_exception(
         await workflow.run("test-file-path")
 
     assert workflow.is_done
+
+
+def test_router_ci_linter_validation_success():
+    """Test router handles successful ci_linter validation."""
+    state = WorkflowState(
+        status=WorkflowStatusEnum.EXECUTION,
+        conversation_history={
+            "ci_pipelines_manager_agent": [
+                AIMessage(
+                    content="",
+                    tool_calls=[
+                        {
+                            "name": "ci_linter",
+                            "args": {"project_id": 123, "content": "..."},
+                            "id": "1",
+                        }
+                    ],
+                ),
+                AIMessage(content='{"valid": true}'),
+            ]
+        },
+        plan=Plan(steps=[]),
+        handover=[],
+        last_human_input=None,
+        ui_chat_log=[],
+    )
+
+    assert _router(state) == Routes.COMMIT_CHANGES
+
+
+def test_router_ci_linter_validation_failure():
+    """Test router handles failed ci_linter validation."""
+    state = WorkflowState(
+        status=WorkflowStatusEnum.EXECUTION,
+        conversation_history={
+            "ci_pipelines_manager_agent": [
+                AIMessage(
+                    content="",
+                    tool_calls=[
+                        {
+                            "name": "ci_linter",
+                            "args": {"project_id": 123, "content": "..."},
+                            "id": "1",
+                        }
+                    ],
+                ),
+                AIMessage(content='{"valid": false, "errors": ["syntax error"]}'),
+            ]
+        },
+        plan=Plan(steps=[]),
+        handover=[],
+        last_human_input=None,
+        ui_chat_log=[],
+    )
+
+    assert _router(state) == Routes.AGENT
+
+
+def test_router_ci_linter_max_attempts():
+    """Test router handles max validation attempts."""
+    messages = []
+    # Add 3 ci_linter calls
+    for i in range(3):
+        messages.extend(
+            [
+                AIMessage(
+                    content=f"attempt {i}",
+                    tool_calls=[
+                        {
+                            "name": "ci_linter",
+                            "args": {"project_id": 123, "content": "..."},
+                            "id": str(i),
+                        }
+                    ],
+                ),
+                AIMessage(content='{"valid": false}'),
+            ]
+        )
+
+    state = WorkflowState(
+        status=WorkflowStatusEnum.EXECUTION,
+        conversation_history={"ci_pipelines_manager_agent": messages},
+        plan=Plan(steps=[]),
+        handover=[],
+        last_human_input=None,
+        ui_chat_log=[],
+    )
+
+    assert _router(state) == Routes.COMMIT_CHANGES
+
+
+def test_router_create_file_returns_to_agent():
+    """Test router returns to agent after file creation for validation."""
+    state = WorkflowState(
+        status=WorkflowStatusEnum.EXECUTION,
+        conversation_history={
+            "ci_pipelines_manager_agent": [
+                AIMessage(
+                    content="",
+                    tool_calls=[
+                        {
+                            "name": "create_file_with_contents",
+                            "args": {"file_path": ".gitlab-ci.yml", "contents": "..."},
+                            "id": "1",
+                        }
+                    ],
+                ),
+                AIMessage(content="File created"),
+            ]
+        },
+        plan=Plan(steps=[]),
+        handover=[],
+        last_human_input=None,
+        ui_chat_log=[],
+    )
+
+    assert _router(state) == Routes.AGENT
+
+
+@patch("duo_workflow_service.workflows.convert_to_gitlab_ci.workflow.log_exception")
+def test_router_ci_linter_json_parsing_error(mock_log_exception):
+    """Test router handles JSON parsing errors in ci_linter responses."""
+    state = WorkflowState(
+        status=WorkflowStatusEnum.EXECUTION,
+        conversation_history={
+            "ci_pipelines_manager_agent": [
+                AIMessage(
+                    content="",
+                    tool_calls=[
+                        {
+                            "name": "ci_linter",
+                            "args": {"project_id": 123, "content": "..."},
+                            "id": "1",
+                        }
+                    ],
+                ),
+                AIMessage(content="This is not valid JSON"),
+            ]
+        },
+        plan=Plan(steps=[]),
+        handover=[],
+        last_human_input=None,
+        ui_chat_log=[],
+        files_changed=[],
+    )
+
+    assert _router(state) == Routes.AGENT
+
+    mock_log_exception.assert_called_once()
+    args, kwargs = mock_log_exception.call_args
+
+    assert isinstance(args[0], json.JSONDecodeError)
+    assert kwargs["extra"]["tool_name"] == "ci_linter"
+    assert kwargs["extra"]["last_msg"] == "This is not valid JSON"
+    assert kwargs["extra"]["error_type"] == "json_parsing_error"
+
+
+def test_router_create_file_max_attempts():
+    """Test router prevents infinite file creation loops."""
+    messages = []
+    for i in range(3):
+        messages.extend(
+            [
+                AIMessage(
+                    content="",
+                    tool_calls=[
+                        {
+                            "name": "create_file_with_contents",
+                            "args": {"file_path": f"file{i}.yml", "contents": "..."},
+                            "id": str(i),
+                        }
+                    ],
+                ),
+                AIMessage(content="File created"),
+            ]
+        )
+
+    state = WorkflowState(
+        status=WorkflowStatusEnum.EXECUTION,
+        conversation_history={"ci_pipelines_manager_agent": messages},
+        plan=Plan(steps=[]),
+        handover=[],
+        last_human_input=None,
+        ui_chat_log=[],
+        files_changed=[],
+    )
+
+    assert _router(state) == Routes.COMMIT_CHANGES

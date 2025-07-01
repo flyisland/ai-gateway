@@ -1,5 +1,4 @@
 import asyncio
-from typing import Any, Dict, List, Optional
 from unittest.mock import Mock, patch
 
 import pytest
@@ -126,6 +125,7 @@ async def test_init_sets_attributes(outbox):
                     "content": "New message",
                     "tool_info": None,
                     "context_elements": None,
+                    "additional_context": None,
                 }
             ],
         ),
@@ -140,6 +140,7 @@ async def test_init_sets_attributes(outbox):
                     "content": "Existing ",
                     "tool_info": None,
                     "context_elements": None,
+                    "additional_context": None,
                 }
             ],
             "content",
@@ -153,6 +154,7 @@ async def test_init_sets_attributes(outbox):
                     "content": "Existing content",
                     "tool_info": None,
                     "context_elements": None,
+                    "additional_context": None,
                 }
             ],
         ),
@@ -167,6 +169,7 @@ async def test_init_sets_attributes(outbox):
                     "content": "Completed message",
                     "tool_info": None,
                     "context_elements": None,
+                    "additional_context": None,
                 }
             ],
             "New message",
@@ -180,6 +183,7 @@ async def test_init_sets_attributes(outbox):
                     "content": "Completed message",
                     "tool_info": None,
                     "context_elements": None,
+                    "additional_context": None,
                 },
                 {
                     "status": None,
@@ -190,6 +194,7 @@ async def test_init_sets_attributes(outbox):
                     "content": "New message",
                     "tool_info": None,
                     "context_elements": None,
+                    "additional_context": None,
                 },
             ],
         ),
@@ -204,6 +209,7 @@ async def test_init_sets_attributes(outbox):
                     "content": "User message",
                     "tool_info": None,
                     "context_elements": None,
+                    "additional_context": None,
                 }
             ],
             "Agent response",
@@ -217,6 +223,7 @@ async def test_init_sets_attributes(outbox):
                     "content": "User message",
                     "tool_info": None,
                     "context_elements": None,
+                    "additional_context": None,
                 },
                 {
                     "status": None,
@@ -227,6 +234,7 @@ async def test_init_sets_attributes(outbox):
                     "content": "Agent response",
                     "tool_info": None,
                     "context_elements": None,
+                    "additional_context": None,
                 },
             ],
         ),

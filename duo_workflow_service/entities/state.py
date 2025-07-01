@@ -1,5 +1,4 @@
 from enum import StrEnum
-from operator import add
 from typing import Annotated, Any, Dict, List, Optional, TypedDict, Union
 
 import structlog
@@ -19,6 +18,7 @@ from duo_workflow_service.gitlab.gitlab_project import Project
 from duo_workflow_service.token_counter.approximate_token_counter import (
     ApproximateTokenCounter,
 )
+from duo_workflow_service.workflows.type_definitions import AdditionalContext
 
 # max content tokens is 200K but adding a buffer of 5% just in case
 MAX_CONTEXT_TOKENS = int(200_000 * 0.95)
@@ -42,11 +42,6 @@ class Task(TypedDict):
 
 class Plan(TypedDict):
     steps: List[Task]
-
-
-class FileChanges(TypedDict):
-    tool_name: str
-    tool_args: Dict[str, Any]
 
 
 class WorkflowStatusEnum(StrEnum):
@@ -97,6 +92,7 @@ class UiChatLog(TypedDict):
     correlation_id: Optional[str]
     tool_info: Optional[ToolInfo]
     context_elements: Optional[List[ContextElement]]
+    additional_context: Optional[List[AdditionalContext]]
 
 
 def _pretrim_large_messages(
@@ -266,7 +262,6 @@ class WorkflowState(TypedDict):
     ui_chat_log: Annotated[List[UiChatLog], _ui_chat_log_reducer]
     handover: List[BaseMessage]
     last_human_input: Union[WorkflowEvent, None]
-    files_changed: Annotated[List[FileChanges], add]
 
 
 class ReplacementRule(BaseModel):
@@ -302,6 +297,10 @@ class SearchAndReplaceWorkflowState(TypedDict):
     pending_files: List[str]
 
 
+class ApprovalStateRejection(BaseModel):
+    message: Optional[str]
+
+
 class ChatWorkflowState(TypedDict):
     plan: Plan
     status: WorkflowStatusEnum
@@ -312,7 +311,7 @@ class ChatWorkflowState(TypedDict):
     last_human_input: Union[WorkflowEvent, None]
     context_elements: List[ContextElement]
     project: Project | None
-    cancel_tool_message: str | None
+    approval: ApprovalStateRejection | None
 
 
 DuoWorkflowStateType = Union[
@@ -325,7 +324,6 @@ class WorkflowContext(TypedDict):
     plan: Plan
     goal: str
     summary: str
-    files_changed: List[FileChanges]
 
 
 class Context(TypedDict):

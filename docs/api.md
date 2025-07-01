@@ -1,7 +1,8 @@
 # API
 
 An interactive API documentation site is available at <http://127.0.0.1:5001/docs>.
-For more information, please see the official FastAPI [doc](https://fastapi.tiangolo.com/tutorial/first-steps/?h=interactive+api+docs#interactive-api-docs).
+For more information, please see the official
+FastAPI [doc](https://fastapi.tiangolo.com/tutorial/first-steps/?h=interactive+api+docs#interactive-api-docs).
 
 ## Authentication
 
@@ -17,7 +18,8 @@ curl --header "Authorization: Bearer <access_token>" --header "X-Gitlab-Authenti
 
 ## Working with self-hosted models
 
-Some parameters that are optional in the [auto-generated interactive API documentation site](#api) are required for self-hosted models.
+Some parameters that are optional in the [auto-generated interactive API documentation site](#api) are required for
+self-hosted models.
 
 For more information, see:
 
@@ -38,17 +40,20 @@ For more information, see:
 
 #### Code Completion
 
-| Version | Endpoint          | Status         | Notes                                              |
-|---------|-------------------|----------------|----------------------------------------------------|
-| v2 | `/completions`         | Current        | Called directly from VSCode GitLab language server |
-| v2 | `/code/completions`    | Current        | Called from Rails side, less frequently            |
+| Version | Endpoint            | Status  | Notes                                              |
+|---------|---------------------|---------|----------------------------------------------------|
+| v2      | `/completions`      | Current | Called directly from VSCode GitLab language server |
+| v2      | `/code/completions` | Current | Called from Rails side, less frequently            |
 
-To see the active endpoints on Kibana (internal link), check out [the logs here](https://log.gprd.gitlab.net/app/r/s/Jh53x).
+To see the active endpoints on Kibana (internal link), check
+out [the logs here](https://log.gprd.gitlab.net/app/r/s/Jh53x).
 The logs are available in the data view `pubsub-mlops-inf-gprd-*`.
 
 ### V4
 
-We have updated the endpoint name from `completions` to `suggestions` to avoid confusion with `code completions`. The v4 endpoint is functionally equivalent to the [v3](#v3) endpoint except for one difference: for streaming responses, v4 returns chunks in SSE format instead of plain text.
+We have updated the endpoint name from `completions` to `suggestions` to avoid confusion with `code completions`. The v4
+endpoint is functionally equivalent to the [v3](#v3) endpoint except for one difference: for streaming responses, v4
+returns chunks in SSE format instead of plain text.
 
 ```plaintext
 POST /v4/code/suggestions
@@ -59,21 +64,23 @@ POST /v4/code/suggestions
 Format details:
 
 - A streaming response consists of one or more SSE messages.
-- An individual, **complete SSE message** consists of the keys `event` and `data` (outputted in this order), and is delimited by double newlines.
+- An individual, **complete SSE message** consists of the keys `event` and `data` (outputted in this order), and is
+  delimited by double newlines.
 - The streaming response always begins with event `stream_start` and ends with `stream_end`.
 - The value of `data` is either `null` or a JSON string.
 - Metadata is only provided in the starting message.
 - The response headers include `X-Streaming-Format=sse`.
 
-| Stream Event    | Description                                                                                     |
-| --------------- | ----------------------------------------------------------------------------------------------- |
-| `stream_start`  | Start of the streaming response. This is currently the only message that contains metadata.     |
-| `stream_end`    | End of the streaming response.                                                                  |
-| `content_chunk` | Code suggestions text chunk.                                                                    |
+| Stream Event    | Description                                                                                 |
+|-----------------|---------------------------------------------------------------------------------------------|
+| `stream_start`  | Start of the streaming response. This is currently the only message that contains metadata. |
+| `stream_end`    | End of the streaming response.                                                              |
+| `content_chunk` | Code suggestions text chunk.                                                                |
 
 Example response:
 
 <!-- codespell:ignore-begin -->
+
 ```shell
 event: stream_start
 data: {"metadata": {"model": {"engine": "agent", "name": "Claude 3 Code Generations Agent"}, "timestamp": 1732121183, "enabled_feature_flags": ["flag_a", "flag_b"], "region": "us-central1"}}
@@ -94,11 +101,13 @@ event: stream_end
 data: null
 
 ```
+
 <!-- codespell:ignore-end -->
 
 ### V3
 
-The v3 endpoint is aligned to the [architectural blueprint](https://docs.gitlab.com/ee/architecture/blueprints/ai_gateway/index.html#example-feature-code-suggestions).
+The v3 endpoint is aligned to
+the [architectural blueprint](https://docs.gitlab.com/ee/architecture/blueprints/ai_gateway/index.html#example-feature-code-suggestions).
 
 ```plaintext
 POST /v3/code/completions
@@ -106,20 +115,20 @@ POST /v3/code/completions
 
 #### Completion
 
-| Attribute                                        | Type    | Required | Description                                                                                        | Example                  |
-| ------------------------------------------------ | ------- | -------- | -------------------------------------------------------------------------------------------------- | ------------------------ |
-| `prompt_components.type`                         | string  | yes      | Identifies the prompt_payload type (for completions use `code_editor_completion`)                  | `code_editor_completion` |
-| `prompt_components.payload.choices_count`        | int     | no       | The number of code completion choices to return (max_len: **4**). Only applies for `vertex-ai`. Does not support streaming. | `2` |
-| `prompt_components.payload.prompt`               | string or  [hash, array]    | no    | The content of a pre-built prompt. [hash, array] type has role with the options: system, user and assistant. | `Human: Complete the function...` or `[{"role": "system", "content": "You are a helpful AI assistant."}]`  |
-| `prompt_components.payload.file_name`            | string  | yes      | The name of the current file (max_len: **255**)                                                    | `README.md`              |
-| `prompt_components.payload.content_above_cursor` | string  | yes      | The content above cursor (max_len: **100,000**)                                                    | `import numpy as np`     |
-| `prompt_components.payload.content_below_cursor` | string  | yes      | The content below cursor (max_len: **100,000**)                                                    | `def __main__:\n`        |
-| `prompt_components.payload.language_identifier`  | string  | no       | [Language identifier](https://code.visualstudio.com/docs/languages/identifiers) (max_len: **255**) | `python`                 |
-| `prompt_components.payload.model_provider`       | string  | no       | The model engine that should be used for the completion                                            | `vertex-ai`              |
-| `prompt_components.payload.model_name`           | string  | no       | The name of the model                                            | `code-gecko@002`              |
-| `prompt_components.payload.stream`               | boolean | no       | Enables streaming response, if applicable (default: false)                                         | `true`                   |
-| `prompt_components.metadata.source`              | string  | no       | Source of the completionrequest (max_len: **255**)                                                 | `GitLab EE`              |
-| `prompt_components.metadata.version`             | string  | no       | Version of the source (max_len: **255**)                                                           | `16.3`                   |
+| Attribute                                        | Type                     | Required | Description                                                                                                                 | Example                                                                                                   |
+|--------------------------------------------------|--------------------------|----------|-----------------------------------------------------------------------------------------------------------------------------|-----------------------------------------------------------------------------------------------------------|
+| `prompt_components.type`                         | string                   | yes      | Identifies the prompt_payload type (for completions use `code_editor_completion`)                                           | `code_editor_completion`                                                                                  |
+| `prompt_components.payload.choices_count`        | int                      | no       | The number of code completion choices to return (max_len: **4**). Only applies for `vertex-ai`. Does not support streaming. | `2`                                                                                                       |
+| `prompt_components.payload.prompt`               | string or  [hash, array] | no       | The content of a pre-built prompt. [hash, array] type has role with the options: system, user and assistant.                | `Human: Complete the function...` or `[{"role": "system", "content": "You are a helpful AI assistant."}]` |
+| `prompt_components.payload.file_name`            | string                   | yes      | The name of the current file (max_len: **255**)                                                                             | `README.md`                                                                                               |
+| `prompt_components.payload.content_above_cursor` | string                   | yes      | The content above cursor (max_len: **100,000**)                                                                             | `import numpy as np`                                                                                      |
+| `prompt_components.payload.content_below_cursor` | string                   | yes      | The content below cursor (max_len: **100,000**)                                                                             | `def __main__:\n`                                                                                         |
+| `prompt_components.payload.language_identifier`  | string                   | no       | [Language identifier](https://code.visualstudio.com/docs/languages/identifiers) (max_len: **255**)                          | `python`                                                                                                  |
+| `prompt_components.payload.model_provider`       | string                   | no       | The model engine that should be used for the completion                                                                     | `vertex-ai`                                                                                               |
+| `prompt_components.payload.model_name`           | string                   | no       | The name of the model                                                                                                       | `code-gecko@002`                                                                                          |
+| `prompt_components.payload.stream`               | boolean                  | no       | Enables streaming response, if applicable (default: false)                                                                  | `true`                                                                                                    |
+| `prompt_components.metadata.source`              | string                   | no       | Source of the completionrequest (max_len: **255**)                                                                          | `GitLab EE`                                                                                               |
+| `prompt_components.metadata.version`             | string                   | no       | Version of the source (max_len: **255**)                                                                                    | `16.3`                                                                                                    |
 
 ```shell
 curl --request POST \
@@ -204,22 +213,22 @@ Example response:
 
 #### Generation
 
-| Attribute                                        | Type    | Required | Description                                                                                        | Example                              |
-| ------------------------------------------------ |---------| -------- | -------------------------------------------------------------------------------------------------- | ------------------------------------ |
-| `prompt_components.type`                         | string  | yes      | Identifies the prompt_payload type (for generation use `code_editor_generation`)                   | `code_editor_generation`             |
-| `prompt_components.payload.file_name`            | string  | yes      | The name of the current file (max_len: **255**)                                                    | `README.md`                          |
-| `prompt_components.payload.content_above_cursor` | string  | yes      | The content above cursor (max_len: **100,000**)                                                    | `import numpy as np`                 |
-| `prompt_components.payload.content_below_cursor` | string  | yes      | The content below cursor (max_len: **100,000**)                                                    | `def __main__:\n`                    |
-| `prompt_components.payload.language_identifier`  | string  | no       | [Language identifier](https://code.visualstudio.com/docs/languages/identifiers) (max_len: **255**) | `python`                             |
-| `prompt_components.payload.model_provider`       | string  | no       | The model engine that should be used for the completion                                            | `anthropic`                          |
-| `prompt_components.payload.model_name`           | string  | no       | The name of the model   | `claude-3-5-sonnet-20241022`              |
-| `prompt_components.payload.stream`               | boolean | no       | Enables streaming response, if applicable (default: false)                                         | `true`                               |
-| `prompt_components.payload.prompt`               | string  | no       | An optional pre-built prompt to be passed directly to the model (max_len: **400,000**)             | `Human: You are a code assistant...` |
-| `prompt_components.payload.prompt_id`            | string  | no       | The ID of the prompt             | `123456` |
-| `prompt_components.payload.prompt_version`       | string  | no       | The version of the prompt             | `1` |
-| `prompt_components.payload.prompt_enhancer`      | JSON    | no       | Parameters to enhance the prompt, eg, examples, contexts, libraries, instructions                                                |`{"examples_array": [], "trimmed_content_above_cursor": "", "trimmed_content_below_cursor": "", "related_files": [],  "related_snippets": [], "libraries": []}`                          |
-| `prompt_components.metadata.source`              | string  | no       | Source of the completionrequest (max_len: **255**)                                                 | `GitLab EE`                          |
-| `prompt_components.metadata.version`             | string  | no       | Version of the source (max_len: **255**)                                                           | `16.3`                               |
+| Attribute                                        | Type    | Required | Description                                                                                        | Example                                                                                                                                                         |
+|--------------------------------------------------|---------|----------|----------------------------------------------------------------------------------------------------|-----------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| `prompt_components.type`                         | string  | yes      | Identifies the prompt_payload type (for generation use `code_editor_generation`)                   | `code_editor_generation`                                                                                                                                        |
+| `prompt_components.payload.file_name`            | string  | yes      | The name of the current file (max_len: **255**)                                                    | `README.md`                                                                                                                                                     |
+| `prompt_components.payload.content_above_cursor` | string  | yes      | The content above cursor (max_len: **100,000**)                                                    | `import numpy as np`                                                                                                                                            |
+| `prompt_components.payload.content_below_cursor` | string  | yes      | The content below cursor (max_len: **100,000**)                                                    | `def __main__:\n`                                                                                                                                               |
+| `prompt_components.payload.language_identifier`  | string  | no       | [Language identifier](https://code.visualstudio.com/docs/languages/identifiers) (max_len: **255**) | `python`                                                                                                                                                        |
+| `prompt_components.payload.model_provider`       | string  | no       | The model engine that should be used for the completion                                            | `anthropic`                                                                                                                                                     |
+| `prompt_components.payload.model_name`           | string  | no       | The name of the model                                                                              | `claude-3-5-sonnet-20241022`                                                                                                                                    |
+| `prompt_components.payload.stream`               | boolean | no       | Enables streaming response, if applicable (default: false)                                         | `true`                                                                                                                                                          |
+| `prompt_components.payload.prompt`               | string  | no       | An optional pre-built prompt to be passed directly to the model (max_len: **400,000**)             | `Human: You are a code assistant...`                                                                                                                            |
+| `prompt_components.payload.prompt_id`            | string  | no       | The ID of the prompt                                                                               | `123456`                                                                                                                                                        |
+| `prompt_components.payload.prompt_version`       | string  | no       | The version of the prompt                                                                          | `1`                                                                                                                                                             |
+| `prompt_components.payload.prompt_enhancer`      | JSON    | no       | Parameters to enhance the prompt, eg, examples, contexts, libraries, instructions                  | `{"examples_array": [], "trimmed_content_above_cursor": "", "trimmed_content_below_cursor": "", "related_files": [],  "related_snippets": [], "libraries": []}` |
+| `prompt_components.metadata.source`              | string  | no       | Source of the completionrequest (max_len: **255**)                                                 | `GitLab EE`                                                                                                                                                     |
+| `prompt_components.metadata.version`             | string  | no       | Version of the source (max_len: **255**)                                                           | `16.3`                                                                                                                                                          |
 
 ```shell
 curl --request POST \
@@ -346,7 +355,8 @@ This will compile and execute the program, printing "Hello World" to the console
 
 - `200: OK` if the service returns some completions.
 - `401: Unauthorized` if the service fails to authenticate using the access token.
-- `422: Unprocessable Entity` if the required attributes are missing or the number of `prompt_component` objects is not adequate.
+- `422: Unprocessable Entity` if the required attributes are missing or the number of `prompt_component` objects is not
+  adequate.
 
 ### V2
 
@@ -368,30 +378,30 @@ POST /v2/code/completions
 This performs some pre-processing of the content before forwarding it to the
 third-party model provider.
 
-| Attribute                           | Type   | Required | Description                                                                                                      | Example                   |
-| ----------------------------------- | ------ | -------- | ---------------------------------------------------------------------------------------------------------------- | ------------------------- |
-| `prompt_version`                    | int    | yes      | The version of the prompt (option: 1).                                                                                       | `1`                       |
-| `project_path`                      | string | no       | The name of the project (max_len: **255**).                                                                      | `gitlab-orb/gitlab-shell` |
-| `project_id`                        | int    | no       | The ID of the project.                                                                                           | `33191677`                |
-| `stream`                      | boolean | no       | Enables streaming response, if applicable (default: false)      | `true` |
-| `model_provider`                    | string | no       | The name of the model provider. Valid values are: `anthropic` and `vertex-ai`.                                   | `vertex-ai`               |
-| `model_name`                      | string | no       | The name of the model (max_length: **50**). | `claude-3-5-sonnet-20241022` |
-| `model_endpoint`                     | string | no       | The endpoint for the model. | `https://api.example.com/v3` |
-| `model_api_key`                     | string | no       | The API key for the model. | `x3iJ-this-Is-key34EXam!pl3` |
-| `model_identifier`                     | string | no       | The identifier for the model. | `36381667` |
-| `current_file`                      | hash   | yes      | The data of the current file.                                                                                    |                           |
-| `current_file.file_name`            | string | yes      | The name of the current file (max_len: **255**).                                                                 | `README.md`               |
-| `current_file.language_identifier`  | string | no       | The language identifier defined from editor (max_len: **255**). This overrides language detected from file name. | `python`                  |
-| `current_file.content_above_cursor` | string | yes      | The content above cursor (max_len: **100,000**).                                                                 | `import numpy as np`      |
-| `current_file.content_below_cursor` | string | yes      | The content below cursor (max_len: **100,000**).                                                                 | `def __main__:\n`         |
-| `choices_count`                     | int    | no       | The number of code completion choices to return (max_len: **4**). Only applies for `vertex-ai`. Does not support streaming.        | `2`                                   |
-| `telemetry`                         | array  | no       | The list of telemetry data from previous request (max_len: **10**).                                              |                           |
-| `telemetry.model_engine`            | string | no       | The model engine used for completions (max_len: **50**).                                                         | `vertex-ai`               |
-| `telemetry.model_name`              | string | no       | The model name used for completions (max_len: **50**).                                                           | `code-gecko`              |
-| `telemetry.lang`                    | string | no       | The language used for completions (max_len: **50**).                                                             | `python`                  |
-| `telemetry.requests`                | int    | yes      | The number of previously requested completions.                                                                  | `1`                       |
-| `telemetry.accepts`                 | int    | yes      | The number of previously accepted completions.                                                                   | `1`                       |
-| `telemetry.errors`                  | int    | yes      | The number of previously failed completions.                                                                     | `0`                       |
+| Attribute                           | Type    | Required | Description                                                                                                                 | Example                      |
+|-------------------------------------|---------|----------|-----------------------------------------------------------------------------------------------------------------------------|------------------------------|
+| `prompt_version`                    | int     | yes      | The version of the prompt (option: 1).                                                                                      | `1`                          |
+| `project_path`                      | string  | no       | The name of the project (max_len: **255**).                                                                                 | `gitlab-orb/gitlab-shell`    |
+| `project_id`                        | int     | no       | The ID of the project.                                                                                                      | `33191677`                   |
+| `stream`                            | boolean | no       | Enables streaming response, if applicable (default: false)                                                                  | `true`                       |
+| `model_provider`                    | string  | no       | The name of the model provider. Valid values are: `anthropic` and `vertex-ai`.                                              | `vertex-ai`                  |
+| `model_name`                        | string  | no       | The name of the model (max_length: **50**).                                                                                 | `claude-3-5-sonnet-20241022` |
+| `model_endpoint`                    | string  | no       | The endpoint for the model.                                                                                                 | `https://api.example.com/v3` |
+| `model_api_key`                     | string  | no       | The API key for the model.                                                                                                  | `x3iJ-this-Is-key34EXam!pl3` |
+| `model_identifier`                  | string  | no       | The identifier for the model.                                                                                               | `36381667`                   |
+| `current_file`                      | hash    | yes      | The data of the current file.                                                                                               |                              |
+| `current_file.file_name`            | string  | yes      | The name of the current file (max_len: **255**).                                                                            | `README.md`                  |
+| `current_file.language_identifier`  | string  | no       | The language identifier defined from editor (max_len: **255**). This overrides language detected from file name.            | `python`                     |
+| `current_file.content_above_cursor` | string  | yes      | The content above cursor (max_len: **100,000**).                                                                            | `import numpy as np`         |
+| `current_file.content_below_cursor` | string  | yes      | The content below cursor (max_len: **100,000**).                                                                            | `def __main__:\n`            |
+| `choices_count`                     | int     | no       | The number of code completion choices to return (max_len: **4**). Only applies for `vertex-ai`. Does not support streaming. | `2`                          |
+| `telemetry`                         | array   | no       | The list of telemetry data from previous request (max_len: **10**).                                                         |                              |
+| `telemetry.model_engine`            | string  | no       | The model engine used for completions (max_len: **50**).                                                                    | `vertex-ai`                  |
+| `telemetry.model_name`              | string  | no       | The model name used for completions (max_len: **50**).                                                                      | `code-gecko`                 |
+| `telemetry.lang`                    | string  | no       | The language used for completions (max_len: **50**).                                                                        | `python`                     |
+| `telemetry.requests`                | int     | yes      | The number of previously requested completions.                                                                             | `1`                          |
+| `telemetry.accepts`                 | int     | yes      | The number of previously accepted completions.                                                                              | `1`                          |
+| `telemetry.errors`                  | int     | yes      | The number of previously failed completions.                                                                                | `0`                          |
 
 ```shell
 curl --request POST \
@@ -452,32 +462,33 @@ Example response:
 
 ##### V2 Prompt
 
-This accepts a pre-built `prompt` and forwards it directly to third-party provider. Prebuilt `prompt`s only supports the `anthropic` model provider.
+This accepts a pre-built `prompt` and forwards it directly to third-party provider. Prebuilt `prompt`s only supports the
+`anthropic` model provider.
 
-| Attribute                           | Type   | Required | Description                                                                    | Example                              |
-| ----------------------------------- | ------ | -------- | ------------------------------------------------------------------------------ | ------------------------------------ |
-| `prompt_version`                    | int    | yes      | The version of the prompt (options: 1 or 2).                                                    | `2`                                  |
-| `project_path`                      | string | no       | The name of the project (max_len: **255**)                                     | `gitlab-orb/gitlab-shell`            |
-| `project_id`                        | int    | no       | The ID of the project                                                          | `33191677`                           |
-| `stream`                      | boolean | no       | Enables streaming response, if applicable (default: false) | `true` |
-| `model_provider`                    | string | no       | The name of the model provider. Valid values are: `anthropic` and `vertex-ai`. | `anthropic`                          |
-| `model_name`                      | string | no       | The name of the model (max_length: **50**). | `claude-3-5-sonnet-20241022` |
-| `model_endpoint`                     | string | no       | The endpoint for the model. | `https://api.example.com/v3` |
-| `model_api_key`                     | string | no       | The API key for the model. | `x3iJ-this-Is-key34EXam!pl3` |
-| `model_identifier`                     | string | no       | The identifier for the model. | `36381667` |
-| `current_file`                      | hash   | yes      | The data of the current file                                                   |                                      |
-| `current_file.file_name`            | string | yes      | The name of the current file (max_len: **255**)                                | `README.md`                          |
-| `current_file.content_above_cursor` | string | yes      | The content above cursor (max_len: **100,000**)                                | `import numpy as np`                 |
-| `current_file.content_below_cursor` | string | yes      | The content below cursor (max_len: **100,000**)                                | `def __main__:\n`                    |
-| `prompt`                            | string | no      | The content of a pre-built prompt                                               | `Human: You are a code assistant...` |
-| `choices_count`                     | int    | no       | The number of code completion choices to return (max_len: **4**). Only applies for `vertex-ai`. Does not support streaming. **Note:** The response may return a number of choices less than the `choices_count` as we drop suggestions with low scores.      | `2`                                   |
-| `telemetry`                         | array  | no       | The list of telemetry data from previous request (max_len: **10**)             |                                      |
-| `telemetry.model_engine`            | string | no       | The model engine used for completions (max_len: **50**)                        | `vertex-ai`                          |
-| `telemetry.model_name`              | string | no       | The model name used for completions (max_len: **50**)                          | `code-gecko`                         |
-| `telemetry.lang`                    | string | no       | The language used for completions (max_len: **50**)                            | `python`                             |
-| `telemetry.requests`                | int    | yes      | The number of previously requested completions                                 | `1`                                  |
-| `telemetry.accepts`                 | int    | yes      | The number of previously accepted completions                                  | `1`                                  |
-| `telemetry.errors`                  | int    | yes      | The number of previously failed completions                                    | `0`                                  |
+| Attribute                           | Type    | Required | Description                                                                                                                                                                                                                                             | Example                              |
+|-------------------------------------|---------|----------|---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|--------------------------------------|
+| `prompt_version`                    | int     | yes      | The version of the prompt (options: 1 or 2).                                                                                                                                                                                                            | `2`                                  |
+| `project_path`                      | string  | no       | The name of the project (max_len: **255**)                                                                                                                                                                                                              | `gitlab-orb/gitlab-shell`            |
+| `project_id`                        | int     | no       | The ID of the project                                                                                                                                                                                                                                   | `33191677`                           |
+| `stream`                            | boolean | no       | Enables streaming response, if applicable (default: false)                                                                                                                                                                                              | `true`                               |
+| `model_provider`                    | string  | no       | The name of the model provider. Valid values are: `anthropic` and `vertex-ai`.                                                                                                                                                                          | `anthropic`                          |
+| `model_name`                        | string  | no       | The name of the model (max_length: **50**).                                                                                                                                                                                                             | `claude-3-5-sonnet-20241022`         |
+| `model_endpoint`                    | string  | no       | The endpoint for the model.                                                                                                                                                                                                                             | `https://api.example.com/v3`         |
+| `model_api_key`                     | string  | no       | The API key for the model.                                                                                                                                                                                                                              | `x3iJ-this-Is-key34EXam!pl3`         |
+| `model_identifier`                  | string  | no       | The identifier for the model.                                                                                                                                                                                                                           | `36381667`                           |
+| `current_file`                      | hash    | yes      | The data of the current file                                                                                                                                                                                                                            |                                      |
+| `current_file.file_name`            | string  | yes      | The name of the current file (max_len: **255**)                                                                                                                                                                                                         | `README.md`                          |
+| `current_file.content_above_cursor` | string  | yes      | The content above cursor (max_len: **100,000**)                                                                                                                                                                                                         | `import numpy as np`                 |
+| `current_file.content_below_cursor` | string  | yes      | The content below cursor (max_len: **100,000**)                                                                                                                                                                                                         | `def __main__:\n`                    |
+| `prompt`                            | string  | no       | The content of a pre-built prompt                                                                                                                                                                                                                       | `Human: You are a code assistant...` |
+| `choices_count`                     | int     | no       | The number of code completion choices to return (max_len: **4**). Only applies for `vertex-ai`. Does not support streaming. **Note:** The response may return a number of choices less than the `choices_count` as we drop suggestions with low scores. | `2`                                  |
+| `telemetry`                         | array   | no       | The list of telemetry data from previous request (max_len: **10**)                                                                                                                                                                                      |                                      |
+| `telemetry.model_engine`            | string  | no       | The model engine used for completions (max_len: **50**)                                                                                                                                                                                                 | `vertex-ai`                          |
+| `telemetry.model_name`              | string  | no       | The model name used for completions (max_len: **50**)                                                                                                                                                                                                   | `code-gecko`                         |
+| `telemetry.lang`                    | string  | no       | The language used for completions (max_len: **50**)                                                                                                                                                                                                     | `python`                             |
+| `telemetry.requests`                | int     | yes      | The number of previously requested completions                                                                                                                                                                                                          | `1`                                  |
+| `telemetry.accepts`                 | int     | yes      | The number of previously accepted completions                                                                                                                                                                                                           | `1`                                  |
+| `telemetry.errors`                  | int     | yes      | The number of previously failed completions                                                                                                                                                                                                             | `0`                                  |
 
 ```shell
 curl --request POST \
@@ -559,32 +570,33 @@ Example response:
 
 ##### V3 Prompt
 
-This accepts a pre-built `prompt` and forwards it directly to a third-party provider. Prebuilt `prompt`s only supports the `anthropic` model provider.
+This accepts a pre-built `prompt` and forwards it directly to a third-party provider. Prebuilt `prompt`s only supports
+the `anthropic` model provider.
 
-| Attribute                           | Type   | Required | Description                                                                    | Example                              |
-| ----------------------------------- | ------ | -------- | ------------------------------------------------------------------------------ | ------------------------------------ |
-| `prompt_version`                    | int    | yes      | The version of the prompt (options: 1, 2 or 3).                                                    | `3`                                  |
-| `project_path`                      | string | no       | The name of the project (max_len: **255**)                                     | `gitlab-orb/gitlab-shell`            |
-| `project_id`                        | int    | no       | The ID of the project                                                          | `33191677`                           |
-| `stream`                      | boolean | no       | Enables streaming response, if applicable (default: false) | `true` |
-| `model_provider`                    | string | no       | The name of the model provider. Valid values are: `anthropic` and `vertex-ai`. | `anthropic`                          |
-| `model_name`                      | string | no       | The name of the model (max_length: **50**). | `claude-3-5-sonnet-20241022` |
-| `model_endpoint`                     | string | no       | The endpoint for the model. | `https://api.example.com/v3` |
-| `model_api_key`                     | string | no       | The API key for the model. | `x3iJ-this-Is-key34EXam!pl3` |
-| `model_identifier`                     | string | no       | The identifier for the model. | `36381667` |
-| `current_file`                      | hash   | yes      | The data of the current file                                                   |                                      |
-| `current_file.file_name`            | string | yes      | The name of the current file (max_len: **255**)                                | `README.md`                          |
-| `current_file.content_above_cursor` | string | yes      | The content above cursor (max_len: **100,000**)                                | `import numpy as np`                 |
-| `current_file.content_below_cursor` | string | yes      | The content below cursor (max_len: **100,000**)                                | `def __main__:\n`                    |
-| `prompt`                            | [hash, array] | no      | The content of a pre-built prompt built with a role (options: system, user and assistant) and string content                                             |  |
-| `choices_count`                     | int    | no       | The number of code completion choices to return (max_len: **4**). Only applies for `vertex-ai`. Does not support streaming. **Note:** The response may return a number of choices less than the `choices_count` as we drop suggestions with low scores.      | `2`                                   |
-| `telemetry`                         | array  | no       | The list of telemetry data from previous request (max_len: **10**)             |                                      |
-| `telemetry.model_engine`            | string | no       | The model engine used for completions (max_len: **50**)                        | `vertex-ai`                          |
-| `telemetry.model_name`              | string | no       | The model name used for completions (max_len: **50**)                          | `code-gecko`                         |
-| `telemetry.lang`                    | string | no       | The language used for completions (max_len: **50**)                            | `python`                             |
-| `telemetry.requests`                | int    | yes      | The number of previously requested completions                                 | `1`                                  |
-| `telemetry.accepts`                 | int    | yes      | The number of previously accepted completions                                  | `1`                                  |
-| `telemetry.errors`                  | int    | yes      | The number of previously failed completions                                    | `0`                                  |
+| Attribute                           | Type          | Required | Description                                                                                                                                                                                                                                             | Example                      |
+|-------------------------------------|---------------|----------|---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|------------------------------|
+| `prompt_version`                    | int           | yes      | The version of the prompt (options: 1, 2 or 3).                                                                                                                                                                                                         | `3`                          |
+| `project_path`                      | string        | no       | The name of the project (max_len: **255**)                                                                                                                                                                                                              | `gitlab-orb/gitlab-shell`    |
+| `project_id`                        | int           | no       | The ID of the project                                                                                                                                                                                                                                   | `33191677`                   |
+| `stream`                            | boolean       | no       | Enables streaming response, if applicable (default: false)                                                                                                                                                                                              | `true`                       |
+| `model_provider`                    | string        | no       | The name of the model provider. Valid values are: `anthropic` and `vertex-ai`.                                                                                                                                                                          | `anthropic`                  |
+| `model_name`                        | string        | no       | The name of the model (max_length: **50**).                                                                                                                                                                                                             | `claude-3-5-sonnet-20241022` |
+| `model_endpoint`                    | string        | no       | The endpoint for the model.                                                                                                                                                                                                                             | `https://api.example.com/v3` |
+| `model_api_key`                     | string        | no       | The API key for the model.                                                                                                                                                                                                                              | `x3iJ-this-Is-key34EXam!pl3` |
+| `model_identifier`                  | string        | no       | The identifier for the model.                                                                                                                                                                                                                           | `36381667`                   |
+| `current_file`                      | hash          | yes      | The data of the current file                                                                                                                                                                                                                            |                              |
+| `current_file.file_name`            | string        | yes      | The name of the current file (max_len: **255**)                                                                                                                                                                                                         | `README.md`                  |
+| `current_file.content_above_cursor` | string        | yes      | The content above cursor (max_len: **100,000**)                                                                                                                                                                                                         | `import numpy as np`         |
+| `current_file.content_below_cursor` | string        | yes      | The content below cursor (max_len: **100,000**)                                                                                                                                                                                                         | `def __main__:\n`            |
+| `prompt`                            | [hash, array] | no       | The content of a pre-built prompt built with a role (options: system, user and assistant) and string content                                                                                                                                            |                              |
+| `choices_count`                     | int           | no       | The number of code completion choices to return (max_len: **4**). Only applies for `vertex-ai`. Does not support streaming. **Note:** The response may return a number of choices less than the `choices_count` as we drop suggestions with low scores. | `2`                          |
+| `telemetry`                         | array         | no       | The list of telemetry data from previous request (max_len: **10**)                                                                                                                                                                                      |                              |
+| `telemetry.model_engine`            | string        | no       | The model engine used for completions (max_len: **50**)                                                                                                                                                                                                 | `vertex-ai`                  |
+| `telemetry.model_name`              | string        | no       | The model name used for completions (max_len: **50**)                                                                                                                                                                                                   | `code-gecko`                 |
+| `telemetry.lang`                    | string        | no       | The language used for completions (max_len: **50**)                                                                                                                                                                                                     | `python`                     |
+| `telemetry.requests`                | int           | yes      | The number of previously requested completions                                                                                                                                                                                                          | `1`                          |
+| `telemetry.accepts`                 | int           | yes      | The number of previously accepted completions                                                                                                                                                                                                           | `1`                          |
+| `telemetry.errors`                  | int           | yes      | The number of previously failed completions                                                                                                                                                                                                             | `0`                          |
 
 ```shell
 curl --request POST \
@@ -674,24 +686,24 @@ POST /v2/code/generations
 This performs some pre-processing of the content before forwarding it to the
 third-party model provider.
 
-| Attribute                           | Type   | Required | Description                                                                                                                                                                            | Example                   |
-| ----------------------------------- | ------ | -------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------- |
-| `prompt_version`                    | int    | yes      | The version of the prompt (option: 1).                                                                                                                                                             | `1`                       |
-| `project_path`                      | string | no       | The name of the project (max_len: **255**).                                                                                                                                            | `gitlab-orb/gitlab-shell` |
-| `project_id`                        | int    | no       | The ID of the project.                                                                                                                                                                 | `33191677`                |
-| `model_provider`                    | string | no       | The name of the model provider. Valid values are: `anthropic` and `vertex-ai`.                                                                                                         | `vertex-ai`               |
+| Attribute                           | Type   | Required | Description                                                                                                                                                                                                | Example                   |
+|-------------------------------------|--------|----------|------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|---------------------------|
+| `prompt_version`                    | int    | yes      | The version of the prompt (option: 1).                                                                                                                                                                     | `1`                       |
+| `project_path`                      | string | no       | The name of the project (max_len: **255**).                                                                                                                                                                | `gitlab-orb/gitlab-shell` |
+| `project_id`                        | int    | no       | The ID of the project.                                                                                                                                                                                     | `33191677`                |
+| `model_provider`                    | string | no       | The name of the model provider. Valid values are: `anthropic` and `vertex-ai`.                                                                                                                             | `vertex-ai`               |
 | `model_name`                        | string | no       | The name of the model name. Valid values are: `claude-3-5-sonnet-20241022`, `claude-3-5-sonnet-20240620` if model_provider is `anthropic`.`code-bison`, `code-bison@002` if model_provider is `vertex-ai`. | `code-bison@002`          |
-| `current_file`                      | hash   | yes      | The data of the current file.                                                                                                                                                          |                           |
-| `current_file.file_name`            | string | yes      | The name of the current file (max_len: **255**).                                                                                                                                       | `README.md`               |
-| `current_file.content_above_cursor` | string | yes      | The content above cursor (max_len: **100,000**).                                                                                                                                       | `import numpy as np`      |
-| `current_file.content_below_cursor` | string | yes      | The content below cursor (max_len: **100,000**).                                                                                                                                       | `def __main__:\n`         |
-| `telemetry`                         | array  | no       | The list of telemetry data from previous request (max_len: **10**).                                                                                                                    |                           |
-| `telemetry.model_engine`            | string | no       | The model engine used for completions (max_len: **50**).                                                                                                                               | `vertex-ai`               |
-| `telemetry.model_name`              | string | no       | The model name used for completions (max_len: **50**).                                                                                                                                 | `code-gecko`              |
-| `telemetry.lang`                    | string | no       | The language used for completions (max_len: **50**).                                                                                                                                   | `python`                  |
-| `telemetry.requests`                | int    | yes      | The number of previously requested completions.                                                                                                                                        | `1`                       |
-| `telemetry.accepts`                 | int    | yes      | The number of previously accepted completions.                                                                                                                                         | `1`                       |
-| `telemetry.errors`                  | int    | yes      | The number of previously failed completions.                                                                                                                                           | `0`                       |
+| `current_file`                      | hash   | yes      | The data of the current file.                                                                                                                                                                              |                           |
+| `current_file.file_name`            | string | yes      | The name of the current file (max_len: **255**).                                                                                                                                                           | `README.md`               |
+| `current_file.content_above_cursor` | string | yes      | The content above cursor (max_len: **100,000**).                                                                                                                                                           | `import numpy as np`      |
+| `current_file.content_below_cursor` | string | yes      | The content below cursor (max_len: **100,000**).                                                                                                                                                           | `def __main__:\n`         |
+| `telemetry`                         | array  | no       | The list of telemetry data from previous request (max_len: **10**).                                                                                                                                        |                           |
+| `telemetry.model_engine`            | string | no       | The model engine used for completions (max_len: **50**).                                                                                                                                                   | `vertex-ai`               |
+| `telemetry.model_name`              | string | no       | The model name used for completions (max_len: **50**).                                                                                                                                                     | `code-gecko`              |
+| `telemetry.lang`                    | string | no       | The language used for completions (max_len: **50**).                                                                                                                                                       | `python`                  |
+| `telemetry.requests`                | int    | yes      | The number of previously requested completions.                                                                                                                                                            | `1`                       |
+| `telemetry.accepts`                 | int    | yes      | The number of previously accepted completions.                                                                                                                                                             | `1`                       |
+| `telemetry.errors`                  | int    | yes      | The number of previously failed completions.                                                                                                                                                               | `0`                       |
 
 ```shell
 curl --request POST \
@@ -748,29 +760,29 @@ Example response:
 
 This accepts a pre-built `prompt` and forwards it directly to the third-party provider.
 
-| Attribute                           | Type   | Required | Description                                                                                                                                                                            | Example                              |
-| ----------------------------------- | ------ | -------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------ |
-| `prompt_version`                    | int    | yes      | The version of the prompt (options: 1 or 2)                                                                                                                                                             | `2`                                  |
-| `prompt_id`            | string  | no       | The ID of the prompt             | `123456` |
-| `project_path`                      | string | no       | The name of the project (max_len: **255**)                                                                                                                                             | `gitlab-orb/gitlab-shell`            |
-| `project_id`                        | int    | no       | The ID of the project                                                                                                                                                                  | `33191677`                           |
-| `model_provider`                    | string | no       | The name of the model provider. Valid values are: `anthropic` and `vertex-ai`. Default to `vertex-ai`.                                                                                 | `anthropic`                          |
-| `model_name`                        | string | no       | The name of the model name. Valid values are: `claude-3-5-sonnet-20241022`, `claude-3-5-sonnet-20240620` if model_provider is `anthropic`.`code-bison`, `code-bison@002` if model_provider is `vertex-ai`. | `claude-3-5-sonnet-20241022`                         |
-| `model_endpoint`                     | string | no       | The endpoint for the model. | `https://api.example.com/v3` |
-| `model_api_key`                     | string | no       | The API key for the model. | `x3iJ-this-Is-key34EXam!pl3` |
-| `model_identifier`                   | string | no       | The identifier for the model. | `36381667` |
-| `current_file`                      | hash   | yes      | The data of the current file                                                                                                                                                           |                                      |
-| `current_file.file_name`            | string | yes      | The name of the current file (max_len: **255**)                                                                                                                                        | `README.md`                          |
-| `current_file.content_above_cursor` | string | yes      | The content above cursor (max_len: **100,000**)                                                                                                                                        | `import numpy as np`                 |
-| `current_file.content_below_cursor` | string | yes      | The content below cursor (max_len: **100,000**)                                                                                                                                        | `def __main__:\n`                    |
-| `prompt`                            | string | yes      | The content of a pre-built prompt                                                                                                                                                       | `Human: You are a code assistant...` |
-| `telemetry`                         | array  | no       | The list of telemetry data from previous request (max_len: **10**)                                                                                                                     |                                      |
-| `telemetry.model_engine`            | string | no       | The model engine used for completions (max_len: **50**)                                                                                                                                | `vertex-ai`                          |
-| `telemetry.model_name`              | string | no       | The model name used for completions (max_len: **50**)                                                                                                                                  | `code-gecko`                         |
-| `telemetry.lang`                    | string | no       | The language used for completions (max_len: **50**)                                                                                                                                    | `python`                             |
-| `telemetry.requests`                | int    | yes      | The number of previously requested completions                                                                                                                                         | `1`                                  |
-| `telemetry.accepts`                 | int    | yes      | The number of previously accepted completions                                                                                                                                          | `1`                                  |
-| `telemetry.errors`                  | int    | yes      | The number of previously failed completions                                                                                                                                            | `0`                                  |
+| Attribute                           | Type   | Required | Description                                                                                                                                                                                                | Example                              |
+|-------------------------------------|--------|----------|------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|--------------------------------------|
+| `prompt_version`                    | int    | yes      | The version of the prompt (options: 1 or 2)                                                                                                                                                                | `2`                                  |
+| `prompt_id`                         | string | no       | The ID of the prompt                                                                                                                                                                                       | `123456`                             |
+| `project_path`                      | string | no       | The name of the project (max_len: **255**)                                                                                                                                                                 | `gitlab-orb/gitlab-shell`            |
+| `project_id`                        | int    | no       | The ID of the project                                                                                                                                                                                      | `33191677`                           |
+| `model_provider`                    | string | no       | The name of the model provider. Valid values are: `anthropic` and `vertex-ai`. Default to `vertex-ai`.                                                                                                     | `anthropic`                          |
+| `model_name`                        | string | no       | The name of the model name. Valid values are: `claude-3-5-sonnet-20241022`, `claude-3-5-sonnet-20240620` if model_provider is `anthropic`.`code-bison`, `code-bison@002` if model_provider is `vertex-ai`. | `claude-3-5-sonnet-20241022`         |
+| `model_endpoint`                    | string | no       | The endpoint for the model.                                                                                                                                                                                | `https://api.example.com/v3`         |
+| `model_api_key`                     | string | no       | The API key for the model.                                                                                                                                                                                 | `x3iJ-this-Is-key34EXam!pl3`         |
+| `model_identifier`                  | string | no       | The identifier for the model.                                                                                                                                                                              | `36381667`                           |
+| `current_file`                      | hash   | yes      | The data of the current file                                                                                                                                                                               |                                      |
+| `current_file.file_name`            | string | yes      | The name of the current file (max_len: **255**)                                                                                                                                                            | `README.md`                          |
+| `current_file.content_above_cursor` | string | yes      | The content above cursor (max_len: **100,000**)                                                                                                                                                            | `import numpy as np`                 |
+| `current_file.content_below_cursor` | string | yes      | The content below cursor (max_len: **100,000**)                                                                                                                                                            | `def __main__:\n`                    |
+| `prompt`                            | string | yes      | The content of a pre-built prompt                                                                                                                                                                          | `Human: You are a code assistant...` |
+| `telemetry`                         | array  | no       | The list of telemetry data from previous request (max_len: **10**)                                                                                                                                         |                                      |
+| `telemetry.model_engine`            | string | no       | The model engine used for completions (max_len: **50**)                                                                                                                                                    | `vertex-ai`                          |
+| `telemetry.model_name`              | string | no       | The model name used for completions (max_len: **50**)                                                                                                                                                      | `code-gecko`                         |
+| `telemetry.lang`                    | string | no       | The language used for completions (max_len: **50**)                                                                                                                                                        | `python`                             |
+| `telemetry.requests`                | int    | yes      | The number of previously requested completions                                                                                                                                                             | `1`                                  |
+| `telemetry.accepts`                 | int    | yes      | The number of previously accepted completions                                                                                                                                                              | `1`                                  |
+| `telemetry.errors`                  | int    | yes      | The number of previously failed completions                                                                                                                                                                | `0`                                  |
 
 ```shell
 curl --request POST \
@@ -864,17 +876,17 @@ Given a prompt, the service will return response received from an AI provider as
 POST /v1/agent/chat
 ```
 
-| Attribute                                      | Type   | Required | Description                                                                                                                                     | Example                                               |
-| ---------------------------------------------- | ------ | -------- | ----------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------- |
-| `prompt_components`                            | array  | yes      | The list of prompt components compliant with <https://docs.gitlab.com/ee/architecture/blueprints/ai_gateway/index.html#protocol> (max_len: **1**). |                                                       |
-| `prompt_components.type`                       | string | yes      | The type of the prompt component (max_len: **255**).                                                                                            | `prompt`                                              |
-| `prompt_components.payload`                    | hash   | yes      | The data of the current prompt component.                                                                                                       |                                                       |
-| `prompt_components.payload.content`            | [string, array]  | yes      | The complete AI prompt (max_len: **400 000**). See [Claude Message API](https://docs.anthropic.com/en/api/messages) for conversation roles payload.models in `claude-3` family. | `content: "hi how are you"`       |
-| `prompt_components.payload.provider`           | string | yes      | The AI provider for which the prompt is designed for. Valid value is: `anthropic`.                                                              | `anthropic`                                           |
-| `prompt_components.payload.model`              | string | yes      | The AI model for which the prompt is designed for. Valid values are: `claude-3-5-sonnet-20240620`,`claude-3-sonnet-20240229`,`claude-3-haiku-2024030`, `claude-3-opus-20240229`, `claude-3-5-sonnet-20241022`.         | `claude-3-5-sonnet-20241022`                            |
-| `prompt_components.prompt_components.metadata` | hash   | no       | The metadata of the prompt component. Only string - string key value pairs are accepted.                                                        |                                                       |
-| `prompt_components.metadata.source`            | string | yes      | The source of the prompt component (max_len: **100**).                                                                                          | `GitLab EE`                                           |
-| `prompt_components.metadata.version`           | string | yes      | The version of the source (max_len: **100**).                                                                                                   | `16.7.0`                                              |
+| Attribute                                      | Type            | Required | Description                                                                                                                                                                                                    | Example                      |
+|------------------------------------------------|-----------------|----------|----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|------------------------------|
+| `prompt_components`                            | array           | yes      | The list of prompt components compliant with <https://docs.gitlab.com/ee/architecture/blueprints/ai_gateway/index.html#protocol> (max_len: **1**).                                                             |                              |
+| `prompt_components.type`                       | string          | yes      | The type of the prompt component (max_len: **255**).                                                                                                                                                           | `prompt`                     |
+| `prompt_components.payload`                    | hash            | yes      | The data of the current prompt component.                                                                                                                                                                      |                              |
+| `prompt_components.payload.content`            | [string, array] | yes      | The complete AI prompt (max_len: **400 000**). See [Claude Message API](https://docs.anthropic.com/en/api/messages) for conversation roles payload.models in `claude-3` family.                                | `content: "hi how are you"`  |
+| `prompt_components.payload.provider`           | string          | yes      | The AI provider for which the prompt is designed for. Valid value is: `anthropic`.                                                                                                                             | `anthropic`                  |
+| `prompt_components.payload.model`              | string          | yes      | The AI model for which the prompt is designed for. Valid values are: `claude-3-5-sonnet-20240620`,`claude-sonnet-4-20250514`,`claude-3-haiku-2024030`, `claude-3-opus-20240229`, `claude-3-5-sonnet-20241022`. | `claude-3-5-sonnet-20241022` |
+| `prompt_components.prompt_components.metadata` | hash            | no       | The metadata of the prompt component. Only string - string key value pairs are accepted.                                                                                                                       |                              |
+| `prompt_components.metadata.source`            | string          | yes      | The source of the prompt component (max_len: **100**).                                                                                                                                                         | `GitLab EE`                  |
+| `prompt_components.metadata.version`           | string          | yes      | The version of the source (max_len: **100**).                                                                                                                                                                  | `16.7.0`                     |
 
 ```shell
 curl --request POST \
@@ -894,7 +906,7 @@ curl --request POST \
           }
         ],
         "provider": "anthropic",
-        "model": "claude-3-sonnet-20240229"
+        "model": "claude-sonnet-4-20250514"
       },
       "metadata": {
         "source": "GitLab EE",
@@ -913,7 +925,7 @@ Example response:
                but I'm operating properly and ready to assist you with any questions or tasks you may have. How can I help you today?.",
   "metadata": {
     "provider": "anthropic",
-    "model": "claude-3-sonnet-20240229",
+    "model": "claude-sonnet-4-20250514",
     "timestamp": 1702292323
   }
 }
@@ -935,15 +947,15 @@ Given a prompt template, the service will return response received from an AI pr
 POST /v1/x-ray/libraries
 ```
 
-| Attribute                            | Type   | Required | Description                                                                                                                                     | Example                               |
-| ------------------------------------ | ------ | -------- | ----------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------- |
+| Attribute                            | Type   | Required | Description                                                                                                                                        | Example                               |
+|--------------------------------------|--------|----------|----------------------------------------------------------------------------------------------------------------------------------------------------|---------------------------------------|
 | `prompt_components`                  | array  | yes      | The list of prompt components compliant with <https://docs.gitlab.com/ee/architecture/blueprints/ai_gateway/index.html#protocol> (max_len: **1**). |                                       |
-| `prompt_components.type`             | string | yes      | The type of the prompt component (max_len: **255**).                                                                                            | `x_ray_package_file_prompt`           |
-| `prompt_components.payload`          | hash   | yes      | The data of the prompt component.                                                                                                               |                                       |
-| `prompt_components.payload.prompt`   | string | yes      | The complete AI prompt.                                                                                                                         | `Human: Tell me fun fact about ducks` |
-| `prompt_components.payload.provider` | string | yes      | The AI provider for which the prompt is designed for.                                                                                           | `anthropic`                           |
-| `prompt_components.payload.model`    | string | yes      | The AI model for which the prompt is designed for.                                                                                              | `claude-2.0`                          |
-| `prompt_components.metadata`         | hash   | no       | The metadata of the prompt component. Only string - string key value pairs are accepted (max_len: **10**).                                      |                                       |
+| `prompt_components.type`             | string | yes      | The type of the prompt component (max_len: **255**).                                                                                               | `x_ray_package_file_prompt`           |
+| `prompt_components.payload`          | hash   | yes      | The data of the prompt component.                                                                                                                  |                                       |
+| `prompt_components.payload.prompt`   | string | yes      | The complete AI prompt.                                                                                                                            | `Human: Tell me fun fact about ducks` |
+| `prompt_components.payload.provider` | string | yes      | The AI provider for which the prompt is designed for.                                                                                              | `anthropic`                           |
+| `prompt_components.payload.model`    | string | yes      | The AI model for which the prompt is designed for.                                                                                                 | `claude-2.0`                          |
+| `prompt_components.metadata`         | hash   | no       | The metadata of the prompt component. Only string - string key value pairs are accepted (max_len: **10**).                                         |                                       |
 
 ````shell
 curl --request POST \

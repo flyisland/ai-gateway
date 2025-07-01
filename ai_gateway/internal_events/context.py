@@ -13,7 +13,7 @@ __all__ = [
 
 
 class EventContext(BaseModel):
-    """This model class represents the available attributes in AI Gateway for the GitLab standard context.
+    """This model class represents the available attributes in the AI Gateway for the GitLab standard context.
 
     See https://gitlab.com/gitlab-org/iglu/-/tree/master/public/schemas/com.gitlab/gitlab_standard?ref_type=heads
     about the spec of the GitLab standard context.
@@ -59,7 +59,7 @@ class InternalEventAdditionalProperties:
         property: Property for the event, representing a specific attribute.
         value: Numeric value associated with the event.
         extra: Additional key-value pairs that cannot be added to the standard context, label, or property.
-               For Example `model_engine`, `prefix_length`, etc.
+            For Example `model_engine`, `prefix_length`, etc.
     """
 
     label: Optional[str] = None

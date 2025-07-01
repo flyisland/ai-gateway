@@ -1,3 +1,4 @@
+import json
 from datetime import datetime, timezone
 from enum import StrEnum
 from typing import Any
@@ -57,11 +58,62 @@ def _router(state: WorkflowState) -> str:
     if len(tool_calls) == 0:
         return Routes.END
 
-    if tool_calls and tool_calls[0].get("name") == "read_file":
+    tool_name = tool_calls[0].get("name")
+
+    if tool_name == "read_file":
         return Routes.AGENT
 
-    if tool_calls[0].get("name") == "create_file_with_contents":
-        return Routes.COMMIT_CHANGES
+    if tool_name == "ci_linter":
+        last_msg = str(agent_messages[-1].content) if agent_messages else ""
+        try:
+            result = json.loads(last_msg)
+        except (json.JSONDecodeError, TypeError) as e:
+            log_exception(
+                e,
+                extra={
+                    "tool_name": "ci_linter",
+                    "last_msg": last_msg,
+                    "error_type": "json_parsing_error",
+                },
+            )
+            return Routes.AGENT
+
+        if result.get("valid") is True:
+            return Routes.COMMIT_CHANGES
+
+        validation_count = len(
+            [
+                msg
+                for msg in agent_messages
+                if hasattr(msg, "tool_calls")
+                and msg.tool_calls
+                and any(call.get("name") == "ci_linter" for call in msg.tool_calls)
+            ]
+        )
+
+        if validation_count >= 3:
+            return Routes.COMMIT_CHANGES
+
+        return Routes.AGENT
+
+    if tool_name == "create_file_with_contents":
+        create_count = len(
+            [
+                msg
+                for msg in agent_messages
+                if hasattr(msg, "tool_calls")
+                and msg.tool_calls
+                and any(
+                    call.get("name") == "create_file_with_contents"
+                    for call in msg.tool_calls
+                )
+            ]
+        )
+
+        if create_count >= 3:
+            return Routes.COMMIT_CHANGES
+
+        return Routes.AGENT
 
     return Routes.END
 
@@ -110,6 +162,7 @@ def _load_file_contents(file_contents: list[str], state: WorkflowState):
                 correlation_id=None,
                 tool_info=None,
                 context_elements=None,
+                additional_context=None,
             )
         )
     else:
@@ -123,6 +176,7 @@ def _load_file_contents(file_contents: list[str], state: WorkflowState):
                 correlation_id=None,
                 tool_info=None,
                 context_elements=None,
+                additional_context=None,
             )
         )
 
@@ -144,6 +198,7 @@ def _git_output(command_output: list[str], state: WorkflowState):
             correlation_id=None,
             tool_info=None,
             context_elements=None,
+            additional_context=None,
         )
     ]
 
@@ -179,7 +234,7 @@ class Workflow(AbstractWorkflow):
         return graph.compile(checkpointer=checkpointer)
 
     def _setup_translator_nodes(self, tools_registry: ToolsRegistry):
-        translation_tools = ["create_file_with_contents", "read_file"]
+        translation_tools = ["create_file_with_contents", "read_file", "ci_linter"]
         agents_toolset = tools_registry.toolset(translation_tools)
         translator_agent = Agent(
             goal="N/A",
@@ -217,13 +272,26 @@ class Workflow(AbstractWorkflow):
 
         self.log.info("Starting %s workflow graph compilation", self._workflow_type)
         graph.set_entry_point("load_files")
+
+        def _load_file_with_project(file_contents: list[str], state: WorkflowState):
+            result = _load_file_contents(file_contents, state)
+            # Inject project_id into the conversation
+            if result.get("conversation_history", {}).get(AGENT_NAME):
+                messages = result["conversation_history"][AGENT_NAME]
+                messages.append(
+                    HumanMessage(
+                        content=f"Note: The project_id for ci_linter validation is {self._project['id']}."
+                    )
+                )
+            return result
+
         # Load jenkins file contents
         graph.add_node(
             "load_files",
             RunToolNode[WorkflowState](
                 tool=tools_registry.get("read_file"),  # type: ignore
                 input_parser=lambda _: [{"file_path": ci_config_file_path}],
-                output_parser=_load_file_contents,  # type: ignore
+                output_parser=_load_file_with_project,  # type: ignore
             ).run,
         )
         # translator nodes
@@ -298,6 +366,7 @@ class Workflow(AbstractWorkflow):
             correlation_id=None,
             tool_info=None,
             context_elements=None,
+            additional_context=None,
         )
 
         return WorkflowState(
@@ -307,5 +376,4 @@ class Workflow(AbstractWorkflow):
             plan=Plan(steps=[]),
             handover=[],
             last_human_input=None,
-            files_changed=[],
         )

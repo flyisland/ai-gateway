@@ -1,4 +1,3 @@
-from datetime import datetime
 from unittest.mock import AsyncMock, MagicMock, Mock, patch
 
 import pytest
@@ -15,7 +14,10 @@ from duo_workflow_service.entities import (
     ToolStatus,
     WorkflowStatusEnum,
 )
-from duo_workflow_service.entities.state import ChatWorkflowState
+from duo_workflow_service.entities.state import (
+    ApprovalStateRejection,
+    ChatWorkflowState,
+)
 from duo_workflow_service.internal_events.event_enum import CategoryEnum
 from duo_workflow_service.workflows.chat.workflow import (
     CHAT_GITLAB_MUTATION_TOOLS,
@@ -24,6 +26,7 @@ from duo_workflow_service.workflows.chat.workflow import (
     Routes,
     Workflow,
 )
+from duo_workflow_service.workflows.type_definitions import AdditionalContext
 from lib.feature_flags import current_feature_flag_context
 
 
@@ -78,6 +81,14 @@ def workflow_with_project(
         context_elements=[context_element],
         mcp_tools=[contract_pb2.McpTool(name="extra_tool", description="Extra tool")],
     )
+    additional_context = [
+        AdditionalContext(
+            category="file",
+            id="test-file-id",
+            content="test content",
+            metadata={"path": "/test/file.py"},
+        )
+    ]
     workflow._project = {
         "id": 123,
         "name": "test-project",
@@ -85,6 +96,7 @@ def workflow_with_project(
         "web_url": "https://example.com/test-project",
         "description": "A test project",
     }
+    workflow._additional_context = additional_context
     workflow._http_client = MagicMock()
     workflow._context_elements = []
     workflow._agent = prompt
@@ -120,11 +132,54 @@ async def test_workflow_initialization(workflow_with_project):
     assert initial_state["status"] == WorkflowStatusEnum.NOT_STARTED
     assert initial_state["plan"] == {"steps": []}
     assert len(initial_state["ui_chat_log"]) == 1
-    assert initial_state["ui_chat_log"][0]["message_type"] == MessageTypeEnum.TOOL
-    assert "Starting chat: Test chat goal" in initial_state["ui_chat_log"][0]["content"]
+    assert initial_state["ui_chat_log"][0]["message_type"] == MessageTypeEnum.USER
+    assert "Test chat goal" in initial_state["ui_chat_log"][0]["content"]
     assert initial_state["ui_chat_log"][0]["status"] == ToolStatus.SUCCESS
+    assert len(initial_state["ui_chat_log"][0]["additional_context"]) == 1
+    assert initial_state["ui_chat_log"][0]["additional_context"][0].category == "file"
     assert initial_state["context_elements"] == []
     assert initial_state["project"]["name"] == "test-project"
+
+
+@pytest.mark.asyncio
+async def test_workflow_initialization_with_additional_context(workflow_with_project):
+    additional_context = [
+        AdditionalContext(
+            category="file",
+            id="file1",
+            content="file content 1",
+            metadata={"path": "/path/to/file1"},
+        ),
+        AdditionalContext(
+            category="issue",
+            id="issue123",
+            content="issue description",
+            metadata={"title": "Bug report", "state": "open"},
+        ),
+        AdditionalContext(
+            category="terminal",
+            content="command output",
+            metadata={"command": "ls -la"},
+        ),
+    ]
+    workflow_with_project._additional_context = additional_context
+
+    initial_state = workflow_with_project.get_workflow_state("Test chat goal")
+
+    assert initial_state["status"] == WorkflowStatusEnum.NOT_STARTED
+    assert initial_state["ui_chat_log"][0]["additional_context"] == additional_context
+    assert len(initial_state["ui_chat_log"][0]["additional_context"]) == 3
+    assert initial_state["ui_chat_log"][0]["additional_context"][0].category == "file"
+    assert initial_state["ui_chat_log"][0]["additional_context"][1].category == "issue"
+    assert (
+        initial_state["ui_chat_log"][0]["additional_context"][2].category == "terminal"
+    )
+    assert (
+        initial_state["conversation_history"]["test_prompt"][0].additional_kwargs[
+            "additional_context"
+        ]
+        == additional_context
+    )
 
 
 @pytest.mark.asyncio
@@ -215,7 +270,7 @@ def test_are_tools_called_with_various_content(
         "last_human_input": None,
         "context_elements": [],
         "project": None,
-        "cancel_tool_message": "",
+        "approval": None,
     }
     assert workflow._are_tools_called(state) == expected_result
 
@@ -249,7 +304,7 @@ def test_are_tools_called_with_tool_use(workflow_with_project):
         "last_human_input": None,
         "context_elements": [],
         "project": None,
-        "cancel_tool_message": "",
+        "approval": None,
     }
     assert workflow._are_tools_called(state) == Routes.TOOL_USE
 
@@ -260,13 +315,9 @@ def test_are_tools_called_with_tool_use(workflow_with_project):
 @patch(
     "duo_workflow_service.workflows.abstract_workflow.fetch_project_data_with_workflow_id"
 )
-@patch(
-    "duo_workflow_service.workflows.abstract_workflow.fetch_workflow_config",
-)
 @patch("duo_workflow_service.workflows.abstract_workflow.UserInterface", autospec=True)
 async def test_workflow_run(
     mock_user_interface,
-    mock_fetch_workflow_config,
     mock_fetch_project_data,
     mock_gitlab_workflow,
     mock_tools_registry,
@@ -276,13 +327,16 @@ async def test_workflow_run(
     mock_tools_registry.configure = AsyncMock(
         return_value=MagicMock(spec=ToolsRegistry)
     )
-    mock_fetch_project_data.return_value = {
-        "id": 1,
-        "name": "test-project",
-        "description": "Test project",
-        "http_url_to_repo": "https://example.com/project",
-        "web_url": "https://example.com/project",
-    }
+    mock_fetch_project_data.return_value = (
+        {
+            "id": 1,
+            "name": "test-project",
+            "description": "Test project",
+            "http_url_to_repo": "https://example.com/project",
+            "web_url": "https://example.com/project",
+        },
+        {"project_id": 1},
+    )
 
     mock_git_lab_workflow_instance = mock_gitlab_workflow.return_value
     mock_git_lab_workflow_instance.__aenter__.return_value = (
@@ -348,16 +402,6 @@ async def test_workflow_run(
         (
             [],
             {"mcp_enabled": True},
-            CHAT_READ_ONLY_TOOLS + CHAT_MUTATION_TOOLS,
-        ),
-        (
-            ["duo_workflow_mcp_support"],
-            {},
-            CHAT_READ_ONLY_TOOLS + CHAT_MUTATION_TOOLS,
-        ),
-        (
-            ["duo_workflow_mcp_support"],
-            {"mcp_enabled": True},
             CHAT_READ_ONLY_TOOLS + CHAT_MUTATION_TOOLS + ["extra_tool"],
         ),
     ],
@@ -399,6 +443,10 @@ async def test_get_graph_input_start(workflow_with_project):
 
     assert result["status"] == WorkflowStatusEnum.NOT_STARTED
     assert result["conversation_history"]["test_prompt"][0].content == "Test goal"
+    assert result["ui_chat_log"][0]["message_type"] == MessageTypeEnum.USER
+    assert "Test goal" in result["ui_chat_log"][0]["content"]
+    assert len(result["ui_chat_log"][0]["additional_context"]) == 1
+    assert result["ui_chat_log"][0]["additional_context"][0].category == "file"
 
 
 @pytest.mark.asyncio
@@ -412,6 +460,10 @@ async def test_get_graph_input_resume(workflow_with_project):
     assert (
         result.update["conversation_history"]["test_prompt"][0].content == "New input"
     )
+    assert result.update["ui_chat_log"][-1]["message_type"] == MessageTypeEnum.USER
+    assert result.update["ui_chat_log"][-1]["content"] == "New input"
+    assert len(result.update["ui_chat_log"][-1]["additional_context"]) == 1
+    assert result.update["ui_chat_log"][-1]["additional_context"][0].category == "file"
 
 
 @pytest.mark.asyncio
@@ -439,7 +491,7 @@ async def test_get_graph_input_resume_with_rejected_approval(
     assert result.update["status"] == WorkflowStatusEnum.EXECUTION
     assert "conversation_history" not in result.update
     assert (
-        result.update["cancel_tool_message"]
+        result.update["approval"].message
         == "Rejected the tool usage because it's not safe"
     )
 
@@ -563,7 +615,7 @@ async def test_chat_workflow_status_flow_integration(
         last_human_input=None,
         context_elements=[],
         project=None,
-        cancel_tool_message=None,
+        approval=None,
     )
 
     ai_response_with_tools = AIMessage(content="I'll list the issues for you.")
@@ -589,7 +641,7 @@ async def test_chat_workflow_status_flow_integration(
         last_human_input=None,
         context_elements=[],
         project=None,
-        cancel_tool_message=None,
+        approval=None,
     )
 
     ai_response_final = AIMessage(content="Here are the issues I found: ...")
@@ -616,7 +668,7 @@ async def test_agent_run_with_tool_approval_required(workflow_with_project):
         last_human_input=None,
         context_elements=[],
         project=None,
-        cancel_tool_message=None,
+        approval=None,
     )
 
     ai_message = AIMessage(content="I'll create the file for you")
@@ -640,7 +692,23 @@ async def test_agent_run_with_tool_approval_required(workflow_with_project):
 
 
 @pytest.mark.asyncio
-async def test_agent_run_with_cancel_tool_message(workflow_with_project):
+@pytest.mark.parametrize(
+    ("cancel_tool_message", "expected_tool_message"),
+    [
+        (
+            "I don't want this file created",
+            "Tool is cancelled temporarily as user has a comment. Comment: I don't want this file created",
+        ),
+        (None, "Tool is cancelled by user."),
+    ],
+    ids=[
+        "Test with simple string content",
+        "Test with list content but no tool_use",
+    ],
+)
+async def test_agent_run_with_cancel_tool_message(
+    workflow_with_project, cancel_tool_message, expected_tool_message
+):
     """Test agent run method when a tool is cancelled with a message."""
     # Setup a state with a previous AI message containing tool calls
     ai_message_with_tools = AIMessage(content="I'll use a tool")
@@ -665,7 +733,7 @@ async def test_agent_run_with_cancel_tool_message(workflow_with_project):
         last_human_input=None,
         context_elements=[],
         project=None,
-        cancel_tool_message="I don't want this file created",
+        approval=ApprovalStateRejection(message=cancel_tool_message),
     )
 
     ai_response_after_cancel = AIMessage(
@@ -686,8 +754,7 @@ async def test_agent_run_with_cancel_tool_message(workflow_with_project):
         if hasattr(msg, "tool_call_id")
     ]
     assert len(tool_messages) == 1
-    assert "Tool cancelled" in tool_messages[0].content
-    assert "I don't want this file created" in tool_messages[0].content
+    assert expected_tool_message == tool_messages[0].content
 
 
 @pytest.mark.asyncio
