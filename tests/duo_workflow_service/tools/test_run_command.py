@@ -109,3 +109,79 @@ def test_run_command_format_display_message():
 
     expected_message = "Run command: ls -l -a /home"
     assert message == expected_message
+
+
+def test_run_command_format_display_message_with_dict():
+    """Test format_display_message when args is passed as a dictionary"""
+    tool = RunCommand(description="Run a shell command")
+
+    # Test with dict containing arguments
+    args_dict = {"program": "echo", "arguments": ["hello", "world"], "flags": ["-n"]}
+
+    message = tool.format_display_message(args_dict)
+
+    expected_message = "Run command: echo -n hello world"
+    assert message == expected_message
+
+
+def test_run_command_format_display_message_with_dict_no_arguments():
+    """Test format_display_message when dict has no arguments key"""
+    tool = RunCommand(description="Run a shell command")
+
+    # Test with dict missing arguments key
+    args_dict = {"program": "pwd", "flags": []}
+
+    message = tool.format_display_message(args_dict)
+
+    expected_message = "Run command: pwd"
+    assert message == expected_message
+
+
+def test_run_command_format_display_message_with_dict_empty_arguments():
+    """Test format_display_message when dict has empty arguments"""
+    tool = RunCommand(description="Run a shell command")
+
+    # Test with dict containing empty arguments
+    args_dict = {"program": "date", "arguments": [], "flags": ["-u"]}
+
+    message = tool.format_display_message(args_dict)
+
+    expected_message = "Run command: date -u"
+    assert message == expected_message
+
+
+def test_run_command_format_display_message_with_object_empty_fields():
+    """Test format_display_message with object having empty arguments and flags"""
+    tool = RunCommand(description="Run a shell command")
+
+    input_data = RunCommandInput(program="whoami", arguments=[], flags=[])
+
+    message = tool.format_display_message(input_data)
+
+    expected_message = "Run command: whoami"
+    assert message == expected_message
+
+
+def test_run_command_format_display_message_with_object_no_flags():
+    """Test format_display_message with object having no flags"""
+    tool = RunCommand(description="Run a shell command")
+
+    input_data = RunCommandInput(program="cat", arguments=["file.txt"], flags=[])
+
+    message = tool.format_display_message(input_data)
+
+    expected_message = "Run command: cat file.txt"
+    assert message == expected_message
+
+
+def test_run_command_format_display_message_with_dict_no_flags():
+    """Test format_display_message when dict has no flags"""
+    tool = RunCommand(description="Run a shell command")
+
+    # Test with dict missing flags key
+    args_dict = {"program": "grep", "arguments": ["pattern", "file.txt"]}
+
+    message = tool.format_display_message(args_dict)
+
+    expected_message = "Run command: grep pattern file.txt"
+    assert message == expected_message

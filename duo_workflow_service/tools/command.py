@@ -64,8 +64,24 @@ Instead of '{disallowed_operator}' please use {self.name} multiple times consecu
         )
 
     def format_display_message(self, args: RunCommandInput) -> str:
-        args_str = " ".join(args.arguments) if args.arguments else ""
-        flags_str = " ".join(args.flags) if args.flags else ""
+        if hasattr(args, "arguments"):
+            args_str = " ".join(args.arguments) if args.arguments else ""
+            flags_str = " ".join(args.flags) if args.flags else ""
+            program = args.program
+        else:
+            # Handle dict case
+            arguments = args.get("arguments", [])
+            args_str = " ".join(arguments) if arguments else ""
+            flags = args.get("flags", [])
+            flags_str = " ".join(flags) if flags else ""
+            program = args.get("program", "")
 
-        command = f"{args.program} {flags_str} {args_str}".strip()
+        # Build command string, only adding spaces when needed
+        command_parts = [program]
+        if flags_str:
+            command_parts.append(flags_str)
+        if args_str:
+            command_parts.append(args_str)
+        
+        command = " ".join(command_parts)
         return f"Run command: {command}"
