@@ -252,9 +252,7 @@ def _ui_chat_log_reducer(
 class WorkflowState(TypedDict):
     plan: Plan
     status: WorkflowStatusEnum
-    conversation_history: Annotated[
-        Dict[str, List[BaseMessage]], _conversation_history_reducer
-    ]
+    conversation_history: Dict[str, List[BaseMessage]]
     ui_chat_log: Annotated[List[UiChatLog], _ui_chat_log_reducer]
     handover: List[BaseMessage]
     last_human_input: Union[WorkflowEvent, None]
@@ -297,9 +295,7 @@ class SearchAndReplaceWorkflowState(TypedDict):
 class ChatWorkflowState(TypedDict):
     plan: Plan
     status: WorkflowStatusEnum
-    conversation_history: Annotated[
-        Dict[str, List[BaseMessage]], _conversation_history_reducer
-    ]
+    conversation_history: Dict[str, List[BaseMessage]]
     ui_chat_log: Annotated[List[UiChatLog], _ui_chat_log_reducer]
     last_human_input: Union[WorkflowEvent, None]
     context_elements: List[ContextElement]
