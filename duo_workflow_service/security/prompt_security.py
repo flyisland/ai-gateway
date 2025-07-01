@@ -1,7 +1,7 @@
 # flake8: noqa: W605
 import re
 from enum import Enum
-from typing import Any, Set
+from typing import Any, Dict, Callable
 
 
 class SecurityException(Exception):
@@ -24,21 +24,14 @@ class PromptSecurity:
         "s": "system",
     }
 
-    # Tools that DON'T need security (write operations only)
-    TOOLS_EXEMPT_FROM_SECURITY: Set[str] = set()
-
-    # Default security functions to apply (unless exempt)
+    # Default security functions to apply to ALL tools
     DEFAULT_SECURITY_FUNCTIONS = [SecurityFunction.ENCODE_TAGS]
 
-    @classmethod
-    def register_exempt_tool(cls, tool_name: str, reason: str):
-        """Register a tool as exempt from security.
-
-        Args:
-            tool_name: Name of the tool to exempt
-            reason: Explanation why this tool doesn't need security
-        """
-        cls.TOOLS_EXEMPT_FROM_SECURITY.add(tool_name)
+    # Tool-specific additional validators (on top of default functions)
+    TOOL_SPECIFIC_VALIDATORS: Dict[str, Callable] = {
+        # 'file_read': '_additional_file_read_validation',
+        # Add tools that need EXTRA validation beyond the default
+    }
 
     @staticmethod
     def apply_security(response: Any, tool_name: str) -> Any:
@@ -54,15 +47,9 @@ class PromptSecurity:
         Raises:
             SecurityException: If validation fails
         """
-        # Check if a tool is exempt from security
-        if tool_name in PromptSecurity.TOOLS_EXEMPT_FROM_SECURITY:
-            return response  # No security needed
-
-        # Apply default security functions to all non-exempt tools
-        security_functions = PromptSecurity.DEFAULT_SECURITY_FUNCTIONS
-
+        # Apply ALL default security functions
         secured_response = response
-        for func in security_functions:
+        for func in PromptSecurity.DEFAULT_SECURITY_FUNCTIONS:
             result = PromptSecurity._apply_function(secured_response, func)
 
             # Check if this is a validation result (tuple) or transformed data
@@ -74,6 +61,18 @@ class PromptSecurity:
                     )
             else:
                 secured_response = result
+
+        # Apply tool-specific additional validation if defined
+        if tool_name in PromptSecurity.TOOL_SPECIFIC_VALIDATORS:
+            validator_func = PromptSecurity.TOOL_SPECIFIC_VALIDATORS[tool_name]
+            if callable(validator_func):
+                secured_response = validator_func(secured_response)
+            elif isinstance(validator_func, str) and hasattr(
+                    PromptSecurity, validator_func
+            ):
+                # If it's a string, try to get the method
+                method = getattr(PromptSecurity, validator_func)
+                secured_response = method(secured_response)
 
         return secured_response
 
@@ -114,8 +113,25 @@ class PromptSecurity:
     def _encode_tags(text: str) -> str:
         """Encode all dangerous tags in text."""
         for tag_name, replacement in PromptSecurity.DANGEROUS_TAGS.items():
+            # Pattern 1: Regular HTML tags like <goal> or </goal>
             text = re.sub(
                 f"<\s*(/?)\s*{tag_name}\s*>",
+                f"&lt;\\1{replacement}&gt;",
+                text,
+                flags=re.IGNORECASE,
+            )
+
+            # Pattern 2: Unicode-escaped tags like \u003cgoal\u003e or \u003c/goal\u003e
+            text = re.sub(
+                f"\\\\u003c\s*(/?)\s*{tag_name}\s*\\\\u003e",
+                f"&lt;\\1{replacement}&gt;",
+                text,
+                flags=re.IGNORECASE,
+            )
+
+            # Pattern 3: Mixed format like \\u003cgoal\\u003e (with double backslashes)
+            text = re.sub(
+                f"\\\\\\\\u003c\s*(/?)\s*{tag_name}\s*\\\\\\\\u003e",
                 f"&lt;\\1{replacement}&gt;",
                 text,
                 flags=re.IGNORECASE,

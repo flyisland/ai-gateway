@@ -5,14 +5,12 @@ from gitlab_cloud_connector import GitLabUnitPrimitive
 from pydantic import BaseModel, Field
 
 from duo_workflow_service.gitlab.url_parser import GitLabUrlParseError, GitLabUrlParser
+from duo_workflow_service.tools.duo_base_tool import DuoBaseTool
 from duo_workflow_service.tools.gitlab_resource_input import ProjectResourceInput
-from duo_workflow_service.tools.tool_base_classes import (
-    ReadOperationTool,
-    WriteOperationTool,
-)
 
 DESCRIPTION_CHARACTER_LIMIT = 1_048_576
 
+# editorconfig-checker-disable
 PROJECT_IDENTIFICATION_DESCRIPTION = """To identify the project you must provide either:
 - project_id parameter, or
 - A GitLab URL like:
@@ -28,6 +26,7 @@ ISSUE_IDENTIFICATION_DESCRIPTION = """To identify an issue you must provide eith
   - https://gitlab.com/namespace/project/-/issues/42
   - https://gitlab.com/group/subgroup/project/-/issues/42
 """
+# editorconfig-checker-enable
 
 
 class IssueResourceInput(ProjectResourceInput):
@@ -37,9 +36,7 @@ class IssueResourceInput(ProjectResourceInput):
     )
 
 
-class IssueBaseTool:
-    """Common functionality for Issue tools - now a mixin"""
-
+class IssueBaseTool(DuoBaseTool):
     unit_primitive: GitLabUnitPrimitive = GitLabUnitPrimitive.ASK_ISSUE
 
     def _validate_issue_url(
@@ -118,9 +115,7 @@ If a label does not already exist, this creates a new project label and assigns 
     )
 
 
-class CreateIssue(WriteOperationTool, IssueBaseTool):
-    """Create issue - write operation, no security needed"""
-
+class CreateIssue(IssueBaseTool):
     name: str = "create_issue"
     description: str = f"""Create a new issue in a GitLab project.
 
@@ -132,7 +127,7 @@ For example:
 - Given the URL https://gitlab.com/namespace/project and the title "Fix bug in login form", the tool call would be:
     create_issue(url="https://gitlab.com/namespace/project", title="Fix bug in login form")
 """
-    args_schema: Type[BaseModel] = CreateIssueInput
+    args_schema: Type[BaseModel] = CreateIssueInput  # type: ignore
 
     async def _arun(self, title: str, **kwargs: Any) -> str:
         url = kwargs.pop("url", None)
@@ -234,13 +229,16 @@ None lists all issues with no labels. Any lists all issues with at least one lab
         default=None,
         description="Return all issues or just those that are opened or closed",
     )
+    page: Optional[int] = Field(
+        default=1,
+        description="Page number. Default is 1.",
+    )
 
 
-class ListIssues(ReadOperationTool, IssueBaseTool):
-    """List issues - read operation, security automatically applied"""
-
+class ListIssues(IssueBaseTool):
     name: str = "list_issues"
     description: str = f"""List issues in a GitLab project.
+    By default, only returns the first 20 issues - use page parameter to get complete results.
 
     {PROJECT_IDENTIFICATION_DESCRIPTION}
 
@@ -250,9 +248,9 @@ class ListIssues(ReadOperationTool, IssueBaseTool):
     - Given the URL https://gitlab.com/namespace/project, the tool call would be:
         list_issues(url="https://gitlab.com/namespace/project")
     """
-    args_schema: Type[BaseModel] = ListIssuesInput
+    args_schema: Type[BaseModel] = ListIssuesInput  # type: ignore
 
-    async def _execute(self, **kwargs: Any) -> str:
+    async def _arun(self, **kwargs: Any) -> str:
         url = kwargs.pop("url", None)
         project_id = kwargs.pop("project_id", None)
 
@@ -279,9 +277,7 @@ class ListIssues(ReadOperationTool, IssueBaseTool):
         return f"List issues in project {args.project_id}"
 
 
-class GetIssue(ReadOperationTool, IssueBaseTool):
-    """Get single issue - read operation, security automatically applied"""
-
+class GetIssue(IssueBaseTool):
     name: str = "get_issue"
     description: str = f"""Get a single issue in a GitLab project.
 
@@ -293,9 +289,9 @@ class GetIssue(ReadOperationTool, IssueBaseTool):
     - Given the URL https://gitlab.com/namespace/project/-/issues/103, the tool call would be:
         get_issue(url=https://gitlab.com/namespace/project/-/issues/103)
     """
-    args_schema: Type[BaseModel] = IssueResourceInput
+    args_schema: Type[BaseModel] = IssueResourceInput  # type: ignore
 
-    async def _execute(self, **kwargs: Any) -> str:
+    async def _arun(self, **kwargs: Any) -> str:
         url = kwargs.get("url")
         project_id = kwargs.get("project_id")
         issue_iid = kwargs.get("issue_iid")
@@ -312,12 +308,7 @@ class GetIssue(ReadOperationTool, IssueBaseTool):
                 path=f"/api/v4/projects/{project_id}/issues/{issue_iid}",
                 parse_json=False,
             )
-
-            if isinstance(response, str):
-                response = json.loads(response)
-
             return json.dumps({"issue": response})
-
         except Exception as e:
             return json.dumps({"error": str(e)})
 
@@ -358,9 +349,7 @@ class UpdateIssueInput(IssueResourceInput):
     )
 
 
-class UpdateIssue(WriteOperationTool, IssueBaseTool):
-    """Update issue - write operation, no security needed"""
-
+class UpdateIssue(IssueBaseTool):
     name: str = "update_issue"
     description: str = f"""Update an existing issue in a GitLab project.
 
@@ -372,7 +361,7 @@ class UpdateIssue(WriteOperationTool, IssueBaseTool):
     - Given the URL https://gitlab.com/namespace/project/-/issues/103 and title "Updated title", the tool call would be:
         update_issue(url="https://gitlab.com/namespace/project/-/issues/103", title="Updated title")
     """
-    args_schema: Type[BaseModel] = UpdateIssueInput
+    args_schema: Type[BaseModel] = UpdateIssueInput  # type: ignore
 
     async def _arun(self, **kwargs: Any) -> str:
         url = kwargs.pop("url", None)
@@ -409,9 +398,7 @@ class CreateIssueNoteInput(IssueResourceInput):
     )
 
 
-class CreateIssueNote(WriteOperationTool, IssueBaseTool):
-    """Create issue note - write operation, no security needed"""
-
+class CreateIssueNote(IssueBaseTool):
     name: str = "create_issue_note"
     description: str = f"""Create a new note (comment) on a GitLab issue.
 
@@ -425,7 +412,7 @@ For example:
 
 The body parameter is always required.
 """
-    args_schema: Type[BaseModel] = CreateIssueNoteInput
+    args_schema: Type[BaseModel] = CreateIssueNoteInput  # type: ignore
 
     async def _arun(self, body: str, **kwargs: Any) -> str:
         url = kwargs.pop("url", None)
@@ -467,13 +454,16 @@ class ListIssueNotesInput(IssueResourceInput):
         default=None,
         description="Return issue notes ordered by created_at or updated_at fields. Default is created_at",
     )
+    page: Optional[int] = Field(
+        default=1,
+        description="Page number. Default is 1.",
+    )
 
 
-class ListIssueNotes(ReadOperationTool, IssueBaseTool):
-    """List issue notes - read operation, security automatically applied"""
-
+class ListIssueNotes(IssueBaseTool):
     name: str = "list_issue_notes"
-    description: str = f"""Get a list of all notes (comments) for a specific issue.
+    description: str = f"""Get a list of issue notes (comments) for a specific issue.
+    By default, only returns the first 20 issue notes - use page parameter to get complete results.
 
     {ISSUE_IDENTIFICATION_DESCRIPTION}
 
@@ -483,9 +473,9 @@ class ListIssueNotes(ReadOperationTool, IssueBaseTool):
     - Given the URL https://gitlab.com/namespace/project/-/issues/103, the tool call would be:
         list_issue_notes(url="https://gitlab.com/namespace/project/-/issues/103")
     """
-    args_schema: Type[BaseModel] = ListIssueNotesInput
+    args_schema: Type[BaseModel] = ListIssueNotesInput  # type: ignore
 
-    async def _execute(self, **kwargs: Any) -> str:
+    async def _arun(self, **kwargs: Any) -> str:
         url = kwargs.pop("url", None)
         project_id = kwargs.pop("project_id", None)
         issue_iid = kwargs.pop("issue_iid", None)
@@ -519,9 +509,7 @@ class GetIssueNoteInput(IssueResourceInput):
     note_id: int = Field(description="The ID of the note")
 
 
-class GetIssueNote(ReadOperationTool, IssueBaseTool):
-    """Get single issue note - read operation, security automatically applied"""
-
+class GetIssueNote(IssueBaseTool):
     name: str = "get_issue_note"
     description: str = f"""Get a single note (comment) from a specific issue.
 
@@ -535,9 +523,9 @@ class GetIssueNote(ReadOperationTool, IssueBaseTool):
 
     The note_id parameter is always required.
     """
-    args_schema: Type[BaseModel] = GetIssueNoteInput
+    args_schema: Type[BaseModel] = GetIssueNoteInput  # type: ignore
 
-    async def _execute(self, note_id: int, **kwargs: Any) -> str:
+    async def _arun(self, note_id: int, **kwargs: Any) -> str:
         url = kwargs.pop("url", None)
         project_id = kwargs.pop("project_id", None)
         issue_iid = kwargs.pop("issue_iid", None)
@@ -554,12 +542,7 @@ class GetIssueNote(ReadOperationTool, IssueBaseTool):
                 path=f"/api/v4/projects/{project_id}/issues/{issue_iid}/notes/{note_id}",
                 parse_json=False,
             )
-
-            if isinstance(response, str):
-                response = json.loads(response)
-
             return json.dumps({"note": response})
-
         except Exception as e:
             return json.dumps({"error": str(e)})
 

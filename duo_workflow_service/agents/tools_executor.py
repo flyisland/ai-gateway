@@ -28,6 +28,7 @@ from duo_workflow_service.internal_events.event_enum import (
     EventLabelEnum,
 )
 from duo_workflow_service.monitoring import duo_workflow_metrics
+from duo_workflow_service.security.prompt_security import PromptSecurity
 from duo_workflow_service.tools import (
     PipelineException,
     RunCommand,
@@ -95,6 +96,12 @@ class ToolsExecutor:
                 continue
 
             result = await self._execute_tool(tool_name, tool_call, plan)
+            if result.get("response") and hasattr(result.get("response"), "content"):
+                secure_result: str = PromptSecurity.apply_security(
+                    response=result["response"].content,
+                    tool_name=tool_name,
+                )
+                result["response"].content = secure_result
 
             chat_logs = result.get("chat_logs", [])
             if chat_logs and isinstance(chat_logs[0], dict):
