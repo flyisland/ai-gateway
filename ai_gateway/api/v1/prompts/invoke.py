@@ -65,12 +65,12 @@ async def invoke(
 
 
 async def _invoke(
-        prompt_request: PromptRequest,
-        prompt_id: str,
-        current_user: StarletteUser,
-        prompt_registry: BasePromptRegistry,
-        process_chunk: Callable,
-        internal_event_category: str,
+    prompt_request: PromptRequest,
+    prompt_id: str,
+    current_user: StarletteUser,
+    prompt_registry: BasePromptRegistry,
+    process_chunk: Callable,
+    internal_event_category: str,
 ):
     try:
         prompt = prompt_registry.get_on_behalf(
@@ -118,7 +118,7 @@ async def _invoke(
                     processed_chunk = process_chunk(chunk)
                     if isinstance(processed_chunk, BaseModel):
                         processed_chunk = (
-                                processed_chunk.model_dump_json(exclude_none=True) + "\n"
+                            processed_chunk.model_dump_json(exclude_none=True) + "\n"
                         )
 
                     yield processed_chunk

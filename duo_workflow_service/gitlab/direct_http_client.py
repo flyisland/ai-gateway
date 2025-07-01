@@ -78,7 +78,7 @@ class DirectGitLabHttpClient(GitlabHttpClient):
                 return parsed_response
 
     async def graphql(
-            self, query: str, variables: Optional[dict] = None, timeout: float = 10.0
+        self, query: str, variables: Optional[dict] = None, timeout: float = 10.0
     ) -> Any:
         """Execute a GraphQL query against the GitLab API.
 
@@ -109,7 +109,7 @@ class DirectGitLabHttpClient(GitlabHttpClient):
         session = connection_pool.session
 
         async with session.request(
-                "POST", url, headers=headers, json=payload
+            "POST", url, headers=headers, json=payload
         ) as response:
             raw_response = await response.text()
 

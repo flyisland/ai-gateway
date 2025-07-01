@@ -152,7 +152,7 @@ class GitlabHttpClient(ABC):
 
     @abstractmethod
     async def graphql(
-            self, query: str, variables: Optional[dict] = None, timeout: float = 10.0
+        self, query: str, variables: Optional[dict] = None, timeout: float = 10.0
     ) -> Any:
         """Execute a GraphQL request against the GitLab API."""
         pass
