@@ -49,6 +49,7 @@ class ExecutorGitLabHttpClient(GitlabHttpClient):
                 action_response.httpResponse.body,
                 parse_json=parse_json,
                 object_hook=object_hook,
+                path=path,
             )
 
             return GitLabHttpResponse(
@@ -67,8 +68,12 @@ class ExecutorGitLabHttpClient(GitlabHttpClient):
             ),
         )
 
+        if "/checkpoints" in path:
+            response = "500 error"
+            logger.info(f"Injected 500 error for path: {path}")
+
         return self._parse_response(
-            response, parse_json=parse_json, object_hook=object_hook
+            response, parse_json=parse_json, object_hook=object_hook, path=path
         )
 
     async def graphql(
