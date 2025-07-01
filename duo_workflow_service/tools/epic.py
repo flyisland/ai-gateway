@@ -5,8 +5,10 @@ from gitlab_cloud_connector import GitLabUnitPrimitive
 from pydantic import BaseModel, Field
 
 from duo_workflow_service.gitlab.url_parser import GitLabUrlParseError, GitLabUrlParser
-from duo_workflow_service.prompt_security import PromptSecurity, SecurityException
-from duo_workflow_service.tools.duo_base_tool import DuoBaseTool
+from duo_workflow_service.tools.tool_base_classes import (
+    ReadOperationTool,
+    WriteOperationTool,
+)
 
 DESCRIPTION_CHARACTER_LIMIT = 1_048_576
 
@@ -42,7 +44,9 @@ class EpicIdsResult(NamedTuple):
     errors: List[str]
 
 
-class EpicBaseTool(DuoBaseTool):
+class EpicBaseTool:
+    """Common functionality for Epic tools - now a mixin"""
+
     unit_primitive: GitLabUnitPrimitive = GitLabUnitPrimitive.ASK_EPIC
 
     def _validate_group_url(
@@ -251,7 +255,9 @@ class WriteEpicInput(EpicResourceInput):
     )
 
 
-class CreateEpic(EpicBaseTool):
+class CreateEpic(WriteOperationTool, EpicBaseTool):
+    """Create epic - write operation, no security needed"""
+
     name: str = "create_epic"
     description: str = f"""Create a new epic in a GitLab group.
 
@@ -363,7 +369,9 @@ reaction. Any returns epics given at least one reaction""",
     )
 
 
-class ListEpics(EpicBaseTool):
+class ListEpics(ReadOperationTool, EpicBaseTool):
+    """List epics - read operation, security automatically applied"""
+
     name: str = "list_epics"
     description: str = f"""Get all epics of the requested group and its subgroups.
 
@@ -377,7 +385,7 @@ class ListEpics(EpicBaseTool):
     """
     args_schema: Type[BaseModel] = ListEpicsInput
 
-    async def _arun(self, **kwargs: Any) -> str:
+    async def _execute(self, **kwargs: Any) -> str:
         url = kwargs.pop("url", None)
         group_id = kwargs.pop("group_id", None)
 
@@ -407,7 +415,9 @@ class ListEpics(EpicBaseTool):
         return f"List epics in {target}"
 
 
-class GetEpic(EpicBaseTool):
+class GetEpic(ReadOperationTool, EpicBaseTool):
+    """Get single epic - read operation, security automatically applied"""
+
     name: str = "get_epic"
     description: str = f"""Get a single epic in a GitLab group
 
@@ -421,7 +431,7 @@ class GetEpic(EpicBaseTool):
     """
     args_schema: Type[BaseModel] = EpicResourceInput
 
-    async def _arun(self, **kwargs: Any) -> str:
+    async def _execute(self, **kwargs: Any) -> str:
         url = kwargs.get("url")
         group_id = kwargs.get("group_id")
         epic_iid = kwargs.get("epic_iid")
@@ -436,15 +446,11 @@ class GetEpic(EpicBaseTool):
                 path=f"/api/v4/groups/{validation_result.group_id}/epics/{validation_result.epic_iid}",
                 parse_json=False,
             )
-            try:
-                if isinstance(response, str):
-                    response = json.loads(response)
-                response = PromptSecurity.apply_security(response, self.name)
 
-                return json.dumps({"epic": response})
+            if isinstance(response, str):
+                response = json.loads(response)
 
-            except SecurityException as e:
-                return json.dumps({"error": str(e)})
+            return json.dumps({"epic": response})
 
         except Exception as e:
             return json.dumps({"error": str(e)})
@@ -468,7 +474,9 @@ class UpdateEpicInput(WriteEpicInput):
     )
 
 
-class UpdateEpic(EpicBaseTool):
+class UpdateEpic(WriteOperationTool, EpicBaseTool):
+    """Update epic - write operation, no security needed"""
+
     name: str = "update_epic"
     description: str = f"""Update an existing epic in a GitLab group.
 
@@ -480,7 +488,7 @@ For example:
 - Given the URL https://gitlab.com/groups/namespace/group/-/epics/42 and title 'Updated Epic', the tool call would be:
     update_epic(url="https://gitlab.com/groups/namespace/group/-/epics/42", title='Updated Epic')
 """
-    args_schema: Type[BaseModel] = UpdateEpicInput  # type: ignore
+    args_schema: Type[BaseModel] = UpdateEpicInput
 
     async def _arun(self, **kwargs: Any) -> str:
         url = kwargs.pop("url", None)
@@ -520,7 +528,9 @@ class ListEpicNotesInput(EpicResourceInput):
     )
 
 
-class ListEpicNotes(EpicBaseTool):
+class ListEpicNotes(ReadOperationTool, EpicBaseTool):
+    """List epic notes - read operation, security automatically applied"""
+
     name: str = "list_epic_notes"
     description: str = f"""Get a list of all notes (comments) for a specific epic.
 
@@ -536,7 +546,7 @@ class ListEpicNotes(EpicBaseTool):
     """
     args_schema: Type[BaseModel] = ListEpicNotesInput
 
-    async def _arun(self, **kwargs: Any) -> str:
+    async def _execute(self, **kwargs: Any) -> str:
         url = kwargs.pop("url", None)
         group_id = kwargs.pop("group_id", None)
         epic_iid = kwargs.pop("epic_iid", None)
@@ -570,7 +580,9 @@ class GetEpicNoteInput(EpicResourceInput):
     note_id: int = Field(description="The ID of the note")
 
 
-class GetEpicNote(EpicBaseTool):
+class GetEpicNote(ReadOperationTool, EpicBaseTool):
+    """Get single epic note - read operation, security automatically applied"""
+
     name: str = "get_epic_note"
     description: str = f"""Get a single note (comment) from a specific epic.
 
@@ -587,7 +599,7 @@ class GetEpicNote(EpicBaseTool):
     """
     args_schema: Type[BaseModel] = GetEpicNoteInput
 
-    async def _arun(self, note_id: int, **kwargs: Any) -> str:
+    async def _execute(self, note_id: int, **kwargs: Any) -> str:
         url = kwargs.pop("url", None)
         group_id = kwargs.pop("group_id", None)
         epic_iid = kwargs.pop("epic_iid", None)

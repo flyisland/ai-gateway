@@ -1,7 +1,7 @@
 # flake8: noqa: W605
 import re
 from enum import Enum
-from typing import Any
+from typing import Any, Set
 
 
 class SecurityException(Exception):
@@ -24,12 +24,21 @@ class PromptSecurity:
         "s": "system",
     }
 
-    # Define which security functions to apply for each tool
-    TOOL_SECURITY_CONFIG = {
-        "get_issue": [SecurityFunction.ENCODE_TAGS],
-        "get_epic": [SecurityFunction.ENCODE_TAGS],
-        "get_issue_note": [SecurityFunction.ENCODE_TAGS],
-    }
+    # Tools that DON'T need security (write operations only)
+    TOOLS_EXEMPT_FROM_SECURITY: Set[str] = set()
+
+    # Default security functions to apply (unless exempt)
+    DEFAULT_SECURITY_FUNCTIONS = [SecurityFunction.ENCODE_TAGS]
+
+    @classmethod
+    def register_exempt_tool(cls, tool_name: str, reason: str):
+        """Register a tool as exempt from security.
+
+        Args:
+            tool_name: Name of the tool to exempt
+            reason: Explanation why this tool doesn't need security
+        """
+        cls.TOOLS_EXEMPT_FROM_SECURITY.add(tool_name)
 
     @staticmethod
     def apply_security(response: Any, tool_name: str) -> Any:
@@ -45,8 +54,12 @@ class PromptSecurity:
         Raises:
             SecurityException: If validation fails
         """
-        # Get security functions for this tool
-        security_functions = PromptSecurity.TOOL_SECURITY_CONFIG.get(tool_name, [])
+        # Check if a tool is exempt from security
+        if tool_name in PromptSecurity.TOOLS_EXEMPT_FROM_SECURITY:
+            return response  # No security needed
+
+        # Apply default security functions to all non-exempt tools
+        security_functions = PromptSecurity.DEFAULT_SECURITY_FUNCTIONS
 
         secured_response = response
         for func in security_functions:
