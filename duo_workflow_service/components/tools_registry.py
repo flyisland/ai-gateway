@@ -71,6 +71,8 @@ _READ_ONLY_GITLAB_TOOLS: list[Type[BaseTool]] = [
     tools.GetWorkflowContext,
     tools.ListVulnerabilities,
     tools.CiLinter,
+    tools.GetUserContributedProjects,
+    tools.AnalyticalQuery,
 ]
 
 _AGENT_PRIVILEGES: dict[str, list[Type[BaseTool]]] = {

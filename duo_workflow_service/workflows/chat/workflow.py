@@ -50,6 +50,8 @@ CHAT_READ_ONLY_TOOLS = [
     "get_merge_request",
     "get_pipeline_errors",
     "get_project",
+    "get_user_contributed_projects",
+    "analytical_query",
     "run_read_only_git_command",
     "list_all_merge_request_notes",
     "list_merge_request_diffs",
