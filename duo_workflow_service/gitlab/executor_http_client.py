@@ -72,7 +72,7 @@ class ExecutorGitLabHttpClient(GitlabHttpClient):
         )
 
     async def graphql(
-            self, query: str, variables: Optional[dict] = None, timeout: float = 10.0
+        self, query: str, variables: Optional[dict] = None, timeout: float = 10.0
     ) -> Any:
         payload = {
             "query": query,
