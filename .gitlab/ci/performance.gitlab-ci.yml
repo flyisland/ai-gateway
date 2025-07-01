@@ -33,7 +33,7 @@ tests:performance:
       artifacts: true
   trigger:
     project: gitlab-org/quality/component-performance-testing
-    branch: main
+    branch: vp/removing-hardcoded-paths
     strategy: depend
     forward:
       pipeline_variables: true
@@ -47,8 +47,6 @@ tests:performance:
     PARENT_PIPELINE_SOURCE: $CI_PIPELINE_SOURCE
     COMPONENT_MR_CI_COMMIT_SHA: $CI_COMMIT_SHORT_SHA
     COMPONENT_SERVICE_NAME: "ai-gateway-influx"
-    TEST_FILE_LOCATION: "performance_tests/k6_test"
-    DOCKER_COMPOSE_FILE_LOCATION: "performance_tests/setup"
   rules:
     - if: $CI_PROJECT_NAMESPACE =~ /^gitlab-org\/security.*/
       when: never
