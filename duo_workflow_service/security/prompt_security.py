@@ -68,7 +68,7 @@ class PromptSecurity:
             if callable(validator_func):
                 secured_response = validator_func(secured_response)
             elif isinstance(validator_func, str) and hasattr(
-                    PromptSecurity, validator_func
+                PromptSecurity, validator_func
             ):
                 # If it's a string, try to get the method
                 method = getattr(PromptSecurity, validator_func)
