@@ -27,6 +27,7 @@ from duo_workflow_service.entities import (
     WorkflowState,
     WorkflowStatusEnum,
 )
+from duo_workflow_service.gitlab.url_parser import GitLabUrlParseError, GitLabUrlParser
 from duo_workflow_service.llm_factory import create_chat_model
 from duo_workflow_service.tracking import log_exception
 from duo_workflow_service.workflows.abstract_workflow import (
@@ -71,9 +72,6 @@ EXECUTOR_TOOLS = [
     "find_files",
     "grep",
     "mkdir",
-    "add_new_task",
-    "remove_task",
-    "update_task_description",
     "get_plan",
     "set_task_status",
     "handover_tool",
@@ -237,9 +235,8 @@ class Workflow(AbstractWorkflow):
         )
         graph.add_edge("set_status_to_execution", executor_entry_node)
 
-        issue_iid = self._workflow_metadata["issue_iid"]
-        issue_title = self._workflow_metadata["issue_title"]
-        merge_request_title = f"Draft: Resolve {issue_title}"
+        issue_iid = self._fetch_issue_iid(goal)
+        merge_request_title = f"Draft: Resolve #{issue_iid}"
 
         # deterministic git actions
         graph.add_node(
@@ -357,3 +354,14 @@ class Workflow(AbstractWorkflow):
             handover=[],
             last_human_input=None,
         )
+
+    def _fetch_issue_iid(self, issue_url: str):
+        try:
+            gitlab_host = GitLabUrlParser.extract_host_from_url(
+                self._project["web_url"]
+            )
+            _, issue_iid = GitLabUrlParser.parse_issue_url(issue_url, gitlab_host)
+            return issue_iid
+        except GitLabUrlParseError as e:
+            log_exception(e, extra={"workflow_id": self._workflow_id})
+            return ""

@@ -20,7 +20,7 @@ Given an issue by Human and a set of tools available to you:
 
 GitLab issue description:
 <issue>
-  <issue_url>{issue_url}</issue_url>
+    <issue_url>{issue_url}</issue_url>
 </issue>
 
 **Guidelines**
@@ -28,8 +28,4 @@ GitLab issue description:
 - Do NOT make recommendations on how to achieve the goal
 - Focus on information extraction and context building
 - Include all relevant metadata and cross-references
-"""
-
-PLANNER_ADDITIONAL_INSTRUCTIONS = """
-
 """

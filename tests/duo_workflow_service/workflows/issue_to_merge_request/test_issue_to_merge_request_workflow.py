@@ -167,9 +167,9 @@ async def test_workflow_run(
     workflow = Workflow(
         "123",
         workflow_type=CategoryEnum.WORKFLOW_ISSUE_TO_MERGE_REQUEST,
-        workflow_metadata={"issue_iid": "1", "issue_title": "Test issue"},
+        workflow_metadata={},
     )
-    await workflow.run("test_goal")
+    await workflow.run("https://example.com/project/-/issues/1")
 
     mock_planner_component.return_value.attach.assert_called_once_with(
         graph=ANY,
@@ -293,6 +293,6 @@ async def test_workflow_run_when_exception(
         compiled_graph.astream.return_value = AsyncIterator()
         instance = graph.return_value
         instance.compile.return_value = compiled_graph
-        await workflow.run("test_goal")
+        await workflow.run("https://example.com/project/-/issues/1")
 
     assert workflow.is_done
