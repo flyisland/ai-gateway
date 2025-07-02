@@ -3,11 +3,10 @@ from typing import (
     Annotated,
     Any,
     ClassVar,
-    Dict,
-    List,
     Optional,
+    Self,
     TypedDict,
-    TypeVar,
+    get_args,
     get_origin,
 )
 
@@ -21,8 +20,18 @@ from duo_workflow_service.entities.state import (
     _ui_chat_log_reducer,
 )
 
+__all__ = [
+    "FlowStatusEnum",
+    "FlowState",
+    "merge_nested_dict",
+    "create_nested_dict",
+    "merge_nested_dict_reducer",
+    "IOKey",
+    "get_vars_from_state",
+]
 
-class WorkflowStatusEnum(StrEnum):
+
+class FlowStatusEnum(StrEnum):
     NOT_STARTED = "not_started"
     PLANNING = "planning"
     EXECUTION = "execution"
@@ -73,14 +82,20 @@ def create_nested_dict(keys: list[str], value: Any) -> dict[str, Any]:
     return result
 
 
-class HasBaseStateFields(TypedDict):
-    status: WorkflowStatusEnum
-    conversation_history: dict[str, list[BaseMessage]]
-    context: dict[str, Any]
-    ui_chat_log: list[UiChatLog]
+def merge_nested_dict_reducer(
+    left: dict[str, Any], right: dict[str, Any]
+) -> dict[str, Any]:
+    """Reducer specifically for nested dictionary fields."""
+    return merge_nested_dict(left or {}, right or {})
 
 
-T = TypeVar("T", bound=HasBaseStateFields)
+class FlowState(TypedDict):
+    status: FlowStatusEnum
+    conversation_history: Annotated[
+        dict[str, list[BaseMessage]], _conversation_history_reducer
+    ]
+    ui_chat_log: Annotated[list[UiChatLog], _ui_chat_log_reducer]
+    context: Annotated[dict[str, Any], merge_nested_dict_reducer]
 
 
 class IOKey(BaseModel):
@@ -93,35 +108,41 @@ class IOKey(BaseModel):
     _key_separator: ClassVar[str] = "."
 
     @model_validator(mode="after")
-    def parse_valid_target(self):
+    def parse_valid_target(self) -> Self:
 
-        allowed_targets = HasBaseStateFields.__annotations__.keys()
+        allowed_targets = FlowState.__annotations__.keys()
         if self.target not in allowed_targets:
             raise ValueError(
                 f"Invalid target: {self.target} allowed targets are {allowed_targets}"
             )
 
-        targets_with_subkeys = {
-            t
-            for t, a in HasBaseStateFields.__annotations__.items()
-            if get_origin(a) is dict
-        }
+        targets_with_subkeys: set[str] = set([])
 
-        if (
-            self.target not in targets_with_subkeys
-            and self.subkeys
-            and len(self.subkeys) > 0
-        ):
+        for attribute, annotation in FlowState.__annotations__.items():
+            annontation_type = get_origin(annotation)
+
+            if annontation_type is None:
+                continue
+
+            if annontation_type is dict:
+                targets_with_subkeys.add(attribute)
+            elif (
+                annontation_type is Annotated
+                and get_origin(get_args(annotation)[0]) is dict
+            ):
+                targets_with_subkeys.add(attribute)
+
+        if self.target not in targets_with_subkeys and self.subkeys:
             raise ValueError(f"{self.target} does not support subkeys")
 
         return self
 
     @classmethod
-    def parse_keys(cls, keys: list[str]) -> list["IOKey"]:
+    def parse_keys(cls, keys: list[str]) -> list[Self]:
         return [cls.parse_key(key) for key in keys]
 
     @classmethod
-    def parse_key(cls, key: str) -> "IOKey":
+    def parse_key(cls, key: str) -> Self:
         target, _, remaining = key.partition(cls._target_separator)
 
         if not remaining:
@@ -131,9 +152,9 @@ class IOKey(BaseModel):
 
         return cls(target=target, subkeys=subkeys)
 
-    def read_from_state(self, state: HasBaseStateFields) -> dict[str, Any]:
+    def read_from_state(self, state: FlowState) -> dict[str, Any]:
         current = state[self.target]  # type: ignore[literal-required]
-        if self.subkeys is None or len(self.subkeys) == 0:
+        if not self.subkeys:
             return {self.target: current}
 
         for key in self.subkeys:  # pylint: disable=not-an-iterable
@@ -142,26 +163,10 @@ class IOKey(BaseModel):
         return {self.subkeys[-1]: current}  # pylint: disable=unsubscriptable-object
 
 
-def get_vars_from_state(inputs: list[IOKey], state: T) -> dict[str, Any]:
+def get_vars_from_state(inputs: list[IOKey], state: FlowState) -> dict[str, Any]:
     variables: dict[str, Any] = {}
 
     for inp in inputs:
         variables = merge_nested_dict(variables, inp.read_from_state(state))
 
     return variables
-
-
-def merge_nested_dict_reducer(
-    left: dict[str, Any], right: dict[str, Any]
-) -> dict[str, Any]:
-    """Reducer specifically for nested dictionary fields."""
-    return merge_nested_dict(left or {}, right or {})
-
-
-class FlowState(TypedDict):
-    status: WorkflowStatusEnum
-    conversation_history: Annotated[
-        Dict[str, List[BaseMessage]], _conversation_history_reducer
-    ]
-    ui_chat_log: Annotated[List[UiChatLog], _ui_chat_log_reducer]
-    context: Annotated[dict[str, Any], merge_nested_dict_reducer]

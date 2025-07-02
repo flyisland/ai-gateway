@@ -4,8 +4,8 @@ from pydantic import ValidationError
 
 from duo_workflow_service.agent_platform.experimental.state.state import (
     FlowState,
+    FlowStatusEnum,
     IOKey,
-    WorkflowStatusEnum,
     create_nested_dict,
     get_vars_from_state,
     merge_nested_dict,
@@ -231,7 +231,7 @@ class TestIOKey:
     def test_iokey_read_from_state_simple_target(self):
         """Test reading simple target from state."""
         state: FlowState = {
-            "status": WorkflowStatusEnum.PLANNING,
+            "status": FlowStatusEnum.PLANNING,
             "conversation_history": {},
             "ui_chat_log": [],
             "context": {},
@@ -240,12 +240,12 @@ class TestIOKey:
         io_key = IOKey(target="status")
         result = io_key.read_from_state(state)
 
-        assert result == {"status": WorkflowStatusEnum.PLANNING}
+        assert result == {"status": FlowStatusEnum.PLANNING}
 
     def test_iokey_read_from_state_with_subkeys(self):
         """Test reading nested value using subkeys."""
         state: FlowState = {
-            "status": WorkflowStatusEnum.PLANNING,
+            "status": FlowStatusEnum.PLANNING,
             "conversation_history": {},
             "ui_chat_log": [],
             "context": {"project": {"name": "test-project", "version": "1.0.0"}},
@@ -259,7 +259,7 @@ class TestIOKey:
     def test_iokey_read_from_state_deep_nesting(self):
         """Test reading deeply nested value."""
         state: FlowState = {
-            "status": WorkflowStatusEnum.PLANNING,
+            "status": FlowStatusEnum.PLANNING,
             "conversation_history": {},
             "ui_chat_log": [],
             "context": {
@@ -277,7 +277,7 @@ class TestIOKey:
     def test_iokey_read_from_state_empty_subkeys(self):
         """Test reading with empty subkeys list."""
         state: FlowState = {
-            "status": WorkflowStatusEnum.PLANNING,
+            "status": FlowStatusEnum.PLANNING,
             "conversation_history": {},
             "ui_chat_log": [],
             "context": {"key": "value"},
@@ -291,7 +291,7 @@ class TestIOKey:
     def test_iokey_read_from_state_none_subkeys(self):
         """Test reading with None subkeys."""
         state: FlowState = {
-            "status": WorkflowStatusEnum.PLANNING,
+            "status": FlowStatusEnum.PLANNING,
             "conversation_history": {},
             "ui_chat_log": [],
             "context": {"key": "value"},
@@ -309,7 +309,7 @@ class TestIOKey:
             HumanMessage(content="User input"),
         ]
         state: FlowState = {
-            "status": WorkflowStatusEnum.PLANNING,
+            "status": FlowStatusEnum.PLANNING,
             "conversation_history": {"main": messages},
             "ui_chat_log": [],
             "context": {},
@@ -325,7 +325,7 @@ class TestIOKey:
     def test_iokey_read_from_state_complex_structure(self):
         """Test reading complex nested structure."""
         state: FlowState = {
-            "status": WorkflowStatusEnum.PLANNING,
+            "status": FlowStatusEnum.PLANNING,
             "conversation_history": {},
             "ui_chat_log": [],
             "context": {
@@ -356,7 +356,7 @@ class TestIOKey:
     def test_get_vars_from_state_multiple_keys(self):
         """Test extracting variables from state using multiple IOKeys."""
         state: FlowState = {
-            "status": WorkflowStatusEnum.EXECUTION,
+            "status": FlowStatusEnum.EXECUTION,
             "conversation_history": {"main": [HumanMessage(content="Hello")]},
             "ui_chat_log": [],
             "context": {"project": {"name": "test-project"}, "user": {"id": 123}},
@@ -370,14 +370,14 @@ class TestIOKey:
 
         variables = get_vars_from_state(io_keys, state)
 
-        assert variables["status"] == WorkflowStatusEnum.EXECUTION
+        assert variables["status"] == FlowStatusEnum.EXECUTION
         assert variables["name"] == "test-project"
         assert variables["id"] == 123
 
     def test_get_vars_from_state_overlapping_keys(self):
         """Test extracting variables with overlapping key names."""
         state: FlowState = {
-            "status": WorkflowStatusEnum.EXECUTION,
+            "status": FlowStatusEnum.EXECUTION,
             "conversation_history": {},
             "ui_chat_log": [],
             "context": {
@@ -400,7 +400,7 @@ class TestIOKey:
         """Test edge cases for IOKey functionality."""
         # Test with special characters in keys
         state: FlowState = {
-            "status": WorkflowStatusEnum.PLANNING,
+            "status": FlowStatusEnum.PLANNING,
             "conversation_history": {},
             "ui_chat_log": [],
             "context": {
@@ -602,7 +602,7 @@ class TestIntegration:
         """Test a complete workflow of state manipulation."""
         # Create initial state
         initial_state: FlowState = {
-            "status": WorkflowStatusEnum.NOT_STARTED,
+            "status": FlowStatusEnum.NOT_STARTED,
             "conversation_history": {},
             "ui_chat_log": [],
             "context": {},
@@ -618,7 +618,7 @@ class TestIntegration:
         # Update state
         updated_state = initial_state.copy()
         updated_state["context"] = updated_context
-        updated_state["status"] = WorkflowStatusEnum.PLANNING
+        updated_state["status"] = FlowStatusEnum.PLANNING
 
         # Extract variables
         variables = get_vars_from_state(io_keys, updated_state)
@@ -626,7 +626,7 @@ class TestIntegration:
         # Verify results
         assert variables["step"] == 1
         assert variables["name"] == "initialization"
-        assert updated_state["status"] == WorkflowStatusEnum.PLANNING
+        assert updated_state["status"] == FlowStatusEnum.PLANNING
         assert updated_state["context"]["flow"]["step"] == 1
 
     def test_io_key_parsing_and_variable_extraction(self):
