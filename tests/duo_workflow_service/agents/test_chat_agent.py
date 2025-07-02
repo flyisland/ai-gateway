@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import datetime, timezone
 from unittest.mock import MagicMock, patch
 
 import pytest
@@ -11,16 +11,15 @@ from duo_workflow_service.entities.state import ChatWorkflowState
 from lib.feature_flags import current_feature_flag_context
 
 
+@pytest.fixture
+def mock_datetime(mock_now: datetime):
+    with patch("duo_workflow_service.agents.chat_agent.datetime") as mock:
+        mock.now.return_value = mock_now
+        mock.timezone = timezone
+        yield mock
+
+
 class TestChatAgentPromptTemplate:
-    @pytest.fixture
-    def mock_datetime(self):
-        with patch("duo_workflow_service.agents.chat_agent.datetime") as mock_datetime:
-            mock_now = datetime(2024, 12, 25, 14, 30, 0)
-            mock_datetime_instance = MagicMock()
-            mock_datetime_instance.strftime = mock_now.strftime
-            mock_datetime_instance.astimezone.return_value.tzname.return_value = "UTC"
-            mock_datetime.now.return_value = mock_datetime_instance
-            yield mock_datetime
 
     @pytest.fixture
     def mock_model_config(self):
