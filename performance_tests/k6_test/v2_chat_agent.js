@@ -1,5 +1,6 @@
 import http from 'k6/http';
 import { sleep } from 'k6';
+import { textSummary } from 'https://jslib.k6.io/k6-summary/0.0.1/index.js';
 
 export const TTFB_THRESHOLD= 35;
 export const RPS_THRESHOLD= 1.5;
