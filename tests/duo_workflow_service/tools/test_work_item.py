@@ -122,7 +122,7 @@ def test_validate_parent_url_with_invalid_url(metadata):
         project_id=None,
     )
     assert isinstance(result, str)
-    assert "Failed to parse URL" in result
+    assert "Failed to parse parent work item URL" in result
 
 
 def test_validate_parent_url_with_no_params(metadata):
@@ -200,7 +200,7 @@ def test_validate_work_item_url_with_no_iid(metadata):
     assert "Must provide work_item_iid if no URL is given" in result
 
 
-def test_validate_work_item_url_with_without_work_item_iid(metadata):
+def test_validate_work_item_url_with_invalid_url_without_work_item_iid(metadata):
     tool = GetWorkItem(description="test tool", metadata=metadata)
     result = tool._validate_work_item_url(
         url="https://gitlab.com/invalid-url",
@@ -209,7 +209,7 @@ def test_validate_work_item_url_with_without_work_item_iid(metadata):
         work_item_iid=None,
     )
     assert isinstance(result, str)
-    assert "Must provide work_item_iid if no URL is given" in result
+    assert "URL is not a work item URL" in result
 
 
 @pytest.mark.asyncio
@@ -321,7 +321,7 @@ async def test_get_work_item_with_invalid_url(gitlab_client_mock, metadata):
 
     response_json = json.loads(response)
     assert "error" in response_json
-    assert "Must provide work_item_iid if no URL is given" in response_json["error"]
+    assert "URL is not a work item URL" in response_json["error"]
     gitlab_client_mock.graphql.assert_not_called()
 
 

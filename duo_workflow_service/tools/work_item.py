@@ -65,17 +65,20 @@ class WorkItemBaseTool(DuoBaseTool):
         work_item_iid: Optional[int],
     ) -> Union[ResolvedWorkItem, str]:
         """Resolve work item information from URL or IDs."""
+        if not work_item_iid and not url:
+            return "Must provide work_item_iid if no URL is given"
+
         if url:
             return self._parse_work_item_url(url)
-
-        if not work_item_iid:
-            return "Must provide work_item_iid if no URL is given"
 
         parent = self._validate_parent_url(
             url=None, group_id=group_id, project_id=project_id
         )
         if isinstance(parent, str):
             return parent
+
+        if not work_item_iid:
+            return "Must provide work_item_iid if no URL is given"
 
         return ResolvedWorkItem(parent=parent, work_item_iid=work_item_iid)
 
@@ -171,13 +174,11 @@ class GetWorkItem(WorkItemBaseTool):
     args_schema: Type[BaseModel] = WorkItemResourceInput
 
     async def _arun(self, **kwargs: Any) -> str:
-        url = kwargs.get("url")
-        group_id = kwargs.get("group_id")
-        project_id = kwargs.get("project_id")
-        work_item_iid = kwargs.get("work_item_iid")
-
         resolved = self._validate_work_item_url(
-            url, group_id, project_id, work_item_iid
+            url=kwargs.get("url"),
+            group_id=kwargs.get("group_id"),
+            project_id=kwargs.get("project_id"),
+            work_item_iid=kwargs.get("work_item_iid"),
         )
 
         if isinstance(resolved, str):
