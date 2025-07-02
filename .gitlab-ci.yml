@@ -40,6 +40,12 @@ variables:
   SAST_EXCLUDED_PATHS: "tests, tmp, api"
   CS_IMAGE: $TARGET_IMAGE
 
+  DS_STATIC_REACHABILITY_ENABLED: "true"
+  DS_ENFORCE_NEW_ANALYZER: "true"
+  # Workaround until https://gitlab.com/gitlab-org/gitlab/-/issues/541988 is addressed
+  DS_EXCLUDED_PATHS: "spec, test, tests, tmp, **/requirements.txt"
+  SECURE_LOG_LEVEL: "debug"
+
 include:
   - local: .gitlab/ci/build.gitlab-ci.yml
   - local: .gitlab/ci/lint.gitlab-ci.yml
@@ -48,9 +54,9 @@ include:
   - local: .gitlab/ci/release.gitlab-ci.yml
   - local: .gitlab/ci/ingest.gitlab-ci.yml
   - template: Jobs/Container-Scanning.latest.gitlab-ci.yml
-  - template: Jobs/Dependency-Scanning.latest.gitlab-ci.yml
   - template: Jobs/SAST.latest.gitlab-ci.yml
   - template: Jobs/Secret-Detection.latest.gitlab-ci.yml
+  - template: Jobs/Dependency-Scanning.latest.gitlab-ci.yml
 
   # Includes a base template for running kaniko easily
   # see https://gitlab.com/gitlab-com/gl-infra/common-ci-tasks/-/blob/main/kaniko.md
@@ -79,6 +85,8 @@ include:
   - component: ${CI_SERVER_FQDN}/gitlab-org/components/danger-review/danger-review@2.1.0
     rules:
       - if: $CI_SERVER_HOST == "gitlab.com"
+
+
 
 cache:
   key:
