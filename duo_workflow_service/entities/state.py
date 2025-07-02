@@ -262,6 +262,7 @@ class WorkflowState(TypedDict):
     ui_chat_log: Annotated[List[UiChatLog], _ui_chat_log_reducer]
     handover: List[BaseMessage]
     last_human_input: Union[WorkflowEvent, None]
+    context: dict[str, Any]
 
 
 class ReplacementRule(BaseModel):
@@ -328,3 +329,38 @@ class WorkflowContext(TypedDict):
 
 class Context(TypedDict):
     workflow: WorkflowContext
+
+
+def merge_nested_dict(existing: dict[str, Any], new: dict[str, Any]) -> dict[str, Any]:
+    if not isinstance(existing, dict):
+        existing = {}
+    if not isinstance(new, dict):
+        return new
+
+    result = existing.copy()
+
+    for key, value in new.items():
+        if key in result and isinstance(result[key], dict) and isinstance(value, dict):
+            # Recursively merge nested dictionaries
+            result[key] = merge_nested_dict(result[key], value)
+        else:
+            # Overwrite or add new key-value pair
+            result[key] = value
+
+    return result
+
+
+def merge_nested_dict_reducer(
+    left: dict[str, Any], right: dict[str, Any]
+) -> dict[str, Any]:
+    """Reducer specifically for nested dictionary fields."""
+    return merge_nested_dict(left or {}, right or {})
+
+
+class PoCWorkflowState(TypedDict):
+    status: WorkflowStatusEnum
+    conversation_history: Annotated[
+        dict[str, list[BaseMessage]], _conversation_history_reducer
+    ]
+    ui_chat_log: Annotated[list[UiChatLog], _ui_chat_log_reducer]
+    context: Annotated[dict[str, Any], merge_nested_dict_reducer]

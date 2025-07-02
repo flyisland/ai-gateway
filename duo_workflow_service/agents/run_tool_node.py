@@ -7,6 +7,7 @@ from langchain.tools import BaseTool
 
 from duo_workflow_service.entities import MessageTypeEnum, ToolStatus, UiChatLog
 from duo_workflow_service.entities.state import (
+    PoCWorkflowState,
     SearchAndReplaceWorkflowState,
     ToolInfo,
     WorkflowState,
@@ -35,7 +36,9 @@ class OutputParserProtocol(Protocol[WorkflowStateT_contra]):
     ) -> dict[str, Any]: ...
 
 
-WorkflowStateT = TypeVar("WorkflowStateT", SearchAndReplaceWorkflowState, WorkflowState)
+WorkflowStateT = TypeVar(
+    "WorkflowStateT", SearchAndReplaceWorkflowState, WorkflowState, PoCWorkflowState
+)
 
 
 class RunToolNode(Generic[WorkflowStateT]):

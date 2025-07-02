@@ -1,0 +1,228 @@
+# ====================================================================
+# YAML DSL for Duo Workflow Service Components and Routers Configuration
+# ====================================================================
+#
+# This YAML DSL defines a declarative way to configure workflow components
+# and routers that can be loaded by the _compile method to build workflow graphs.
+#
+# The DSL maps directly to the component constructors defined in:
+# - duo_workflow_service/agent_registry/components/base.py
+#
+# Usage in _compile method:
+# 1. Load this YAML configuration
+# 2. Parse components and routers sections
+# 3. Instantiate components using the configurations
+# 4. Build the graph using router definitions
+# 5. Set entry point and compile
+#
+# ====================================================================
+
+# ====================================================================
+# COMPONENTS SECTION
+# ====================================================================
+# Define all workflow components with their type-specific configurations
+# Each component maps to a class constructor from base.py
+# Components are now defined as an array with explicit 'name' attributes
+# to help detect non-unique component names
+
+components:
+  # ================================================================
+  # AgentComponent Configuration
+  # ================================================================
+  # Maps to: AgentComponent(name, workflow_id, workflow_type, prompt_id,
+  #                        prompt_version, toolset, inputs?, output?, output_type?)
+
+  - name: "agent"
+    type: AgentComponent
+
+    # Required fields
+    prompt_id: "agents/awesome"               # Prompt identifier for the LLM
+    prompt_version: "^1.0.0"                 # Semantic version constraint
+    toolset: "chat_tools"                    # Reference to toolset (defined separately)
+
+    # Optional fields
+    inputs:                                 # List of input context paths
+      - "first.task"                        # Context path: context["first"]["task"]
+    output: "answer"                        # Output key in component context
+    output_type: "AgentFinalOutput"         # Pydantic model for structured output
+
+    # tools assignment (optional)
+    toolset:
+      - "list_issues"
+      - "get_issue"
+      - "list_issue_notes"
+      - "get_issue_note"
+      - "get_job_logs"
+      - "get_merge_request"
+      - "get_pipeline_errors"
+      - "get_project"
+      - "run_read_only_git_command"
+      - "list_all_merge_request_notes"
+      - "list_merge_request_diffs"
+      - "gitlab_issue_search"
+      - "gitlab_merge_request_search"
+      - "read_file"
+      - "list_dir"
+      - "find_files"
+      - "grep"
+      - "get_epic"
+      - "list_epics"
+      - "scan_directory_tree"
+      - "list_epic_notes"
+      - "get_epic_note"
+      - "get_commit"
+      - "list_commits"
+      - "get_commit_comments"
+      - "get_commit_diff"
+      - "create_file_with_contents"
+      - "edit_file"
+      - "mkdir"
+
+    # Validation: if output_type is specified, output must also be specified
+
+  # ================================================================
+  # HiltChatBackComponent Configuration
+  # ================================================================
+  # Maps to: HiltChatBackComponent(name, workflow_id, workflow_type, inputs?, output?)
+
+  - name: "hilt"
+    type: HiltChatBackComponent
+
+    # Optional fields
+    inputs:
+      - "conversation_history.agent"        # Reference to agent's conversation history
+    output: "agent"                         # Output key - will store human input
+
+  # ================================================================
+  # EndComponent Configuration
+  # ================================================================
+  # Maps to: EndComponent(name, workflow_id, workflow_type, inputs?, output?)
+
+  - name: "end"
+    type: EndComponent
+    # No additional configuration needed - inherits base fields only
+
+  # ================================================================
+  # HiltComponent Configuration (Example)
+  # ================================================================
+  # Maps to: HiltComponent(name, workflow_id, workflow_type, human_prompt, inputs?, output?)
+
+  - name: "human_input_example"
+    type: HiltComponent
+
+    # Required fields
+    human_prompt: "Please provide additional information:"
+
+    # Optional fields
+    inputs:
+      - "agent.answer"
+    output: "user_feedback"
+
+# ====================================================================
+# ROUTERS SECTION
+# ====================================================================
+# Define workflow routing logic - how components connect to each other
+# Each router maps to: Router(from_component, to_component, input?)
+
+routers:
+  # ================================================================
+  # Simple Unconditional Router
+  # ================================================================
+  # Maps to: Router(from_component=agent_component, to_component=hilt_component)
+
+  - from: "agent"
+    to: "hilt"
+    # No 'condition' field means unconditional routing
+
+  # ================================================================
+  # Conditional Router with Status-based Routing
+  # ================================================================
+  # Maps to: Router(from_component=hilt_component, input="status",
+  #                to_component={EXECUTION: agent_component, DEFAULT_ROUTE: end_component})
+
+  - from: "hilt"
+    condition:
+      input: "status"                       # Context path to evaluate for routing
+      routes:
+        "EXECUTION": "agent"                # If status == "EXECUTION", route to agent
+        "default_route": "end"              # Default fallback route (uses DEFAULT_ROUTE constant)
+
+
+
+# ====================================================================
+# WORKFLOW FLOW DEFINITION
+# ====================================================================
+# Define the entry point and overall flow structure
+
+flow:
+  entry_point: "agent"                      # Component to start workflow execution
+
+
+# ====================================================================
+# EXAMPLE: Complete Issue-to-MR Workflow Configuration
+# ====================================================================
+# This section shows how the current _compile method would be represented
+
+example_issue_to_mr_workflow:
+  components:
+    - name: "agent"
+      type: AgentComponent
+      prompt_id: "agents/awesome"
+      prompt_version: "^1.0.0"
+      inputs: ["context:task"]
+      output_type: "AgentFinalOutput"
+      output: "context:agent.answer"
+      ui_log_events:
+        llm: true
+        tools: ["on_execution_success"]
+      toolset:
+        - "list_issues"
+        - "get_issue"
+        - "list_issue_notes"
+        - "get_issue_note"
+        - "get_job_logs"
+        - "get_merge_request"
+        - "get_pipeline_errors"
+        - "get_project"
+        - "run_read_only_git_command"
+        - "list_all_merge_request_notes"
+        - "list_merge_request_diffs"
+        - "gitlab_issue_search"
+        - "gitlab_merge_request_search"
+        - "read_file"
+        - "list_dir"
+        - "find_files"
+        - "grep"
+        - "get_epic"
+        - "list_epics"
+        - "scan_directory_tree"
+        - "list_epic_notes"
+        - "get_epic_note"
+        - "get_commit"
+        - "list_commits"
+        - "get_commit_comments"
+        - "get_commit_diff"
+        - "create_file_with_contents"
+        - "edit_file"
+        - "mkdir"
+
+    - name: "hilt"
+      type: HiltChatBackComponent
+      output: "conversation_history:agent"
+
+    - name: "end"
+      type: EndComponent
+
+  routers:
+    - from: "agent"
+      to: "hilt"
+
+    - from: "hilt"
+      condition:
+        input: "status"
+        routes:
+          "Execution": "agent"
+          "default_route": "end"
+
+  flow:
+    entry_point: "agent"
