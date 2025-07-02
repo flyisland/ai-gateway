@@ -469,6 +469,43 @@ async def test_adding_ai_context_to_ui_chat_logs(
             "tool_calls": [
                 {
                     "id": "1",
+                    "name": "create_plan",
+                    "args": {
+                        "tasks": ["Task 1", "Task 2", "Task 3"],
+                    },
+                },
+                {
+                    "id": "2",
+                    "name": "create_plan",
+                    "args": {
+                        "tasks": ["Task 4", "Task 5"],
+                    },
+                },
+            ],
+            "tools_response": [
+                ToolMessage(
+                    content="Plan created", name="create_plan", tool_call_id="1"
+                ),
+                ToolMessage(
+                    content="Plan created", name="create_plan", tool_call_id="2"
+                ),
+            ],
+            "expected_plan": {
+                "steps": [
+                    {"id": "task-0", "description": "Task 4", "status": "Not Started"},
+                    {"id": "task-1", "description": "Task 5", "status": "Not Started"},
+                ]
+            },
+            "expected_log_content": [
+                "Create plan with 3 tasks",
+                "Create plan with 2 tasks",
+            ],
+        },
+        {
+            "plan": {"steps": []},
+            "tool_calls": [
+                {
+                    "id": "1",
                     "name": "update_task_description",
                     "args": {
                         "task_id": "1",

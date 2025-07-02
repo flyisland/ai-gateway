@@ -73,7 +73,11 @@ def test_get_plan(tool: GetPlan, plan_steps: list[Task]):
 
 
 def assert_update(
-    tool: PlannerTool, result: Any, expected_message: str, expected_steps: list[Task]
+    tool: PlannerTool,
+    result: Any,
+    expected_message: str,
+    expected_steps: list[Task],
+    reset: bool = False,
 ):
     result = cast(Command, result).update
 
@@ -81,6 +85,7 @@ def assert_update(
         ToolMessage(name=tool.name, tool_call_id="1", content=expected_message)
     ]
     assert result["plan"]["steps"] == expected_steps
+    assert result["plan"].get("reset", False) == reset
 
 
 @pytest.mark.parametrize("tool_class", [SetTaskStatus])
@@ -281,6 +286,7 @@ def test_create_plan(tool: CreatePlan):
             Task(id="task-1", description="Task 2", status=TaskStatus.NOT_STARTED),
             Task(id="task-2", description="Task 3", status=TaskStatus.NOT_STARTED),
         ],
+        reset=True,
     )
 
 

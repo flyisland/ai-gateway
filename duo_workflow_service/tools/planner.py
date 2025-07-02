@@ -66,7 +66,7 @@ class PlannerTool(DuoBaseTool):
     def tools_agent_name(self, tools_agent_name: str):
         self._tools_agent_name = tools_agent_name
 
-    def _command(self, steps: List[Task], tool_message: str):
+    def _command(self, steps: List[Task], tool_message: str, reset: bool = False):
         return LangGraphCommand(
             update={
                 "conversation_history": {
@@ -78,7 +78,7 @@ class PlannerTool(DuoBaseTool):
                         )
                     ],
                 },
-                "plan": Plan(steps=steps),
+                "plan": Plan(steps=steps, reset=reset),
             }
         )
 
@@ -247,7 +247,7 @@ class CreatePlan(PlannerTool):
                 )
             )
 
-        return self._command(steps, "Plan created")
+        return self._command(steps, "Plan created", reset=True)
 
     def format_display_message(self, args: CreatePlanInput) -> str:
         return f"Create plan with {len(args.tasks)} tasks"

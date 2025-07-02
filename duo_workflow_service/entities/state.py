@@ -43,6 +43,7 @@ class Task(TypedDict):
 
 class Plan(TypedDict):
     steps: List[Task]
+    reset: NotRequired[bool]  # Used in updates to discard previous steps
 
 
 class WorkflowStatusEnum(StrEnum):
@@ -119,6 +120,11 @@ def _plan_reducer(current: Plan, new: Optional[Plan]) -> Plan:
 
     if current is None or "steps" not in current:
         current = Plan(steps=[])
+
+    # Discard existing steps if asked to reset
+    if new.get("reset"):
+        current["steps"] = new["steps"]
+        return current
 
     for step in new["steps"]:
         # Find existing step with same id
