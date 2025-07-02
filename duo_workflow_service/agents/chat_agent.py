@@ -46,6 +46,7 @@ class ChatAgentPromptTemplate(Runnable[ChatWorkflowState, PromptValue]):
         messages: list[BaseMessage] = []
         agent_name = _kwargs["agent_name"]
         project: Project | None = input.get("project")
+        project_languages: dict | None = input.get("project_languages")
 
         # Handle system messages with static and dynamic parts
         # Create separate system messages for static and dynamic parts
@@ -72,6 +73,11 @@ class ChatAgentPromptTemplate(Runnable[ChatWorkflowState, PromptValue]):
                 current_time=datetime.now().strftime("%H:%M:%S"),
                 current_timezone=datetime.now().astimezone().tzname(),
                 project=project,
+                project_languages=(
+                    ", ".join(project_languages.keys())
+                    if project_languages is not None
+                    else "Unknown"
+                ),
             )
             messages.append(SystemMessage(content=dynamic_content))
 

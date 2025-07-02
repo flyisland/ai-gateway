@@ -29,10 +29,8 @@ from duo_workflow_service.checkpointer.notifier import UserInterface
 from duo_workflow_service.components import ToolsRegistry
 from duo_workflow_service.entities import DuoWorkflowStateType
 from duo_workflow_service.gitlab.events import get_event
-from duo_workflow_service.gitlab.gitlab_project import (
-    Project,
-    fetch_project_data_with_workflow_id,
-)
+from duo_workflow_service.gitlab.gitlab_project import Project, fetch_project_data
+from duo_workflow_service.gitlab.gitlab_workflow_params import fetch_workflow_config
 from duo_workflow_service.gitlab.http_client import GitlabHttpClient
 from duo_workflow_service.gitlab.http_client_factory import get_http_client
 from duo_workflow_service.gitlab.url_parser import GitLabUrlParser
@@ -194,12 +192,25 @@ class AbstractWorkflow(ABC):
         }
         compiled_graph = None
         try:
-            self._project, self._workflow_config = (
-                await fetch_project_data_with_workflow_id(
-                    client=self._http_client,
-                    workflow_id=self._workflow_id,
-                )
+            self._workflow_config = await fetch_workflow_config(
+                self._http_client, self._workflow_id
             )
+
+            if not (
+                isinstance(self._workflow_config, dict)
+                and "project_id" in self._workflow_config
+            ):
+                raise Exception("Failed to retrieve project ID")
+
+            project_id = self._workflow_config["project_id"]
+            self._project, workflow_specific_data = await asyncio.gather(
+                fetch_project_data(client=self._http_client, project_id=project_id),
+                self.fetch_workflow_specific_data(project_id),
+            )
+
+            # Merge workflow_specific_data into the workflow instance
+            for key, value in workflow_specific_data.items():
+                setattr(self, key, value)
 
             if "web_url" not in self._project:
                 raise RuntimeError(
@@ -283,6 +294,18 @@ class AbstractWorkflow(ABC):
     @abstractmethod
     def get_workflow_state(self, goal: str) -> DuoWorkflowStateType:
         pass
+
+    async def fetch_workflow_specific_data(self, project_id: int) -> dict[str, Any]:
+        """Fetch workflow-specific data that each subclass may need.
+
+        Args:
+            project_id: The project ID to fetch data for
+
+        Returns:
+            Dictionary containing workflow-specific data that will be merged
+            with the base project data
+        """
+        return {}
 
     async def cleanup(self, workflow_id: str):
         try:

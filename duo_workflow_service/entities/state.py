@@ -351,6 +351,7 @@ class ChatWorkflowState(TypedDict):
     context_elements: List[ContextElement]
     project: Project | None
     approval: ApprovalStateRejection | None
+    project_languages: dict | None
 
 
 DuoWorkflowStateType = Union[

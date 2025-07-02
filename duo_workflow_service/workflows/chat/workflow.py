@@ -20,6 +20,7 @@ from duo_workflow_service.entities.state import (
     UiChatLog,
     WorkflowStatusEnum,
 )
+from duo_workflow_service.gitlab.gitlab_project import fetch_project_languages
 from duo_workflow_service.tracking.errors import log_exception
 from duo_workflow_service.workflows.abstract_workflow import AbstractWorkflow
 from lib.feature_flags.context import FeatureFlag, is_feature_enabled
@@ -93,6 +94,7 @@ CHAT_MUTATION_TOOLS = [
 class Workflow(AbstractWorkflow):
     _stream: bool = True
     _agent: ChatAgent
+    _project_languages: dict[str, Any]
 
     def _are_tools_called(self, state: ChatWorkflowState) -> Routes:
         if state["status"] in [WorkflowStatusEnum.CANCELLED, WorkflowStatusEnum.ERROR]:
@@ -141,6 +143,7 @@ class Workflow(AbstractWorkflow):
             context_elements=contextElements,
             project=self._project,
             approval=None,
+            project_languages=self._project_languages,
         )
 
     async def get_graph_input(self, goal: str, status_event: str) -> Any:
@@ -247,6 +250,12 @@ class Workflow(AbstractWorkflow):
             available_tools += [tool.name for tool in self._additional_tools]
 
         return available_tools
+
+    async def fetch_workflow_specific_data(self, project_id: int) -> dict[str, Any]:
+        project_languages = await fetch_project_languages(
+            client=self._http_client, project_id=project_id
+        )
+        return {"_project_languages": project_languages}
 
     async def _handle_workflow_failure(
         self, error: BaseException, compiled_graph: Any, graph_config: Any
