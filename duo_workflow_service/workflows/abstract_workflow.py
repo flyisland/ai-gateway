@@ -25,6 +25,8 @@ from duo_workflow_service.checkpointer.gitlab_workflow import (
     GitLabWorkflow,
     WorkflowStatusEventEnum,
 )
+from duo_workflow_service.checkpointer.async_queue_checkpointer import AsyncQueueCheckpointer
+from duo_workflow_service.checkpointer.background_queue_processor import BackgroundQueueProcessor
 from duo_workflow_service.checkpointer.notifier import UserInterface
 from duo_workflow_service.components import ToolsRegistry
 from duo_workflow_service.entities import DuoWorkflowStateType
@@ -84,6 +86,8 @@ class AbstractWorkflow(ABC):
     _additional_tools: list[Type[BaseTool]]
     _approval: Optional[contract_pb2.Approval]
     _prompt_registry: LocalPromptRegistry
+    _checkpointer_outbox: asyncio.Queue
+    _background_processor: Optional[BackgroundQueueProcessor] = None
 
     @inject
     def __init__(
@@ -125,6 +129,8 @@ class AbstractWorkflow(ABC):
         self._model_config = self._get_model_config()
         self._approval = approval
         self._prompt_registry = prompt_registry
+        self._checkpointer_outbox = asyncio.Queue()
+        self._background_processor = None
 
     async def run(self, goal: str) -> None:
         with duo_workflow_metrics.time_workflow(
@@ -234,36 +240,92 @@ class AbstractWorkflow(ABC):
                 outbox=self._streaming_outbox, goal=goal
             )
 
-            async with GitLabWorkflow(
-                self._http_client, self._workflow_id, self._workflow_type
-            ) as checkpointer:
-                status_event = getattr(checkpointer, "initial_status_event", None)
-                if not status_event:
-                    checkpoint_tuple = await checkpointer.aget_tuple(graph_config)
-                    status_event = (
-                        "" if checkpoint_tuple else WorkflowStatusEventEnum.START
-                    )
-
-                compiled_graph = self._compile(goal, tools_registry, checkpointer)
-                graph_input = await self.get_graph_input(goal, status_event)
-
-                async for type, state in compiled_graph.astream(
-                    input=graph_input,
-                    config=graph_config,
-                    stream_mode=["values", "messages", "updates"],
-                ):
-                    if type == "updates":
-                        for step in state:
-                            self.log.info(f"step: {step}")
-                    else:
-                        await checkpoint_notifier.send_event(
-                            type=type, state=state, stream=self._stream
+            # Use async queue checkpointer if enabled
+            use_async_checkpointer = self._should_use_async_checkpointer()
+            
+            if use_async_checkpointer:
+                # Start background processor for completely non-blocking operations
+                self._background_processor = BackgroundQueueProcessor(self._http_client)
+                await self._background_processor.start_processing(self._checkpointer_outbox)
+                
+                self.log.info(
+                    "Using async queue checkpointer with background processing",
+                    workflow_id=self._workflow_id,
+                    workflow_type=self._workflow_type.value,
+                )
+                
+                async with AsyncQueueCheckpointer(
+                    self._http_client, self._workflow_id, self._workflow_type, self._checkpointer_outbox
+                ) as checkpointer:
+                    status_event = getattr(checkpointer, "initial_status_event", None)
+                    if not status_event:
+                        checkpoint_tuple = await checkpointer.aget_tuple(graph_config)
+                        status_event = (
+                            "" if checkpoint_tuple else WorkflowStatusEventEnum.START
                         )
+
+                    compiled_graph = self._compile(goal, tools_registry, checkpointer)
+                    graph_input = await self.get_graph_input(goal, status_event)
+
+                    async for type, state in compiled_graph.astream(
+                        input=graph_input,
+                        config=graph_config,
+                        stream_mode=["values", "messages", "updates"],
+                    ):
+                        if type == "updates":
+                            for step in state:
+                                self.log.info(f"step: {step}")
+                        else:
+                            await checkpoint_notifier.send_event(
+                                type=type, state=state, stream=self._stream
+                            )
+            else:
+                self.log.info(
+                    "Using synchronous GitLab workflow checkpointer",
+                    workflow_id=self._workflow_id,
+                    workflow_type=self._workflow_type.value,
+                )
+                
+                async with GitLabWorkflow(
+                    self._http_client, self._workflow_id, self._workflow_type
+                ) as checkpointer:
+                    status_event = getattr(checkpointer, "initial_status_event", None)
+                    if not status_event:
+                        checkpoint_tuple = await checkpointer.aget_tuple(graph_config)
+                        status_event = (
+                            "" if checkpoint_tuple else WorkflowStatusEventEnum.START
+                        )
+
+                    compiled_graph = self._compile(goal, tools_registry, checkpointer)
+                    graph_input = await self.get_graph_input(goal, status_event)
+
+                    async for type, state in compiled_graph.astream(
+                        input=graph_input,
+                        config=graph_config,
+                        stream_mode=["values", "messages", "updates"],
+                    ):
+                        if type == "updates":
+                            for step in state:
+                                self.log.info(f"step: {step}")
+                        else:
+                            await checkpoint_notifier.send_event(
+                                type=type, state=state, stream=self._stream
+                            )
 
         except BaseException as e:
             await self._handle_workflow_failure(e, compiled_graph, graph_config)
             raise TraceableException(e)
         finally:
+            # Stop background processor gracefully
+            if self._background_processor:
+                stats = self._background_processor.get_stats()
+                self.log.info(
+                    "Stopping background queue processor",
+                    **stats,
+                    workflow_id=self._workflow_id,
+                )
+                await self._background_processor.stop_processing()
+            
             # Wait until outbox is checked to gracefully stop a workflow
             await asyncio.sleep(self.OUTBOX_CHECK_INTERVAL * 2)
             self.is_done = True
@@ -383,6 +445,30 @@ class AbstractWorkflow(ABC):
             )
 
         return AnthropicConfig(model_name=KindAnthropicModel.CLAUDE_SONNET_4.value)
+
+    def _should_use_async_checkpointer(self) -> bool:
+        """
+        Determine whether to use the async queue checkpointer.
+        
+        Returns True if:
+        1. Environment variable ASYNC_QUEUE_CHECKPOINTER is set to 'true'
+        2. OR workflow config has 'async_checkpointer' set to True
+        3. OR this is a chat workflow (default async for chat)
+        """
+        # Check environment variable
+        env_setting = os.getenv("ASYNC_QUEUE_CHECKPOINTER", "").lower()
+        if env_setting == "true":
+            return True
+            
+        # Check workflow configuration
+        if self._workflow_config.get("async_checkpointer", False):
+            return True
+            
+        # Default to async for chat workflows (they benefit most from non-blocking saves)
+        if self._workflow_type == CategoryEnum.WORKFLOW_CHAT:
+            return True
+            
+        return False
 
 
 TypeWorkflow = type[AbstractWorkflow]

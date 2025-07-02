@@ -1,4 +1,5 @@
 import json
+from collections import deque
 from typing import Any
 
 from langchain_core.messages import AIMessage, HumanMessage, SystemMessage, ToolMessage
@@ -37,4 +38,6 @@ class CustomEncoder(json.JSONEncoder):
             data = o.model_dump()
             data.update({"type": o.__class__.__name__})
             return data
+        if isinstance(o, deque):
+            return list(o)
         return super().default(o)
