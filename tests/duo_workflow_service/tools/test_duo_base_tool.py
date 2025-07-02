@@ -152,4 +152,7 @@ def test_format_tool_display_message_for_tool_with_args_schema_when_error():
     result = format_tool_display_message(mock_tool, args)
 
     assert result == "Tool msg"
-    mock_tool.format_display_message.assert_called_once_with(DuoBaseTool, args)
+    mock_tool.format_display_message.assert_called_once_with(args)
+
+    call_args = mock_tool.format_display_message.call_args
+    assert len(call_args.args) == 1
