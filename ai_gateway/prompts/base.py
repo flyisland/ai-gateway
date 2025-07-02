@@ -106,7 +106,7 @@ class Prompt(RunnableBinding[Input, Output]):
         )
         if tools and isinstance(model, BaseChatModel):
             model = model.bind_tools(tools)  # type: ignore[assignment]
-        prompt = self._build_prompt_template(config.prompt_template, config.model)
+        prompt = self._build_prompt_template(config)
         chain = self._build_chain(
             cast(
                 Runnable[Input, Output],
@@ -284,13 +284,11 @@ class Prompt(RunnableBinding[Input, Output]):
 
     @classmethod
     def _build_prompt_template(
-        cls,
-        prompt_template: dict[str, str],
-        model_config: ModelConfig,  # pylint: disable=unused-argument
+        cls, config: PromptConfig
     ) -> Runnable[Input, PromptValue]:
         messages = []
 
-        for role, template in cls._prompt_template_to_messages(prompt_template):
+        for role, template in cls._prompt_template_to_messages(config.prompt_template):
             messages.append((role, template))
 
         return cast(
