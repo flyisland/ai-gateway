@@ -213,7 +213,7 @@ def test_validate_work_item_url_with_invalid_url_without_work_item_iid(metadata)
         work_item_iid=None,
     )
     assert isinstance(result, str)
-    assert "URL is not a work item URL" in result
+    assert "Failed to parse work item URL" in result
 
 
 @pytest.mark.asyncio
@@ -311,7 +311,7 @@ async def test_list_work_items_with_invalid_url(gitlab_client_mock, metadata):
     response_json = json.loads(response)
     assert "error" in response_json
     assert (
-        "Failed to parse URL: URL netloc 'example.com' does not match gitlab_host 'gitlab.com'"
+        "Failed to parse parent work item URL: URL netloc 'example.com' does not match gitlab_host 'gitlab.com'"
         in response_json["error"]
     )
     gitlab_client_mock.graphql.assert_not_called()
@@ -708,7 +708,7 @@ async def test_get_work_item_notes_with_invalid_url(gitlab_client_mock, metadata
 
     response_json = json.loads(response)
     assert "error" in response_json
-    assert "Must provide work_item_iid if no URL is given" in response_json["error"]
+    assert "URL is not a work item URL" in response_json["error"]
     gitlab_client_mock.graphql.assert_not_called()
 
 
