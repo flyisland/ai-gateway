@@ -2,7 +2,7 @@ import pytest
 from langchain_core.messages import HumanMessage, SystemMessage
 from pydantic import ValidationError
 
-from duo_workflow_service.agent_platform.experimental.state.state import (
+from duo_workflow_service.agent_platform.experimental.state import (
     FlowState,
     FlowStatusEnum,
     IOKey,
