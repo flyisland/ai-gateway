@@ -168,7 +168,7 @@ query ListProjectWorkItems($fullPath: ID!, $state: IssuableState, $search: Strin
         }
     }
 }
- """
+"""
 
 GET_PROJECT_WORK_ITEM_NOTES_QUERY = """
 query GetProjectWorkItemNotes($fullPath: ID!, $workItemIid: String!) {
