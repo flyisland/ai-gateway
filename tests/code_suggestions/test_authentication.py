@@ -378,8 +378,8 @@ invalid_authentication_token_type_error = {
             {
                 "Authorization": "Bearer 12345",
                 "X-Gitlab-Authentication-Type": "oidc",
-                "X-Gitlab-Instance-Id": "mismatch",
-                "X-Gitlab-Realm": "self-managed",
+                "X-GitLab-Instance-Id": "mismatch",
+                "X-GitLab-Realm": "self-managed",
             },
             None,
             200,
