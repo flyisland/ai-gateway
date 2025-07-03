@@ -20,10 +20,10 @@ PARENT_IDENTIFICATION_DESCRIPTION = """To identify the parent (group or project)
 - group_id parameter, or
 - project_id parameter, or
 - A GitLab URL like:
-  - https://gitlab.com/namespace/group
-  - https://gitlab.com/groups/namespace/group
-  - https://gitlab.com/namespace/project
-  - https://gitlab.com/namespace/group/project
+    - https://gitlab.com/namespace/group
+    - https://gitlab.com/groups/namespace/group
+    - https://gitlab.com/namespace/project
+    - https://gitlab.com/namespace/group/project
 """
 
 
