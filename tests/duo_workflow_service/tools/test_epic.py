@@ -1053,10 +1053,10 @@ async def test_update_epic_with_url_error(
 @pytest.mark.parametrize(
     "sort,order_by,expected_variables",
     [
-        (None, None, {"fullPath": "namespace%2Fgroup", "workItemIid": "123"}),
-        ("asc", None, {"fullPath": "namespace%2Fgroup", "workItemIid": "123"}),
-        ("desc", "created_at", {"fullPath": "namespace%2Fgroup", "workItemIid": "123"}),
-        (None, "updated_at", {"fullPath": "namespace%2Fgroup", "workItemIid": "123"}),
+        (None, None, {"fullPath": "namespace%2Fgroup", "epicIid": "123"}),
+        ("asc", None, {"fullPath": "namespace%2Fgroup", "epicIid": "123"}),
+        ("desc", "created_at", {"fullPath": "namespace%2Fgroup", "epicIid": "123"}),
+        (None, "updated_at", {"fullPath": "namespace%2Fgroup", "epicIid": "123"}),
     ],
 )
 async def test_list_epic_notes(
@@ -1064,29 +1064,26 @@ async def test_list_epic_notes(
 ):
     mock_response = {
         "namespace": {
-            "workItems": {
-                "nodes": [
+            "workItem": {
+                "widgets": [
                     {
-                        "widgets": [
-                            {
-                                "notes": {
-                                    "nodes": [
-                                        {
-                                            "id": "gid://gitlab/Note/1",
-                                            "body": "Epic Note 1",
-                                            "author": {"username": "user1"},
-                                            "createdAt": "2025-01-01T12:00:00Z",
-                                        },
-                                        {
-                                            "id": "gid://gitlab/Note/2",
-                                            "body": "Epic Note 2",
-                                            "author": {"username": "user2"},
-                                            "createdAt": "2025-01-02T12:00:00Z",
-                                        },
-                                    ]
-                                }
-                            }
-                        ]
+                        "type": "NOTES",
+                        "notes": {
+                            "nodes": [
+                                {
+                                    "id": "gid://gitlab/Note/1",
+                                    "body": "Epic Note 1",
+                                    "author": {"username": "user1"},
+                                    "createdAt": "2025-01-01T12:00:00Z",
+                                },
+                                {
+                                    "id": "gid://gitlab/Note/2",
+                                    "body": "Epic Note 2",
+                                    "author": {"username": "user2"},
+                                    "createdAt": "2025-01-02T12:00:00Z",
+                                },
+                            ]
+                        },
                     }
                 ]
             }
@@ -1121,25 +1118,7 @@ async def test_list_epic_notes(
     gitlab_client_mock.graphql.assert_called_once()
     call_args = gitlab_client_mock.graphql.call_args
     assert call_args[0][1] == expected_variables
-    assert "query GetGroupWorkItem" in call_args[0][0]
-
-
-@pytest.mark.asyncio
-async def test_list_epic_notes_with_no_widgets(gitlab_client_mock, metadata):
-    graphql_response = {"namespace": {"workItems": {"nodes": [{"widgets": []}]}}}
-
-    gitlab_client_mock.graphql = AsyncMock(return_value=graphql_response)
-
-    tool = ListEpicNotes(description="list epic notes description", metadata=metadata)
-
-    response = await tool._arun(group_id="namespace%2Fgroup", epic_iid=42)
-
-    expected_response = json.dumps({"notes": []})
-    assert response == expected_response
-
-    gitlab_client_mock.graphql.assert_called_once()
-    call_args = gitlab_client_mock.graphql.call_args
-    assert call_args[0][1] == {"fullPath": "namespace%2Fgroup", "workItemIid": "42"}
+    assert "query GetEpicNotes" in call_args[0][0]
 
 
 @pytest.mark.asyncio
@@ -1155,7 +1134,7 @@ async def test_list_epic_notes_error(gitlab_client_mock, metadata):
 
     gitlab_client_mock.graphql.assert_called_once()
     call_args = gitlab_client_mock.graphql.call_args
-    assert call_args[0][1] == {"fullPath": "namespace%2Fgroup", "workItemIid": "999"}
+    assert call_args[0][1] == {"fullPath": "namespace%2Fgroup", "epicIid": "999"}
 
 
 def test_list_epic_notes_format_display_message():
@@ -1175,7 +1154,7 @@ def test_list_epic_notes_format_display_message():
     [
         (
             "https://gitlab.com/groups/namespace/group/-/epics/123",
-            {"fullPath": "namespace%2Fgroup", "workItemIid": "123"},
+            {"fullPath": "namespace%2Fgroup", "epicIid": "123"},
         ),
     ],
 )
@@ -1184,23 +1163,20 @@ async def test_list_epic_notes_with_url_success(
 ):
     mock_graphql_response = {
         "namespace": {
-            "workItems": {
-                "nodes": [
+            "workItem": {
+                "widgets": [
                     {
-                        "widgets": [
-                            {
-                                "notes": {
-                                    "nodes": [
-                                        {
-                                            "id": "gid://gitlab/Note/1",
-                                            "body": "Epic Note 1",
-                                            "author": {"username": "user1"},
-                                            "createdAt": "2025-01-01T12:00:00Z",
-                                        }
-                                    ]
+                        "type": "NOTES",
+                        "notes": {
+                            "nodes": [
+                                {
+                                    "id": "gid://gitlab/Note/1",
+                                    "body": "Epic Note 1",
+                                    "author": {"username": "user1"},
+                                    "createdAt": "2025-01-01T12:00:00Z",
                                 }
-                            }
-                        ]
+                            ]
+                        },
                     }
                 ]
             }
