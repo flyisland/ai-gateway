@@ -123,7 +123,7 @@ def test_default_with_approval_state():
 
 def test_default_with_additional_context():
     encoder = CustomEncoder()
-    additional_context = AdditionalContext(
+    o = AdditionalContext(
         category="merge_request",
         id="12345",
         content="This is the merge request content",
@@ -132,9 +132,9 @@ def test_default_with_additional_context():
             "state": "open",
         },
     )
-    encoded_context = encoder.default(additional_context)
-    assert encoded_context == {
-        "type": "AdditionalContext",
+
+    encoded_additional_context = encoder.default(o)
+    assert encoded_additional_context == {
         "category": "merge_request",
         "id": "12345",
         "content": "This is the merge request content",
@@ -142,4 +142,5 @@ def test_default_with_additional_context():
             "url": "https://gitlab.com/repo/merge_requests/12345",
             "state": "open",
         },
+        "type": "AdditionalContext",
     }
