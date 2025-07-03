@@ -146,13 +146,17 @@ def test_format_tool_display_message_for_tool_with_pydantic_args_schema():
 def test_format_tool_display_message_for_tool_with_args_schema_when_error():
     mock_tool = MagicMock(spec=DuoBaseTool)
     mock_tool.args_schema = ErrorArgsModel
-    mock_tool.format_display_message.return_value = "Tool msg"
     args = {"test": "value"}
 
-    result = format_tool_display_message(mock_tool, args)
+    with patch.object(
+        DuoBaseTool,
+        "format_display_message",
+        return_value="Using MagicMock: test=value",
+    ) as mock_parent_method:
 
-    assert result == "Tool msg"
-    mock_tool.format_display_message.assert_called_once_with(args)
+        result = format_tool_display_message(mock_tool, args)
+        assert result == "Using MagicMock: test=value"
 
-    call_args = mock_tool.format_display_message.call_args
-    assert len(call_args.args) == 1
+        mock_parent_method.assert_called_once_with(mock_tool, args)
+
+        mock_tool.format_display_message.assert_not_called()
