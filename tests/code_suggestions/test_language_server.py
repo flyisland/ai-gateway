@@ -51,6 +51,4 @@ class TestLanguageServer:
     ):
         subject = LanguageServerVersion.from_string(semver)
         assert subject.version == expected_version
-        assert (
-            subject.supports_node_executor_tools() == supports_node_executor_tools
-        )
+        assert subject.supports_node_executor_tools() == supports_node_executor_tools

@@ -17,6 +17,7 @@ from duo_workflow_service.components.tools_registry import (
     ToolsRegistry,
 )
 from duo_workflow_service.gitlab.http_client import GitlabHttpClient
+from duo_workflow_service.tools.work_item import GetWorkItem
 from lib.feature_flags import current_feature_flag_context
 
 
@@ -652,15 +653,18 @@ def test_work_item_tools_feature_flag(
 
 @pytest.mark.asyncio
 @pytest.mark.parametrize(
-    "lsp_version",
+    "lsp_version,feature_flags,ff_disabled_tools",
     [
-        "0.0.1",
-        "7.42.999",
+        ("0.0.1", "", {}),
+        ("0.0.1", "duo_workflow_work_item_tools", {GetWorkItem}),
+        ("7.42.999", "", {}),
+        ("7.42.999", "duo_workflow_work_item_tools", {GetWorkItem}),
     ],
 )
 async def test_registry_configuration_with_restricted_language_server_client(
-    gl_http_client, lsp_version
+    gl_http_client, lsp_version, feature_flags, ff_disabled_tools
 ):
+    current_feature_flag_context.set(feature_flags)
     workflow_config = {
         "id": "test_workflow",
         "agent_privileges_names": list(_AGENT_PRIVILEGES.keys()),
@@ -678,7 +682,11 @@ async def test_registry_configuration_with_restricted_language_server_client(
     expected_tools = [
         *[tool_cls().name for tool_cls in _DEFAULT_TOOLS],
         *[tool_cls.tool_title for tool_cls in NO_OP_TOOLS],
-        *[tool_cls().name for tool_cls in _AGENT_PRIVILEGES["read_only_gitlab"]],
+        *[
+            tool_cls().name
+            for tool_cls in _AGENT_PRIVILEGES["read_only_gitlab"]
+            if tool_cls not in ff_disabled_tools
+        ],
     ]
     assert set(registry._enabled_tools.keys()).issubset(expected_tools)
 
@@ -693,17 +701,22 @@ async def test_registry_configuration_with_restricted_language_server_client(
 
 @pytest.mark.asyncio
 @pytest.mark.parametrize(
-    "lsp_version",
+    "lsp_version,feature_flags,ff_disabled_tools",
     [
-        None,
-        "7.43.0",
-        "7.43.1",
-        "8.0.0",
+        (None, "duo_workflow_work_item_tools", {}),
+        (None, "", {GetWorkItem}),
+        ("7.43.0", "duo_workflow_work_item_tools", {}),
+        ("7.43.0", "", {GetWorkItem}),
+        ("7.43.1", "duo_workflow_work_item_tools", {}),
+        ("7.43.1", "", {GetWorkItem}),
+        ("8.0.0", "duo_workflow_work_item_tools", {}),
+        ("8.0.0", "", {GetWorkItem}),
     ],
 )
 async def test_registry_configuration_with_unrestricted_language_server_client(
-    gl_http_client, lsp_version
+    gl_http_client, lsp_version, feature_flags, ff_disabled_tools
 ):
+    current_feature_flag_context.set(feature_flags)
     workflow_config = {
         "id": "test_workflow",
         "agent_privileges_names": list(_AGENT_PRIVILEGES.keys()),
@@ -723,4 +736,5 @@ async def test_registry_configuration_with_unrestricted_language_server_client(
     enabled_tools = set(registry._enabled_tools.keys())
     for privilege in _AGENT_PRIVILEGES.keys():
         for tool_cls in _AGENT_PRIVILEGES[privilege]:
-            assert tool_cls().name in enabled_tools
+            if tool_cls not in ff_disabled_tools:
+                assert tool_cls().name in enabled_tools
