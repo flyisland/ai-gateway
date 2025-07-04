@@ -8,7 +8,7 @@ from gitlab_cloud_connector import (
 )
 from jinja2 import PackageLoader, meta
 from jinja2.sandbox import SandboxedEnvironment
-from langchain_core.callbacks import BaseCallbackHandler, get_usage_metadata_callback
+from langchain_core.callbacks import get_usage_metadata_callback
 from langchain_core.language_models import BaseChatModel
 from langchain_core.messages.ai import UsageMetadata
 from langchain_core.prompt_values import PromptValue
@@ -25,7 +25,6 @@ from ai_gateway.internal_events.context import InternalEventAdditionalProperties
 from ai_gateway.model_metadata import TypeModelMetadata, current_model_metadata_context
 from ai_gateway.prompts.config.base import ModelConfig, PromptConfig, PromptParams
 from ai_gateway.prompts.typing import Model, TypeModelFactory
-from ai_gateway.structured_logging import get_request_logger
 
 __all__ = [
     "Prompt",
@@ -64,20 +63,6 @@ def jinja2_formatter(template: str, /, **kwargs: Any) -> str:
 
 # Override LangChain's jinja2 formatter so we can specify a loader with access to all our templates
 DEFAULT_FORMATTER_MAPPING["jinja2"] = jinja2_formatter
-
-
-class PromptLoggingHandler(BaseCallbackHandler):
-    """Logs the full prompt that is sent to the LLM."""
-
-    def on_llm_start(
-        self,
-        serialized: dict[str, Any],  # pylint: disable=unused-argument
-        prompts: list[str],
-        **_kwargs: Any,
-    ) -> Any:
-        get_request_logger("prompt").info(
-            "Performing LLM request", prompt="\n".join(prompts)
-        )
 
 
 class Prompt(RunnableBinding[Input, Output]):
@@ -177,7 +162,7 @@ class Prompt(RunnableBinding[Input, Output]):
         ) as watcher, get_usage_metadata_callback() as cb:
             result = await super().ainvoke(
                 input,
-                self._add_logger_to_config(config),
+                config,
                 **kwargs,
             )
 
@@ -204,7 +189,7 @@ class Prompt(RunnableBinding[Input, Output]):
 
             async for item in super().astream(
                 input,
-                self._add_logger_to_config(config),
+                config,
                 **kwargs,
             ):
                 if previous_item:
@@ -262,17 +247,6 @@ class Prompt(RunnableBinding[Input, Output]):
     @staticmethod
     def _build_chain(chain: Runnable[Input, Output]) -> Runnable[Input, Output]:
         return chain
-
-    @staticmethod
-    def _add_logger_to_config(config):
-        callback = PromptLoggingHandler()
-
-        if not config:
-            return {"callbacks": [callback]}
-
-        config["callbacks"] = [*config.get("callbacks", []), callback]
-
-        return config
 
     # Assume that the prompt template keys map to roles. Subclasses can
     # override this method to implement more complex logic.

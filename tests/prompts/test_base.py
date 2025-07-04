@@ -121,33 +121,22 @@ class TestPrompt:
         }
 
     @pytest.mark.asyncio
-    @mock.patch("ai_gateway.prompts.base.get_request_logger")
     async def test_ainvoke(
         self,
-        mock_get_logger: mock.Mock,
         mock_watch: mock.Mock,
         prompt: Prompt,
         model_response: str,
     ):
-        mock_logger = mock.MagicMock()
-        mock_get_logger.return_value = mock_logger
 
         response = await prompt.ainvoke({"name": "Duo", "content": "What's up?"})
 
         assert response.content == model_response
 
-        mock_logger.info.assert_called_with(
-            "Performing LLM request",
-            prompt="System: Hi, I'm Duo\nHuman: What's up?",
-        )
-
         mock_watch.assert_called_with(stream=False)
 
     @pytest.mark.asyncio
-    @mock.patch("ai_gateway.prompts.base.get_request_logger")
     async def test_astream(
         self,
-        mock_get_logger: mock.Mock,
         mock_watch: mock.Mock,
         prompt: Prompt,
         model_response: str,
@@ -155,19 +144,12 @@ class TestPrompt:
         response = ""
 
         mock_watcher = mock_watch.return_value.__enter__.return_value
-        mock_logger = mock.MagicMock()
-        mock_get_logger.return_value = mock_logger
 
         async for c in prompt.astream({"name": "Duo", "content": "What's up?"}):
             response += c.content
 
             # Make sure we don't finish prematurely
             mock_watcher.afinish.assert_not_awaited()
-
-        mock_logger.info.assert_called_with(
-            "Performing LLM request",
-            prompt="System: Hi, I'm Duo\nHuman: What's up?",
-        )
 
         assert response == model_response
 
