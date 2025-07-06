@@ -58,7 +58,6 @@ class WorkflowStatusEnum(StrEnum):
     TOOL_CALL_APPROVAL_REQUIRED = "tool_call_approval_required"
     APPROVAL_ERROR = "approval_error"
 
-
 class MessageTypeEnum(StrEnum):
     AGENT = "agent"
     USER = "user"
@@ -299,6 +298,7 @@ class WorkflowState(TypedDict):
     ui_chat_log: Annotated[List[UiChatLog], _ui_chat_log_reducer]
     handover: List[BaseMessage]
     last_human_input: Union[WorkflowEvent, None]
+    context: dict[str, Any]
 
 
 class ReplacementRule(BaseModel):
@@ -364,3 +364,10 @@ class WorkflowContext(TypedDict):
 
 class Context(TypedDict):
     workflow: WorkflowContext
+
+
+class PoCWorkflowState(TypedDict):
+    status: WorkflowStatusEnum
+    conversation_history: Dict[str, List[BaseMessage]]
+    ui_chat_log: Annotated[List[UiChatLog], _ui_chat_log_reducer]
+    context: dict[str, Any]
