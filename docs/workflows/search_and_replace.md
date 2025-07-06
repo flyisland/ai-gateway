@@ -7,7 +7,7 @@ functionality.
 
 ## Prerequisites
 
-Create configuration file: `.duo_workflow/search_and_replace_config.yaml`
+Create a configuration file: `.duo_workflow/search_and_replace_config.yaml`
 
 ## Configuration Format
 
@@ -60,9 +60,11 @@ replacement_rules:
 ```
 
 ## How to Use
-1. Create a .duo_workflow directory in target repository's root folder. Create pipeline config yaml search_and_replace_config.yml file in the `.duo_workflow` directory. A sample config should look like
 
-```
+1. Create a .duo_workflow directory in target repository's root folder. Create pipeline config YAML
+   search_and_replace_config file in the `.duo_workflow` directory. A sample config should look like
+
+``` plaintext
 domain_speciality: "an experienced Vue.js engineer specialised in UI accessibility" # short description of role / position that model should roleplay into
 assignment_description: "accessibility issues" # few words description of assignment type, eg: a11y issues, fearture flag removel, eslint error fixes
 file_types:
@@ -80,8 +82,13 @@ replacement_rules:
       4. If you do not know what value 'alt' should have add `alt` attribute to the gl-avatar with value '<placeholder FIX ME>'
 ```
 
-1. Point goal to a directory (using relative path from repository root) that you wish to process eg export DW_GOAL="app/assets/javascripts/admin/abuse_report"
-1. Run the executor process locally (or with docker) following instructions in https://gitlab.com/gitlab-org/duo-workflow/duo-workflow-executor#running-the-executor. Be sure to change the `workflow_definition` to `search_and_replace` (--definition="search_and_replace") and the goal to `DW_GOAL` from the previous step (--goal="app/assets/javascripts/admin/abuse_report").
+1. Point goal to a directory (using relative path from repository root) that you wish to process eg export DW_GOAL="
+   app/assets/javascripts/admin/abuse_report"
+1. Run the executor process locally (or with Docker) following instructions
+   in [Running executor locally](https://gitlab.com/gitlab-org/duo-workflow/duo-workflow-executor#running-the-executor).
+   Be sure to change the
+   `workflow_definition` to `search_and_replace` (--definition="search_and_replace") and the goal to `DW_GOAL` from the
+   previous step (--goal="app/assets/javascripts/admin/abuse_report").
 1. Verify changes made in the desired directory.
 
 ## Best Practices

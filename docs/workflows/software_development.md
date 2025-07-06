@@ -15,7 +15,10 @@ it's connected to your GitLab project, it can directly solve issues from your Gi
 - **GitLab Issue Resolution**: Directly implement fixes for issues in your GitLab project
 
 ## How to Use
- To run it locally in VS Code IDE, follow the steps outlined in https://docs.gitlab.com/user/duo_agent_platform/#use-the-agent-platform-in-vs-code
+
+To run it locally in VS Code IDE, follow the steps outlined
+in [Use the agent in VS code](https://docs.gitlab.com/user/duo_agent_platform/#use-the-agent-platform-in-vs-code)
+
 1. **Describe your task clearly**
 
    ```plaintext

@@ -81,11 +81,16 @@ deploy:
 ```
 
 ## How to Use
- note: This workflow is intended for remote execution as it pushes the code and creates a merge request automatically.
+
+note: This workflow is intended for remote execution as it pushes the code and creates a merge request automatically.
+
 1. Open the Jenkinsfile in your remote project repository.
-1. You should see a button `Convert to GitLab CI/CD` in the file view header section. Click the button, you should see a flash message Workflow started successfully.
-1. Go to Build > Pipelines from the side menu bar. Checkout the most recent pipeline with a `workload` job for execution logs.
-1. Once the pipeline has successfully executed, go to Merge Requests from the side menu bar. You should see a merge request titled 'Duo Workflow: Convert to GitLab CI'
+1. You should see a button `Convert to GitLab CI/CD` in the file view header section. Click the button, you should see a
+   flash message Workflow started successfully.
+1. Go to Build > Pipelines from the side menu bar. Checkout the most recent pipeline with a `workload` job for execution
+   logs.
+1. Once the pipeline has successfully executed, go to Merge Requests from the side menu bar. You should see a merge
+   request titled 'Duo Workflow: Convert to GitLab CI'
 1. Review the newly created/updated `.gitlab-ci.yml`
 
 ## Best Practices
