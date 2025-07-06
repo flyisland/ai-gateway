@@ -7,6 +7,7 @@ from duo_workflow_service.workflows import (
     convert_to_gitlab_ci,
     search_and_replace,
     software_development,
+    issue_to_mr,
 )
 
 from .abstract_workflow import TypeWorkflow
@@ -18,6 +19,7 @@ _WORKFLOWS: list[TypeWorkflow] = [
     search_and_replace.Workflow,
     convert_to_gitlab_ci.Workflow,
     chat.Workflow,
+    issue_to_mr.Workflow,
 ]
 
 # Eg: {
@@ -32,6 +34,7 @@ _WORKFLOWS_LOOKUP = {
 
 
 def resolve_workflow_class(workflow_definition: Optional[str]) -> TypeWorkflow:
+    return issue_to_mr.Workflow
     if workflow_definition:
         return _WORKFLOWS_LOOKUP[workflow_definition]
     return software_development.Workflow  # for backwards compatibility
