@@ -64,6 +64,18 @@ def workflow():
 
 
 @pytest.fixture
+def workflow_config():
+    return {
+        "first_checkpoint": None,
+        "workflow_status": "created",
+        "agent_privileges_names": [],
+        "pre_approved_agent_privileges_names": [],
+        "mcp_enabled": True,
+        "allow_agent_to_request_user": True,
+    }
+
+
+@pytest.fixture
 def checkpoint_tuple():
     return CheckpointTuple(
         config={"configurable": {"thread_id": "123", "checkpoint_id": str(uuid4())}},

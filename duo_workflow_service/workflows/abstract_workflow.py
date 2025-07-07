@@ -32,7 +32,7 @@ from duo_workflow_service.gitlab.events import get_event
 from duo_workflow_service.gitlab.gitlab_project import (
     Project,
     WorkflowConfig,
-    emptyWorkflowConfig,
+    empty_workflow_config,
     fetch_workflow_and_project_data,
 )
 from duo_workflow_service.gitlab.http_client import GitlabHttpClient
@@ -123,7 +123,7 @@ class AbstractWorkflow(ABC):
         self._model_config = self._get_model_config()
         self._approval = approval
         self._prompt_registry = prompt_registry
-        self._workflow_config = emptyWorkflowConfig()
+        self._workflow_config = empty_workflow_config()
 
     async def run(self, goal: str) -> None:
         with duo_workflow_metrics.time_workflow(

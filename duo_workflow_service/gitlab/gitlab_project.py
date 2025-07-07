@@ -106,7 +106,7 @@ def extract_project_id_from_workflow(workflow: dict):
     return project_id
 
 
-def emptyWorkflowConfig() -> WorkflowConfig:
+def empty_workflow_config() -> WorkflowConfig:
     return {
         "agent_privileges_names": [],
         "pre_approved_agent_privileges_names": [],
