@@ -71,3 +71,29 @@ class TestChatAnthropic:
 
         assert model.anthropic_api_url == "http://anthropic.test"
         assert model._async_client.base_url == "http://anthropic.test"
+
+    @pytest.mark.parametrize(
+        ("betas", "expected_header"),
+        [
+            (["beta1"], "beta1"),
+            (["beta1", "beta2"], "beta1,beta2"),
+            (["extended-cache-ttl-2025-04-11"], "extended-cache-ttl-2025-04-11"),
+            ([], None),
+            (None, None),
+        ],
+    )
+    def test_betas_configuration(self, betas, expected_header):
+        """Test that betas are properly configured in headers."""
+        model = ChatAnthropic(
+            async_client=AsyncAnthropic(),
+            model="claude-3-5-sonnet-20241022",
+            betas=betas,
+        )  # type: ignore[call-arg]
+
+        if expected_header:
+            assert (
+                model._async_client.default_headers["anthropic-beta"] == expected_header
+            )
+        else:
+            # If no betas or empty list, header should not be present or should be None
+            assert model._async_client.default_headers.get("anthropic-beta") is None

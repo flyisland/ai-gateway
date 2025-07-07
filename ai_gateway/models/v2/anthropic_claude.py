@@ -1,4 +1,4 @@
-from typing import Any, List, Mapping, Optional, Self
+from typing import Any, List, MutableMapping, Optional, Self
 
 from anthropic import AsyncAnthropic
 from langchain_anthropic import ChatAnthropic as _LChatAnthropic
@@ -24,8 +24,11 @@ class ChatAnthropic(_LChatAnthropic):
     max_retries: int = 1
     """Number of retries allowed for requests sent to the Anthropic Completion API."""
 
-    default_headers: Mapping[str, str] = {"anthropic-version": "2023-06-01"}
+    default_headers: MutableMapping[str, str] = {"anthropic-version": "2023-06-01"}
     """Headers to pass to the Anthropic clients, will be used for every API call."""
+
+    betas: Optional[list[str]] = None
+    """Beta features to enable for the Anthropic client."""
 
     @model_validator(mode="after")
     def post_init(self) -> Self:
@@ -33,7 +36,11 @@ class ChatAnthropic(_LChatAnthropic):
             "api_key": self.anthropic_api_key.get_secret_value(),
             "base_url": self.anthropic_api_url,
         }
-
+        if self.betas is not None and len(self.betas) > 0:
+            beta_header = ",".join(self.betas)
+            if self.default_headers is None:
+                self.default_headers = {}
+            self.default_headers["anthropic-beta"] = beta_header
         client_options.update(
             {
                 "max_retries": self.max_retries,

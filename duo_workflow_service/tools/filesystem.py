@@ -19,9 +19,9 @@ class ReadFile(DuoBaseTool):
     IMPORTANT:
     - When a task requires reading multiple files, include batches of tool calls in a single response
     - Do not make separate responses for each file - group related files together
-
-    """
-    args_schema: Type[BaseModel] = ReadFileInput  # type: ignore
+     IMPORTANT:
+ - When a task requires reading multiple files, include batches of tool calls in a single response
+ - Do not make separate responses for each file - group related files together
 
     async def _arun(self, file_path: str) -> str:
         return await _execute_action(
