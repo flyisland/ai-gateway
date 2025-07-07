@@ -36,7 +36,7 @@ def test_extract_project_id_from_workflow():
 
 
 @pytest.mark.asyncio
-async def test_fetch_project_data_with_workflow_id_success():
+async def test_fetch_workflow_and_project_data_success():
     gitlab_client = AsyncMock()
     # Mock GraphQL response
     gitlab_client.graphql.return_value = {
@@ -95,7 +95,7 @@ async def test_fetch_project_data_with_workflow_id_success():
 
 
 @pytest.mark.asyncio
-async def test_fetch_project_data_with_workflow_id_no_workflow():
+async def test_fetch_workflow_and_project_data_no_workflow():
     gitlab_client = AsyncMock()
     # Mock empty response
     gitlab_client.graphql.return_value = {"duoWorkflowWorkflows": {"nodes": []}}
