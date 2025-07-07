@@ -127,7 +127,6 @@ def _git_output(command_output: list[str], state: WorkflowState):
             status=ToolStatus.SUCCESS,
             correlation_id=None,
             tool_info=None,
-            context_elements=None,
             additional_context=None,
         )
     ]
