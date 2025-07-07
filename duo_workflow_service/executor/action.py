@@ -6,6 +6,7 @@ import structlog
 from prometheus_client import Histogram
 
 from contract import contract_pb2
+from duo_workflow_service.errors.error_handler import ActionException
 
 ACTION_LATENCY = Histogram(
     name="executor_actions_duration_seconds",
@@ -51,6 +52,20 @@ async def _execute_action_and_get_action_response(
 
     inbox.task_done()
     return event.actionResponse
+
+
+async def _execute_action_and_get_http_response(
+    metadata: Dict[str, Any], action: contract_pb2.Action
+) -> contract_pb2.HttpResponse:
+    actionResponse = await _execute_action_and_get_action_response(metadata, action)
+
+    if len(actionResponse.httpResponse.error) > 0:
+        raise ActionException(
+            status_code=actionResponse.httpResponse.statusCode,
+            message=actionResponse.httpResponse.error,
+        )
+
+    return actionResponse.httpResponse
 
 
 async def _execute_action(metadata: Dict[str, Any], action: contract_pb2.Action):

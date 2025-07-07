@@ -1,5 +1,6 @@
 import json
 
+from duo_workflow_service.errors.error_handler import ActionException
 from duo_workflow_service.gitlab.http_client import GitlabHttpClient, GitLabHttpResponse
 
 
@@ -26,12 +27,17 @@ class GitLabStatusUpdater:
         Raises:
             Exception: If the update request fails.
         """
-        result = await self._client.apatch(
-            path=f"{self.workflow_api_path}/{workflow_id}",
-            body=json.dumps({"status_event": status_event}),
-            parse_json=True,
-            use_http_response=True,
-        )
+        try:
+            result = await self._client.apatch(
+                path=f"{self.workflow_api_path}/{workflow_id}",
+                body=json.dumps({"status_event": status_event}),
+                parse_json=True,
+                use_http_response=True,
+            )
+        except ActionException as e:
+            raise Exception(
+                f"Failed to update workflow status: {status_event} due to action execution exception: {e}"
+            )
 
         if not isinstance(result, GitLabHttpResponse):
             raise Exception(
