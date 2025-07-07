@@ -294,7 +294,7 @@ async def test_generate_token_with_self_signed_token_issuer():
 
 
 @pytest.mark.asyncio
-async def test_grpc_serve():
+async def test_grpc_server():
     mock_server = AsyncMock()
     mock_server.add_insecure_port.return_value = None
     mock_server.start.return_value = None

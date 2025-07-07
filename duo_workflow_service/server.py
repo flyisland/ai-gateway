@@ -122,17 +122,28 @@ class DuoWorkflowService(contract_pb2_grpc.DuoWorkflowServicer):
     ) -> AsyncIterator[contract_pb2.Action]:
         user: CloudConnectorUser = current_user.get()
 
-        if not user.can(GitLabUnitPrimitive.DUO_WORKFLOW_EXECUTE_WORKFLOW):
-            await context.abort(
-                grpc.StatusCode.PERMISSION_DENIED, "Unauthorized to execute workflow"
-            )
 
-        monitoring_context: MonitoringContext = current_monitoring_context.get()
 
         # Fetch the start workflow call
         start_workflow_request: contract_pb2.ClientEvent = await anext(
             aiter(request_iterator)
         )
+
+        workflow_definition = start_workflow_request.startRequest.workflowDefinition
+
+        if workflow_definition is "chat":
+            unit_primitive = GitLabUnitPrimitive.DUO_CHAT
+        else:
+            unit_primitive = GitLabUnitPrimitive.DUO_WORKFLOW_EXECUTE_WORKFLOW
+
+        if not user.can(unit_primitive):
+            await context.abort(
+                grpc.StatusCode.PERMISSION_DENIED,
+                f"Unauthorized to execute {workflow_definition or 'workflow'}",
+            )
+
+
+        monitoring_context: MonitoringContext = current_monitoring_context.get()
 
         await self.authorize_additional_context(
             current_user=user,
@@ -160,7 +171,6 @@ class DuoWorkflowService(contract_pb2_grpc.DuoWorkflowServicer):
             additional_context = None
 
         workflow_metadata = {}
-        workflow_definition = start_workflow_request.startRequest.workflowDefinition
         monitoring_context.workflow_id = workflow_id
         monitoring_context.workflow_definition = workflow_definition
         if start_workflow_request.startRequest.workflowMetadata:
@@ -265,8 +275,15 @@ class DuoWorkflowService(contract_pb2_grpc.DuoWorkflowServicer):
     ) -> contract_pb2.GenerateTokenResponse:
         user: CloudConnectorUser = current_user.get()
 
+
+        workflow_definition = request.workflowDefinition
+        if workflow_definition is "chat":
+            unit_primitive = GitLabUnitPrimitive.DUO_CHAT
+        else:
+            unit_primitive = GitLabUnitPrimitive.DUO_WORKFLOW_EXECUTE_WORKFLOW
+
         if not user.can(
-            GitLabUnitPrimitive.DUO_WORKFLOW_EXECUTE_WORKFLOW,
+            unit_primitive=unit_primitive,
             disallowed_issuers=[CloudConnectorConfig().service_name],
         ):
             await context.abort(
