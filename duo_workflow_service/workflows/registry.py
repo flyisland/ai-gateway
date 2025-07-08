@@ -5,7 +5,7 @@ from typing import Optional
 from duo_workflow_service.workflows import (
     chat,
     convert_to_gitlab_ci,
-    issue_to_mr,
+    flow_registry,
     search_and_replace,
     software_development,
 )
@@ -19,7 +19,8 @@ _WORKFLOWS: list[TypeWorkflow] = [
     search_and_replace.Workflow,
     convert_to_gitlab_ci.Workflow,
     chat.Workflow,
-    issue_to_mr.Workflow,
+    flow_registry.Flow,
+    flow_registry.PytonAPIFlow,
 ]
 
 # Eg: {
@@ -34,7 +35,8 @@ _WORKFLOWS_LOOKUP = {
 
 
 def resolve_workflow_class(workflow_definition: Optional[str]) -> TypeWorkflow:
-    return issue_to_mr.Workflow
+    # return flow_registry.PytonAPIFlow
+    return flow_registry.Flow
     if workflow_definition:
         return _WORKFLOWS_LOOKUP[workflow_definition]
     return software_development.Workflow  # for backwards compatibility

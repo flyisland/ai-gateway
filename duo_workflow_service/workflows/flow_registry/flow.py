@@ -99,7 +99,7 @@ def load_output_model_class(output_type_name: str) -> Type:
     return output_class
 
 
-class Workflow(AbstractWorkflow):
+class Flow(AbstractWorkflow):
     def get_workflow_state(self, goal: str) -> PoCWorkflowState:
         context_elements = self._context_elements or []
 
