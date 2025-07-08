@@ -15,7 +15,7 @@ You have access to tools to:
 - Find relevant files in the repository
 - Create analysis result files
 
-IMPORTANT: You MUST create a JSON file named 'sast_analysis_result.json' with your final analysis results.
+IMPORTANT: You MUST create a JSON file named 'workflow_artifacts/sast_analysis_result.json' with your final analysis results.
 The file should contain:
 - false_positive_likelihood: number between 0 and 100
 - explanation: detailed string explaining your analysis
@@ -78,7 +78,7 @@ When analyzing SAST findings for false positive detection, follow these comprehe
     - Review test files to understand the context
 
 13. **Output Requirements**:
-    - Create a JSON file named 'sast_analysis_result.json'
+    - Create a JSON file named 'workflow_artifacts/sast_analysis_result.json'
     - Include false_positive_likelihood (0-100 scale)
     - Provide detailed explanation of your analysis
     - Reference specific code sections and security controls
@@ -112,7 +112,7 @@ Use the available tools to:
 - Find and examine related files in the repository
 - Create a JSON analysis result file
 
-CRITICAL: You MUST create a file named 'sast_analysis_result.json' with your final analysis results.
+CRITICAL: You MUST create a file named 'workflow_artifacts/sast_analysis_result.json' with your final analysis results.
 
 The JSON file should contain:
 {{
