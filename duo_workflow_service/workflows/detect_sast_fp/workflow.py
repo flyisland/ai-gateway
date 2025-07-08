@@ -23,9 +23,9 @@ from langgraph.graph import StateGraph, END
 from langgraph.checkpoint.memory import BaseCheckpointSaver
 from duo_workflow_service.workflows.abstract_workflow import AbstractWorkflow
 from duo_workflow_service.components import ToolsRegistry
-from duo_workflow_service.entities import WorkflowStatusEnum
-from duo_workflow_service.components.detect_sast_fp_simple import start_fp_detect_component, end_fp_detect_component, attach as detect_sast_fp_attach
+from duo_workflow_service.entities import WorkflowStatusEnum, UiChatLog, MessageTypeEnum, ToolStatus
 
+from duo_workflow_service.components.detect_sast_fp_simple import start_fp_detect_component, end_fp_detect_component, attach as detect_sast_fp_attach
 
 class Workflow(AbstractWorkflow):
     """SAST False Positive Detection Workflow.
@@ -61,19 +61,34 @@ class Workflow(AbstractWorkflow):
         return graph.compile(checkpointer=checkpointer)
 
     async def _start_detect_fp(self, state):
-        # Minimal node logic for workflow entry
+        log_entry = UiChatLog(
+            message_type=MessageTypeEnum.TOOL,
+            message_sub_type=None,
+            content="Entered start_detect_fp node",
+            timestamp=datetime.now(timezone.utc).isoformat(),
+            status=ToolStatus.SUCCESS,
+            correlation_id=None,
+            tool_info=None,
+            context_elements=None,
+        )
+        state = dict(state)
+        state.setdefault("ui_chat_log", []).append(log_entry)
         return state
 
     async def _end_detect_fp(self, state):
-        # Minimal node logic for workflow exit
+        log_entry = UiChatLog(
+            message_type=MessageTypeEnum.TOOL,
+            message_sub_type=None,
+            content="Entered end_detect_fp node",
+            timestamp=datetime.now(timezone.utc).isoformat(),
+            status=ToolStatus.SUCCESS,
+            correlation_id=None,
+            tool_info=None,
+            context_elements=None,
+        )
+        state = dict(state)
+        state.setdefault("ui_chat_log", []).append(log_entry)
         return state
-
-    def _setup_analyzer_nodes(self, tools_registry: ToolsRegistry):
-        """Setup the SAST analyzer agent and tools."""
-        # This method is no longer used as the workflow graph is simplified
-        # and the agent logic is moved directly into the graph nodes.
-        # Keeping it for now as it might be re-introduced or refactored later.
-        pass
 
     def _setup_workflow_graph(
         self,
@@ -88,7 +103,18 @@ class Workflow(AbstractWorkflow):
 
     def get_workflow_state(self, goal: str):
         """Create the initial workflow state with the starting log message."""
-        # This method is no longer used as the workflow graph is simplified
-        # and the agent logic is moved directly into the graph nodes.
-        # Keeping it for now as it might be re-introduced or refactored later.
-        return {"status": WorkflowStatusEnum.NOT_STARTED, "goal": goal}
+        initial_log = UiChatLog(
+            message_type=MessageTypeEnum.TOOL,
+            message_sub_type=None,
+            content=f"Starting detect_sast_fp workflow with goal: {goal}",
+            timestamp=datetime.now(timezone.utc).isoformat(),
+            status=ToolStatus.SUCCESS,
+            correlation_id=None,
+            tool_info=None,
+            context_elements=None,
+        )
+        return {
+            "status": WorkflowStatusEnum.NOT_STARTED,
+            "goal": goal,
+            "ui_chat_log": [initial_log],
+        }

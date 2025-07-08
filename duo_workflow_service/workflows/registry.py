@@ -7,7 +7,7 @@ from duo_workflow_service.workflows import (
     convert_to_gitlab_ci,
     search_and_replace,
     software_development,
-    detect_sast_fp,  # Renamed from sast_fp_detect
+    detect_sast_fp,
 )
 
 from .abstract_workflow import TypeWorkflow
@@ -19,7 +19,7 @@ _WORKFLOWS: list[TypeWorkflow] = [
     search_and_replace.Workflow,
     convert_to_gitlab_ci.Workflow,
     chat.Workflow,
-    detect_sast_fp.Workflow,  # Renamed from sast_fp_detect
+    detect_sast_fp.Workflow,
 ]
 
 # Eg: {
