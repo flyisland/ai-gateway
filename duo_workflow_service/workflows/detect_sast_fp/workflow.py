@@ -18,6 +18,7 @@ finding related files, and creating analysis result files.
 
 from datetime import datetime, timezone
 from typing import Any
+import random
 
 from langgraph.graph import StateGraph, END
 from langgraph.checkpoint.memory import BaseCheckpointSaver
@@ -26,6 +27,7 @@ from duo_workflow_service.components import ToolsRegistry
 from duo_workflow_service.entities import WorkflowStatusEnum, UiChatLog, MessageTypeEnum, ToolStatus
 
 from duo_workflow_service.components.detect_sast_fp_simple import start_fp_detect_component, end_fp_detect_component, attach as detect_sast_fp_attach
+from duo_workflow_service.components.detect_sast_fp_class.component import DetectSastFpComponent
 
 class Workflow(AbstractWorkflow):
     """SAST False Positive Detection Workflow.
@@ -51,12 +53,30 @@ class Workflow(AbstractWorkflow):
     def _compile(self, goal: str, tools_registry: ToolsRegistry, checkpointer: BaseCheckpointSaver):
         graph = StateGraph(dict)
         graph.add_node("start_detect_fp", self._start_detect_fp)
-        # Attach the component between start_detect_fp and end_detect_fp_component
-        detect_sast_fp_attach(graph, "component_entry", "component_exit")
+        # Add choose_component node
+        graph.add_node("choose_component", self._choose_component)
+        # Attach function-based component
+        func_entry_node = "component_entry"
+        func_exit_node = "component_exit"
+        detect_sast_fp_attach(graph, func_entry_node, func_exit_node)
+        # Attach class-based component with explicit entry/exit node names
+        class_entry_node = "class_component_entry"
+        class_exit_node = "class_component_exit"
+        class_component = DetectSastFpComponent(entry_node=class_entry_node, exit_node=class_exit_node)
+        class_component.attach(graph)
         graph.add_node("end_detect_fp", self._end_detect_fp)
         graph.set_entry_point("start_detect_fp")
-        graph.add_edge("start_detect_fp", "component_entry")
-        graph.add_edge("component_exit", "end_detect_fp")
+        graph.add_edge("start_detect_fp", "choose_component")
+        # Use add_conditional_edge to route from choose_component
+        def _choose_route(state):
+            if state.get("chosen_component") == "function":
+                return func_entry_node
+            else:
+                return class_entry_node
+        graph.add_conditional_edges("choose_component", _choose_route)
+        # Edges from both component exits to end_detect_fp
+        graph.add_edge(func_exit_node, "end_detect_fp")
+        graph.add_edge(class_exit_node, "end_detect_fp")
         graph.add_edge("end_detect_fp", END)
         return graph.compile(checkpointer=checkpointer)
 
@@ -89,6 +109,15 @@ class Workflow(AbstractWorkflow):
         state = dict(state)
         state.setdefault("ui_chat_log", []).append(log_entry)
         return state
+
+    async def _choose_component(self, state):
+        # Randomly choose which component to use
+        if random.choice([True, False]):
+            state["chosen_component"] = "function"
+            return {"__next__": "component_entry", **state}
+        else:
+            state["chosen_component"] = "class"
+            return {"__next__": "class_component_entry", **state}
 
     def _setup_workflow_graph(
         self,

@@ -198,15 +198,27 @@ config:
 graph TD;
     __start__([<p>__start__</p>]):::first
     start_detect_fp(start_detect_fp)
+    choose_component(choose_component)
     component_entry(component_entry)
     component_exit(component_exit)
+    class_component_entry(class_component_entry)
+    class_component_exit(class_component_exit)
     end_detect_fp(end_detect_fp)
     __end__([<p>__end__</p>]):::last
     __start__ --> start_detect_fp;
+    class_component_entry --> class_component_exit;
+    class_component_exit --> end_detect_fp;
     component_entry --> component_exit;
     component_exit --> end_detect_fp;
     end_detect_fp --> __end__;
-    start_detect_fp --> component_entry;
+    start_detect_fp --> choose_component;
+    choose_component -.-> start_detect_fp;
+    choose_component -.-> component_entry;
+    choose_component -.-> component_exit;
+    choose_component -.-> class_component_entry;
+    choose_component -.-> class_component_exit;
+    choose_component -.-> end_detect_fp;
+    choose_component -.-> __end__;
     classDef default fill:#f2f0ff,line-height:1.2
     classDef first fill-opacity:0
     classDef last fill:#bfb6fc
