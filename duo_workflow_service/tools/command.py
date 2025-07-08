@@ -23,8 +23,8 @@ class RunCommandInput(BaseModel):
 class RunCommand(DuoBaseTool):
     name: str = "run_command"
     description: str = (
-        "Run a bash command in the current working directory. **Requires human approval before execution.** "
-        "Only use this tool when no other available tool can fulfill the goal. "
+        "Run a bash command in the current working directory. "
+        "This tool should be reserved for cases where specialized tools cannot accomplish the task. "
         f"Following bash commands are not supported: {', '.join(_DISALLOWED_COMMANDS)} "
         "and will result in error. "
         "Pay extra attention to correctly escape special characters like '`'"
