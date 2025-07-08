@@ -2,6 +2,7 @@ import os
 from datetime import datetime, timezone
 from typing import Any, Type
 
+from pydantic import BaseModel
 import yaml
 from langgraph.graph import StateGraph
 from langgraph.types import Command
@@ -28,8 +29,14 @@ DEBUG = os.getenv("DEBUG")
 MAX_MESSAGE_LENGTH = 200
 RECURSION_LIMIT = 500
 
+class FlowConfig(BaseModel):
+    flow: dict
+    components: list[dict]
+    routers: list[dict]
+    environment: str
+    version: int
 
-def load_yaml_config(config_key: str = "example_issue_to_mr_workflow") -> dict:
+def load_yaml_config() -> FlowConfig:
     """Load YAML configuration from proposal.yaml file.
 
     Args:
@@ -52,13 +59,7 @@ def load_yaml_config(config_key: str = "example_issue_to_mr_workflow") -> dict:
         with open(yaml_path, "r", encoding="utf-8") as file:
             yaml_content = yaml.safe_load(file)
 
-        if config_key not in yaml_content:
-            raise KeyError(
-                f"Configuration key '{config_key}' not found in proposal.yaml"
-            )
-
-        return yaml_content[config_key]
-
+        return FlowConfig(**yaml_content)
     except FileNotFoundError:
         raise FileNotFoundError("proposal.yaml file not found in project root")
     except yaml.YAMLError as e:
@@ -133,7 +134,7 @@ class Workflow(AbstractWorkflow):
 
     def _compile(self, goal, tools_registry, checkpointer):
         # Load YAML configuration for the example_issue_to_mr_workflow
-        config = load_yaml_config("example_issue_to_mr_workflow")
+        config = load_yaml_config()
 
         # TODO: Implement workflow graph building using the loaded config
         component_classes = {
@@ -144,7 +145,7 @@ class Workflow(AbstractWorkflow):
 
         # Create components from array-based configuration
         components = {}
-        for comp_config in config["components"]:  # components is now an array
+        for comp_config in config.components:
             comp_name = comp_config["name"]  # explicit name field
             comp_type = comp_config["type"]
             comp_class = component_classes[comp_type]
@@ -185,7 +186,7 @@ class Workflow(AbstractWorkflow):
         graph = StateGraph(PoCWorkflowState)
 
         # Create and attach routers
-        for router_config in config["routers"]:
+        for router_config in config.routers:
             from_comp = components[router_config["from"]]
 
             if "condition" in router_config:
@@ -209,7 +210,7 @@ class Workflow(AbstractWorkflow):
             router.attach(graph)
 
         # Set entry point
-        entry_component = components[config["flow"]["entry_point"]]
+        entry_component = components[config.flow["entry_point"]]
         graph.set_entry_point(entry_component.__entry_hook__())
 
         return graph.compile(checkpointer=checkpointer)

@@ -198,8 +198,8 @@ class UIHistory[W: BaseUILogWriter](BaseModel):
 
 
 class UILogAgentEvents(BaseModel):
-    llm: bool | list[UILogEventsLLM] = Field(default=True)
-    tools: bool | list[UILogEventsTool] = Field(default=True)
+    llm: bool | list[UILogEventsLLM] = Field(default=False)
+    tools: bool | list[UILogEventsTool] = Field(default=False)
 
 
 class UILogWriterAgentLLM(BaseUILogWriter):
