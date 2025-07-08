@@ -100,6 +100,8 @@ EXECUTOR_TOOLS = [
     "get_commit_comments",
     "get_commit_diff",
     "get_work_item",
+    "list_work_items",
+    "get_work_item_notes",
 ]
 
 CONTEXT_BUILDER_TOOLS = [
@@ -132,6 +134,8 @@ CONTEXT_BUILDER_TOOLS = [
     "get_commit_comments",
     "get_commit_diff",
     "get_work_item",
+    "list_work_items",
+    "get_work_item_notes",
 ]
 
 PLANNER_TOOLS = [
@@ -154,7 +158,6 @@ class Routes(StrEnum):
     BUILD_CONTEXT = "build_context"
     STOP = "stop"
     CHAT = "chat"
-    WAIT_FOR_HUMAN_INPUT = "wait_for_human_input"
 
 
 def _router(
