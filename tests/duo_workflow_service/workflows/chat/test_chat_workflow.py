@@ -306,9 +306,9 @@ async def test_workflow_run(
             else:
                 return ("values", state)
 
-    with patch(
-        "duo_workflow_service.workflows.chat.workflow.StateGraph"
-    ) as mock_graph_cls:
+    # Force this test to use synchronous checkpointer to avoid mocking complexity
+    with patch.object(workflow_with_project, '_should_use_async_checkpointer', return_value=False), \
+         patch("duo_workflow_service.workflows.chat.workflow.StateGraph") as mock_graph_cls:
         compiled_graph = MagicMock()
         compiled_graph.astream.return_value = AsyncIterator()
         mock_graph = mock_graph_cls.return_value
