@@ -122,8 +122,6 @@ class DuoWorkflowService(contract_pb2_grpc.DuoWorkflowServicer):
     ) -> AsyncIterator[contract_pb2.Action]:
         user: CloudConnectorUser = current_user.get()
 
-
-
         # Fetch the start workflow call
         start_workflow_request: contract_pb2.ClientEvent = await anext(
             aiter(request_iterator)
@@ -131,7 +129,7 @@ class DuoWorkflowService(contract_pb2_grpc.DuoWorkflowServicer):
 
         workflow_definition = start_workflow_request.startRequest.workflowDefinition
 
-        if workflow_definition is "chat":
+        if workflow_definition == "chat":
             unit_primitive = GitLabUnitPrimitive.DUO_CHAT
         else:
             unit_primitive = GitLabUnitPrimitive.DUO_WORKFLOW_EXECUTE_WORKFLOW
@@ -141,7 +139,6 @@ class DuoWorkflowService(contract_pb2_grpc.DuoWorkflowServicer):
                 grpc.StatusCode.PERMISSION_DENIED,
                 f"Unauthorized to execute {workflow_definition or 'workflow'}",
             )
-
 
         monitoring_context: MonitoringContext = current_monitoring_context.get()
 
@@ -275,13 +272,15 @@ class DuoWorkflowService(contract_pb2_grpc.DuoWorkflowServicer):
     ) -> contract_pb2.GenerateTokenResponse:
         user: CloudConnectorUser = current_user.get()
 
-
         workflow_definition = request.workflowDefinition
-        if workflow_definition is "chat":
+        print("SFSKFHSKDJFS")
+        print(workflow_definition)
+        if workflow_definition == "chat":
             unit_primitive = GitLabUnitPrimitive.DUO_CHAT
         else:
             unit_primitive = GitLabUnitPrimitive.DUO_WORKFLOW_EXECUTE_WORKFLOW
 
+        print(unit_primitive)
         if not user.can(
             unit_primitive=unit_primitive,
             disallowed_issuers=[CloudConnectorConfig().service_name],
