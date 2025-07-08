@@ -77,14 +77,12 @@ class RunToolNode(Generic[WorkflowStateT]):
 
         for tool_params in self._input_parser(state):
             with duo_workflow_metrics.time_tool_call(tool_name=self._tool.name):
-                output = await self._tool._arun(**tool_params)
-                response = output.get("response")
-                if response and hasattr(response, "content"):
+                if output := await self._tool._arun(**tool_params):
                     secure_result: str = PromptSecurity.apply_security(
-                        response=output["response"].content,
+                        response=output,
                         tool_name=self._tool.name,
                     )
-                output = secure_result
+                    output = secure_result
 
             outputs.append(output)
             logs.append(
