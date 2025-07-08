@@ -1,7 +1,7 @@
 # flake8: noqa: W605
 import re
 from enum import Enum
-from typing import Any, Dict, Callable
+from typing import Any, Callable, Dict
 
 
 class SecurityException(Exception):

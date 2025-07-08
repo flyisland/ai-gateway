@@ -12,6 +12,7 @@ from duo_workflow_service.entities.state import (
     WorkflowState,
 )
 from duo_workflow_service.monitoring import duo_workflow_metrics
+from duo_workflow_service.security.prompt_security import PromptSecurity
 
 WorkflowStateT_contra = TypeVar(
     "WorkflowStateT_contra",
@@ -77,6 +78,14 @@ class RunToolNode(Generic[WorkflowStateT]):
         for tool_params in self._input_parser(state):
             with duo_workflow_metrics.time_tool_call(tool_name=self._tool.name):
                 output = await self._tool._arun(**tool_params)
+                response = output.get("response")
+                if response and hasattr(response, "content"):
+                    secure_result: str = PromptSecurity.apply_security(
+                        response=output["response"].content,
+                        tool_name=self._tool.name,
+                    )
+                output = secure_result
+
             outputs.append(output)
             logs.append(
                 UiChatLog(
