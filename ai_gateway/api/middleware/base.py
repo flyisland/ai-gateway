@@ -169,11 +169,10 @@ class AccessLogMiddleware:
             )
 
 
-class DistributedTraceMiddleware:
-    """Middleware for distributed tracing."""
-
-    def __init__(self, app, skip_endpoints, environment):
+class InternalEventMiddleware:
+    def __init__(self, app, skip_endpoints, enabled, environment):
         self.app = app
+        self.enabled = enabled
         self.environment = environment
         self.path_resolver = _PathResolver.from_optional_list(skip_endpoints)
 

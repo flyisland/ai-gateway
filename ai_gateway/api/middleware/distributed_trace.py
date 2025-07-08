@@ -24,7 +24,7 @@ class DistributedTraceMiddleware:
             return
 
         current_run_id = request.headers.get("langsmith-trace")
-        if current_run_id:
+        if self.environment == "development" and current_run_id:
             with tracing_context(parent=current_run_id):
                 await self.app(scope, receive, send)
         else:
