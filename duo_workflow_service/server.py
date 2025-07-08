@@ -128,11 +128,7 @@ class DuoWorkflowService(contract_pb2_grpc.DuoWorkflowServicer):
         )
 
         workflow_definition = start_workflow_request.startRequest.workflowDefinition
-
-        if workflow_definition == "chat":
-            unit_primitive = GitLabUnitPrimitive.DUO_CHAT
-        else:
-            unit_primitive = GitLabUnitPrimitive.DUO_WORKFLOW_EXECUTE_WORKFLOW
+        unit_primitive = choose_unit_primitive(workflow_definition)
 
         if not user.can(unit_primitive):
             await context.abort(
@@ -273,14 +269,8 @@ class DuoWorkflowService(contract_pb2_grpc.DuoWorkflowServicer):
         user: CloudConnectorUser = current_user.get()
 
         workflow_definition = request.workflowDefinition
-        print("SFSKFHSKDJFS")
-        print(workflow_definition)
-        if workflow_definition == "chat":
-            unit_primitive = GitLabUnitPrimitive.DUO_CHAT
-        else:
-            unit_primitive = GitLabUnitPrimitive.DUO_WORKFLOW_EXECUTE_WORKFLOW
+        unit_primitive = choose_unit_primitive(workflow_definition)
 
-        print(unit_primitive)
         if not user.can(
             unit_primitive=unit_primitive,
             disallowed_issuers=[CloudConnectorConfig().service_name],
@@ -378,6 +368,13 @@ def setup_cloud_connector():
         "DUO_WORKFLOW_CLOUD_CONNECTOR_SERVICE_NAME", "gitlab-duo-workflow-service"
     )
     os.environ["CLOUD_CONNECTOR_SERVICE_NAME"] = cloud_connector_service_name
+
+
+def choose_unit_primitive(workflow_definition: str) -> GitLabUnitPrimitive:
+    if workflow_definition == "chat":
+        return GitLabUnitPrimitive.DUO_CHAT
+
+    return GitLabUnitPrimitive.DUO_WORKFLOW_EXECUTE_WORKFLOW
 
 
 def setup_container():
