@@ -24,6 +24,7 @@ from langgraph.checkpoint.memory import BaseCheckpointSaver
 from duo_workflow_service.workflows.abstract_workflow import AbstractWorkflow
 from duo_workflow_service.components import ToolsRegistry
 from duo_workflow_service.entities import WorkflowStatusEnum
+from duo_workflow_service.components.detect_sast_fp_simple import start_fp_detect_component, end_fp_detect_component, attach as detect_sast_fp_attach
 
 
 class Workflow(AbstractWorkflow):
@@ -50,11 +51,22 @@ class Workflow(AbstractWorkflow):
     def _compile(self, goal: str, tools_registry: ToolsRegistry, checkpointer: BaseCheckpointSaver):
         graph = StateGraph(dict)
         graph.add_node("start_detect_fp", self._start_detect_fp)
+        # Attach the component between start_detect_fp and end_detect_fp_component
+        detect_sast_fp_attach(graph, "component_entry", "component_exit")
         graph.add_node("end_detect_fp", self._end_detect_fp)
         graph.set_entry_point("start_detect_fp")
-        graph.add_edge("start_detect_fp", "end_detect_fp")
+        graph.add_edge("start_detect_fp", "component_entry")
+        graph.add_edge("component_exit", "end_detect_fp")
         graph.add_edge("end_detect_fp", END)
         return graph.compile(checkpointer=checkpointer)
+
+    async def _start_detect_fp(self, state):
+        # Minimal node logic for workflow entry
+        return state
+
+    async def _end_detect_fp(self, state):
+        # Minimal node logic for workflow exit
+        return state
 
     def _setup_analyzer_nodes(self, tools_registry: ToolsRegistry):
         """Setup the SAST analyzer agent and tools."""
@@ -73,14 +85,6 @@ class Workflow(AbstractWorkflow):
         # and the agent logic is moved directly into the graph nodes.
         # Keeping it for now as it might be re-introduced or refactored later.
         pass
-
-    async def _start_detect_fp(self, state):
-        # Minimal node logic
-        return state
-
-    async def _end_detect_fp(self, state):
-        # Minimal node logic
-        return state
 
     def get_workflow_state(self, goal: str):
         """Create the initial workflow state with the starting log message."""
