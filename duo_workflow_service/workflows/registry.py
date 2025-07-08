@@ -35,8 +35,8 @@ _WORKFLOWS_LOOKUP = {
 
 
 def resolve_workflow_class(workflow_definition: Optional[str]) -> TypeWorkflow:
-    return flow_registry.PytonAPIFlow
-    # return flow_registry.Flow
+    # return flow_registry.PytonAPIFlow
+    return flow_registry.Flow
     if workflow_definition:
         return _WORKFLOWS_LOOKUP[workflow_definition]
     return software_development.Workflow  # for backwards compatibility
