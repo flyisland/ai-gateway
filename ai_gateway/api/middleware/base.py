@@ -7,8 +7,7 @@ from typing import Optional
 import structlog
 from asgi_correlation_id.context import correlation_id
 from fastapi import status
-from langsmith.run_helpers import tracing_context
-from starlette.datastructures import MutableHeaders
+from starlette.datastructures import CommaSeparatedStrings, MutableHeaders
 from starlette.middleware.base import Request
 from starlette_context import context as starlette_context
 from uvicorn.protocols.utils import get_path_with_query_string
