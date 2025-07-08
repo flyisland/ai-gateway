@@ -1,0 +1,8 @@
+version: 1
+environment: local # Environment represents target execution environment - local or remote
+components:
+
+routers:
+
+flow:
+

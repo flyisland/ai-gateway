@@ -20,7 +20,7 @@ prompt_template:
     Format the link using Markdown syntax ([title](link)) for it to be clickable.
   user: |
     Here is my task:
-    {{task}}
+    {{goal}}
   placeholder: history
 params:
   timeout: 30

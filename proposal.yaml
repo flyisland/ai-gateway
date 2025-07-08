@@ -5,7 +5,7 @@ components:
     type: AgentComponent
     prompt_id: "agents/awesome"
     prompt_version: "^1.0.0"
-    inputs: ["context:task"]
+    inputs: ["context:goal"]
     output_type: "AgentFinalOutput"
     output: "context:agent.answer"
     ui_log_events:

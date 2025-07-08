@@ -54,7 +54,7 @@ def load_yaml_config() -> FlowConfig:
         # Get the path to proposal.yaml relative to the project root
         current_dir = os.path.dirname(os.path.abspath(__file__))
         project_root = os.path.join(current_dir, "..", "..", "..")
-        yaml_path = os.path.join(project_root, "proposal.yaml")
+        yaml_path = os.path.join(project_root, "flow_registry_demo.yaml") # "proposal.yaml") # flow_registry_demo.yaml
 
         with open(yaml_path, "r", encoding="utf-8") as file:
             yaml_content = yaml.safe_load(file)
@@ -119,7 +119,7 @@ class Flow(AbstractWorkflow):
             ui_chat_log=[initial_ui_chat_log],
             context={
                 "project_id": self._project.get("id"),
-                "task": goal,
+                "goal": goal,
             },
         )
 

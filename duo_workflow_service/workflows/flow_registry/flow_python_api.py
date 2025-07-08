@@ -73,7 +73,7 @@ class Flow(AbstractWorkflow):
             ui_chat_log=[initial_ui_chat_log],
             context={
                 "project_id": self._project.get("id"),
-                "task": goal,
+                "goal": goal,
             },
         )
 
@@ -95,7 +95,7 @@ class Flow(AbstractWorkflow):
         ]
         agent_component = AgentComponent(
             name="agent",
-            inputs=["context:task"],
+            inputs=["context:goal"],
             output="context:agent.answer",
             output_type=AgentFinalOutput,
             prompt_id="agents/awesome",
