@@ -21,7 +21,7 @@ class PromptSecurity:
     DANGEROUS_TAGS = {
         "goal": "goal",
         "system": "system",
-        "s": "system",
+        # Removed "s" mapping to prevent false positives with legitimate HTML
     }
 
     # Default security functions to apply to ALL tools

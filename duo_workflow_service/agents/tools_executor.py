@@ -89,7 +89,8 @@ class ToolsExecutor:
                 continue
 
             result = await self._execute_tool(tool_name, tool_call, plan)
-            if result.get("response") and hasattr(result.get("response"), "content"):
+            response = result.get("response")
+            if response and hasattr(response, "content"):
                 secure_result: str = PromptSecurity.apply_security(
                     response=result["response"].content,
                     tool_name=tool_name,
