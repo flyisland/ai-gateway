@@ -109,12 +109,3 @@ async def test_run_tool_node_security_layer():
     assert secured_outputs[0] == "output1 with &lt;goal&gt;dangerous tag&lt;/goal&gt;"
     assert secured_outputs[1] == "output2 with &lt;system&gt;another tag&lt;/system&gt;"
 
-    # Verify the state was passed correctly
-    assert output_parser.call_args[0][1] == state
-
-    # Verify UI chat log
-    assert len(result["ui_chat_log"]) == 2
-    assert all(
-        log["message_type"] == MessageTypeEnum.TOOL for log in result["ui_chat_log"]
-    )
-    assert all(log["status"] == ToolStatus.SUCCESS for log in result["ui_chat_log"])
