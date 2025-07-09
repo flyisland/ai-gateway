@@ -21,7 +21,6 @@ class PromptSecurity:
     DANGEROUS_TAGS = {
         "goal": "goal",
         "system": "system",
-        # Removed "s" mapping to prevent false positives with legitimate HTML
     }
 
     # Default security functions to apply to ALL tools
@@ -115,7 +114,7 @@ class PromptSecurity:
         for tag_name, replacement in PromptSecurity.DANGEROUS_TAGS.items():
             # Pattern 1: Regular HTML tags like <goal> or </goal>
             text = re.sub(
-                f"<\s*(/?)\s*{tag_name}\s*>",
+                r"<\s*(/?)\s*{tag_name}\s*>",
                 f"&lt;\\1{replacement}&gt;",
                 text,
                 flags=re.IGNORECASE,
@@ -123,7 +122,7 @@ class PromptSecurity:
 
             # Pattern 2: Unicode-escaped tags like \u003cgoal\u003e or \u003c/goal\u003e
             text = re.sub(
-                f"\\\\u003c\s*(/?)\s*{tag_name}\s*\\\\u003e",
+                r"\\\\u003c\s*(/?)\s*{tag_name}\s*\\\\u003e",
                 f"&lt;\\1{replacement}&gt;",
                 text,
                 flags=re.IGNORECASE,
@@ -131,7 +130,7 @@ class PromptSecurity:
 
             # Pattern 3: Mixed format like \\u003cgoal\\u003e (with double backslashes)
             text = re.sub(
-                f"\\\\\\\\u003c\s*(/?)\s*{tag_name}\s*\\\\\\\\u003e",
+                r"\\\\\\\\u003c\s*(/?)\s*{tag_name}\s*\\\\\\\\u003e",
                 f"&lt;\\1{replacement}&gt;",
                 text,
                 flags=re.IGNORECASE,
