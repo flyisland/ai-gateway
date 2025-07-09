@@ -408,6 +408,7 @@ def _resolve_code_completions_litellm(
     payload: SuggestionsRequest,
     current_user: StarletteUser,
     prompt_registry: BasePromptRegistry,
+    # pylint: disable=unused-argument
     use_llm_prompt_caching: bool,
     completions_agent_factory: Factory[CodeCompletions],
     completions_litellm_factory: Factory[CodeCompletions],

@@ -6,6 +6,7 @@ from pydantic import AnyUrl, BaseModel, StringConstraints, UrlConstraints
 
 from ai_gateway.api.auth_utils import StarletteUser
 from ai_gateway.model_selection import ModelSelectionConfig
+from ai_gateway.config import Config
 
 
 class BaseModelMetadata(BaseModel):
@@ -100,16 +101,21 @@ def parameters_for_gitlab_provider(parameters) -> dict[str, Any]:
     }
 
     if gitlab_model.provider == "fireworks_ai":
-        from ai_gateway.config import Config
         config = Config()
 
         if config.model_endpoints.fireworks_current_region_endpoint:
             if gitlab_model.gitlab_identifier == "codestral_2501_fireworks":
-                model_config = config.model_endpoints.fireworks_current_region_endpoint.get("codestral-2501", {})
+                model_config = (
+                    config.model_endpoints.fireworks_current_region_endpoint.get(
+                        "codestral-2501", {}
+                    )
+                )
                 if model_config:
                     result["endpoint"] = model_config.get("endpoint")
                     result["api_key"] = config.model_keys.fireworks_api_key
-                    result["identifier"] = f"text-completion-openai/{model_config.get('identifier')}"
+                    result["identifier"] = (
+                        f"text-completion-openai/{model_config.get('identifier')}"
+                    )
 
     return result
 
