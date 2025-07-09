@@ -41,7 +41,7 @@ class AgentModel(TextGenModelBase):
         if stream:
             return self._handle_stream(params)
 
-        response = await self.prompt.ainvoke(params)
+        response = await self.prompt.ainvoke_prompt(params)
 
         response_content = self._format_response_content(response.content) or ""
 

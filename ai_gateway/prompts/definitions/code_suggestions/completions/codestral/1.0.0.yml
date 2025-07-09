@@ -10,10 +10,8 @@ model:
 unit_primitives:
   - complete_code
 prompt_template:
-  system: |
-    {% include 'code_suggestions/completions/codestral_system/1.0.0.jinja' %}
   user: |
-    <s>[SUFFIX]{{suffix}}[PREFIX]{{prefix}}
+    </s>[SUFFIX]{suffix}[PREFIX]{prefix}[MIDDLE]
 params:
   timeout: 60
   stop:
