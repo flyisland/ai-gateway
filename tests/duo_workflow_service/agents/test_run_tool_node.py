@@ -108,4 +108,3 @@ async def test_run_tool_node_security_layer():
     assert len(secured_outputs) == 2
     assert secured_outputs[0] == "output1 with &lt;goal&gt;dangerous tag&lt;/goal&gt;"
     assert secured_outputs[1] == "output2 with &lt;system&gt;another tag&lt;/system&gt;"
-
