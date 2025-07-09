@@ -26,6 +26,7 @@ class RunCommand(DuoBaseTool):
         "Run a bash command in the current working directory. "
         f"Following bash commands are not supported: {', '.join(_DISALLOWED_COMMANDS)} "
         "and will result in error."
+        "If listing files use the list_dir tool instead."
         "Pay extra attention to correctly escape special characters like '`'"
     )
     args_schema: Type[BaseModel] = RunCommandInput  # type: ignore
