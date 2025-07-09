@@ -87,7 +87,7 @@ class RunToolNode(Generic[WorkflowStateT]):
                             tool_name=self._tool.name,
                         )
                         output = secure_output
-                    except SecurityException as e:
+                    except SecurityException:
                         raise
 
             outputs.append(output)
