@@ -55,11 +55,7 @@ class ChatAgentPromptTemplate(Runnable[ChatWorkflowState, PromptValue]):
             static_content_text = jinja2_formatter(
                 self.prompt_template["system_static"]
             )
-            # Always cache system prompts for Anthropic models in agentic chat
-            # Check if this is an Anthropic model by looking at the agent's model_provider
-            agent_name = _kwargs["agent_name"]
-            # We need to access the agent instance to check the model provider
-            # This will be passed from the ChatAgent.run method
+            # Always cache static system prompt for Anthropic models
             is_anthropic = _kwargs.get("is_anthropic_model", False)
             if is_anthropic:
                 cached_static_content: list[Union[str, dict]] = [
