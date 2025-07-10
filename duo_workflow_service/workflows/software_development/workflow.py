@@ -18,6 +18,7 @@ from langgraph.graph import (  # pylint: disable=no-langgraph-langchain-imports
     StateGraph,
 )
 
+from ai_gateway.structured_logging import can_log_request_data
 from duo_workflow_service.agents import (
     Agent,
     AgentV2,
@@ -341,6 +342,27 @@ class Workflow(AbstractWorkflow):
             project=self._project,
             goal=goal,
         )
+
+    def log_workflow_elements(self, element):
+        if "conversation_history" not in element:
+            return
+
+        for agent, messages in element["conversation_history"].items():
+            self.log.info("agent: %s", agent)
+            if can_log_request_data():
+                messages = messages if DEBUG else messages[-MAX_MESSAGES_TO_DISPLAY:]
+                for message in messages:
+                    self.log.info(
+                        f"%s: %{'' if DEBUG else f'.{MAX_MESSAGE_LENGTH}'}s",
+                        message.__class__.__name__,
+                        message.content,
+                    )
+                self.log.info("--------------------------")
+                if "status" in element:
+                    self.log.info(element["status"])
+                if "plan" in element:
+                    self.log.info(element["plan"])
+                self.log.info("###############################")
 
     def _setup_context_builder(
         self,

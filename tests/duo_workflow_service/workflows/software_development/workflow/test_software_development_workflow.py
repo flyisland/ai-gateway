@@ -977,7 +977,6 @@ async def test_workflow_cleanup(workflow):
     assert workflow._inbox.qsize() == 0
 
 
-@pytest.mark.parametrize("duo_workflow_prompt_registry_enabled", [False, True])
 @pytest.mark.parametrize(
     "env_vars,expected_config_type,expected_model",
     [
@@ -1005,12 +1004,51 @@ def test_software_development_workflow_model_config(
     workflow,
 ):
     """Test that software development workflow uses correct model based on feature flags."""
-    from duo_workflow_service.interceptors.feature_flag_interceptor import (
-        current_feature_flag_context,
-    )
-
     with patch.dict(os.environ, env_vars, clear=True):
         config = workflow._get_model_config()
 
         assert isinstance(config, expected_config_type)
         assert config.model_name == expected_model
+
+
+@pytest.mark.parametrize(
+    ("feature_flags", "expected_output"),
+    [
+        (
+            "expanded_ai_logging",
+            ["%s", "AIMessage", "Test AI Message"],
+        ),
+        ("", None),
+    ],
+)
+@patch("logging.Logger.info")
+def test_log_workflow_elements(mock_logger_info, feature_flags, expected_output):
+    """Test logging of workflow elements with feature flags."""
+    workflow = Workflow(
+        "123",
+        {},
+        workflow_type=CategoryEnum.WORKFLOW_SOFTWARE_DEVELOPMENT,
+    )
+
+    element = {
+        "conversation_history": {
+            "test_agent": [AIMessage(content="Test AI Message")],
+        }
+    }
+
+    token = current_feature_flag_context.set({feature_flags})
+    try:
+        workflow.log = Mock()
+        workflow.log_workflow_elements(element)
+        format_call_args = workflow.log.info.call_args_list
+        assert format_call_args[0][0][0] == "agent: %s"
+        assert format_call_args[0][0][1] == "test_agent"
+        if expected_output is not None:
+            assert len(format_call_args) == 4
+            assert format_call_args[1][0][0].startswith(expected_output[0])
+            assert format_call_args[1][0][1] == expected_output[1]
+            assert format_call_args[1][0][2] == expected_output[2]
+        else:
+            assert len(format_call_args) == 1
+    finally:
+        current_feature_flag_context.reset(token)

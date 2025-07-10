@@ -9,6 +9,7 @@ from langgraph.checkpoint.memory import BaseCheckpointSaver
 from langgraph.graph import END, StateGraph
 from langgraph.types import Command
 
+from ai_gateway.structured_logging import can_log_request_data
 from duo_workflow_service.agents.chat_agent import ChatAgent
 from duo_workflow_service.agents.tools_executor import ToolsExecutor
 from duo_workflow_service.checkpointer.gitlab_workflow import WorkflowStatusEventEnum
@@ -240,6 +241,17 @@ class Workflow(AbstractWorkflow):
         graph.add_edge("run_tools", "agent")
 
         return graph.compile(checkpointer=checkpointer)
+
+    def log_workflow_elements(self, element):
+        if can_log_request_data():
+            self.log.info("###############################")
+            if "ui_chat_log" in element:
+                for log in element["ui_chat_log"]:
+                    self.log.info(
+                        f"%s: %{'' if DEBUG else f'.{MAX_MESSAGE_LENGTH}'}s",
+                        log["message_type"],
+                        log["content"],
+                    )
 
     def _get_tools(self):
         available_tools = CHAT_READ_ONLY_TOOLS + CHAT_MUTATION_TOOLS + RUN_COMMAND_TOOLS

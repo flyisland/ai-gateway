@@ -1,6 +1,6 @@
-# pylint: disable=too-many-return-statements,unused-argument
-
+# pylint: disable=too-many-return-statements,unused-argument,direct-environment-variable-reference
 import json
+import os
 from datetime import datetime, timezone
 from enum import StrEnum
 from typing import Any
@@ -9,6 +9,7 @@ from langchain_core.messages import HumanMessage, SystemMessage
 from langgraph.checkpoint.memory import BaseCheckpointSaver
 from langgraph.graph import END, StateGraph
 
+from ai_gateway.structured_logging import can_log_request_data
 from duo_workflow_service.agents import Agent, HandoverAgent, RunToolNode, ToolsExecutor
 from duo_workflow_service.components import ToolsRegistry
 from duo_workflow_service.entities import (
@@ -38,6 +39,8 @@ from duo_workflow_service.workflows.convert_to_gitlab_ci.prompts import (
 from lib.internal_events.event_enum import CategoryEnum
 
 AGENT_NAME = "ci_pipelines_manager_agent"
+DEBUG = os.getenv("DEBUG")
+MAX_MESSAGE_LENGTH = 200
 
 
 # ROUTERS
@@ -377,3 +380,14 @@ class Workflow(AbstractWorkflow):
             project=None,
             goal=goal,
         )
+
+    def log_workflow_elements(self, element):
+        if can_log_request_data():
+            self.log.info("###############################")
+            if "ui_chat_log" in element:
+                for log in element["ui_chat_log"]:
+                    self.log.info(
+                        f"%s: %{'' if DEBUG else f'.{MAX_MESSAGE_LENGTH}'}s",
+                        log["message_type"],
+                        log["content"],
+                    )

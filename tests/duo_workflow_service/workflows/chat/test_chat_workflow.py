@@ -726,3 +726,41 @@ async def test_workflow_with_approval_object():
 
     assert workflow._approval is not None
     assert workflow._approval.WhichOneof("user_decision") == "approval"
+
+
+@pytest.mark.parametrize(
+    ("feature_flags", "expected_output"),
+    [("expanded_ai_logging", ["%s", "Test message content"]), ("", None)],
+)
+@patch("logging.Logger.info")
+def test_log_workflow_elements(
+    mock_logger_info, workflow_with_project, feature_flags, expected_output
+):
+    element = {
+        "ui_chat_log": [
+            {
+                "message_type": MessageTypeEnum.AGENT,
+                "content": "Test message content",
+                "timestamp": datetime.now().isoformat(),
+                "status": ToolStatus.SUCCESS,
+            }
+        ]
+    }
+    token = current_feature_flag_context.set({feature_flags})
+    try:
+        workflow_with_project.log = Mock()
+        workflow_with_project.log_workflow_elements(element)
+        if expected_output is not None:
+            workflow_with_project.log.info.assert_any_call(
+                "###############################"
+            )
+
+            format_call_args = workflow_with_project.log.info.call_args_list[1][0]
+            assert format_call_args[0].startswith(
+                expected_output[0]
+            )  # Format string starts with message type
+            assert expected_output[1] in format_call_args[2]  # Second arg is content
+        else:
+            assert len(workflow_with_project.log.warning.call_args_list) == 0
+    finally:
+        current_feature_flag_context.reset(token)

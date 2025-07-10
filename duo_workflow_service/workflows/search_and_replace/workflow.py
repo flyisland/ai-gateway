@@ -10,6 +10,7 @@ from langchain_core.messages import AIMessage, HumanMessage, SystemMessage
 from langgraph.checkpoint.memory import BaseCheckpointSaver
 from langgraph.graph import END, StateGraph
 
+from ai_gateway.structured_logging import can_log_request_data
 from duo_workflow_service.agents import Agent, RunToolNode, ToolsExecutor
 from duo_workflow_service.agents.handover import HandoverAgent
 from duo_workflow_service.components import ToolsRegistry
@@ -525,3 +526,14 @@ class Workflow(AbstractWorkflow):
             plan=Plan(steps=[]),
             handover=[],
         )
+
+    def log_workflow_elements(self, element):
+        if can_log_request_data():
+            self.log.info("###############################")
+            if "ui_chat_log" in element:
+                for log in element["ui_chat_log"]:
+                    self.log.info(
+                        f"%s: %{'' if DEBUG else f'.{MAX_MESSAGE_LENGTH}'}s",
+                        log["message_type"],
+                        log["content"],
+                    )

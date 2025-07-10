@@ -1,3 +1,5 @@
+# pylint: disable=direct-environment-variable-reference,
+import os
 import shlex
 from datetime import datetime, timezone
 from enum import StrEnum
@@ -8,6 +10,7 @@ from langgraph.checkpoint.base import BaseCheckpointSaver
 from langgraph.constants import END
 from langgraph.graph import StateGraph
 
+from ai_gateway.structured_logging import can_log_request_data
 from duo_workflow_service.agents import (
     Agent,
     HandoverAgent,
@@ -83,6 +86,8 @@ EXECUTOR_TOOLS = [
     "get_epic_note",
     "get_commit",
 ]
+DEBUG = os.getenv("DEBUG")
+MAX_MESSAGE_LENGTH = 200
 
 
 class Routes(StrEnum):
@@ -357,6 +362,17 @@ class Workflow(AbstractWorkflow):
             project=self._project,
             goal=goal,
         )
+
+    def log_workflow_elements(self, element):
+        if can_log_request_data():
+            self.log.info("###############################")
+            if "ui_chat_log" in element:
+                for log in element["ui_chat_log"]:
+                    self.log.info(
+                        f"%s: %{'' if DEBUG else f'.{MAX_MESSAGE_LENGTH}'}s",
+                        log["message_type"],
+                        log["content"],
+                    )
 
     def _fetch_issue_iid(self, issue_url: str):
         try:
