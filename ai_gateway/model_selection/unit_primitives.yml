@@ -143,3 +143,9 @@ configurable_unit_primitives:
     default_model: "claude_3_5_sonnet_20240620"
     selectable_models:
       - "claude_3_5_sonnet_20240620"
+  - feature_setting: "duo_chat_ai_catalog_item"
+    unit_primitives:
+      - "ai_catalog_item"
+    default_model: "claude_3_5_sonnet_20240620"
+    selectable_models:
+      - "claude_3_5_sonnet_20240620"

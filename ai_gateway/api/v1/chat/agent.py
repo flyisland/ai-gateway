@@ -51,6 +51,10 @@ CHAT_INVOKABLES = [
         unit_primitive=GitLabUnitPrimitive.SUMMARIZE_COMMENTS,
     ),
     ChatInvokable(
+        name="ai_catalog_item",
+        unit_primitive=GitLabUnitPrimitive.AI_CATALOG_ITEM,
+    ),
+    ChatInvokable(
         name="troubleshoot_job",
         unit_primitive=GitLabUnitPrimitive.TROUBLESHOOT_JOB,
     ),
