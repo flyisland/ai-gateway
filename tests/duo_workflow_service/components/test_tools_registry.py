@@ -17,7 +17,11 @@ from duo_workflow_service.components.tools_registry import (
     ToolsRegistry,
 )
 from duo_workflow_service.gitlab.http_client import GitlabHttpClient
-from duo_workflow_service.tools.work_item import GetWorkItem
+from duo_workflow_service.tools.work_item import (
+    GetWorkItem,
+    GetWorkItemNotes,
+    ListWorkItems,
+)
 from lib.feature_flags import current_feature_flag_context
 
 
@@ -656,9 +660,17 @@ def test_work_item_tools_feature_flag(
     "lsp_version,feature_flags,ff_disabled_tools",
     [
         ("0.0.1", "", {}),
-        ("0.0.1", "duo_workflow_work_item_tools", {GetWorkItem}),
+        (
+            "0.0.1",
+            "duo_workflow_work_item_tools",
+            {GetWorkItem, ListWorkItems, GetWorkItemNotes},
+        ),
         ("7.42.999", "", {}),
-        ("7.42.999", "duo_workflow_work_item_tools", {GetWorkItem}),
+        (
+            "7.42.999",
+            "duo_workflow_work_item_tools",
+            {GetWorkItem, ListWorkItems, GetWorkItemNotes},
+        ),
     ],
 )
 async def test_registry_configuration_with_restricted_language_server_client(
@@ -704,13 +716,13 @@ async def test_registry_configuration_with_restricted_language_server_client(
     "lsp_version,feature_flags,ff_disabled_tools",
     [
         (None, "duo_workflow_work_item_tools", {}),
-        (None, "", {GetWorkItem}),
+        (None, "", {GetWorkItem, ListWorkItems, GetWorkItemNotes}),
         ("7.43.0", "duo_workflow_work_item_tools", {}),
-        ("7.43.0", "", {GetWorkItem}),
+        ("7.43.0", "", {GetWorkItem, ListWorkItems, GetWorkItemNotes}),
         ("7.43.1", "duo_workflow_work_item_tools", {}),
-        ("7.43.1", "", {GetWorkItem}),
+        ("7.43.1", "", {GetWorkItem, ListWorkItems, GetWorkItemNotes}),
         ("8.0.0", "duo_workflow_work_item_tools", {}),
-        ("8.0.0", "", {GetWorkItem}),
+        ("8.0.0", "", {GetWorkItem, ListWorkItems, GetWorkItemNotes}),
     ],
 )
 async def test_registry_configuration_with_unrestricted_language_server_client(
