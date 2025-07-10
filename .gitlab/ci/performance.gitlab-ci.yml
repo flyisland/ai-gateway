@@ -11,8 +11,7 @@ dotenv-vars:
     - cat variables.env
   artifacts:
     paths:
-      - performance_tests
-      - variables.env
+      - e2eperformance
     expire_in: 5d
     reports:
       dotenv: variables.env
@@ -47,8 +46,6 @@ tests:performance:
     PARENT_PIPELINE_SOURCE: $CI_PIPELINE_SOURCE
     COMPONENT_MR_CI_COMMIT_SHA: $CI_COMMIT_SHORT_SHA
     COMPONENT_SERVICE_NAME: "ai-gateway-influx"
-    TEST_FILE_LOCATION: "performance_tests/k6_test"
-    # DOCKER_COMPOSE_FILE_LOCATION: "performance_tests/setup"
     GITLAB_HELM_CHART_REF: "6cdb0e1cd4ceb7c9fd01ffa2f62c4a7a4c77a23b"
     TEST_FILE_LOCATION: "e2eperformance/tests"
     DATA_SEEDER_FILE_NAME: "beautiful_data.rb"
