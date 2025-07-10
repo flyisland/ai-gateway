@@ -1,4 +1,5 @@
 import json
+import urllib.parse
 from typing import List, Optional, Tuple, Type
 
 from pydantic import BaseModel, Field
@@ -15,7 +16,7 @@ class RepositoryFileResourceInput(ProjectResourceInput):
     )
     file_path: Optional[str] = Field(
         default=None,
-        description="URL encoded full path to file, such as lib%2Fclass%2Erb.",
+        description="Full path to file, such as lib/class.rb.",
     )
 
 
@@ -108,9 +109,14 @@ class GetRepositoryFile(RepositoryFileBaseTool):
         if errors:
             return json.dumps({"error": "; ".join(errors)})
 
+        if not project_id or not file_path:
+            return json.dumps({"error": "Project id or file path is missing"})
+
+        url_encoded_file_path = urllib.parse.quote(file_path, safe="")
+
         try:
             response = await self.gitlab_client.aget(
-                path=f"/api/v4/projects/{project_id}/repository/files/{file_path}/raw",
+                path=f"/api/v4/projects/{project_id}/repository/files/{url_encoded_file_path}/raw",
                 params={"ref": ref},
                 parse_json=False,
             )

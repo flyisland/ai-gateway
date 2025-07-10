@@ -52,6 +52,17 @@ def tool(metadata):
             {"content": "file content"},
         ),
         (
+            {
+                "project_id": "gitlab-org/gitlab",
+                "ref": "master",
+                "file_path": "file/path/with/slashes",
+            },
+            "/api/v4/projects/gitlab-org/gitlab/repository/files/file%2Fpath%2Fwith%2Fslashes/raw",
+            "master",
+            "file content",
+            {"content": "file content"},
+        ),
+        (
             {"url": "https://gitlab.com/namespace/project/-/blob/master/README.md"},
             "/api/v4/projects/namespace%2Fproject/repository/files/README.md/raw",
             "master",
@@ -72,7 +83,12 @@ def tool(metadata):
             },
         ),
     ],
-    ids=["Explicit params", "URL parameter", "Special characters in text content"],
+    ids=[
+        "Explicit params",
+        "File path with slashes",
+        "URL parameter",
+        "Special characters in text content",
+    ],
 )
 @pytest.mark.asyncio
 async def test_get_file_success(
@@ -109,6 +125,14 @@ async def test_get_file_success(
             "Failed to parse URL",
         ),
         (
+            {"url": "https://gitlab.com/namespace/project"},
+            {
+                "mock_type": "validate_error",
+                "mock_value": (None, None, None, []),
+            },
+            "Project id or file path is missing",
+        ),
+        (
             {"project_id": "3", "ref": "master", "file_path": "README.md"},
             {"mock_type": "api_error", "mock_value": Exception("API error")},
             "API error",
@@ -130,6 +154,7 @@ async def test_get_file_success(
     ],
     ids=[
         "URL parsing error",
+        "Project id or file path is missing",
         "API error",
         "Binary file detection",
     ],
