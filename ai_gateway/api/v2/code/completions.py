@@ -145,9 +145,9 @@ async def completions(
         completions_anthropic_factory,
         completions_litellm_factory,
         completions_fireworks_factory,
-        completions_agent_factory,
+        completions_agent_factory,  # make this unneccessary in the end
         completions_amazon_q_factory,
-        completions_litellm_vertex_codestral_factory,
+        completions_litellm_vertex_codestral_factory,  # this could be completions_litellm
         internal_event_client,
         region=region,
     )
@@ -438,21 +438,28 @@ def _resolve_code_completions_litellm(
     completions_agent_factory: Factory[CodeCompletions],
     completions_litellm_factory: Factory[CodeCompletions],
 ) -> CodeCompletions:
-    if payload.prompt_version == 2 and not payload.prompt:
-        model_metadata = ModelMetadata(
-            name=payload.model_name,
-            endpoint=payload.model_endpoint,
-            api_key=payload.model_api_key,
-            identifier=payload.model_identifier,
-            provider=payload.model_provider or "text-completion-openai",
-        )
+    # Duo self- hosted
+    # prompt  = resolve_prompt ()....
+    # if payload.prompt_version == 2 and not payload.prompt:
+    #     model_metadata = ModelMetadata(
+    #         name=payload.model_name,
+    #         endpoint=payload.model_endpoint,
+    #         api_key=payload.model_api_key,
+    #         identifier=payload.model_identifier,
+    #         provider=payload.model_provider or "text-completion-openai",
+    #     )
+    #
+    #     return _resolve_agent_code_completions(
+    #         model_metadata=model_metadata,
+    #         current_user=current_user,
+    #         prompt_registry=prompt_registry,
+    #         completions_agent_factory=completions_agent_factory,
+    #     )
 
-        return _resolve_agent_code_completions(
-            model_metadata=model_metadata,
-            current_user=current_user,
-            prompt_registry=prompt_registry,
-            completions_agent_factory=completions_agent_factory,
-        )
+    # .com
+
+    # Resolve prompt here and to litellm_factory
+    # prompt = _resolve_prompt(...)
 
     return completions_litellm_factory(
         model__name=payload.model_name,
@@ -460,6 +467,7 @@ def _resolve_code_completions_litellm(
         model__api_key=payload.model_api_key,
         model__provider=payload.model_provider,
         model__using_cache=use_llm_prompt_caching,
+        # prompt=prompt,
     )
 
 

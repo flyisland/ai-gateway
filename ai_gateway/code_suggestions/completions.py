@@ -19,7 +19,10 @@ from ai_gateway.code_suggestions.processing import (
 )
 from ai_gateway.code_suggestions.processing.post.completions import PostProcessor
 from ai_gateway.code_suggestions.processing.pre import PromptBuilderPrefixBased
-from ai_gateway.code_suggestions.processing.typing import MetadataExtraInfo
+from ai_gateway.code_suggestions.processing.typing import (
+    MetadataExtraInfo,
+    CodeCompletionPrompt,
+)
 from ai_gateway.instrumentators import (
     KnownMetrics,
     TextGenModelInstrumentator,
@@ -141,6 +144,10 @@ class CodeCompletions:
             model.input_token_limit, tokenization_strategy
         )
 
+    def _prompt_to_code_completion_prompt(self, prompt: Prompt) -> CodeCompletionPrompt:
+        # Implement conversion from ai_gateway.prompts.base.Prompt to CodeCompletionPrompt
+        pass
+
     def _get_prompt(
         self,
         prefix: str,
@@ -173,6 +180,7 @@ class CodeCompletions:
         raw_prompt: Optional[str | list[Message]] = None,
         code_context: Optional[list] = None,
         stream: bool = False,
+        prompt: Optional[Prompt] = None,
         **kwargs: Any,
     ) -> Union[CodeSuggestionsOutput, AsyncIterator[CodeSuggestionsChunk]]:
         lang_id = resolve_lang_id(file_name, editor_lang)
@@ -181,22 +189,26 @@ class CodeCompletions:
         context_max_percent = kwargs.pop(
             "context_max_percent", 1.0
         )  # default is full context window
-        prompt = self._get_prompt(
-            prefix,
-            suffix,
-            raw_prompt=raw_prompt,
-            code_context=code_context,
-            context_max_percent=context_max_percent,
-        )
 
-        with self.instrumentator.watch(prompt) as watch_container:
+        if self.prompt is None:
+            code_completion_prompt = self._prompt_to_code_completion_prompt(...)
+        else:
+            code_completion_prompt = self._get_prompt(
+                prefix,
+                suffix,
+                raw_prompt=raw_prompt,
+                code_context=code_context,
+                context_max_percent=context_max_percent,
+            )
+
+        with self.instrumentator.watch(code_completion_prompt) as watch_container:
             try:
                 watch_container.register_lang(lang_id, editor_lang)
 
                 if isinstance(self.model, AgentModel):
                     params = {
-                        "prefix": prompt.prefix,
-                        "suffix": prompt.suffix,
+                        "prefix": code_completion_prompt.prefix,
+                        "suffix": code_completion_prompt.suffix,
                         "file_name": file_name,
                         "language": (
                             editor_lang or resolve_lang_name(file_name)
@@ -206,13 +218,13 @@ class CodeCompletions:
                     res = await self.model.generate(params, stream)
                 elif isinstance(self.model, ChatModelBase):
                     res = await self.model.generate(
-                        prompt.prefix, stream=stream, **kwargs
+                        code_completion_prompt.prefix, stream=stream, **kwargs
                     )
                 elif isinstance(self.model, AmazonQModel):
                     if lang := (editor_lang or resolve_lang_name(file_name)):
                         res = await self.model.generate(
-                            prompt.prefix,
-                            prompt.suffix,
+                            code_completion_prompt.prefix,
+                            code_completion_prompt.suffix,
                             file_name,
                             lang.lower(),
                             stream,
@@ -222,7 +234,10 @@ class CodeCompletions:
                         res = None
                 else:
                     res = await self.model.generate(
-                        prompt.prefix, prompt.suffix, stream, **kwargs
+                        code_completion_prompt.prefix,
+                        code_completion_prompt.suffix,
+                        stream,
+                        **kwargs,
                     )
 
                 if res:
@@ -230,7 +245,7 @@ class CodeCompletions:
                         return self._handle_stream(res)
 
                     return await self._handle_sync(
-                        prompt, res, lang_id, watch_container
+                        code_completion_prompt, res, lang_id, watch_container
                     )
             except ModelAPICallError as ex:
                 watch_container.register_model_exception(str(ex), ex.code)

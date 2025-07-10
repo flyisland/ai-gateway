@@ -52,7 +52,7 @@ class CodeContent(NamedTuple):
     length_tokens: int
 
 
-class Prompt(NamedTuple):
+class CodeCompletionPrompt(NamedTuple):
     prefix: str | list
     metadata: MetadataPromptBuilder
     suffix: Optional[str] = None
