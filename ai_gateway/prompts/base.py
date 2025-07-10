@@ -85,6 +85,7 @@ class Prompt(RunnableBinding[Input, Output]):
     prompt_tpl: Runnable[Input, PromptValue]
     internal_event_client: Optional[InternalEventsClient] = None
     limits: Optional[ModelLimits] = None
+    text_completion: bool = False
 
     def __init__(
         self,
@@ -114,6 +115,8 @@ class Prompt(RunnableBinding[Input, Output]):
                 prompt | model.bind(**model_kwargs),
             )
         )
+
+        # self.text_completion = config.text_completion
 
         super().__init__(
             name=config.name,
@@ -185,6 +188,15 @@ class Prompt(RunnableBinding[Input, Output]):
             self.handle_usage_metadata(watcher, cb.usage_metadata)
 
             return result
+
+    async def ainvoke_prompt(
+        self,
+        input: Input,
+        config: Optional[RunnableConfig] = None,
+        **kwargs: Optional[Any],
+    ) -> Output:
+        # Implement this
+        pass
 
     async def astream(
         self,

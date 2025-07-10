@@ -41,7 +41,19 @@ class AgentModel(TextGenModelBase):
         if stream:
             return self._handle_stream(params)
 
-        response = await self.prompt.ainvoke_prompt(params)
+        if self.prompt.text_completion:
+            response = await self.prompt.ainvoke_prompt(params)
+
+            # Implement conversion to expected result type
+            response_content = ""
+            return TextGenModelOutput(
+                text=response_content,
+                # Give a high value, the model doesn't return scores.
+                score=10**5,
+                safety_attributes=SafetyAttributes(),
+            )
+
+        response = await self.prompt.ainvoke(params)
 
         response_content = self._format_response_content(response.content) or ""
 

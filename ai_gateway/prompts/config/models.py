@@ -29,6 +29,7 @@ class BaseModelParams(BaseModel):
     max_retries: int | None = 1
     model_class_provider: str | None = None
     custom_llm_provider: str | None = None
+    text_completion: bool = False
 
 
 class ChatLiteLLMParams(BaseModelParams):

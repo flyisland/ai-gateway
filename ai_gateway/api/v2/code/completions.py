@@ -375,6 +375,8 @@ def _build_code_generations(
     generations_agent_factory: Factory[CodeGenerations],
     internal_event_client: InternalEventsClient,
 ) -> CodeGenerations:
+    # Duo self-hosted. Can we use this for .com? We need to make Prompt registry support text completion based on a
+    # configuration
     if payload.prompt_id:
         return _resolve_prompt_code_generations(
             payload,
@@ -383,25 +385,27 @@ def _build_code_generations(
             generations_agent_factory,
         )
 
-    tracking_event = f"request_{GitLabUnitPrimitive.GENERATE_CODE}"
-
-    # If we didn't use the prompt registry, we have to track the internal event manually
-    _track_code_suggestions_event(tracking_event, internal_event_client)
-
-    if payload.model_provider == KindModelProvider.ANTHROPIC:
-        return _resolve_code_generations_anthropic_chat(
-            payload,
-            generations_anthropic_chat_factory,
-        )
-
-    if payload.model_provider == KindModelProvider.LITELLM:
-        return generations_litellm_factory(
-            model__name=payload.model_name,
-            model__endpoint=payload.model_endpoint,
-            model__api_key=payload.model_api_key,
-        )
-
-    return generations_vertex_factory()
+    # .com is below
+    # tracking_event = f"request_{GitLabUnitPrimitive.GENERATE_CODE}"
+    #
+    # # If we didn't use the prompt registry, we have to track the internal event manually
+    # _track_code_suggestions_event(tracking_event, internal_event_client)
+    #
+    # if payload.model_provider == KindModelProvider.ANTHROPIC:
+    #     return _resolve_code_generations_anthropic_chat(
+    #         payload,
+    #         generations_anthropic_chat_factory,
+    #     )
+    #
+    # # Can we configure duo self-hosted here instead of in _resolve_prompt_code_generations?
+    # if payload.model_provider == KindModelProvider.LITELLM:
+    #     return generations_litellm_factory(
+    #         model__name=payload.model_name,
+    #         model__endpoint=payload.model_endpoint,
+    #         model__api_key=payload.model_api_key,
+    #     )
+    #
+    # return generations_vertex_factory()
 
 
 def _resolve_code_completions_litellm(
