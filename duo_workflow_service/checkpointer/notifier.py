@@ -13,6 +13,7 @@ from duo_workflow_service.checkpointer.gitlab_workflow import (
 )
 from duo_workflow_service.entities.state import (
     MessageTypeEnum,
+    ToolInfo,
     UiChatLog,
     WorkflowStatusEnum,
 )
@@ -29,6 +30,7 @@ class UserInterface:
         self.ui_chat_log: list[UiChatLog] = []
         self.status = WorkflowStatusEnum.NOT_STARTED
         self.steps: list[dict] = []
+        self.last_message_chunk = None
 
     async def send_event(
         self,
@@ -71,15 +73,12 @@ class UserInterface:
         return await self.outbox.put(action)
 
     def _append_chunk_to_ui_chat_log(self, message: BaseMessage):
-        content = StrOutputParser().invoke(message) or ""
-        if not content:
-            return
-
         if (
             not self.ui_chat_log
-            or self.ui_chat_log[-1]["message_type"] != MessageTypeEnum.AGENT
+            or not self.ui_chat_log[-1]["message_type"] in [MessageTypeEnum.AGENT, MessageTypeEnum.TOOL]
             or self.ui_chat_log[-1]["status"]
         ):
+            self.last_message_chunk = message
             last_message = UiChatLog(
                 status=None,
                 correlation_id=None,
@@ -92,6 +91,12 @@ class UserInterface:
             )
             self.ui_chat_log.append(last_message)
         else:
+            self.last_message_chunk += message
             last_message = self.ui_chat_log[-1]
 
-        last_message["content"] = last_message["content"] + content
+        last_message["content"] = StrOutputParser().invoke(self.last_message_chunk) or ""
+
+        if self.last_message_chunk.tool_calls:
+            tool_call = self.last_message_chunk.tool_calls[0]
+            last_message["tool_info"] = ToolInfo(name=tool_call["name"], args=tool_call["args"])
+            last_message["message_type"] = MessageTypeEnum.TOOL
