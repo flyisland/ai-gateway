@@ -23,7 +23,7 @@ from langchain_community.cache import SQLiteCache
 
 from ai_gateway.config import Config
 from ai_gateway.container import ContainerApplication
-from contract import contract_pb2, contract_pb2_grpc
+from contract import contract_pb2, contract_pb2_grpc, health_pb2_grpc
 from duo_workflow_service.gitlab.connection_pool import connection_pool
 from duo_workflow_service.interceptors.authentication_interceptor import (
     AuthenticationInterceptor,
@@ -44,6 +44,7 @@ from duo_workflow_service.interceptors.monitoring_interceptor import (
 from duo_workflow_service.llm_factory import validate_llm_access
 from duo_workflow_service.monitoring import setup_monitoring
 from duo_workflow_service.profiling import setup_profiling
+from duo_workflow_service.services.health import HealthService
 from duo_workflow_service.structured_logging import set_workflow_id, setup_logging
 from duo_workflow_service.tracking import MonitoringContext, current_monitoring_context
 from duo_workflow_service.tracking.errors import log_exception
@@ -373,6 +374,7 @@ async def serve(port: int) -> None:
         contract_pb2_grpc.add_DuoWorkflowServicer_to_server(
             DuoWorkflowService(), server
         )
+        health_pb2_grpc.add_HealthServicer_to_server(HealthService(), server)
         server.add_insecure_port(f"[::]:{port}")
         # enable reflection for faster local development and debugging
         # this can be removed when we are closer to production
