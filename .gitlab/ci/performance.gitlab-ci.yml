@@ -48,7 +48,7 @@ tests:performance:
     COMPONENT_SERVICE_NAME: "ai-gateway-influx"
     GITLAB_HELM_CHART_REF: "6cdb0e1cd4ceb7c9fd01ffa2f62c4a7a4c77a23b"
     TEST_FILE_LOCATION: "e2eperformance/tests"
-    DATA_SEEDER_FILE_NAME: "beautiful_data.rb"
+    DATA_SEEDER_FILE_NAME: "beautiful_data"
     # DOCKER_COMPOSE_FILE_LOCATION: "performance_tests/setup"
     RUN_ON_CNG: true
   rules:
