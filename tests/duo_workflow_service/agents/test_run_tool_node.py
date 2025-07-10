@@ -95,7 +95,7 @@ async def test_run_tool_node_security_layer():
     # Execute
     state = {"initial_key": "initial_value"}
     result = await node.run(state)
-
+    assert result
     # Verify
     input_parser.assert_called_once_with(state)
     assert tool._arun.call_count == 2
