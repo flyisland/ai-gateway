@@ -83,17 +83,37 @@ class TestChatAnthropic:
         ],
     )
     def test_betas_configuration(self, betas, expected_header):
-        """Test that betas are properly configured in headers."""
         model = ChatAnthropic(
             async_client=AsyncAnthropic(),
             model="claude-3-5-sonnet-20241022",
             betas=betas,
-        )  # type: ignore[call-arg]
+        )
 
         if expected_header:
             assert (
                 model._async_client.default_headers["anthropic-beta"] == expected_header
             )
         else:
-            # If no betas or empty list, header should not be present or should be None
             assert model._async_client.default_headers.get("anthropic-beta") is None
+
+    def test_get_combined_headers_method(self):
+        model = ChatAnthropic(
+            async_client=AsyncAnthropic(),
+            model="claude-3-5-sonnet-20241022",
+        )
+
+        headers = model._get_combined_headers()
+        assert headers == {"anthropic-version": "2023-06-01"}
+
+        model_with_betas = ChatAnthropic(
+            async_client=AsyncAnthropic(),
+            model="claude-3-5-sonnet-20241022",
+            betas=["beta1", "beta2"],
+        )
+
+        headers_with_betas = model_with_betas._get_combined_headers()
+        expected_headers = {
+            "anthropic-version": "2023-06-01",
+            "anthropic-beta": "beta1,beta2",
+        }
+        assert headers_with_betas == expected_headers
