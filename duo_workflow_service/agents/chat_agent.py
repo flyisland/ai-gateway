@@ -15,6 +15,7 @@ from langchain_core.runnables import Runnable, RunnableConfig
 
 from ai_gateway.prompts import Prompt, jinja2_formatter
 from ai_gateway.prompts.config.base import PromptConfig
+from ai_gateway.prompts.config.models import ModelClassProvider
 from duo_workflow_service.components.tools_registry import ToolsRegistry
 from duo_workflow_service.entities.state import (
     ApprovalStateRejection,
@@ -28,7 +29,6 @@ from duo_workflow_service.entities.state import (
 from duo_workflow_service.gitlab.gitlab_project import Project
 from duo_workflow_service.slash_commands.goal_parser import parse as slash_command_parse
 from duo_workflow_service.structured_logging import _workflow_id
-from lib.feature_flags.context import FeatureFlag, is_feature_enabled
 from lib.internal_events import InternalEventAdditionalProperties
 from lib.internal_events.event_enum import CategoryEnum, EventEnum, EventPropertyEnum
 
@@ -55,7 +55,13 @@ class ChatAgentPromptTemplate(Runnable[ChatWorkflowState, PromptValue]):
             static_content_text = jinja2_formatter(
                 self.prompt_template["system_static"]
             )
-            if is_feature_enabled(FeatureFlag.ENABLE_ANTHROPIC_PROMPT_CACHING):
+            # Always cache system prompts for Anthropic models in agentic chat
+            # Check if this is an Anthropic model by looking at the agent's model_provider
+            agent_name = _kwargs["agent_name"]
+            # We need to access the agent instance to check the model provider
+            # This will be passed from the ChatAgent.run method
+            is_anthropic = _kwargs.get("is_anthropic_model", False)
+            if is_anthropic:
                 cached_static_content: list[Union[str, dict]] = [
                     {
                         "text": static_content_text,
@@ -158,7 +164,11 @@ class ChatAgent(Prompt[ChatWorkflowState, BaseMessage]):
             input["conversation_history"][self.name].extend(messages)
 
         try:
-            agent_response = await super().ainvoke(input=input, agent_name=self.name)
+            # Check if this is an Anthropic model for prompt caching
+            is_anthropic_model = self.model_provider == ModelClassProvider.ANTHROPIC
+            agent_response = await super().ainvoke(
+                input=input, agent_name=self.name, is_anthropic_model=is_anthropic_model
+            )
             new_messages.append(agent_response)
 
             if isinstance(agent_response, AIMessage):
