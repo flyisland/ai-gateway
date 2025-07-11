@@ -81,6 +81,7 @@ def workflow_with_project(
         "http_url_to_repo": "https://example.com",
         "web_url": "https://example.com/test-project",
         "description": "A test project",
+        "default_branch": "main",
         "languages": [{"name": "Python", "share": 1.0}],
         "default_branch": "main",
     }

@@ -306,14 +306,14 @@ class Workflow(AbstractWorkflow):
                 output_parser=_git_output,  # type: ignore
             ).run,
         )
-        graph.add_node(
-            "complete",
-            HandoverAgent(
-                new_status=WorkflowStatusEnum.COMPLETED, handover_from="executor"
-            ).run,
-        )
-        graph.add_edge("git_actions", "complete")
-        graph.add_edge("complete", END)
+        # graph.add_node(
+        #     "complete",
+        #     HandoverAgent(
+        #         new_status=WorkflowStatusEnum.COMPLETED, handover_from="executor"
+        #     ).run,
+        # )
+        graph.add_edge("git_actions", END)
+        # graph.add_edge("complete", END)
         return graph
 
     def _add_context_builder_nodes(

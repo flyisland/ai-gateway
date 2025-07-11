@@ -94,6 +94,7 @@ class CreateMergeRequest(DuoBaseTool):
             "source_branch": source_branch,
             "target_branch": target_branch,
             "title": title,
+            "labels": ["built with gitlab duo"],
         }
 
         optional_params = [
