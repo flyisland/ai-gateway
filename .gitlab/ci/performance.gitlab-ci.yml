@@ -46,7 +46,7 @@ tests:performance:
     PARENT_PIPELINE_SOURCE: $CI_PIPELINE_SOURCE
     COMPONENT_MR_CI_COMMIT_SHA: $CI_COMMIT_SHORT_SHA
     COMPONENT_SERVICE_NAME: "ai-gateway-influx"
-    GITLAB_HELM_CHART_REF: "6cdb0e1cd4ceb7c9fd01ffa2f62c4a7a4c77a23b"
+    GITLAB_HELM_CHART_REF: "4fd9ec7c720fe6f976cf19b8230e32c0035301ed"
     TEST_FILE_LOCATION: "e2eperformance/tests"
     DATA_SEEDER_FILE_NAME: "vishal_seed.rb"
     # DOCKER_COMPOSE_FILE_LOCATION: "performance_tests/setup"
