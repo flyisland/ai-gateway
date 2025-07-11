@@ -71,8 +71,24 @@ def tool(metadata):
                 "content": "# -*- coding: utf-8 -*-\n\ndef λ_function():\n    return '你好，世界！'"
             },
         ),
+        (
+            {
+                "project_id": "gitlab-org/gitlab",
+                "ref": "master",
+                "file_path": "file/path/with/slashes",
+            },
+            "/api/v4/projects/gitlab-org/gitlab/repository/files/file%2Fpath%2Fwith%2Fslashes/raw",
+            "master",
+            "file content",
+            {"content": "file content"},
+        ),
     ],
-    ids=["Explicit params", "URL parameter", "Special characters in text content"],
+    ids=[
+        "Explicit params",
+        "URL parameter",
+        "Special characters in text content",
+        "Path with slashes",
+    ],
 )
 @pytest.mark.asyncio
 async def test_get_file_success(
@@ -127,11 +143,20 @@ async def test_get_file_success(
             },
             "Binary file detected",
         ),
+        (
+            {"url": "https://gitlab.com/namespace/project"},
+            {
+                "mock_type": "validate_error",
+                "mock_value": (None, None, None, []),
+            },
+            "Missing file_path",
+        ),
     ],
     ids=[
         "URL parsing error",
         "API error",
         "Binary file detection",
+        "Missing file path",
     ],
 )
 @pytest.mark.asyncio
@@ -203,47 +228,3 @@ def test_url_parser_repository_file(host):
 def test_is_binary_string(binary_detection_tool, content, expected_result):
     result = binary_detection_tool._is_binary_string(content)
     assert result == expected_result
-
-
-@pytest.mark.asyncio
-async def test_get_file_path_encoding(tool, gitlab_client_mock):
-    input_params = {
-        "project_id": "some-group/some-project",
-        "ref": "main",
-        "file_path": "src/components/button.vue",
-    }
-
-    expected_path = (
-        "/api/v4/projects/some-group/some-project/repository/files/"
-        "src%2Fcomponents%2Fbutton.vue/raw"
-    )
-
-    gitlab_client_mock.aget.return_value = "<template>Hello</template>"
-
-    result = await tool._arun(**input_params)
-
-    gitlab_client_mock.aget.assert_called_once_with(
-        path=expected_path,
-        params={"ref": "main"},
-        parse_json=False,
-    )
-
-    assert json.loads(result) == {"content": "<template>Hello</template>"}
-
-
-@pytest.mark.asyncio
-async def test_get_file_path_none_from_url_parsing(tool):
-    tool._validate_repository_file_url = lambda url, project_id, ref, file_path: (
-        "some-group%2Fsome-project",
-        "main",
-        None,
-        [],
-    )
-
-    result = await tool._arun(
-        url="https://gitlab.com/some-group/some-project/-/blob/main/missing.vue"
-    )
-
-    parsed = json.loads(result)
-    assert "error" in parsed
-    assert parsed["error"] == "Missing file_path"

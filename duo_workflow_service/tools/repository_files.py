@@ -16,7 +16,7 @@ class RepositoryFileResourceInput(ProjectResourceInput):
     )
     file_path: Optional[str] = Field(
         default=None,
-        description="URL encoded full path to file, such as lib%2Fclass%2Erb.",
+        description="Full path to file, such as lib/class.rb.",
     )
 
 
