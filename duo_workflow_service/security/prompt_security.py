@@ -1,6 +1,6 @@
 # flake8: noqa: W605
 import re
-from typing import Any, Callable, Dict, List
+from typing import Callable, Dict, List
 
 
 class SecurityException(Exception):
@@ -18,7 +18,7 @@ def encode_dangerous_tags(response: str | dict | list) -> str | dict | list:
     """
     # Define dangerous tags to encode
     # These tags are commonly used in prompt injection attacks to manipulate LLM behavior:
-    # - "goal": Used to override or redirect the primary task objective  
+    # - "goal": Used to override or redirect the primary task objective
     # - "system": Used to inject system-level instructions or override system prompts
     DANGEROUS_TAGS = {
         "goal": "goal",
@@ -63,18 +63,24 @@ class PromptSecurity:
     """Security class with configurable security functions."""
 
     # Default security functions to apply to ALL tools
-    DEFAULT_SECURITY_FUNCTIONS: List[Callable[[str | dict | list], str | dict | list]] = [
+    DEFAULT_SECURITY_FUNCTIONS: List[
+        Callable[[str | dict | list], str | dict | list]
+    ] = [
         encode_dangerous_tags,
     ]
 
     # Tool-specific additional security functions
-    TOOL_SPECIFIC_FUNCTIONS: Dict[str, List[Callable[[str | dict | list], str | dict | list]]] = {
+    TOOL_SPECIFIC_FUNCTIONS: Dict[
+        str, List[Callable[[str | dict | list], str | dict | list]]
+    ] = {
         # 'file_read': [validate_no_script_tags],
         # Add tools that need EXTRA security functions
     }
 
     @staticmethod
-    def apply_security(response: str | dict | list, tool_name: str) -> str | dict | list:
+    def apply_security(
+        response: str | dict | list, tool_name: str
+    ) -> str | dict | list:
         """Apply all configured security functions for a specific tool.
 
         Each security function should either:
