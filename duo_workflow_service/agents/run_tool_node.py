@@ -3,6 +3,7 @@
 from datetime import datetime, timezone
 from typing import Any, Generic, Protocol, TypeVar
 
+import structlog
 from langchain.tools import BaseTool
 
 from duo_workflow_service.entities import MessageTypeEnum, ToolStatus, UiChatLog
@@ -65,6 +66,7 @@ class RunToolNode(Generic[WorkflowStateT]):
         self._tool = tool
         self._input_parser = input_parser
         self._output_parser = output_parser
+        self._logger = structlog.stdlib.get_logger("workflow")
 
     async def run(self, state: WorkflowStateT) -> dict[str, Any]:
         """Execute the tool with given state.
@@ -87,7 +89,10 @@ class RunToolNode(Generic[WorkflowStateT]):
                             tool_name=self._tool.name,
                         )
                         output = secure_output
-                    except SecurityException:
+                    except SecurityException as e:
+                        self._logger.error(
+                            f"Security validation failed for tool {self._tool.name}: {e}"
+                        )
                         raise
 
             outputs.append(output)
