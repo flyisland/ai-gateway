@@ -227,6 +227,11 @@ class DuoWorkflowService(contract_pb2_grpc.DuoWorkflowServicer):
                             aiter(request_iterator)
                         )
 
+                        # Skip heartbeat messages - they should not affect workflow processing
+                        while _event.HasField("heartbeatRequest"):
+                            log.debug("Received heartbeat message, ignoring")
+                            _event = await anext(aiter(request_iterator))
+
                         if workflow.outbox_empty():
                             continue
 
@@ -244,6 +249,11 @@ class DuoWorkflowService(contract_pb2_grpc.DuoWorkflowServicer):
                     event: contract_pb2.ClientEvent = await anext(
                         aiter(request_iterator)
                     )
+
+                    # Skip heartbeat messages - they should not affect workflow processing
+                    while event.HasField("heartbeatRequest"):
+                        log.debug("Received heartbeat message, ignoring")
+                        event = await anext(aiter(request_iterator))
 
                     workflow.add_to_inbox(event)
                     if (
