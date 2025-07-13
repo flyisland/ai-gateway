@@ -166,8 +166,17 @@ def setup_logging(
 
 
 def can_log_request_data():
+    """Check if request data logging is enabled.
+    
+    This function uses lazy evaluation to get the current configuration
+    instead of relying on global variables that might not be set yet.
+    """
+    # Get config dynamically to avoid dependency on global state
+    from ai_gateway.app import get_config
+    config = get_config()
+    
     return (
-        ENABLE_REQUEST_LOGGING
+        config.logging.enable_request_logging
         or (CUSTOM_MODELS_ENABLED and enabled_instance_verbose_ai_logs())
         or (
             not CUSTOM_MODELS_ENABLED
