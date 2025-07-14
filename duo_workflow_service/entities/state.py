@@ -155,6 +155,7 @@ def _plan_reducer(current: Plan, new: Optional[Plan]) -> Plan:
 def _conversation_history_reducer(
     current: Dict[str, List[BaseMessage]], new: Optional[Dict[str, List[BaseMessage]]]
 ) -> Dict[str, List[BaseMessage]]:
+    from duo_workflow_service.agents.message_compressor import MessageCompressor
     reduced = {**current}
 
     if new is None:
@@ -165,6 +166,8 @@ def _conversation_history_reducer(
             continue
 
         token_counter = ApproximateTokenCounter(agent_name)
+
+        compressor = MessageCompressor(token_counter)
         processed_messages = _pretrim_large_messages(new_messages, token_counter)
 
         if not processed_messages:
@@ -174,22 +177,34 @@ def _conversation_history_reducer(
 
         if agent_name in reduced:
             existing_messages = reduced[agent_name]
-            reduced[agent_name] = reduced[agent_name] + processed_messages
+            all_messages = reduced[agent_name] + processed_messages
         else:
-            reduced[agent_name] = processed_messages
+            all_messages = processed_messages
 
         try:
-            trimmed_messages = trim_messages(
-                reduced[agent_name],
-                max_tokens=MAX_CONTEXT_TOKENS,
-                strategy="last",
-                token_counter=token_counter.count_tokens,
-                start_on="human",
-                include_system=True,
-                allow_partial=False,
-            )
+            current_tokens = token_counter.count_tokens(all_messages)
+            if current_tokens > MAX_CONTEXT_TOKENS:
+                compressed_messages = compressor.compress_messages(
+                    all_messages,
+                    target_token_count=MAX_CONTEXT_TOKENS
+                )
 
-            reduced[agent_name] = _restore_message_consistency(trimmed_messages)
+                reduced[agent_name] = compressed_messages
+
+                logger.info("JEFF" * 500)
+                logger.info(f"CURRENT_TOKENS: {current_tokens}")
+                trimmed_messages = trim_messages(
+                    compressed_messages,
+                    max_tokens=MAX_CONTEXT_TOKENS,
+                    strategy="last",
+                    token_counter=token_counter.count_tokens,
+                    start_on="human",
+                    include_system=True,
+                    allow_partial=False,
+                )
+                reduced[agent_name] = _restore_message_consistency(trimmed_messages)
+            else:
+                reduced[agent_name] = _restore_message_consistency(all_messages)
 
             # If trimming resulted in empty list, keep at least the last few messages along with the system message
             if not reduced[agent_name] or len(reduced[agent_name]) == 1:
@@ -213,20 +228,20 @@ def _conversation_history_reducer(
                     agent_name=agent_name,
                 )
 
-            # Detect potential conversation loops or trimming failures
-            post_trimmed_messages = reduced[agent_name]
+            # Detect potential conversation loops or compression/trimming failures
+            post_processed_messages = reduced[agent_name]
             if (
-                existing_messages == post_trimmed_messages
+                existing_messages == post_processed_messages
                 and len(processed_messages) > 0
             ):
                 logger.warning(
-                    "Trimming resulted in identical message state - possible conversation loop",
+                    "Message processing resulted in identical state - possible conversation loop",
                     agent_name=agent_name,
                 )
 
         except Exception as e:
             logger.error(
-                f"Error during message trimming: {str(e)}",
+                f"Error during message compression/trimming: {str(e)}",
                 agent_name=agent_name,
                 exc_info=True,
             )
