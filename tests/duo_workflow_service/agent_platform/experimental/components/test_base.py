@@ -42,8 +42,8 @@ class TestBaseComponentValidateFields:
 
         component = ConcreteComponent(
             name="test_component",
-            workflow_id="test_workflow",
-            workflow_type="test_type",
+            flow_id="test_workflow",
+            flow_type="test_type",
             inputs=["context", "conversation_history"],
             output="context",
         )
@@ -74,8 +74,8 @@ class TestBaseComponentValidateFields:
         with pytest.raises(ValidationError) as exc_info:
             ConcreteComponent(
                 name="test_component",
-                workflow_id="test_workflow",
-                workflow_type="test_type",
+                flow_id="test_workflow",
+                flow_type="test_type",
                 inputs=["status"],  # This target is not in _allowed_input_targets
             )
 
@@ -100,8 +100,8 @@ class TestBaseComponentValidateFields:
         with pytest.raises(ValidationError) as exc_info:
             ConcreteComponent(
                 name="test_component",
-                workflow_id="test_workflow",
-                workflow_type="test_type",
+                flow_id="test_workflow",
+                flow_type="test_type",
                 output="conversation_history",  # This target is not in _allowed_output_targets
             )
 
@@ -124,8 +124,8 @@ class TestBaseComponentValidateFields:
         with pytest.raises(ValidationError) as exc_info:
             ConcreteComponent(
                 name="test_component",
-                workflow_id="test_workflow",
-                workflow_type="test_type",
+                flow_id="test_workflow",
+                flow_type="test_type",
                 inputs=["context", "status"],
             )
 
@@ -138,8 +138,8 @@ class TestBaseComponentValidateFields:
         """Test that __entry_hook__ returns the expected format."""
         component = ConcreteComponent(
             name="test_component",
-            workflow_id="test_workflow",
-            workflow_type="test_type",
+            flow_id="test_workflow",
+            flow_type="test_type",
         )
 
         entry_name = component.__entry_hook__()
@@ -149,8 +149,8 @@ class TestBaseComponentValidateFields:
         """Test that BaseComponent instances are immutable (frozen)."""
         component = ConcreteComponent(
             name="test_component",
-            workflow_id="test_workflow",
-            workflow_type="test_type",
+            flow_id="test_workflow",
+            flow_type="test_type",
         )
 
         with pytest.raises(ValidationError) as exc_info:
@@ -166,8 +166,8 @@ class TestBaseComponentValidateFields:
         """Test component creation when inputs and output are not provided."""
         component = ConcreteComponent(
             name="test_component",
-            workflow_id="test_workflow",
-            workflow_type="test_type",
+            flow_id="test_workflow",
+            flow_type="test_type",
         )
 
         # IOKey parsing methods should not be called when fields are not provided

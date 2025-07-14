@@ -23,6 +23,7 @@ from duo_workflow_service.entities.state import (
 __all__ = [
     "FlowStatusEnum",
     "FlowState",
+    "FlowStateKeys",
     "merge_nested_dict",
     "create_nested_dict",
     "merge_nested_dict_reducer",
@@ -88,6 +89,11 @@ def merge_nested_dict_reducer(
     """Reducer specifically for nested dictionary fields."""
     return merge_nested_dict(left or {}, right or {})
 
+class FlowStateKeys(StrEnum):
+    STATUS = "status"
+    CONVERSATION_HISTORY = "conversation_history"
+    UI_CHAT_LOG = "ui_chat_log"
+    CONTEXT = "context"
 
 class FlowState(TypedDict):
     status: FlowStatusEnum

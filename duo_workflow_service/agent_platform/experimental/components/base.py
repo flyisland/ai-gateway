@@ -23,8 +23,8 @@ class BaseComponent(BaseModel, ABC):
     model_config = ConfigDict(arbitrary_types_allowed=True, frozen=True)
 
     name: str
-    workflow_id: str | int
-    workflow_type: str
+    flow_id: str | int
+    flow_type: str
 
     inputs: list[IOKey] = Field(default_factory=list)
     output: Optional[IOKey] = None
