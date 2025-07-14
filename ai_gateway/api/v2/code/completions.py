@@ -596,9 +596,9 @@ def _build_code_completions(
                 )
 
         return code_completions, kwargs
- 
+
     else:
-        config = _get_provider_config( # BACK TO HERE
+        config = _get_provider_config(
             payload.model_provider,
             completions_anthropic_factory,
             completions_litellm_factory,

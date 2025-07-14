@@ -12,6 +12,7 @@ from gitlab_cloud_connector import CloudConnectorUser, UserClaims
 from snowplow_tracker import Snowplow
 from starlette.datastructures import CommaSeparatedStrings
 from structlog.testing import capture_logs
+from google.auth.credentials import Credentials
 
 from ai_gateway.api.error_utils import capture_validation_errors
 from ai_gateway.api.v2 import api_router
@@ -1153,8 +1154,12 @@ class TestCodeCompletions:
         assert result["model"]["engine"] == "vertex-ai"
         assert result["model"]["name"] == "vertex_ai/codestral-2501"
         assert result["choices"][0]["text"] == "Post-processed completion response"
+    
+    @patch('google.auth.default')
+    def test_vertex_codestral_with_prompt(self, mock_auth,mock_client, mock_agent_model: Mock):
+        mock_credentials = Mock(spec=Credentials)
+        mock_auth.return_value = (mock_credentials, "test-project-id")
 
-    def test_vertex_codestral_with_prompt(self, mock_client, mock_agent_model: Mock):
         params = {
             "prompt_version": 2,
             "project_path": "gitlab-org/gitlab",
