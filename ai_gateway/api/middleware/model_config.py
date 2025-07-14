@@ -1,6 +1,6 @@
 import json
 
-from starlette.types import ASGIApp, Receive, Scope, Send
+from starlette.types import ASGIApp, Message, Receive, Scope, Send
 
 from ai_gateway.model_metadata import (
     create_model_metadata,
@@ -22,10 +22,13 @@ class ModelConfigMiddleware:
             await self.app(scope, receive, send)
             return
 
-        async def fetch_model_metadata():
+        async def fetch_model_metadata() -> Message:
             body_parts = []
+            max_chunks = 1000
+            chunk_count = 0
 
-            while True:
+            while chunk_count < max_chunks:
+                chunk_count += 1
                 message = await receive()
 
                 if message["type"] == "http.request":
@@ -35,10 +38,12 @@ class ModelConfigMiddleware:
 
                     if not message.get("more_body", False):
                         break
+                elif body_parts:
+                    continue
                 else:
                     return message
 
-            full_body = b"".join(body_parts)
+            full_body = b"".join(body_parts) if body_parts else b""
 
             if b"model_metadata" not in full_body:
                 return {"type": "http.request", "body": full_body, "more_body": False}
