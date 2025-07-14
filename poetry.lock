@@ -2464,6 +2464,22 @@ langchain-core = ">=0.3.53,<1.0.0"
 pydantic = ">=2.7.4,<3.0.0"
 
 [[package]]
+name = "langchain-cerebras"
+version = "0.5.0"
+description = "An integration package connecting Cerebras and LangChain"
+optional = false
+python-versions = "<4.0,>=3.9"
+groups = ["main"]
+files = [
+    {file = "langchain_cerebras-0.5.0-py3-none-any.whl", hash = "sha256:f129df699d6eb71d8e2602d7abe9ae75c289168b2e52d33cdefe5d4982e027b9"},
+    {file = "langchain_cerebras-0.5.0.tar.gz", hash = "sha256:24cfe76358cd8c779f33c77708df08cc5fec81ed13797830396be0f52abdd80a"},
+]
+
+[package.dependencies]
+langchain-core = ">=0.3.29,<0.4.0"
+langchain-openai = ">=0.3.0,<0.4.0"
+
+[[package]]
 name = "langchain-community"
 version = "0.3.25"
 description = "Community contributed LangChain integrations."
@@ -2544,7 +2560,7 @@ version = "0.3.9"
 description = "An integration package connecting OpenAI and LangChain"
 optional = false
 python-versions = "<4.0,>=3.9"
-groups = ["eval"]
+groups = ["main", "eval"]
 files = [
     {file = "langchain_openai-0.3.9-py3-none-any.whl", hash = "sha256:1ad95c09a620910c39a8eb826eb146bd96bfbc55e4fca78b1e28ffd5e4f5b261"},
     {file = "langchain_openai-0.3.9.tar.gz", hash = "sha256:a2897d15765a435eff3fed7043235c25ec1e192e6c45a81e9e4fae2951335fb3"},
@@ -6457,4 +6473,4 @@ cffi = ["cffi (>=1.11)"]
 [metadata]
 lock-version = "2.1"
 python-versions = ">=3.12.0,<3.13.0"
-content-hash = "9b4294cca57d72571106c2b1f3e43df624d2afb337942201cf9a896430a1465c"
+content-hash = "82c993a3508c756e5523d201425ec752c24946064981764aef420c5dab444f1f"

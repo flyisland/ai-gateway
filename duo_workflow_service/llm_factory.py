@@ -5,6 +5,7 @@ from typing import Literal, Optional, Union
 
 import structlog
 from langchain_anthropic import ChatAnthropic
+from langchain_cerebras import ChatCerebras
 from langchain_core.language_models.chat_models import BaseChatModel
 from langchain_google_vertexai.model_garden import ChatAnthropicVertex
 from langsmith import tracing_context
@@ -64,8 +65,18 @@ class VertexConfig(ModelConfig):
     location: str = Field(default_factory=_get_location)
 
 
+class CerebrasConfig(ModelConfig):
+    provider: Literal["cerebras"] = "cerebras"
+
+    @staticmethod
+    def _get_model_name() -> str:
+        return "llama-3.3-70b"
+    
+    model_name: str = Field(default_factory=_get_model_name)
+
+
 def create_chat_model(
-    config: Union[AnthropicConfig, VertexConfig],
+    config: Union[AnthropicConfig, VertexConfig, CerebrasConfig],
     **kwargs,
 ) -> BaseChatModel:
 
@@ -88,13 +99,24 @@ def create_chat_model(
             **kwargs,
         )
 
+    if isinstance(config, CerebrasConfig):
+        cerebras_api_key = os.environ.get("CEREBRAS_API_KEY")
+        if cerebras_api_key and len(cerebras_api_key) > 1:
+            return ChatCerebras(
+                model=config.model_name,
+                api_key=cerebras_api_key,
+                max_retries=config.max_retries,
+                **kwargs,
+            )
+        raise RuntimeError("CEREBRAS_API_KEY needs to be set for Cerebras provider")
+
     raise ValueError(
         f"Unsupported config type: {type(config).__name__}. "
-        "Must be either AnthropicConfig or VertexConfig"
+        "Must be either AnthropicConfig, VertexConfig, or CerebrasConfig"
     )
 
 
-def validate_llm_access(config: Optional[Union[AnthropicConfig, VertexConfig]] = None):
+def validate_llm_access(config: Optional[Union[AnthropicConfig, VertexConfig, CerebrasConfig]] = None):
     if config is None:
         try:
             config = VertexConfig()

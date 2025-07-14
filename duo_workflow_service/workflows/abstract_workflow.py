@@ -39,7 +39,7 @@ from duo_workflow_service.gitlab.gitlab_project import (
 from duo_workflow_service.gitlab.http_client import GitlabHttpClient
 from duo_workflow_service.gitlab.http_client_factory import get_http_client
 from duo_workflow_service.gitlab.url_parser import GitLabUrlParser
-from duo_workflow_service.llm_factory import AnthropicConfig, VertexConfig
+from duo_workflow_service.llm_factory import AnthropicConfig, CerebrasConfig, VertexConfig
 from duo_workflow_service.monitoring import duo_workflow_metrics
 from duo_workflow_service.tools import convert_mcp_tools_to_langchain_tools
 from duo_workflow_service.tracking import log_exception
@@ -359,7 +359,7 @@ class AbstractWorkflow(ABC):
             metadata=metadata, mcp_tools=mcp_tools
         )
 
-    def _get_model_config(self) -> Union[AnthropicConfig, VertexConfig]:
+    def _get_model_config(self) -> Union[AnthropicConfig, VertexConfig, CerebrasConfig]:
         """Determine the appropriate model configuration based on deployment environment.
 
         This method creates the appropriate configuration object for either
@@ -384,6 +384,11 @@ class AbstractWorkflow(ABC):
         if bool(_vertex_project_id and len(_vertex_project_id) > 1):
             return VertexConfig(
                 model_name=KindAnthropicModel.CLAUDE_SONNET_4_VERTEX.value
+            )
+        _cerebras_api_key = os.getenv("CEREBRAS_API_KEY")
+        if bool(_cerebras_api_key) and len(_cerebras_api_key) > 1:
+            return CerebrasConfig(
+                model_name="llama-3.3-70b"
             )
 
         return AnthropicConfig(model_name=KindAnthropicModel.CLAUDE_SONNET_4.value)
