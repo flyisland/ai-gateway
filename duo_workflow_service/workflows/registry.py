@@ -11,6 +11,7 @@ from duo_workflow_service.workflows import (
 )
 
 from .abstract_workflow import TypeWorkflow
+from duo_workflow_service.agent_platform.experimental.flows import Flow
 
 current_directory = Path(__file__).parent
 
@@ -34,6 +35,7 @@ _WORKFLOWS_LOOKUP = {
 
 
 def resolve_workflow_class(workflow_definition: Optional[str]) -> TypeWorkflow:
+    return Flow
     if workflow_definition:
         return _WORKFLOWS_LOOKUP[workflow_definition]
     return software_development.Workflow  # for backwards compatibility

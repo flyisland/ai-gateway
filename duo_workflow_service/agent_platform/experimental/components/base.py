@@ -20,7 +20,7 @@ class RouterProtocol(Protocol):
 
 
 class BaseComponent(BaseModel, ABC):
-    model_config = ConfigDict(arbitrary_types_allowed=True, frozen=True)
+    model_config = ConfigDict(arbitrary_types_allowed=True)
 
     name: str
     flow_id: str | int

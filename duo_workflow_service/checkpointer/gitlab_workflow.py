@@ -30,6 +30,7 @@ from langgraph.checkpoint.base import (
 from langgraph.checkpoint.memory import MemorySaver
 
 from ai_gateway.container import ContainerApplication
+from duo_workflow_service.agent_platform.experimental.state.base import WorkflowStatusEnum
 from duo_workflow_service.checkpointer.gitlab_workflow_utils import (
     STATUS_TO_EVENT_PROPERTY,
 )

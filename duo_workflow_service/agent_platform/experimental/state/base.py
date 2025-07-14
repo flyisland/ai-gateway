@@ -16,12 +16,12 @@ from pydantic import BaseModel, ConfigDict, model_validator
 # TODO: Remove dependency on legacy duo workflow packages
 from duo_workflow_service.entities.state import (
     UiChatLog,
+    WorkflowStatusEnum,
     _conversation_history_reducer,
     _ui_chat_log_reducer,
 )
 
 __all__ = [
-    "FlowStatusEnum",
     "FlowState",
     "FlowStateKeys",
     "merge_nested_dict",
@@ -30,21 +30,6 @@ __all__ = [
     "IOKey",
     "get_vars_from_state",
 ]
-
-
-class FlowStatusEnum(StrEnum):
-    NOT_STARTED = "not_started"
-    PLANNING = "planning"
-    EXECUTION = "execution"
-    COMPLETED = "completed"
-    ERROR = "error"
-    PAUSED = "paused"
-    CANCELLED = "cancelled"
-    INPUT_REQUIRED = "input_required"
-    PLAN_APPROVAL_REQUIRED = "plan_approval_required"
-    TOOL_CALL_APPROVAL_REQUIRED = "tool_call_approval_required"
-    APPROVAL_ERROR = "approval_error"
-
 
 def merge_nested_dict(existing: dict[str, Any], new: dict[str, Any]) -> dict[str, Any]:
     if not isinstance(existing, dict):
@@ -96,7 +81,7 @@ class FlowStateKeys(StrEnum):
     CONTEXT = "context"
 
 class FlowState(TypedDict):
-    status: FlowStatusEnum
+    status: WorkflowStatusEnum
     conversation_history: Annotated[
         dict[str, list[BaseMessage]], _conversation_history_reducer
     ]

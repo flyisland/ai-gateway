@@ -12,7 +12,7 @@ from langchain_core.callbacks import BaseCallbackHandler, get_usage_metadata_cal
 from langchain_core.language_models import BaseChatModel
 from langchain_core.messages.ai import UsageMetadata
 from langchain_core.prompt_values import PromptValue
-from langchain_core.prompts import ChatPromptTemplate, string
+from langchain_core.prompts import ChatPromptTemplate, string, MessagesPlaceholder
 from langchain_core.prompts.string import DEFAULT_FORMATTER_MAPPING
 from langchain_core.runnables import Runnable, RunnableBinding, RunnableConfig
 from langchain_core.tools import BaseTool
@@ -301,7 +301,10 @@ class Prompt(RunnableBinding[Input, Output]):
         messages = []
 
         for role, template in cls._prompt_template_to_messages(config.prompt_template):
-            messages.append((role, template))
+            if role == "placeholder":
+                messages.append(MessagesPlaceholder(template))
+            else:
+                messages.append((role, template))
 
         return cast(
             Runnable[Input, PromptValue],

@@ -2,7 +2,7 @@ import structlog
 from duo_workflow_service.agent_platform.experimental.components import BaseComponent, RouterProtocol
 
 
-from duo_workflow_service.agent_platform.experimental.state import FlowState, FlowStateKeys, FlowStatusEnum, IOKey, get_vars_from_state, create_nested_dict
+from duo_workflow_service.agent_platform.experimental.state import FlowState, FlowStateKeys, IOKey, get_vars_from_state, create_nested_dict
 from langgraph.graph import StateGraph
 from pydantic import BaseModel, Field, ConfigDict
 
@@ -32,7 +32,7 @@ from typing import (
     TypedDict,
 )
 
-from duo_workflow_service.agents.prompts import NEXT_STEP_PROMPT
+from duo_workflow_service.entities.state import WorkflowStatusEnum
 from duo_workflow_service.security.prompt_security import PromptSecurity, SecurityException
 from duo_workflow_service.token_counter.approximate_token_counter import ApproximateTokenCounter
 from duo_workflow_service.tools.toolset import Toolset
@@ -45,6 +45,19 @@ from duo_workflow_service.errors.error_handler import ModelError, ModelErrorHand
 
 InjectedValue = None
 
+
+__all__ = ["AgentComponent", "EndComponent"]
+
+class EndComponent(BaseComponent):
+    def __entry_hook__(self):
+        return END #"terminate_graph"
+    
+    def attach(self, graph: StateGraph, router: RouterProtocol) -> None:
+        graph.add_node(self.__entry_hook__(), self._terminate_flow)
+        graph.add_edge(self.__entry_hook__(), END)
+    
+    async def _terminate_flow(self, state: FlowState) -> dict:
+        return { FlowStateKeys.STATUS.value: WorkflowStatusEnum.COMPLETED.value } # WorkflowStatusEnum
 
 class AgentFinalOutput(BaseModel):
     """A final response to the user."""
@@ -74,7 +87,6 @@ class AgentNode:
     _error_handler: ModelErrorHandler
 
 
-    @inject
     def __init__(
         self,
         flow_id: str,
@@ -83,9 +95,7 @@ class AgentNode:
         prompt: Prompt,
         inputs: list[IOKey],
         component_name: str,
-        internal_event_client: InternalEventsClient = Provide[
-            ContainerApplication.internal_event.client
-        ],
+        internal_event_client: InternalEventsClient,
     ):
         self._flow_id = flow_id
         self._flow_type = flow_type
@@ -97,54 +107,8 @@ class AgentNode:
         self._approximate_token_counter = ApproximateTokenCounter(component_name)
         self._error_handler = ModelErrorHandler()
 
-    # async def _try_parse_structured_response(
-    #     self, completion: AIMessage
-    # ) -> Optional[_FinalResponse]:
-    #     if (
-
-    #         len(completion.tool_calls) > 0
-    #         and completion.tool_calls[0]["name"] == self.output_type.__name__
-    #     ):
-    #         output_parser = PydanticToolsParser(
-    #             tools=[self.output_type], first_tool_only=True
-    #         )
-    #         parsed = await output_parser.ainvoke(completion)
-
-    #         return AgentNode._FinalResponse(
-    #             tool_call_id=completion.tool_calls[0].get("id"),
-    #             payload=parsed,
-    #         )
-
-    #     return None
-
-    # lets use dedicated node to request final answer
-    # async def _try_parse_raw_response(
-    #     self, completion: AIMessage
-    # ) -> Optional[_FinalResponse]:
-    #     if not self.output_type and len(completion.tool_calls) == 0:
-    #         output_parser = StrOutputParser()
-    #         parsed = await output_parser.ainvoke(completion)
-
-    #         return AgentNode._FinalResponse(payload=parsed)
-
-    #     return None
-
-    # async def _process_final_response(
-    #     self, completion: AIMessage
-    # ) -> Optional[_FinalResponse]:
-    #     parsers = [
-    #         self._try_parse_structured_response,
-    #         self._try_parse_raw_response,
-    #     ]
-
-    #     for parser in parsers:
-    #         if response := await parser(completion):
-    #             return response
-
-    #     return None
-
     async def run(self, state: FlowState) -> dict:
-        history = state[FlowStateKeys.CONVERSATION_HISTORY].get(self._component_name, [])
+        history = state[FlowStateKeys.CONVERSATION_HISTORY.value].get(self._component_name, [])
 
         variables = get_vars_from_state(self._inputs, state)
         model_name = getattr(self._prompt.model, "model_name", "unknown")
@@ -171,7 +135,7 @@ class AgentNode:
                 )
 
                 return {
-                    FlowStateKeys.CONVERSATION_HISTORY: {self._component_name: [completion]},
+                    FlowStateKeys.CONVERSATION_HISTORY.value: {self._component_name: [completion]},
                 }
             except APIStatusError as e:
                 error_message = str(e)
@@ -201,7 +165,7 @@ class AgentNode:
         self._internal_event_client.track_event(
             event_name=EventEnum.TOKEN_PER_USER_PROMPT.value,
             additional_properties=additional_properties,
-            category=self._flow_type.value,
+            category=self._flow_type
         )
 
 class FinalResponseNode:
@@ -215,7 +179,7 @@ class FinalResponseNode:
         self._output = output
 
     async def run(self, state: FlowState) -> dict:
-        last_message = state[FlowStateKeys.CONVERSATION_HISTORY].get(self._component_name, [])[-1]
+        last_message = state[FlowStateKeys.CONVERSATION_HISTORY.value].get(self._component_name, [])[-1]
 
         final_response: ToolCall = next(
             (
@@ -226,25 +190,22 @@ class FinalResponseNode:
             None
         )
 
-        output_parser = PydanticToolsParser(
-            tools=[AgentFinalOutput], first_tool_only=True
-        )
-
-        parsed: AgentFinalOutput = await output_parser.ainvoke(last_message)
+        parsed_response = AgentFinalOutput(**final_response["args"])
 
         updates = {
-            FlowStateKeys.CONVERSATION_HISTORY: {self._component_name: [ToolMessage(content="", tool_call_id=final_response.id)]},
+            FlowStateKeys.CONVERSATION_HISTORY.value: {self._component_name: [ToolMessage(content="", tool_call_id=final_response['id'])]},
         }
 
         if self._output:
             updates[self._output.target] = create_nested_dict(
-                self._output.subkeys, parsed.final_response
+                self._output.subkeys, parsed_response.final_response
             )
         
         return updates
 
 class ReflexionNode:
     name: str
+    _NEXT_STEP_PROMPT =  f"What is the next task? Call the `{AgentFinalOutput.tool_title}` tool if your task is complete"
     _component_name: str
 
     def __init__(self, component_name: str, name: str):
@@ -253,7 +214,7 @@ class ReflexionNode:
 
     async def run(self, _state: FlowState) -> dict:
         return {
-            FlowStateKeys.CONVERSATION_HISTORY: {self._component_name: [HumanMessage(content=NEXT_STEP_PROMPT)]},
+            FlowStateKeys.CONVERSATION_HISTORY.value: {self._component_name: [HumanMessage(content=self._NEXT_STEP_PROMPT)]},
         }
 
 class ToolNode:
@@ -272,9 +233,7 @@ class ToolNode:
             toolset: Toolset,
             flow_id: str,
             flow_type: CategoryEnum,
-            internal_event_client: InternalEventsClient = Provide[
-                ContainerApplication.internal_event.client
-            ],
+            internal_event_client: InternalEventsClient,
         ):
         self.name = name
         self._component_name = component_name
@@ -310,7 +269,7 @@ class ToolNode:
                     tool=self._toolset[tool_name],
                     tool_call_args=tool_call_args 
                 )
-            
+
             tools_responses.append(
                 ToolMessage(
                     content=self._sanitize_response(
@@ -322,7 +281,7 @@ class ToolNode:
             )
 
         return {
-            FlowStateKeys.CONVERSATION_HISTORY: {
+            FlowStateKeys.CONVERSATION_HISTORY.value: {
                 self._component_name: tools_responses,
             },
         }
@@ -347,10 +306,10 @@ class ToolNode:
         except Exception as e:
             return self._format_execution_error(tool_name=tool.name, error=e)
 
-    def _sanitize_response(self, response, tool_name):
+    def _sanitize_response(self, response: str, tool_name: str) -> str:
         try:
-            response.content = PromptSecurity.apply_security(
-                response=response.content, tool_name=tool_name
+            return PromptSecurity.apply_security(
+                response=response, tool_name=tool_name
             )
         except SecurityException as e:
             self._logger.error(
@@ -375,7 +334,7 @@ class ToolNode:
         self._internal_event_client.track_event(
             event_name=event_name.value,
             additional_properties=additional_properties,
-            category=self._flow_type.value,
+            category=self._flow_type,
         )
 
     def _format_type_error_response(
@@ -427,23 +386,55 @@ class ToolNode:
 
         return f"Tool runtime exception due to {str(error)}"
 
-@inject
 class AgentComponent(BaseComponent):
     prompt_id: str
     prompt_version: str
     toolset: Toolset
 
-    prompt_registry: Annotated[
-        LocalPromptRegistry, Provide[ContainerApplication.pkg_prompts.prompt_registry]
-    ] = InjectedValue
+    prompt_registry: LocalPromptRegistry
+    internal_event_client: InternalEventsClient
 
     _allowed_input_targets = tuple(FlowState.__annotations__.keys())
     _allowed_output_targets = tuple(FlowState.__annotations__.keys())
 
+    @inject
+    def __init__(
+        self,
+        name: str,
+        flow_id: str,
+        flow_type: CategoryEnum,
+        inputs: list[IOKey],
+        prompt_id: str,
+        prompt_version: str,
+        toolset: Toolset,
+        output: Optional[IOKey] = None,
+        prompt_registry: LocalPromptRegistry = Provide[
+            ContainerApplication.pkg_prompts.prompt_registry
+        ],
+        internal_event_client: InternalEventsClient = Provide[
+            ContainerApplication.internal_event.client
+        ],
+        **kwargs
+    ):
+        super().__init__(
+            name=name,
+            flow_id=flow_id,
+            flow_type=flow_type,
+            inputs=inputs,
+            output=output,
+            prompt_id=prompt_id,
+            prompt_version=prompt_version,
+            toolset=toolset,
+            prompt_registry=prompt_registry,
+            internal_event_client=internal_event_client,
+            **kwargs
+        )
+
+
     def _agent_node_router(
         self, state: FlowState
     ) -> str:
-        history: list[BaseMessage] = state[FlowStateKeys.CONVERSATION_HISTORY][self.name]
+        history: list[BaseMessage] = state[FlowStateKeys.CONVERSATION_HISTORY.value][self.name]
         last_message = history[-1]
         if isinstance(last_message, AIMessage) and len(last_message.tool_calls) > 0:
             if any(
@@ -476,6 +467,7 @@ class AgentComponent(BaseComponent):
             inputs=self.inputs,
             flow_id=self.flow_id,
             flow_type=self.flow_type,
+            internal_event_client=self.internal_event_client,
         )
         node_tools = ToolNode(
             name=f"{self.name}#tools",
@@ -483,11 +475,11 @@ class AgentComponent(BaseComponent):
             toolset=self.toolset,
             flow_id=self.flow_id,
             flow_type=self.flow_type,
+            internal_event_client=self.internal_event_client,
         )
         node_final_response = FinalResponseNode(
             name=f"{self.name}#final_response",
             component_name=self.name,
-            output_type=AgentFinalOutput,
             output=self.output,
         )
         node_reflexion = ReflexionNode(

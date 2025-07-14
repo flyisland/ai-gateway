@@ -20,11 +20,10 @@ from duo_workflow_service.agent_platform.experimental.flows.flow_config import (
 from duo_workflow_service.agent_platform.experimental.routers import Router
 from duo_workflow_service.agent_platform.experimental.state import (
     FlowState,
-    FlowStatusEnum,
 )
 from duo_workflow_service.checkpointer.gitlab_workflow import WorkflowStatusEventEnum
 from duo_workflow_service.components.tools_registry import ToolsRegistry
-from duo_workflow_service.entities.state import MessageTypeEnum, ToolStatus, UiChatLog
+from duo_workflow_service.entities.state import MessageTypeEnum, ToolStatus, UiChatLog, WorkflowStatusEnum
 from duo_workflow_service.tracking.errors import log_exception
 from duo_workflow_service.workflows.abstract_workflow import (
     AbstractWorkflow,
@@ -92,7 +91,7 @@ class Flow(AbstractWorkflow):
         )
 
         return FlowState(
-            status=FlowStatusEnum.NOT_STARTED,
+            status=WorkflowStatusEnum.NOT_STARTED,
             conversation_history={},
             ui_chat_log=[initial_ui_chat_log],
             context={
@@ -117,13 +116,13 @@ class Flow(AbstractWorkflow):
         for comp_config in self._config.components:
             comp_name = comp_config["name"]  # explicit name field
             comp_class = load_component_class(comp_config["type"])
-
+            
             comp_params = {k: v for k, v in comp_config.items() if k != "type"}
 
             comp_params.update(
                 {
-                    "workflow_id": self._workflow_id,
-                    "workflow_type": self._workflow_type,
+                    "flow_id": self._workflow_id,
+                    "flow_type": self._workflow_type,
                 }
             )
 
@@ -142,6 +141,7 @@ class Flow(AbstractWorkflow):
 
             components[comp_name] = comp_class(**comp_params)
 
+        # TODO: Automatically include end componentd
         return components
 
     def _build_routers(

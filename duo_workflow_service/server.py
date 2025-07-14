@@ -61,6 +61,9 @@ from duo_workflow_service.workflows.type_definitions import AdditionalContext
 from lib.internal_events import InternalEventsClient
 from lib.internal_events.event_enum import CategoryEnum
 
+from duo_workflow_service.agent_platform.experimental.flows import Flow, FlowConfig
+
+
 log = structlog.stdlib.get_logger("server")
 
 catalog = data_model.load_catalog()
@@ -202,19 +205,30 @@ class DuoWorkflowService(contract_pb2_grpc.DuoWorkflowServicer):
 
         invocation_metadata = dict(context.invocation_metadata())
 
-        workflow: AbstractWorkflow = workflow_class(
+        # workflow: AbstractWorkflow = workflow_class(
+        #     workflow_id=workflow_id,
+        #     workflow_metadata=workflow_metadata,
+        #     workflow_type=workflow_type,
+        #     user=user,
+        #     mcp_tools=mcp_tools,
+        #     additional_context=additional_context,
+        #     invocation_metadata={
+        #         "base_url": invocation_metadata.get("x-gitlab-base-url", ""),
+        #         "gitlab_token": invocation_metadata.get("x-gitlab-oauth-token", ""),
+        #     },
+        #     approval=start_workflow_request.startRequest.approval,
+        #     language_server_version=language_server_version.get(),
+        # )
+
+        workflow = Flow(
             workflow_id=workflow_id,
             workflow_metadata=workflow_metadata,
             workflow_type=workflow_type,
-            user=user,
-            mcp_tools=mcp_tools,
-            additional_context=additional_context,
+            config=FlowConfig.from_yaml_config("prototype.yml"),
             invocation_metadata={
                 "base_url": invocation_metadata.get("x-gitlab-base-url", ""),
                 "gitlab_token": invocation_metadata.get("x-gitlab-oauth-token", ""),
-            },
-            approval=start_workflow_request.startRequest.approval,
-            language_server_version=language_server_version.get(),
+            }
         )
 
         async def send_events():

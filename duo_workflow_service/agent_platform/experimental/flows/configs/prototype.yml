@@ -1,0 +1,25 @@
+version: 1
+environment: remote # Environment represents target execution environment - local or remote
+components:
+  - name: "agent"
+    type: AgentComponent
+    prompt_id: "agents/awesome"
+    prompt_version: "^1.0.0"
+    inputs: ["context:goal"]
+    output: "context:agent.answer"
+    toolset:
+      - "read_file"
+      - "list_dir"
+      - "find_files"
+      - "read_file"
+      - "grep"
+      - "create_file_with_contents"
+      - "edit_file"
+      - "mkdir"
+  - name: "end"
+    type: EndComponent
+routers:
+  - from: "agent"
+    to: "end"
+flow:
+  entry_point: "agent"

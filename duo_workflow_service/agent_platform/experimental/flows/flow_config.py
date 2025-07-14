@@ -39,8 +39,7 @@ def load_component_class(cls_name: str) -> type:
         raise AttributeError(f"Component class '{cls_name}' not found")
 
     component_class = getattr(components, cls_name)
-
-    if not inspect.isclass(component_class):
+    if not inspect.isclass(component_class): #  and not inspect.isfunction(component_class):
         raise TypeError(f"'{cls_name}' is not a class")
 
     return component_class
