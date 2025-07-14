@@ -1,5 +1,6 @@
+from dataclasses import dataclass
 from time import time
-from typing import Annotated, AsyncIterator, Optional, Tuple
+from typing import Annotated, AsyncIterator, Dict, Any, Optional, Tuple
 
 from dependency_injector.providers import Factory
 from fastapi import APIRouter, Depends, HTTPException, Request, status
@@ -72,6 +73,20 @@ from lib.internal_events import InternalEventsClient
 __all__ = [
     "router",
 ]
+
+
+@dataclass
+class CompletionConfig:
+    """Configuration for code completion providers."""
+    factory: Factory[CodeCompletions]
+    handler_class: Optional[type] = None
+    requires_prompt_registry: bool = False
+    extra_kwargs: Optional[Dict[str, Any]] = None
+    unit_primitive: Optional[GitLabUnitPrimitive] = None
+
+    def __post_init__(self):
+        if self.extra_kwargs is None:
+            self.extra_kwargs = {}
 
 
 request_log = get_request_logger("codesuggestions")
@@ -463,12 +478,59 @@ def _resolve_code_completions_litellm(
     )
 
 
+def _get_provider_config(
+    provider: KindModelProvider,
+    completions_anthropic_factory: Factory[CodeCompletions],
+    completions_litellm_factory: Factory[CodeCompletions],
+    completions_fireworks_factory: Factory[CodeCompletions],
+    completions_amazon_q_factory: Factory[CodeCompletions],
+    completions_litellm_vertex_codestral_factory: Factory[CodeCompletions],
+    region: str,
+) -> CompletionConfig:
+    """Get the appropriate completion configuration for the given provider."""
+
+    if provider == KindModelProvider.ANTHROPIC:
+        return CompletionConfig(
+            factory=completions_anthropic_factory,
+            handler_class=AnthropicHandler,
+        )
+
+    elif provider in (KindModelProvider.LITELLM, KindModelProvider.MISTRALAI):
+        return CompletionConfig(
+            factory=completions_litellm_factory,
+            handler_class=LiteLlmHandler,
+            requires_prompt_registry=True,
+        )
+
+    elif provider == KindModelProvider.AMAZON_Q:
+        return CompletionConfig(
+            factory=completions_amazon_q_factory,
+            unit_primitive=GitLabUnitPrimitive.AMAZON_Q_INTEGRATION,
+        )
+
+    elif provider == KindModelProvider.FIREWORKS or not _allow_vertex_codestral(region):
+        return CompletionConfig(
+            factory=completions_fireworks_factory,
+            handler_class=FireworksHandler,
+            requires_prompt_registry=True,
+        )
+
+    else:
+        return CompletionConfig(
+            factory=completions_litellm_vertex_codestral_factory,
+            extra_kwargs={
+                "temperature": 0.7,
+                "max_output_tokens": 64,
+                "context_max_percent": 0.3,
+            }
+        )
+
+
 def _build_code_completions(
     request: Request,
     payload: CompletionsRequestWithVersion,
     current_user: StarletteUser,
     prompt_registry: BasePromptRegistry,
-    # pylint: disable=unused-argument
     completions_legacy_factory: Factory[CodeCompletionsLegacy],
     completions_anthropic_factory: Factory[CodeCompletions],
     completions_litellm_factory: Factory[CodeCompletions],
@@ -483,7 +545,6 @@ def _build_code_completions(
     use_llm_prompt_caching = (
         request.headers.get(X_GITLAB_MODEL_PROMPT_CACHE_ENABLED, "true") == "true"
     )
-    kwargs = {}
 
     unit_primitive = GitLabUnitPrimitive.COMPLETE_CODE
     tracking_event = f"request_{unit_primitive}"
@@ -499,6 +560,7 @@ def _build_code_completions(
 
         payload.model_name = model_metadata.identifier
         payload.model_provider = model_metadata.provider
+        kwargs = {}
 
         if model_metadata.provider == KindModelProvider.ANTHROPIC:
             AnthropicHandler(payload, request, kwargs).update_completion_params()
@@ -533,84 +595,65 @@ def _build_code_completions(
                     {"code_context": [ctx.content for ctx in payload.context]}
                 )
 
-    elif payload.model_provider == KindModelProvider.ANTHROPIC:
-        AnthropicHandler(payload, request, kwargs).update_completion_params()
-        code_completions = completions_anthropic_factory(
-            model__name=payload.model_name,
-        )
-    elif payload.model_provider in (
-        KindModelProvider.LITELLM,
-        KindModelProvider.MISTRALAI,
-    ):
-        LiteLlmHandler(payload, request, kwargs).update_completion_params()
-        code_completions = _resolve_code_completions_litellm(
-            payload=payload,
-            current_user=current_user,
-            prompt_registry=prompt_registry,
-            use_llm_prompt_caching=use_llm_prompt_caching,
-            completions_agent_factory=completions_agent_factory,
-            completions_litellm_factory=completions_litellm_factory,
-        )
-
-        _track_code_suggestions_event(tracking_event, internal_event_client)
-
         return code_completions, kwargs
-    elif payload.model_provider == KindModelProvider.AMAZON_Q:
-        unit_primitive = GitLabUnitPrimitive.AMAZON_Q_INTEGRATION
-        tracking_event = f"request_{unit_primitive}_complete_code"
-        code_completions = completions_amazon_q_factory(
-            model__current_user=current_user,
-            model__role_arn=payload.role_arn,
-        )
-    elif (
-        payload.model_provider == KindModelProvider.FIREWORKS
-        or not _allow_vertex_codestral(region)
-    ):
-        FireworksHandler(payload, request, kwargs).update_completion_params()
-        code_completions = _resolve_code_completions_litellm(
-            payload=payload,
-            current_user=current_user,
-            prompt_registry=prompt_registry,
-            use_llm_prompt_caching=use_llm_prompt_caching,
-            completions_agent_factory=completions_agent_factory,
-            completions_litellm_factory=completions_fireworks_factory,
-        )
-
-        _track_code_suggestions_event(tracking_event, internal_event_client)
-
-        return code_completions, kwargs
+ 
     else:
-        code_completions = _resolve_code_completions_vertex_codestral(
-            payload=payload,
-            completions_litellm_vertex_codestral_factory=completions_litellm_vertex_codestral_factory,
+        config = _get_provider_config( # BACK TO HERE
+            payload.model_provider,
+            completions_anthropic_factory,
+            completions_litellm_factory,
+            completions_fireworks_factory,
+            completions_amazon_q_factory,
+            completions_litellm_vertex_codestral_factory,
+            region,
         )
 
-        # We need to pass this here since litellm.LiteLlmTextGenModel
-        # sets the default temperature and max_output_tokens in the `generate` function signature
-        # To override those values, the kwargs passed to `generate` is updated here
-        # For further details, see:
-        # https://gitlab.com/gitlab-org/modelops/applied-ml/code-suggestions/ai-assist/-/merge_requests/1172#note_2060587592 # pylint: disable=line-too-long
-        #
-        # The temperature value is taken from Mistral's docs: https://docs.mistral.ai/api/#operation/createFIMCompletion
-        # context_max_percent is set to 0.3 to limit the amount of context right now because latency increases with
-        # larger context
-        kwargs.update(
-            {"temperature": 0.7, "max_output_tokens": 64, "context_max_percent": 0.3}
-        )
-        if payload.context:
+        kwargs = {}
+
+        if config.handler_class:
+            config.handler_class(payload, request, kwargs).update_completion_params()
+
+        if config.requires_prompt_registry:
+            code_completions = _resolve_code_completions_litellm(
+                payload=payload,
+                current_user=current_user,
+                prompt_registry=prompt_registry,
+                use_llm_prompt_caching=use_llm_prompt_caching,
+                completions_agent_factory=completions_agent_factory,
+                completions_litellm_factory=config.factory,
+            )
+
+            _track_code_suggestions_event(tracking_event, internal_event_client)
+            return code_completions, kwargs
+
+        if payload.model_provider == KindModelProvider.AMAZON_Q:
+            code_completions = config.factory(
+                model__current_user=current_user,
+                model__role_arn=payload.role_arn,
+            )
+        elif payload.model_provider == KindModelProvider.ANTHROPIC:
+            code_completions = config.factory(model__name=payload.model_name)
+        else:
+            code_completions = config.factory()
+
+        kwargs.update(config.extra_kwargs)
+
+        if (payload.model_provider not in [KindModelProvider.ANTHROPIC, KindModelProvider.AMAZON_Q] and payload.context):
             kwargs.update({"code_context": [ctx.content for ctx in payload.context]})
 
-    # Providers that are handled via the prompt registry perform their own UP check and event tracking. If we reach
-    # this point is because we're using some other legacy provider, and we need to perform these steps now
-    if not current_user.can(unit_primitive):
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="Unauthorized to access code completions",
-        )
+        unit_primitive = config.unit_primitive or GitLabUnitPrimitive.COMPLETE_CODE
+        tracking_event = f"request_{unit_primitive}"
+        if config.unit_primitive == GitLabUnitPrimitive.AMAZON_Q_INTEGRATION:
+            tracking_event = f"request_{unit_primitive}_complete_code"
+        if not current_user.can(unit_primitive):
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Unauthorized to access code completions",
+            )
 
-    _track_code_suggestions_event(tracking_event, internal_event_client)
+        _track_code_suggestions_event(tracking_event, internal_event_client)
 
-    return code_completions, kwargs
+        return code_completions, kwargs
 
 
 def _resolve_code_completions_vertex_codestral(
