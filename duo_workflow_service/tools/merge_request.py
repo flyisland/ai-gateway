@@ -112,10 +112,7 @@ class CreateMergeRequest(DuoBaseTool):
                 body=json.dumps(data),
             )
             return json.dumps(
-                {
-                    "status": "success",
-                    "merge_request": response,
-                }
+                {"status": "success", "merge_request": MergeRequest(**response)}
             )
         except Exception as e:
             return json.dumps({"error": str(e)})

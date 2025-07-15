@@ -176,6 +176,8 @@ config:
 ---
 graph TD;
     __start__([<p>__start__</p>]):::first
+    fetch_issue(fetch_issue)
+    create_merge_request(create_merge_request)
     build_context(build_context)
     build_context_tools(build_context_tools)
     build_context_handover(build_context_handover)
@@ -191,15 +193,16 @@ graph TD;
     execution_supervisor(execution_supervisor)
     execution_handover(execution_handover)
     git_actions(git_actions)
-    complete(complete)
+    update_merge_request(update_merge_request)
     __end__([<p>__end__</p>]):::last
-    __start__ --> build_context;
+    __start__ --> fetch_issue;
     build_context -. &nbsp;HandoverAgent&nbsp; .-> build_context_handover;
     build_context -. &nbsp;call_tool&nbsp; .-> build_context_tools;
     build_context -. &nbsp;stop&nbsp; .-> plan_terminator;
     build_context_handover --> planning;
     build_context_tools -.-> build_context;
     build_context_tools -. &nbsp;stop&nbsp; .-> plan_terminator;
+    create_merge_request --> build_context;
     execution -. &nbsp;HandoverAgent&nbsp; .-> execution_handover;
     execution -. &nbsp;PlanSupervisorAgent&nbsp; .-> execution_supervisor;
     execution -. &nbsp;call_tool&nbsp; .-> execution_tools;
@@ -208,7 +211,8 @@ graph TD;
     execution_handover --> git_actions;
     execution_supervisor --> execution;
     execution_tools --> execution;
-    git_actions --> complete;
+    fetch_issue --> create_merge_request;
+    git_actions --> update_merge_request;
     planning -. &nbsp;stop&nbsp; .-> plan_terminator;
     planning -. &nbsp;PlanSupervisorAgent&nbsp; .-> planning_supervisor;
     planning -. &nbsp;HandoverAgent&nbsp; .-> set_status_to_execution;
@@ -221,8 +225,8 @@ graph TD;
     tools_approval_entry_executor -. &nbsp;back&nbsp; .-> execution;
     tools_approval_entry_executor -. &nbsp;continue&nbsp; .-> tools_approval_check_executor;
     update_plan --> planning;
-    complete --> __end__;
     plan_terminator --> __end__;
+    update_merge_request --> __end__;
     classDef default fill:#f2f0ff,line-height:1.2
     classDef first fill-opacity:0
     classDef last fill:#bfb6fc
