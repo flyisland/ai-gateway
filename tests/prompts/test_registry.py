@@ -1063,12 +1063,13 @@ class TestLocalPromptRegistry:
         self,
         mock_prompt_class: type[Prompt],
         registry: LocalPromptRegistry,
-        prompt_config: PromptConfig,
         tool_choice: str | None,
     ):
         """Test that tool_choice parameter is correctly passed from get method to Prompt constructor."""
 
-        from langchain_core.tools.base import BaseTool
+        from langchain_core.tools.base import (  # pylint: disable=import-outside-toplevel
+            BaseTool,
+        )
 
         class Tool(BaseTool):
             name: str = "tool"
@@ -1106,4 +1107,4 @@ class TestLocalPromptRegistry:
         _, kwargs = mock_prompt_class.call_args
 
         assert kwargs.get("tool_choice") == tool_choice
-        assert all([isinstance(tool, Tool) for tool in kwargs.get("tools")])
+        assert all(isinstance(tool, Tool) for tool in kwargs.get("tools"))
