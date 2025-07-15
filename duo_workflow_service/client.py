@@ -11,7 +11,7 @@ from gitlab_cloud_connector import (
     UserClaims,
 )
 
-from contract import contract_pb2, contract_pb2_grpc
+from contract import contract_pb2, contract_pb2_grpc, health_pb2, health_pb2_grpc
 
 
 def generate_client_events():
@@ -20,6 +20,17 @@ def generate_client_events():
             clientVersion="1", workflowDefinition="test", goal="test"
         )
     )
+
+
+def test_health_check():
+    port = int(os.environ.get("PORT", "50052"))
+    channel = grpc.insecure_channel(f"localhost:{port}")
+    stub = health_pb2_grpc.HealthStub(channel)
+
+    request = health_pb2.HealthCheckRequest()
+    response: health_pb2.HealthCheckResponse = stub.Check(request)
+    print("Health check:")
+    print(f"response: {response}")
 
 
 def test_generate_token():
@@ -109,5 +120,6 @@ def test_execute_workflow():
 if __name__ == "__main__":
     load_dotenv()
 
+    test_health_check()
     test_generate_token()
     test_execute_workflow()

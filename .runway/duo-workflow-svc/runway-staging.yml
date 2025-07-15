@@ -32,3 +32,12 @@ spec:
     limits:
       cpu: 2000m
       memory: 8G
+  # Overriding startup probe setting for the DWS container.
+  # NOTE: Removing this entry will fallback to the default startup probe.
+  # See https://schemas.runway.gitlab.com/RunwayService/#spec_startup_probe
+  startup_probe:
+    grpc_service: duo-workflow-service
+    initial_delay_seconds: 20
+    timeout_seconds: 10
+    period_seconds: 10
+    failure_threshold: 24

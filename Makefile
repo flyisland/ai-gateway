@@ -50,6 +50,7 @@ TEST_PATH_ARG ?=
 
 # grpc
 
+PROTO_FILES = ./contract/contract.proto ./contract/health.proto
 PROTOC_VERSION := 27.3
 PROTOC_GEN_GO_VERSION := v1.35.1
 PROTOC_GEN_GO_GRPC_VERSION := v1.5.1
@@ -84,7 +85,7 @@ gen-proto-python: install-test-deps
 		--python_out=./ \
 		--pyi_out=./ \
 		--grpc_python_out=./ \
-		./contract/contract.proto
+		$(PROTO_FILES)
 
 .PHONY: gen-proto-ruby
 gen-proto-ruby:
@@ -97,7 +98,7 @@ gen-proto-ruby:
 gen-proto-go: gen-proto-go-install bin/protoc
 	bin/protoc --go_out=clients/gopb --go_opt=paths=source_relative \
 		--go-grpc_out=clients/gopb --go-grpc_opt=paths=source_relative \
-		./contract/contract.proto
+		$(PROTO_FILES)
 
 .PHONY: gen-proto-go-install
 gen-proto-go-install:
@@ -112,7 +113,7 @@ gen-proto-node: bin/protoc
 		--proto_path=./contract \
 		--ts_proto_out=clients/node/src/grpc \
 		--ts_proto_opt=env=node,useAbortSignal=true,esModuleInterop=true,outputServices=grpc-js \
-		./contract/contract.proto
+		$(PROTO_FILES)
 		@echo "Building Node client after generating proto files..."
 		@(cd clients/node; npx tsc)
 		@(cd clients/node; npm run after_generate)
