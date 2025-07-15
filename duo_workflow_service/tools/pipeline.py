@@ -1,9 +1,10 @@
 import json
-from typing import Any, Optional, Type
+from typing import Any, Optional, Type, Dict
 
 from gitlab_cloud_connector import GitLabUnitPrimitive
 from pydantic import BaseModel, Field
 
+from duo_workflow_service.gitlab.http_client import GitlabHttpClient
 from duo_workflow_service.tools.duo_base_tool import DuoBaseTool
 from duo_workflow_service.tools.gitlab_resource_input import ProjectResourceInput
 from duo_workflow_service.tools.merge_request import (
@@ -78,24 +79,18 @@ class GetPipelineErrorsForMergeRequest(DuoBaseTool):
         last_pipeline = pipelines[0]
         last_pipeline_id = last_pipeline["id"]
 
-        jobs = await self.gitlab_client.aget(
-            path=f"/api/v4/projects/{validation_result.project_id}/pipelines/{last_pipeline_id}/jobs"
-        )
+        failed_jobs = await get_failed_jobs_for_pipeline_id(validation_result.project_id, last_pipeline_id, self.gitlab_client)
 
         traces = "Failed Jobs:\n"
-        for job in jobs:
-            if job["status"] == "failed":
-                job_id = job["id"]
-                job_name = job["name"]
-                traces += f"Name: {job_name}\nJob ID: {job_id}\n"
-                try:
-                    trace = await self.gitlab_client.aget(
-                        path=f"/api/v4/projects/{validation_result.project_id}/jobs/{job_id}/trace",
-                        parse_json=False,
-                    )
-                    traces += f"Trace: {trace}\n"
-                except Exception as e:
-                    traces += f"Error fetching trace: {str(e)}\n"
+        for job in failed_jobs:
+            job_id = job["id"]
+            job_name = job["name"]
+            traces += f"Name: {job_name}\nJob ID: {job_id}\n"
+            try:
+                trace = await get_trace_for_job(validation_result.project_id, job_id, self.gitlab_client)
+                traces += f"Trace: {trace}\n"
+            except Exception as e:
+                traces += f"Error fetching trace: {str(e)}\n"
 
         return json.dumps({"merge_request": merge_request, "traces": traces})
 
@@ -103,3 +98,28 @@ class GetPipelineErrorsForMergeRequest(DuoBaseTool):
         if args.url:
             return f"Get pipeline error logs for {args.url}"
         return f"Get pipeline error logs for merge request !{args.merge_request_iid} in project {args.project_id}"
+
+async def get_failed_jobs_for_pipeline_id(
+    project_id: int | str,
+    pipeline_id: str,
+    gitlab_client: GitlabHttpClient,
+) -> Dict[str, Any]:
+    jobs = await gitlab_client.aget(
+        path=f"/api/v4/projects/{project_id}/pipelines/{pipeline_id}/jobs"
+    )
+
+    failed_jobs = [job for job in jobs if job["status"] == "failed"]
+    # import pdb; pdb.set_trace()
+    return failed_jobs
+
+async def get_trace_for_job(
+    project_id: int | str,
+    job_id: str,
+    gitlab_client: GitlabHttpClient,
+) -> str:
+    trace = await gitlab_client.aget(
+        path=f"/api/v4/projects/{project_id}/jobs/{job_id}/trace",
+        parse_json=False,
+    )
+
+    return trace
