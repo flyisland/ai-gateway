@@ -174,6 +174,9 @@ class ToolsRegistry:
     ):
         tools_for_agent_privileges = _AGENT_PRIVILEGES
 
+        # Always enable mcp tools until it's reliably passed by clients as an agent privilege
+        enabled_tools.append(_RUN_MCP_TOOLS_PRIVILEGE)
+
         if _RUN_MCP_TOOLS_PRIVILEGE in enabled_tools:
             tools_for_agent_privileges[_RUN_MCP_TOOLS_PRIVILEGE] = mcp_tools or []
 

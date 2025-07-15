@@ -51,7 +51,7 @@ _outbox = MagicMock(spec=asyncio.Queue)
     "config,expected_tools_set",
     [
         (
-            {},
+            [],
             {
                 "create_plan",
                 "add_new_task",
@@ -381,7 +381,7 @@ async def test_registry_configuration(gl_http_client, mcp_tools):
             None,
             ["read_write_files"],
         ),
-        ("handover_tool", tools.HandoverTool, {}),
+        ("handover_tool", tools.HandoverTool, []),
     ],
     ids=["approved_tool", "not_approved_tool", "nonexistent_tool", "handover_tool"],
 )
@@ -404,7 +404,7 @@ def test_get_tool(tool_metadata, tool_name, expected_tool, config):
             [tools.ListIssues],
             ["read_only_gitlab"],
         ),
-        (["nonexistent_tool"], [], {}),
+        (["nonexistent_tool"], [], []),
     ],
     ids=["multiple_tools", "no_tools"],
 )
@@ -428,7 +428,7 @@ def test_get_batch_tools(tool_metadata, requested_tools, expected_tools, config)
             [tools.ReadFile],
             ["read_write_files"],
         ),
-        (["handover_tool"], [], {}),
+        (["handover_tool"], [], []),
     ],
     ids=["tools_and_noop_tools_mixed", "noop_tools_only"],
 )
@@ -592,7 +592,7 @@ def test_available_tools_for_user(
         (
             ["read_write_files", "use_git", "nonexistent_privilege"],
             ["read_file", "create_file_with_contents"],
-            ["read_file", "create_file_with_contents"],
+            ["read_file", "create_file_with_contents", "extra_tool"],
             set(["read_file", "create_file_with_contents"]),
         ),
         (
@@ -604,19 +604,19 @@ def test_available_tools_for_user(
         (
             ["read_write_files", "use_git"],
             ["run_git_command"],
-            ["run_git_command"],
+            ["run_git_command", "extra_tool"],
             set(),
         ),
         (
             ["read_write_files", "use_git"],
             ["read_file", "run_git_command"],
-            ["read_file", "run_git_command"],
+            ["read_file", "run_git_command", "extra_tool"],
             {"read_file"},
         ),
         (
             ["read_write_files", "use_git"],
             ["nonexistent_tool"],  # Nonexistent tool should be filtered out
-            ["nonexistent_tool"],
+            ["nonexistent_tool", "extra_tool"],
             set(),
         ),
     ],

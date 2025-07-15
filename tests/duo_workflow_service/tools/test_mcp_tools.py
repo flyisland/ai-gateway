@@ -12,7 +12,7 @@ from duo_workflow_service.tools.mcp_tools import (
 
 
 @pytest.mark.asyncio
-async def test_convert_mcp_tools_to_langchain_tools():
+async def test_convert_mcp_tools_to_langchain_tool_classes():
     metadata = {"outbox": AsyncMock()}
     mcp_tools = [
         contract_pb2.McpTool(
