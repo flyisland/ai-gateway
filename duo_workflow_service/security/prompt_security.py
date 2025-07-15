@@ -2,6 +2,10 @@
 import re
 from typing import Callable, Dict, List
 
+from duo_workflow_service.security.markdown_content_security import (
+    strip_hidden_markdown_content,
+)
+
 
 class SecurityException(Exception):
     """Custom exception raised when security validation fails."""
@@ -67,6 +71,7 @@ class PromptSecurity:
         Callable[[str | dict | list], str | dict | list]
     ] = [
         encode_dangerous_tags,
+        strip_hidden_markdown_content,
     ]
 
     # Tool-specific additional security functions
