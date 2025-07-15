@@ -1,7 +1,7 @@
 # pylint: disable=too-many-lines
 from pathlib import Path
 from textwrap import dedent
-from typing import Sequence, Type, cast
+from typing import Any, Sequence, Type, cast
 from unittest.mock import Mock, patch
 
 import pytest
@@ -1049,3 +1049,61 @@ class TestLocalPromptRegistry:
 
             call_dict = mock_log.info.call_args[1]
             assert call_dict["model_identifier"] == expected_identifier
+
+    @pytest.mark.parametrize(
+        "tool_choice",
+        [
+            "auto",
+            "any",
+            None,
+        ],
+    )
+    @patch("ai_gateway.prompts.registry.Prompt")
+    def test_get_with_tool_choice(
+        self,
+        mock_prompt_class: type[Prompt],
+        registry: LocalPromptRegistry,
+        prompt_config: PromptConfig,
+        tool_choice: str | None,
+    ):
+        """Test that tool_choice parameter is correctly passed from get method to Prompt constructor."""
+
+        from langchain_core.tools.base import BaseTool
+
+        class Tool(BaseTool):
+            name: str = "tool"
+            description: str = "mock tool"
+
+            def _run(self, *args: Any, **kwargs: Any) -> Any:
+                pass
+
+        registry.prompts_registered = {
+            "test/base": PromptRegistered(
+                klass=mock_prompt_class,
+                versions={
+                    "1.0.0": PromptConfig(
+                        name="Test prompt 1.0.0",
+                        model=ModelConfig(
+                            name="claude-3-5-sonnet-20241022",
+                            params=ChatLiteLLMParams(
+                                model_class_provider=ModelClassProvider.LITE_LLM,
+                                custom_llm_provider="vllm",
+                            ),
+                        ),
+                        prompt_template={"system": "Template1"},
+                    ),
+                },
+            )
+        }
+
+        _ = registry.get(
+            prompt_id="test",
+            prompt_version="^1.0.0",
+            tools=[Tool()],
+            tool_choice=tool_choice,
+        )
+
+        _, kwargs = mock_prompt_class.call_args
+
+        assert kwargs.get("tool_choice") == tool_choice
+        assert all([isinstance(tool, Tool) for tool in kwargs.get("tools")])

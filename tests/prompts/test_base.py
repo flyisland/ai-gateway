@@ -531,6 +531,34 @@ class TestPrompt:
         ):
             await anext(prompt.astream({"content": "What's up?"}))
 
+    @pytest.mark.parametrize(
+        "tool_choice",
+        [
+            "auto",
+            None,
+            "any",
+        ],
+    )
+    def test_bind_tools_with_tool_choice(
+        self,
+        prompt_config: PromptConfig,
+        tool_choice: str | None,
+    ):
+        """Test that tool_choice parameter is correctly passed to bind_tools method."""
+        mock_model = mock.MagicMock(spec=ChatAnthropic)
+        mock_model.bind_tools.return_value = mock_model
+        mock_model_factory = mock.MagicMock(return_value=mock_model)
+
+        _ = Prompt(
+            model_factory=mock_model_factory,
+            config=prompt_config,
+            tools=[mock.MagicMock(spec=BaseTool)],
+            tool_choice=tool_choice,
+        )
+
+        _, kwargs = mock_model.bind_tools.call_args
+        assert kwargs["tool_choice"] == tool_choice
+
 
 def _assert_usage_metadata_handling(
     mock_watcher: mock.Mock,
