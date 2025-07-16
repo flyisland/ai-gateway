@@ -33,6 +33,7 @@ from ai_gateway.prompts.config import (
     ModelConfig,
     PromptConfig,
 )
+from ai_gateway.prompts.config.base import PromptParams
 from ai_gateway.prompts.typing import Model, TypeModelFactory
 
 
@@ -300,7 +301,7 @@ def prompts_registered(prompt_class: type[Prompt]):
                     ),
                     unit_primitives=["duo_chat"],
                     prompt_template={"system": "Template1", "user": "Template2"},
-                    params={"timeout": 60, "stop": ["Foo", "Bar"]},
+                    params=PromptParams(timeout=60, stop=["Foo", "Bar"]),
                 ),
             },
         ),
@@ -317,10 +318,7 @@ def prompts_registered(prompt_class: type[Prompt]):
                     ),
                     unit_primitives=["amazon_q_integration"],
                     prompt_template={"system": "Template1", "user": "Template2"},
-                    params={
-                        "timeout": 60,
-                        "stop": ["Foo", "Bar"],
-                    },
+                    params=PromptParams(timeout=60, stop=["Foo", "Bar"]),
                 ),
             },
         ),
@@ -342,11 +340,9 @@ def prompts_registered(prompt_class: type[Prompt]):
                     ),
                     unit_primitives=["duo_chat"],
                     prompt_template={"system": "Template1", "user": "Template2"},
-                    params={
-                        "timeout": 60,
-                        "stop": ["Foo", "Bar"],
-                        "vertex_location": "us-east1",
-                    },
+                    params=PromptParams(
+                        timeout=60, stop=["Foo", "Bar"], vertex_location="us-east1"
+                    ),
                 ),
             },
         ),
