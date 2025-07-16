@@ -135,12 +135,7 @@ async def test_init_sets_attributes(outbox):
 
 
 @pytest.mark.parametrize(
-    (
-        "existing_messages",
-        "message_content",
-        "expected_messages",
-        "should_execute_action",
-    ),
+    ("existing_messages", "message_content", "expected_messages"),
     [
         (
             [],
@@ -157,7 +152,6 @@ async def test_init_sets_attributes(outbox):
                     "additional_context": None,
                 }
             ],
-            True,
         ),
         (
             [
@@ -185,7 +179,6 @@ async def test_init_sets_attributes(outbox):
                     "additional_context": None,
                 }
             ],
-            True,
         ),
         (
             [
@@ -223,7 +216,6 @@ async def test_init_sets_attributes(outbox):
                     "additional_context": None,
                 },
             ],
-            True,
         ),
         (
             [
@@ -261,23 +253,17 @@ async def test_init_sets_attributes(outbox):
                     "additional_context": None,
                 },
             ],
-            True,
         ),
         (
             [],
             "",
             [],
-            False,
         ),
     ],
 )
 @pytest.mark.asyncio
 async def test_send_event_messages_stream(
-    checkpoint_notifier,
-    existing_messages,
-    message_content,
-    expected_messages,
-    should_execute_action,
+    checkpoint_notifier, existing_messages, message_content, expected_messages
 ):
     checkpoint_notifier.ui_chat_log = existing_messages
 
@@ -291,10 +277,7 @@ async def test_send_event_messages_stream(
 
         assert checkpoint_notifier.ui_chat_log == expected_messages
 
-        if should_execute_action:
-            assert not checkpoint_notifier.outbox.empty()
-            action = await checkpoint_notifier.outbox.get()
-            assert action.newCheckpoint.goal == "test_goal"
-            assert action.newCheckpoint.checkpoint is not None
-        else:
-            assert checkpoint_notifier.outbox.empty()
+        assert not checkpoint_notifier.outbox.empty()
+        action = await checkpoint_notifier.outbox.get()
+        assert action.newCheckpoint.goal == "test_goal"
+        assert action.newCheckpoint.checkpoint is not None
