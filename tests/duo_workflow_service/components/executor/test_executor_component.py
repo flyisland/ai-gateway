@@ -1,4 +1,5 @@
-from unittest.mock import MagicMock, Mock, call, patch
+from typing import Any
+from unittest.mock import AsyncMock, MagicMock, Mock, call, patch
 
 import pytest
 from langchain_core.messages import AIMessage, HumanMessage, SystemMessage
@@ -7,6 +8,13 @@ from langgraph.graph import StateGraph
 
 from duo_workflow_service.components import ToolsApprovalComponent, ToolsRegistry
 from duo_workflow_service.components.executor.component import ExecutorComponent, Routes
+from duo_workflow_service.components.executor.prompts import (
+    EXECUTOR_SYSTEM_MESSAGE,
+    GET_PLAN_TOOL_NAME,
+    HANDOVER_TOOL_NAME,
+    OS_INFORMATION_COMPONENT,
+    SET_TASK_STATUS_TOOL_NAME,
+)
 from duo_workflow_service.entities import Plan, WorkflowState, WorkflowStatusEnum
 from duo_workflow_service.tools import DuoBaseTool
 from duo_workflow_service.workflows.type_definitions import AdditionalContext
@@ -63,10 +71,27 @@ def mock_tool_registry():
 
 
 @pytest.fixture
-def mock_create_model():
+def end_message():
+    return AIMessage(
+        content="Done with the execution, over to handover agent",
+        tool_calls=[
+            {
+                "id": "1",
+                "name": "handover_tool",
+                "args": {"summary": "done"},
+            }
+        ],
+    )
+
+
+@pytest.fixture
+def mock_create_model(end_message):
     with patch(
         "duo_workflow_service.components.executor.component.create_chat_model"
     ) as mock:
+        mock.return_value = mock
+        mock.bind_tools.return_value = mock
+        mock.ainvoke = AsyncMock(return_value=end_message)
         yield mock
 
 
@@ -114,6 +139,18 @@ class TestExecutorComponent:
         return CategoryEnum.WORKFLOW_SOFTWARE_DEVELOPMENT
 
     @pytest.fixture
+    def goal(self) -> str:
+        return "Test goal"
+
+    @pytest.fixture
+    def project(self) -> dict[str, Any]:
+        return {
+            "id": 123,
+            "name": "test-project",
+            "http_url_to_repo": "https://gitlab.com/test/repo",
+        }
+
+    @pytest.fixture
     def mock_dependencies(
         self,
         mock_toolset,
@@ -121,34 +158,34 @@ class TestExecutorComponent:
         gl_http_client,
         additional_context,
         workflow_type,
+        goal,
+        project,
     ):
         return {
             "workflow_id": "test-workflow-123",
             "workflow_type": workflow_type,
-            "goal": "Test goal",
+            "goal": goal,
             "executor_toolset": mock_toolset,
             "tools_registry": mock_tool_registry,
             "model_config": "",
-            "project": {
-                "id": 123,
-                "name": "test-project",
-                "http_url_to_repo": "https://gitlab.com/test/repo",
-            },
+            "project": project,
             "http_client": gl_http_client,
             "additional_context": additional_context,
         }
 
     @pytest.fixture
-    def executor_component(self, mock_dependencies):
+    def executor_component(
+        self, mock_dependencies, mock_duo_workflow_service_container
+    ):
         return ExecutorComponent(**mock_dependencies)
 
-    def test_init(self, mock_dependencies, workflow_type):
+    def test_init(self, mock_dependencies, workflow_type, goal):
         """Test executorComponent initialization."""
         component = ExecutorComponent(**mock_dependencies)
 
         assert component.workflow_id == "test-workflow-123"
         assert component.workflow_type == workflow_type
-        assert component.goal == "Test goal"
+        assert component.goal == goal
         assert component.executor_toolset == mock_dependencies["executor_toolset"]
         assert component.tools_registry == mock_dependencies["tools_registry"]
         assert component.model_config == mock_dependencies["model_config"]
@@ -449,6 +486,7 @@ class TestExecutorComponent:
         assert len(response["handover"]) == 0
         assert len(response["conversation_history"]["executor"]) == 4
 
+    @pytest.mark.asyncio
     @pytest.mark.parametrize(
         "additional_context,expected_os_info",
         [
@@ -473,15 +511,37 @@ class TestExecutorComponent:
             ),
         ],
     )
-    def test_format_executor_message(self, expected_os_info, executor_component):
-        result = executor_component._format_system_prompt()
+    async def test_messages_to_model(
+        self,
+        expected_os_info,
+        mock_create_model,
+        compiled_graph,
+        graph_input,
+        graph_config,
+        project,
+        goal,
+    ):
+        await compiled_graph.ainvoke(input=graph_input, config=graph_config)
 
-        assert "{os_information}" not in result
+        os_information = (
+            OS_INFORMATION_COMPONENT.format(os_information=expected_os_info)
+            if expected_os_info
+            else ""
+        )
 
-        if expected_os_info:
-            assert f"<os_information>{expected_os_info}</os_information>" in result
-            assert "Here is the information about the operating system" in result
-        else:
-            assert "<os_information>" not in result
+        expected_message = EXECUTOR_SYSTEM_MESSAGE.format(
+            set_task_status_tool_name=SET_TASK_STATUS_TOOL_NAME,
+            handover_tool_name=HANDOVER_TOOL_NAME,
+            get_plan_tool_name=GET_PLAN_TOOL_NAME,
+            project_id=project["id"],
+            project_name=project["name"],
+            project_url=project["http_url_to_repo"],
+            os_information=os_information,
+        )
 
-        assert expected_os_info in result
+        mock_create_model.ainvoke.assert_called_with(
+            [
+                SystemMessage(content=expected_message),
+                HumanMessage(content=f"Your goal is: {goal}"),
+            ]
+        )
