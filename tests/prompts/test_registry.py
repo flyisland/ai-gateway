@@ -1,7 +1,7 @@
 # pylint: disable=too-many-lines
 from pathlib import Path
 from textwrap import dedent
-from typing import Any, Sequence, Type, cast
+from typing import Sequence, Type, cast
 from unittest.mock import Mock, patch
 
 import pytest
@@ -221,10 +221,10 @@ def model_factories():
 
 
 @pytest.fixture
-def prompts_registered():
+def prompts_registered(prompt_class: type[Prompt]):
     return {
         "test/base": PromptRegistered(
-            klass=Prompt,
+            klass=prompt_class,
             versions={
                 "1.0.0": PromptConfig(
                     name="Test prompt 1.0.0",
@@ -1051,60 +1051,36 @@ class TestLocalPromptRegistry:
             assert call_dict["model_identifier"] == expected_identifier
 
     @pytest.mark.parametrize(
-        "tool_choice",
+        ("tool_choice", "prompt_class"),
         [
-            "auto",
-            "any",
-            None,
+            ("auto", Mock(spec=Prompt)),
+            ("any", Mock(spec=Prompt)),
+            (None, Mock(spec=Prompt)),
         ],
     )
-    @patch("ai_gateway.prompts.registry.Prompt")
     def test_get_with_tool_choice(
         self,
-        mock_prompt_class: type[Prompt],
+        prompt_class: Mock,
         registry: LocalPromptRegistry,
         tool_choice: str | None,
     ):
         """Test that tool_choice parameter is correctly passed from get method to Prompt constructor."""
 
+        # We have custom BaseTool in ai_gateway.chat.tools.
+        # To avoid potential collisions, we import BaseTool from LangChain locally.
         from langchain_core.tools.base import (  # pylint: disable=import-outside-toplevel
             BaseTool,
         )
 
-        class Tool(BaseTool):
-            name: str = "tool"
-            description: str = "mock tool"
-
-            def _run(self, *args: Any, **kwargs: Any) -> Any:
-                pass
-
-        registry.prompts_registered = {
-            "test/base": PromptRegistered(
-                klass=mock_prompt_class,
-                versions={
-                    "1.0.0": PromptConfig(
-                        name="Test prompt 1.0.0",
-                        model=ModelConfig(
-                            name="claude-3-5-sonnet-20241022",
-                            params=ChatLiteLLMParams(
-                                model_class_provider=ModelClassProvider.LITE_LLM,
-                                custom_llm_provider="vllm",
-                            ),
-                        ),
-                        prompt_template={"system": "Template1"},
-                    ),
-                },
-            )
-        }
+        tools: list[BaseTool] = [Mock(spec=BaseTool)]
 
         _ = registry.get(
             prompt_id="test",
             prompt_version="^1.0.0",
-            tools=[Tool()],
+            tools=tools,
             tool_choice=tool_choice,
         )
 
-        _, kwargs = mock_prompt_class.call_args
-
+        kwargs = prompt_class.call_args.kwargs
         assert kwargs.get("tool_choice") == tool_choice
-        assert all(isinstance(tool, Tool) for tool in kwargs.get("tools"))
+        assert kwargs.get("tools") == tools
