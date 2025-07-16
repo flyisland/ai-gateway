@@ -10,14 +10,33 @@ from duo_workflow_service.components.executor.component import ExecutorComponent
 from duo_workflow_service.entities import Plan, WorkflowState, WorkflowStatusEnum
 from duo_workflow_service.tools import DuoBaseTool
 from duo_workflow_service.workflows.type_definitions import AdditionalContext
+from lib.internal_events.event_enum import CategoryEnum
 
 
 @pytest.fixture
 def approval_component(mock_toolset):
-    return MagicMock(
+    mock = MagicMock(
         spec=ToolsApprovalComponent,
         toolset=mock_toolset,
     )
+    mock.attach.return_value = "execution_tools"
+
+    return mock
+
+
+@pytest.fixture
+def compiled_graph(executor_component, approval_component):
+    graph = StateGraph(WorkflowState)
+
+    entry_point = executor_component.attach(
+        graph=graph,
+        exit_node=END,
+        next_node=END,
+        approval_component=approval_component,
+    )
+    graph.set_entry_point(entry_point)
+
+    return graph.compile()
 
 
 @pytest.fixture
@@ -43,13 +62,69 @@ def mock_tool_registry():
     return registry
 
 
+@pytest.fixture
+def mock_create_model():
+    with patch(
+        "duo_workflow_service.components.executor.component.create_chat_model"
+    ) as mock:
+        yield mock
+
+
+@pytest.fixture
+def mock_agent():
+    with patch("duo_workflow_service.components.executor.component.Agent") as mock:
+        yield mock
+
+
+@pytest.fixture
+def mock_tools_executor():
+    with patch(
+        "duo_workflow_service.components.executor.component.ToolsExecutor"
+    ) as mock:
+        yield mock
+
+
+@pytest.fixture
+def mock_supervisor_agent():
+    with patch(
+        "duo_workflow_service.components.executor.component.PlanSupervisorAgent"
+    ) as mock:
+        yield mock
+
+
+@pytest.fixture
+def mock_handover_agent():
+    with patch(
+        "duo_workflow_service.components.executor.component.HandoverAgent"
+    ) as mock:
+        mock.return_value.run.return_value = {
+            "status": WorkflowStatusEnum.COMPLETED,
+            "handover": [AIMessage(content="This is a summary")],
+        }
+        yield mock
+
+
 class TestExecutorComponent:
+    @pytest.fixture
+    def additional_context(self) -> AdditionalContext | None:
+        return None
 
     @pytest.fixture
-    def mock_dependencies(self, mock_toolset, mock_tool_registry, gl_http_client):
+    def workflow_type(self) -> CategoryEnum:
+        return CategoryEnum.WORKFLOW_SOFTWARE_DEVELOPMENT
+
+    @pytest.fixture
+    def mock_dependencies(
+        self,
+        mock_toolset,
+        mock_tool_registry,
+        gl_http_client,
+        additional_context,
+        workflow_type,
+    ):
         return {
             "workflow_id": "test-workflow-123",
-            "workflow_type": "test-workflow-type",
+            "workflow_type": workflow_type,
             "goal": "Test goal",
             "executor_toolset": mock_toolset,
             "tools_registry": mock_tool_registry,
@@ -60,19 +135,19 @@ class TestExecutorComponent:
                 "http_url_to_repo": "https://gitlab.com/test/repo",
             },
             "http_client": gl_http_client,
-            "additional_context": None,
+            "additional_context": additional_context,
         }
 
     @pytest.fixture
     def executor_component(self, mock_dependencies):
         return ExecutorComponent(**mock_dependencies)
 
-    def test_init(self, mock_dependencies):
+    def test_init(self, mock_dependencies, workflow_type):
         """Test executorComponent initialization."""
         component = ExecutorComponent(**mock_dependencies)
 
         assert component.workflow_id == "test-workflow-123"
-        assert component.workflow_type == "test-workflow-type"
+        assert component.workflow_type == workflow_type
         assert component.goal == "Test goal"
         assert component.executor_toolset == mock_dependencies["executor_toolset"]
         assert component.tools_registry == mock_dependencies["tools_registry"]
@@ -80,20 +155,14 @@ class TestExecutorComponent:
         assert component.project == mock_dependencies["project"]
         assert component.http_client == mock_dependencies["http_client"]
 
-    @patch("duo_workflow_service.components.executor.component.create_chat_model")
-    @patch("duo_workflow_service.components.executor.component.Agent")
-    @patch("duo_workflow_service.components.executor.component.ToolsExecutor")
-    @patch("duo_workflow_service.components.executor.component.PlanSupervisorAgent")
-    @patch("duo_workflow_service.components.executor.component.HandoverAgent")
     def test_attach_creates_nodes_and_edges(
         self,
-        mock_handover,
-        mock_supervisor,
+        mock_handover_agent,
+        mock_supervisor_agent,
         mock_tools_executor,
         mock_agent,
         mock_create_model,
         executor_component,
-        approval_component,
     ):
         """Test that attach method creates all necessary nodes and edges."""
         # Setup mocks
@@ -108,8 +177,8 @@ class TestExecutorComponent:
         expected_calls = [
             call("execution", mock_agent.return_value.run),
             call("execution_tools", mock_tools_executor.return_value.run),
-            call("execution_supervisor", mock_supervisor.return_value.run),
-            call("execution_handover", mock_handover.return_value.run),
+            call("execution_supervisor", mock_supervisor_agent.return_value.run),
+            call("execution_handover", mock_handover_agent.return_value.run),
         ]
         mock_graph.add_node.assert_has_calls(expected_calls)
 
@@ -134,10 +203,8 @@ class TestExecutorComponent:
         # Verify return value
         assert entry_node == "execution"
 
-    @patch("duo_workflow_service.components.executor.component.create_chat_model")
-    @patch("duo_workflow_service.components.executor.component.Agent")
     def test_attach_creates_agent_with_correct_parameters(
-        self, mock_agent, mock_create_model, executor_component
+        self, mock_agent, mock_create_model, executor_component, workflow_type
     ):
         """Test that Agent is created with correct parameters."""
         mock_graph = Mock(spec=StateGraph)
@@ -150,14 +217,9 @@ class TestExecutorComponent:
         assert call_args[1]["name"] == "executor"
         assert call_args[1]["workflow_id"] == "test-workflow-123"
         assert call_args[1]["toolset"] == executor_component.executor_toolset
-        assert call_args[1]["workflow_type"] == "test-workflow-type"
+        assert call_args[1]["workflow_type"] == workflow_type
 
     @pytest.mark.asyncio
-    @patch("duo_workflow_service.components.executor.component.create_chat_model")
-    @patch("duo_workflow_service.components.executor.component.Agent")
-    @patch("duo_workflow_service.components.executor.component.ToolsExecutor")
-    @patch("duo_workflow_service.components.executor.component.PlanSupervisorAgent")
-    @patch("duo_workflow_service.components.executor.component.HandoverAgent")
     async def test_component_run_with_no_approval_component(
         self,
         mock_handover_agent,
@@ -165,14 +227,11 @@ class TestExecutorComponent:
         mock_tools_executor,
         mock_agent,
         mock_create_model,
-        executor_component,
-        approval_component,
         graph_input,
         graph_config,
         mock_tool_registry,
+        compiled_graph,
     ):
-        graph = StateGraph(WorkflowState)
-
         mock_tool_registry.approval_required.return_value = False
 
         mock_agent.return_value.run.side_effect = [
@@ -236,22 +295,11 @@ class TestExecutorComponent:
             }
         }
 
-        mock_handover_agent.return_value.run.return_value = {
-            "status": WorkflowStatusEnum.COMPLETED,
-            "handover": [AIMessage(content="This is a summary")],
-        }
-
         mock_tools_executor.return_value.run.return_value = {
             "plan": Plan(steps=[]),
             "status": WorkflowStatusEnum.EXECUTION,
             "conversation_history": {},
         }
-
-        entry_point = executor_component.attach(
-            graph=graph, exit_node=END, next_node=END, approval_component=None
-        )
-        graph.set_entry_point(entry_point)
-        compiled_graph = graph.compile()
 
         response = await compiled_graph.ainvoke(input=graph_input, config=graph_config)
 
@@ -266,11 +314,6 @@ class TestExecutorComponent:
         assert len(response["conversation_history"]["executor"]) == 6
 
     @pytest.mark.asyncio
-    @patch("duo_workflow_service.components.executor.component.create_chat_model")
-    @patch("duo_workflow_service.components.executor.component.Agent")
-    @patch("duo_workflow_service.components.executor.component.ToolsExecutor")
-    @patch("duo_workflow_service.components.executor.component.PlanSupervisorAgent")
-    @patch("duo_workflow_service.components.executor.component.HandoverAgent")
     async def test_component_run_with_approval_component(
         self,
         mock_handover_agent,
@@ -283,9 +326,8 @@ class TestExecutorComponent:
         graph_input,
         graph_config,
         mock_tool_registry,
+        compiled_graph,
     ):
-        graph = StateGraph(WorkflowState)
-
         mock_agent.return_value.run.side_effect = [
             {
                 "plan": Plan(steps=[]),
@@ -327,27 +369,11 @@ class TestExecutorComponent:
             },
         ]
 
-        mock_handover_agent.return_value.run.return_value = {
-            "status": WorkflowStatusEnum.COMPLETED,
-            "handover": [AIMessage(content="This is a summary")],
-        }
-
         mock_tools_executor.return_value.run.return_value = {
             "plan": Plan(steps=[]),
             "status": WorkflowStatusEnum.EXECUTION,
             "conversation_history": {},
         }
-        approval_component_instance = approval_component.return_value
-        approval_component_instance.attach.return_value = "execution_tools"
-
-        entry_point = executor_component.attach(
-            graph=graph,
-            exit_node=END,
-            next_node=END,
-            approval_component=approval_component_instance,
-        )
-        graph.set_entry_point(entry_point)
-        compiled_graph = graph.compile()
 
         response = await compiled_graph.ainvoke(input=graph_input, config=graph_config)
 
@@ -362,11 +388,6 @@ class TestExecutorComponent:
         assert len(response["conversation_history"]["executor"]) == 4
 
     @pytest.mark.asyncio
-    @patch("duo_workflow_service.components.executor.component.create_chat_model")
-    @patch("duo_workflow_service.components.executor.component.Agent")
-    @patch("duo_workflow_service.components.executor.component.ToolsExecutor")
-    @patch("duo_workflow_service.components.executor.component.PlanSupervisorAgent")
-    @patch("duo_workflow_service.components.executor.component.HandoverAgent")
     async def test_component_run_with_error(
         self,
         mock_handover_agent,
@@ -378,9 +399,8 @@ class TestExecutorComponent:
         graph_input,
         graph_config,
         mock_tool_registry,
+        compiled_graph,
     ):
-        graph = StateGraph(WorkflowState)
-
         mock_tool_registry.approval_required.return_value = False
         mock_agent.return_value.run.side_effect = [
             {
@@ -418,12 +438,6 @@ class TestExecutorComponent:
             "conversation_history": {},
         }
 
-        entry_point = executor_component.attach(
-            graph=graph, exit_node=END, next_node=END, approval_component=None
-        )
-        graph.set_entry_point(entry_point)
-        compiled_graph = graph.compile()
-
         response = await compiled_graph.ainvoke(input=graph_input, config=graph_config)
 
         mock_supervisor_agent.return_value.run.assert_not_called()
@@ -459,18 +473,7 @@ class TestExecutorComponent:
             ),
         ],
     )
-    def test_format_executor_message(
-        self, additional_context, expected_os_info, executor_component
-    ):
-        executor_component.project = {
-            "id": 123,
-            "name": "Test Project",
-            "http_url_to_repo": "https://github.com/test/project",
-            "description": "This is a test project description",
-            "web_url": "",
-        }
-        executor_component.additional_context = additional_context
-
+    def test_format_executor_message(self, expected_os_info, executor_component):
         result = executor_component._format_system_prompt()
 
         assert "{os_information}" not in result
