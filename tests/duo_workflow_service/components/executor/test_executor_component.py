@@ -2,10 +2,13 @@ from typing import Any
 from unittest.mock import AsyncMock, MagicMock, Mock, call, patch
 
 import pytest
+from gitlab_cloud_connector import CloudConnectorUser, UserClaims
 from langchain_core.messages import AIMessage, HumanMessage, SystemMessage
+from langchain_core.prompt_values import ChatPromptValue
 from langgraph.constants import END
 from langgraph.graph import StateGraph
 
+from ai_gateway.models.mock import FakeModel
 from duo_workflow_service.components import ToolsApprovalComponent, ToolsRegistry
 from duo_workflow_service.components.executor.component import ExecutorComponent, Routes
 from duo_workflow_service.components.executor.prompts import (
@@ -18,7 +21,13 @@ from duo_workflow_service.components.executor.prompts import (
 from duo_workflow_service.entities import Plan, WorkflowState, WorkflowStatusEnum
 from duo_workflow_service.tools import DuoBaseTool
 from duo_workflow_service.workflows.type_definitions import AdditionalContext
+from lib.feature_flags.context import current_feature_flag_context
 from lib.internal_events.event_enum import CategoryEnum
+
+
+@pytest.fixture
+def config_values():
+    return {"mock_model_responses": True}
 
 
 @pytest.fixture
@@ -85,19 +94,49 @@ def end_message():
 
 
 @pytest.fixture
-def mock_create_model(end_message):
+def mock_create_model():
     with patch(
         "duo_workflow_service.components.executor.component.create_chat_model"
     ) as mock:
         mock.return_value = mock
         mock.bind_tools.return_value = mock
-        mock.ainvoke = AsyncMock(return_value=end_message)
         yield mock
 
 
 @pytest.fixture
-def mock_agent():
-    with patch("duo_workflow_service.components.executor.component.Agent") as mock:
+def mock_model_ainvoke(
+    duo_workflow_prompt_registry_enabled, mock_create_model, end_message
+):
+    if duo_workflow_prompt_registry_enabled:
+        with patch.object(FakeModel, "ainvoke") as mock:
+            mock.return_value = end_message
+            yield mock
+    else:
+        mock_create_model.ainvoke = AsyncMock(return_value=end_message)
+        yield mock_create_model.ainvoke
+
+
+@pytest.fixture
+def duo_workflow_prompt_registry_enabled() -> bool:
+    return False
+
+
+@pytest.fixture(autouse=True)
+def stub_feature_flags(duo_workflow_prompt_registry_enabled: bool):
+    if duo_workflow_prompt_registry_enabled:
+        current_feature_flag_context.set({"duo_workflow_prompt_registry"})
+
+    yield
+
+
+@pytest.fixture
+def mock_agent(duo_workflow_prompt_registry_enabled: bool):
+    if duo_workflow_prompt_registry_enabled:
+        factory = "ai_gateway.prompts.registry.LocalPromptRegistry.get_on_behalf"
+    else:
+        factory = "duo_workflow_service.components.executor.component.Agent"
+
+    with patch(factory) as mock:
         yield mock
 
 
@@ -129,11 +168,20 @@ def mock_handover_agent():
         yield mock
 
 
-class TestExecutorComponent:
-    @pytest.fixture
-    def additional_context(self) -> AdditionalContext | None:
-        return None
+@pytest.fixture
+def user():
+    return CloudConnectorUser(
+        authenticated=True,
+        claims=UserClaims(
+            scopes=["duo_workflow_execute_workflow"],
+            issuer="gitlab-duo-workflow-service",
+        ),
+    )
 
+
+@pytest.mark.usefixtures("mock_container")
+@pytest.mark.parametrize("duo_workflow_prompt_registry_enabled", [False, True])
+class TestExecutorComponent:
     @pytest.fixture
     def workflow_type(self) -> CategoryEnum:
         return CategoryEnum.WORKFLOW_SOFTWARE_DEVELOPMENT
@@ -141,14 +189,6 @@ class TestExecutorComponent:
     @pytest.fixture
     def goal(self) -> str:
         return "Test goal"
-
-    @pytest.fixture
-    def project(self) -> dict[str, Any]:
-        return {
-            "id": 123,
-            "name": "test-project",
-            "http_url_to_repo": "https://gitlab.com/test/repo",
-        }
 
     @pytest.fixture
     def mock_dependencies(
@@ -160,6 +200,7 @@ class TestExecutorComponent:
         workflow_type,
         goal,
         project,
+        user,
     ):
         return {
             "workflow_id": "test-workflow-123",
@@ -171,6 +212,7 @@ class TestExecutorComponent:
             "project": project,
             "http_client": gl_http_client,
             "additional_context": additional_context,
+            "user": user,
         }
 
     @pytest.fixture
@@ -241,7 +283,12 @@ class TestExecutorComponent:
         assert entry_node == "execution"
 
     def test_attach_creates_agent_with_correct_parameters(
-        self, mock_agent, mock_create_model, executor_component, workflow_type
+        self,
+        mock_agent,
+        mock_create_model,
+        executor_component,
+        workflow_type,
+        duo_workflow_prompt_registry_enabled,
     ):
         """Test that Agent is created with correct parameters."""
         mock_graph = Mock(spec=StateGraph)
@@ -249,12 +296,22 @@ class TestExecutorComponent:
 
         # Verify Agent was called with correct parameters
         mock_agent.assert_called_once()
-        call_args = mock_agent.call_args
 
-        assert call_args[1]["name"] == "executor"
-        assert call_args[1]["workflow_id"] == "test-workflow-123"
-        assert call_args[1]["toolset"] == executor_component.executor_toolset
-        assert call_args[1]["workflow_type"] == workflow_type
+        if duo_workflow_prompt_registry_enabled:
+            mock_agent.assert_called_once_with(
+                executor_component.user,
+                "workflow/executor",
+                "^1.0.0",
+                tools=executor_component.executor_toolset.bindable,
+                workflow_id="test-workflow-123",
+                http_client=executor_component.http_client,
+            )
+        else:
+            call_args = mock_agent.call_args
+            assert call_args[1]["name"] == "executor"
+            assert call_args[1]["workflow_id"] == "test-workflow-123"
+            assert call_args[1]["toolset"] == executor_component.executor_toolset
+            assert call_args[1]["workflow_type"] == workflow_type
 
     @pytest.mark.asyncio
     async def test_component_run_with_no_approval_component(
@@ -514,14 +571,14 @@ class TestExecutorComponent:
     async def test_messages_to_model(
         self,
         expected_os_info,
-        mock_create_model,
+        mock_model_ainvoke,
         compiled_graph,
-        graph_input,
+        workflow_state,
         graph_config,
         project,
         goal,
     ):
-        await compiled_graph.ainvoke(input=graph_input, config=graph_config)
+        await compiled_graph.ainvoke(input=workflow_state, config=graph_config)
 
         os_information = (
             OS_INFORMATION_COMPONENT.format(os_information=expected_os_info)
@@ -539,9 +596,12 @@ class TestExecutorComponent:
             os_information=os_information,
         )
 
-        mock_create_model.ainvoke.assert_called_with(
-            [
-                SystemMessage(content=expected_message),
-                HumanMessage(content=f"Your goal is: {goal}"),
-            ]
-        )
+        ainvoke_messages = mock_model_ainvoke.call_args.args[0]
+
+        if isinstance(ainvoke_messages, ChatPromptValue):
+            ainvoke_messages = ainvoke_messages.messages
+
+        assert ainvoke_messages == [
+            SystemMessage(content=expected_message),
+            HumanMessage(content=f"Your goal is: {goal}"),
+        ]
