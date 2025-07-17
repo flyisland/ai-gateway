@@ -113,7 +113,8 @@ def create_chat_model(
             return ChatOpenAI(
                 model=config.model_name,
                 max_retries=config.max_retries,
-                temperature=0,
+                temperature=1,
+                output_version="responses/v1"
             )
         raise RuntimeError("OPENAI_API_KEY needs to be set for OpenAI provider")
 
