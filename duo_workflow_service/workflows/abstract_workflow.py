@@ -405,7 +405,7 @@ class AbstractWorkflow(ABC):
         )
         if _openai_api_key and len(_openai_api_key.strip()) > 0:
             log.info("Using OpenAI configuration")
-            return OpenAIConfig(model_name=KindOpenAIModel.GPT_4_1.value)
+            return OpenAIConfig(model_name=os.environ.get("OPENAI_MODEL_NAME", KindOpenAIModel.GPT_4_1.value))
 
         log.info("Using Anthropic configuration")
         return AnthropicConfig(model_name=KindAnthropicModel.CLAUDE_SONNET_4.value)

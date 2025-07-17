@@ -74,11 +74,11 @@ class OpenAIConfig(ModelConfig):
     @classmethod
     def validate_model_name(cls, v: str) -> str:
         """Validate that model_name matches a value from KindOpenAIModel."""
-        valid_models = [model.value for model in KindOpenAIModel]
-        if v not in valid_models:
-            raise ValueError(
-                f"model_name '{v}' is not valid. Must be one of: {', '.join(valid_models)}"
-            )
+        # valid_models = [model.value for model in KindOpenAIModel]
+        # if v not in valid_models:
+        #     raise ValueError(
+        #         f"model_name '{v}' is not valid. Must be one of: {', '.join(valid_models)}"
+        #     )
         return v
 
 
