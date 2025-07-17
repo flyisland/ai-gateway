@@ -192,8 +192,8 @@ async def test_workflow_run(
     assert mock_tools_executor.call_count == 1
     assert mock_tools_executor.return_value.run.call_count >= 1
 
-    assert mock_handover_agent.call_count == 3
-    assert mock_handover_agent.return_value.run.call_count == 3
+    assert mock_handover_agent.call_count == 2
+    assert mock_handover_agent.return_value.run.call_count == 2
 
     assert mock_git_lab_workflow_instance.aput.call_count == 0
     assert mock_git_lab_workflow_instance.aget_tuple.call_count == 0

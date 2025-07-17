@@ -27,7 +27,6 @@ from duo_workflow_service.entities import (
     WorkflowState,
     WorkflowStatusEnum,
 )
-from duo_workflow_service.gitlab.url_parser import GitLabUrlParseError, GitLabUrlParser
 from duo_workflow_service.llm_factory import create_chat_model
 from duo_workflow_service.tracking import log_exception
 from duo_workflow_service.workflows.abstract_workflow import (
@@ -200,8 +199,6 @@ class Workflow(AbstractWorkflow):
 
         # Add nodes to the graph
         graph.set_entry_point("fetch_issue")
-
-        issue_iid = self._fetch_issue_iid(goal)
 
         graph.add_node(
             "fetch_issue",
@@ -445,38 +442,44 @@ class Workflow(AbstractWorkflow):
     def _set_merge_request_context(
         self, merge_request_output: list[str], state: WorkflowState
     ):
-        mr_nested = json.loads(merge_request_output[-1])
-        mr_details = mr_nested["merge_request"]
-        mr_context = AdditionalContext(
+        mr_details = (json.loads(merge_request_output[-1])).get("merge_request", {})
+        metadata = {
+            "state": mr_details["state"],
+            "url": mr_details["web_url"],
+            "assignees": [mr_details["author"]["id"]],
+        }
+        self._set_additional_context(
             category="merge_request",
-            id=str(mr_details["iid"]),
+            context_id=str(mr_details["iid"]),
             content=mr_details["description"],
-            metadata={
-                "state": mr_details["state"],
-                "url": mr_details["web_url"],
-                "assignees": [mr_details["author"]["id"]],
-            },
+            metadata=metadata,
         )
-        if self._additional_context is not None:
-            self._additional_context.append(mr_context)
-        else:
-            self._additional_context = [mr_context]
 
         return {"status": state["status"]}
 
+    def _set_additional_context(
+        self, category: str, context_id: str, content: str, metadata: dict
+    ):
+        additional_context = AdditionalContext(
+            category=category, id=context_id, content=content, metadata=metadata
+        )
+        if self._additional_context is not None:
+            self._additional_context.append(additional_context)
+        else:
+            self._additional_context = [additional_context]
+
     def _fetch_additional_context(self, context_type: str) -> AdditionalContext:
-        issue_details = None
-        if issue_details is None:
-            raise RuntimeError("Additional context not found")
+        additional_context = None
 
-        for issue_context in self._additional_context:
-            if issue_context.category == context_type:
-                issue_details = issue_context
-                break
+        if self._additional_context is not None:
+            for workflow_context in self._additional_context:
+                if workflow_context.category == context_type:
+                    additional_context = workflow_context
+                    break
 
-        if issue_details is None:
+        if additional_context is None:
             raise RuntimeError("Additional context not found")
-        return issue_details
+        return additional_context
 
     def _create_merge_request(
         self, state: WorkflowState
@@ -484,10 +487,11 @@ class Workflow(AbstractWorkflow):
         issue_details = self._fetch_additional_context("issue")
         if issue_details is None or issue_details.metadata is None:
             raise RuntimeError("Issue context not found")
+
         merge_request_title = f"Draft: Resolve {issue_details.metadata['title']}"
         return [
             {
-                "source_branch": self._workflow_metadata["git_ref"],
+                "source_branch": self._workflow_metadata["git_branch"],
                 "target_branch": self._project["default_branch"],
                 "title": merge_request_title,
                 "project_id": self._project["id"],

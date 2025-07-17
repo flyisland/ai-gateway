@@ -177,6 +177,7 @@ config:
 graph TD;
     __start__([<p>__start__</p>]):::first
     fetch_issue(fetch_issue)
+    fetch_current_branch(fetch_current_branch)
     create_merge_request(create_merge_request)
     build_context(build_context)
     build_context_tools(build_context_tools)
@@ -211,7 +212,8 @@ graph TD;
     execution_handover --> git_actions;
     execution_supervisor --> execution;
     execution_tools --> execution;
-    fetch_issue --> create_merge_request;
+    fetch_current_branch --> create_merge_request;
+    fetch_issue --> fetch_current_branch;
     git_actions --> update_merge_request;
     planning -. &nbsp;stop&nbsp; .-> plan_terminator;
     planning -. &nbsp;PlanSupervisorAgent&nbsp; .-> planning_supervisor;

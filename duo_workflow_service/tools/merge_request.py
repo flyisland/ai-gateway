@@ -94,7 +94,6 @@ class CreateMergeRequest(DuoBaseTool):
             "source_branch": source_branch,
             "target_branch": target_branch,
             "title": title,
-            "labels": ["built with gitlab duo"],
         }
 
         optional_params = [
@@ -111,9 +110,7 @@ class CreateMergeRequest(DuoBaseTool):
                 path=f"/api/v4/projects/{project_id}/merge_requests",
                 body=json.dumps(data),
             )
-            return json.dumps(
-                {"status": "success", "merge_request": MergeRequest(**response)}
-            )
+            return json.dumps({"status": "success", "merge_request": response})
         except Exception as e:
             return json.dumps({"error": str(e)})
 
