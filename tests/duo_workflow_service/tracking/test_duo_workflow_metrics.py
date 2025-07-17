@@ -25,6 +25,7 @@ class TestDuoWorkflowMetrics(unittest.TestCase):
             "llm_response_counter",
             "checkpoint_error_counter",
             "model_completion_error_counter",
+            "asnycio_warning_counter",
         ]:
             mock_histogram = MagicMock()
             setattr(self.metrics, metric_name, mock_histogram)
@@ -225,6 +226,24 @@ class TestDuoWorkflowMetrics(unittest.TestCase):
             http_status="500",
             error_type="test_reason",
         )
+
+    def test_asyncio_warning_counter(self):
+        observe_mock = MagicMock()
+        labels_result_mock = MagicMock()
+        labels_result_mock.inc = observe_mock
+
+        cast(MagicMock, self.metrics.asnycio_warning_counter.labels).return_value = (
+            labels_result_mock
+        )
+
+        self.metrics.count_asyncio_warning(
+            type="test_type",
+            workflow_id="test_workflow",
+        )
+
+        cast(
+            MagicMock, self.metrics.asnycio_warning_counter.labels
+        ).assert_called_once_with(type="test_type", workflow_id="test_workflow")
 
 
 if __name__ == "__main__":

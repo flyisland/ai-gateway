@@ -100,6 +100,13 @@ class DuoWorkflowMetrics:
             registry=registry,
         )
 
+        self.asnycio_warning_counter = Counter(
+            "duo_workflow_asyncio_error_total",
+            "Error count of asyncio warnings during workflow execution",
+            ["type", "workflow_id"],
+            registry=registry,
+        )
+
     def count_llm_response(
         self, model="unknown", request_type="unknown", stop_reason="unknown"
     ):
@@ -135,6 +142,12 @@ class DuoWorkflowMetrics:
             provider=provider,
             http_status=http_status,
             error_type=error_type,
+        ).inc()
+
+    def count_asyncio_warning(self, type="unknown", workflow_id="unknown"):
+        self.asnycio_warning_counter.labels(
+            type=type,
+            workflow_id=workflow_id,
         ).inc()
 
     def time_llm_request(self, model="unknown", request_type="unknown"):
