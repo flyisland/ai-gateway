@@ -1,3 +1,4 @@
+import os
 from contextlib import contextmanager
 from pathlib import Path
 from typing import Any, AsyncIterator, Literal, Optional, Type, Union
@@ -56,6 +57,14 @@ from lib.feature_flags.context import current_feature_flag_context
 from lib.internal_events.client import InternalEventsClient
 
 pytest_plugins = ("pytest_asyncio",)
+
+
+# Configure test environment
+# AIGW_ENVIRONMENT is needed early in test setup before config system initialization
+# pylint: disable=direct-environment-variable-reference
+os.environ["AIGW_ENVIRONMENT"] = "test"
+os.environ["LANGCHAIN_TRACING_V2"] = "false"
+# pylint: enable=direct-environment-variable-reference
 
 
 @pytest.fixture

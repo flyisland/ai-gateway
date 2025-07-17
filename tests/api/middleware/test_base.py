@@ -7,14 +7,21 @@ from ai_gateway.api.middleware import DistributedTraceMiddleware
 
 
 @pytest.fixture
-def distributed_trace_middleware(mock_app):
+def distributed_trace_middleware_development(mock_app):
     return DistributedTraceMiddleware(
         mock_app, skip_endpoints=["/health"], environment="development"
     )
 
 
+@pytest.fixture
+def distributed_trace_middleware_test(mock_app):
+    return DistributedTraceMiddleware(
+        mock_app, skip_endpoints=["/health"], environment="test"
+    )
+
+
 @pytest.mark.asyncio
-async def test_middleware_distributed_trace(distributed_trace_middleware):
+async def test_middleware_distributed_trace(distributed_trace_middleware_development):
     current_run_id = "20240808T090953171943Z18dfa1db-1dfc-4a48-aaf8-a139960955ce"
     request = Request(
         {
@@ -32,8 +39,40 @@ async def test_middleware_distributed_trace(distributed_trace_middleware):
     with patch(
         "ai_gateway.api.middleware.base.tracing_context"
     ) as mock_tracing_context:
-        await distributed_trace_middleware(scope, receive, send)
+        await distributed_trace_middleware_development(scope, receive, send)
 
         mock_tracing_context.assert_called_once_with(parent=current_run_id)
 
-    distributed_trace_middleware.app.assert_called_once_with(scope, receive, send)
+    distributed_trace_middleware_development.app.assert_called_once_with(
+        scope, receive, send
+    )
+
+
+@pytest.mark.asyncio
+async def test_middleware_distributed_trace_disabled_during_tests(
+    distributed_trace_middleware_test,
+):
+    """Test that langsmith tracing is disabled when running tests."""
+    current_run_id = "20240808T090953171943Z18dfa1db-1dfc-4a48-aaf8-a139960955ce"
+    request = Request(
+        {
+            "type": "http",
+            "path": "/api/endpoint",
+            "headers": [
+                (b"langsmith-trace", current_run_id.encode()),
+            ],
+        }
+    )
+    scope = request.scope
+    receive = AsyncMock()
+    send = AsyncMock()
+
+    with patch(
+        "ai_gateway.api.middleware.base.tracing_context"
+    ) as mock_tracing_context:
+        await distributed_trace_middleware_test(scope, receive, send)
+
+        # tracing_context should not be called when tests are running
+        mock_tracing_context.assert_not_called()
+
+    distributed_trace_middleware_test.app.assert_called_once_with(scope, receive, send)
