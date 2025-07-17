@@ -21,7 +21,10 @@ def distributed_trace_middleware_test(mock_app):
 
 
 @pytest.mark.asyncio
-async def test_middleware_distributed_trace(distributed_trace_middleware_development):
+async def test_middleware_distributed_trace_enabled_in_development(
+    distributed_trace_middleware_development,
+):
+    """Test that langsmith tracing is enabled in development environment with langsmith-trace header."""
     current_run_id = "20240808T090953171943Z18dfa1db-1dfc-4a48-aaf8-a139960955ce"
     request = Request(
         {
@@ -41,7 +44,9 @@ async def test_middleware_distributed_trace(distributed_trace_middleware_develop
     ) as mock_tracing_context:
         await distributed_trace_middleware_development(scope, receive, send)
 
-        mock_tracing_context.assert_called_once_with(parent=current_run_id)
+        mock_tracing_context.assert_called_once_with(
+            parent=current_run_id, enabled=True
+        )
 
     distributed_trace_middleware_development.app.assert_called_once_with(
         scope, receive, send
@@ -49,10 +54,39 @@ async def test_middleware_distributed_trace(distributed_trace_middleware_develop
 
 
 @pytest.mark.asyncio
-async def test_middleware_distributed_trace_disabled_during_tests(
+async def test_middleware_distributed_trace_disabled_in_development_without_header(
+    distributed_trace_middleware_development,
+):
+    """Test that langsmith tracing is disabled in development environment without langsmith-trace header."""
+    request = Request(
+        {
+            "type": "http",
+            "path": "/api/endpoint",
+            "headers": [],
+        }
+    )
+    scope = request.scope
+    receive = AsyncMock()
+    send = AsyncMock()
+
+    with patch(
+        "ai_gateway.api.middleware.base.tracing_context"
+    ) as mock_tracing_context:
+        await distributed_trace_middleware_development(scope, receive, send)
+
+        # tracing_context should not be called when langsmith-trace header is missing
+        mock_tracing_context.assert_not_called()
+
+    distributed_trace_middleware_development.app.assert_called_once_with(
+        scope, receive, send
+    )
+
+
+@pytest.mark.asyncio
+async def test_middleware_distributed_trace_disabled_in_non_development_environment(
     distributed_trace_middleware_test,
 ):
-    """Test that langsmith tracing is disabled when running tests."""
+    """Test that langsmith tracing is disabled when environment is not development."""
     current_run_id = "20240808T090953171943Z18dfa1db-1dfc-4a48-aaf8-a139960955ce"
     request = Request(
         {
@@ -72,7 +106,9 @@ async def test_middleware_distributed_trace_disabled_during_tests(
     ) as mock_tracing_context:
         await distributed_trace_middleware_test(scope, receive, send)
 
-        # tracing_context should not be called when tests are running
-        mock_tracing_context.assert_not_called()
+        # tracing_context is called but with enabled=False in non-development environments
+        mock_tracing_context.assert_called_once_with(
+            parent=current_run_id, enabled=False
+        )
 
     distributed_trace_middleware_test.app.assert_called_once_with(scope, receive, send)
