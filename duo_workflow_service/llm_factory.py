@@ -7,10 +7,12 @@ import structlog
 from langchain_anthropic import ChatAnthropic
 from langchain_core.language_models.chat_models import BaseChatModel
 from langchain_google_vertexai.model_garden import ChatAnthropicVertex
+from langchain_openai import ChatOpenAI
 from langsmith import tracing_context
 from pydantic import BaseModel, Field, field_validator
 
 from ai_gateway.models import KindAnthropicModel
+from ai_gateway.models.openai import KindOpenAIModel
 from duo_workflow_service.tracking.errors import log_exception
 
 
@@ -65,14 +67,29 @@ class VertexConfig(ModelConfig):
     location: str = Field(default_factory=_get_location)
 
 
+class OpenAIConfig(ModelConfig):
+    provider: Literal["openai"] = "openai"
+
+    @field_validator("model_name")
+    @classmethod
+    def validate_model_name(cls, v: str) -> str:
+        """Validate that model_name matches a value from KindOpenAIModel."""
+        valid_models = [model.value for model in KindOpenAIModel]
+        if v not in valid_models:
+            raise ValueError(
+                f"model_name '{v}' is not valid. Must be one of: {', '.join(valid_models)}"
+            )
+        return v
+
+
 def create_chat_model(
-    config: Union[AnthropicConfig, VertexConfig],
+    config: Union[AnthropicConfig, VertexConfig, OpenAIConfig],
     **kwargs,
 ) -> BaseChatModel:
 
     if isinstance(config, AnthropicConfig):
         anthropic_api_key = os.environ.get("ANTHROPIC_API_KEY")
-        if anthropic_api_key and len(anthropic_api_key) > 1:
+        if anthropic_api_key and len(anthropic_api_key.strip()) > 0:
             return ChatAnthropic(
                 model_name=config.model_name,
                 **kwargs,
@@ -90,34 +107,49 @@ def create_chat_model(
             **kwargs,
         )
 
+    if isinstance(config, OpenAIConfig):
+        openai_api_key = os.environ.get("OPENAI_API_KEY")
+        if openai_api_key and len(openai_api_key.strip()) > 0:
+            return ChatOpenAI(
+                model=config.model_name,
+                max_retries=config.max_retries,
+                temperature=0,
+            )
+        raise RuntimeError("OPENAI_API_KEY needs to be set for OpenAI provider")
+
     raise ValueError(
         f"Unsupported config type: {type(config).__name__}. "
-        "Must be either AnthropicConfig or VertexConfig"
+        "Must be either AnthropicConfig, VertexConfig, or OpenAIConfig"
     )
 
 
-def validate_llm_access(config: Optional[Union[AnthropicConfig, VertexConfig]] = None):
+def validate_llm_access(
+    config: Optional[Union[AnthropicConfig, VertexConfig, OpenAIConfig]] = None,
+):
     if config is None:
         try:
             config = VertexConfig()
         except RuntimeError:
-            config = AnthropicConfig(
-                model_name=KindAnthropicModel.CLAUDE_SONNET_4.value
-            )
+            try:
+                config = OpenAIConfig(model_name=KindOpenAIModel.GPT_4_1.value)
+            except RuntimeError:
+                config = AnthropicConfig(
+                    model_name=KindAnthropicModel.CLAUDE_SONNET_4.value
+                )
 
     log = structlog.stdlib.get_logger("server")
-    anthropic_client = create_chat_model(config=config)
+    model_client = create_chat_model(config=config)
 
     with tracing_context(enabled=False):
         try:
-            anthropic_response = anthropic_client.invoke(
+            model_response = model_client.invoke(
                 "Answer in under 80 characters: What LLM am I talking to?"
             )
         except Exception as e:
             log_exception(e)
             raise e
 
-    content = anthropic_response.content
+    content = model_response.content
     # feature flags are not yet loaded, so logging the model name here could be misleading if the model name depends on
     # feature flags.
     log.info(str(content))

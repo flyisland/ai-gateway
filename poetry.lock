@@ -2545,7 +2545,7 @@ version = "0.3.9"
 description = "An integration package connecting OpenAI and LangChain"
 optional = false
 python-versions = "<4.0,>=3.9"
-groups = ["eval"]
+groups = ["main", "eval"]
 files = [
     {file = "langchain_openai-0.3.9-py3-none-any.whl", hash = "sha256:1ad95c09a620910c39a8eb826eb146bd96bfbc55e4fca78b1e28ffd5e4f5b261"},
     {file = "langchain_openai-0.3.9.tar.gz", hash = "sha256:a2897d15765a435eff3fed7043235c25ec1e192e6c45a81e9e4fae2951335fb3"},
@@ -6459,4 +6459,4 @@ cffi = ["cffi (>=1.11)"]
 [metadata]
 lock-version = "2.1"
 python-versions = ">=3.12.0,<3.13.0"
-content-hash = "77363e0153035dd6d1f00d7e6530ce407ccbc2891c24c1bb52728fa414fe72b7"
+content-hash = "cca050e403bcf907e6650708a0a8018120cec4850d942e9dfb52a34cdd90f989"

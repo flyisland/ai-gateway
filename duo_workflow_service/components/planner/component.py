@@ -21,6 +21,7 @@ from duo_workflow_service.entities import WorkflowState, WorkflowStatusEnum
 from duo_workflow_service.gitlab.http_client import GitlabHttpClient
 from duo_workflow_service.llm_factory import (
     AnthropicConfig,
+    OpenAIConfig,
     VertexConfig,
     create_chat_model,
 )
@@ -61,7 +62,7 @@ class PlannerComponent:
         planner_toolset: Any,
         executor_toolset: Any,
         tools_registry: ToolsRegistry,
-        model_config: Union[AnthropicConfig, VertexConfig],
+        model_config: Union[AnthropicConfig, VertexConfig, OpenAIConfig],
         project: Any,
         http_client: GitlabHttpClient,
     ):

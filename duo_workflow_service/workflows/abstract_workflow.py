@@ -21,6 +21,7 @@ from langsmith import traceable, tracing_context
 from ai_gateway.code_suggestions.language_server import LanguageServerVersion
 from ai_gateway.container import ContainerApplication
 from ai_gateway.models import KindAnthropicModel
+from ai_gateway.models.openai import KindOpenAIModel
 from ai_gateway.prompts.registry import LocalPromptRegistry
 from contract import contract_pb2
 from duo_workflow_service.checkpointer.gitlab_workflow import (
@@ -40,7 +41,7 @@ from duo_workflow_service.gitlab.gitlab_project import (
 from duo_workflow_service.gitlab.http_client import GitlabHttpClient
 from duo_workflow_service.gitlab.http_client_factory import get_http_client
 from duo_workflow_service.gitlab.url_parser import GitLabUrlParser
-from duo_workflow_service.llm_factory import AnthropicConfig, VertexConfig
+from duo_workflow_service.llm_factory import AnthropicConfig, OpenAIConfig, VertexConfig
 from duo_workflow_service.monitoring import duo_workflow_metrics
 from duo_workflow_service.tools import convert_mcp_tools_to_langchain_tools
 from duo_workflow_service.tracking import log_exception
@@ -364,33 +365,49 @@ class AbstractWorkflow(ABC):
             metadata=metadata, mcp_tools=mcp_tools
         )
 
-    def _get_model_config(self) -> Union[AnthropicConfig, VertexConfig]:
+    def _get_model_config(self) -> Union[AnthropicConfig, VertexConfig, OpenAIConfig]:
         """Determine the appropriate model configuration based on deployment environment.
 
         This method creates the appropriate configuration object for either
-        Vertex AI or standard Anthropic API deployments. It automatically
+        Vertex AI, OpenAI, or standard Anthropic API deployments. It automatically
         detects the deployment environment and returns the corresponding
         configuration with the appropriate model.
 
-        The method checks for the presence of DUO_WORKFLOW__VERTEX_PROJECT_ID
-        environment variable to determine if running on Google Cloud Vertex AI.
+        The method checks for environment variables in the following order:
+        1. DUO_WORKFLOW__VERTEX_PROJECT_ID - For Google Cloud Vertex AI
+        2. OPENAI_API_KEY - For OpenAI API
+        3. Default to Anthropic API
 
         Returns:
-            Union[AnthropicConfig, VertexConfig]: The configuration object for
+            Union[AnthropicConfig, VertexConfig, OpenAIConfig]: The configuration object for
                 the current deployment environment:
                 - VertexConfig: When running on Google Cloud Vertex AI
+                - OpenAIConfig: When using OpenAI API
                 - AnthropicConfig: When using Anthropic API directly
 
         Note:
             Subclasses can override this method to implement custom model selection
             logic or to use different model versions.
         """
+        log = structlog.stdlib.get_logger("workflow")
+
         _vertex_project_id = os.getenv("DUO_WORKFLOW__VERTEX_PROJECT_ID")
-        if bool(_vertex_project_id and len(_vertex_project_id) > 1):
+        log.info(f"Vertex project ID: {_vertex_project_id}")
+        if _vertex_project_id and len(_vertex_project_id.strip()) > 0:
+            log.info("Using Vertex AI configuration")
             return VertexConfig(
                 model_name=KindAnthropicModel.CLAUDE_SONNET_4_VERTEX.value
             )
 
+        _openai_api_key = os.getenv("OPENAI_API_KEY")
+        log.info(
+            f"OpenAI API key present: {bool(_openai_api_key and len(_openai_api_key.strip()) > 0)}"
+        )
+        if _openai_api_key and len(_openai_api_key.strip()) > 0:
+            log.info("Using OpenAI configuration")
+            return OpenAIConfig(model_name=KindOpenAIModel.GPT_4_1.value)
+
+        log.info("Using Anthropic configuration")
         return AnthropicConfig(model_name=KindAnthropicModel.CLAUDE_SONNET_4.value)
 
 

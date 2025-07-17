@@ -4,8 +4,10 @@ from unittest.mock import Mock, patch
 import pytest
 
 from ai_gateway.models import KindAnthropicModel
+from ai_gateway.models.openai import KindOpenAIModel
 from duo_workflow_service.llm_factory import (
     AnthropicConfig,
+    OpenAIConfig,
     VertexConfig,
     create_chat_model,
     validate_llm_access,
@@ -22,6 +24,13 @@ from duo_workflow_service.llm_factory import (
             },
             does_not_raise(),
             "vertex",
+        ),
+        (
+            {
+                "OPENAI_API_KEY": "test-key",
+            },
+            does_not_raise(),
+            "openai",  # Falls back to OpenAI and succeeds
         ),
         (
             {
@@ -52,7 +61,9 @@ from duo_workflow_service.llm_factory import (
 )
 @patch("duo_workflow_service.llm_factory.ChatAnthropicVertex")
 @patch("duo_workflow_service.llm_factory.ChatAnthropic")
+@patch("duo_workflow_service.llm_factory.ChatOpenAI")
 def test_validate_anthropic_variables(
+    mock_openai_client,
     mock_anthropic_client,
     mock_vertex_client,
     env_vars,
@@ -64,6 +75,7 @@ def test_validate_anthropic_variables(
     mock_response.content = "I am Claude, an AI assistant."
     mock_anthropic_client.return_value.invoke.return_value = mock_response
     mock_vertex_client.return_value.invoke.return_value = mock_response
+    mock_openai_client.return_value.invoke.return_value = mock_response
 
     with patch("os.environ", env_vars):
         with expectation:
@@ -71,6 +83,7 @@ def test_validate_anthropic_variables(
 
         if calls_llm == "vertex":
             mock_anthropic_client.assert_not_called()
+            mock_openai_client.assert_not_called()
             mock_vertex_client.assert_called_once()
 
             call_kwargs = mock_vertex_client.call_args.kwargs
@@ -80,8 +93,16 @@ def test_validate_anthropic_variables(
             )
             assert call_kwargs["project"] == "test-proj"
             assert call_kwargs["location"] == "test-loc"
+        elif calls_llm == "openai":
+            mock_vertex_client.assert_not_called()
+            mock_anthropic_client.assert_not_called()
+            mock_openai_client.assert_called_once()
+
+            call_kwargs = mock_openai_client.call_args.kwargs
+            assert call_kwargs["model_name"] == KindOpenAIModel.GPT_4_1.value
         elif calls_llm == "anthropic":
             mock_vertex_client.assert_not_called()
+            mock_openai_client.assert_not_called()
             mock_anthropic_client.assert_called_once()
 
             call_kwargs = mock_anthropic_client.call_args.kwargs
@@ -90,6 +111,7 @@ def test_validate_anthropic_variables(
         else:
             mock_vertex_client.assert_not_called()
             mock_anthropic_client.assert_not_called()
+            mock_openai_client.assert_not_called()
 
 
 @pytest.mark.parametrize(
@@ -154,6 +176,53 @@ def test_clients_receive_max_retries_from_config(
             assert call_kwargs["max_retries"] == expected_retries
             assert call_kwargs["betas"] == ["extended-cache-ttl-2025-04-11"]
             mock_vertex_client.assert_not_called()
+
+
+@pytest.mark.parametrize(
+    "model_name,expectation",
+    [
+        (KindOpenAIModel.GPT_4_1.value, does_not_raise()),
+        (KindOpenAIModel.GPT_4_TURBO.value, does_not_raise()),
+        (
+            "invalid-model",
+            pytest.raises(ValueError, match="model_name 'invalid-model' is not valid"),
+        ),
+    ],
+)
+def test_openai_config_validation(model_name, expectation):
+    """Test that OpenAIConfig validates model names correctly."""
+    with expectation:
+        config = OpenAIConfig(model_name=model_name)
+        assert config.model_name == model_name
+        assert config.provider == "openai"
+
+
+@patch("duo_workflow_service.llm_factory.ChatOpenAI")
+def test_create_chat_model_with_openai_config(mock_openai_client):
+    """Test that create_chat_model works with OpenAI configuration."""
+    config = OpenAIConfig(model_name=KindOpenAIModel.GPT_4_1.value)
+
+    with patch("os.environ", {"OPENAI_API_KEY": "test-key"}):
+        create_chat_model(config)
+
+        mock_openai_client.assert_called_once()
+        call_kwargs = mock_openai_client.call_args.kwargs
+        assert call_kwargs["model_name"] == KindOpenAIModel.GPT_4_1.value
+        assert call_kwargs["max_retries"] == 6  # default from ModelConfig
+
+
+@patch("duo_workflow_service.llm_factory.ChatOpenAI")
+def test_create_chat_model_with_openai_config_missing_key(mock_openai_client):
+    """Test that create_chat_model raises error when OpenAI API key is missing."""
+    config = OpenAIConfig(model_name=KindOpenAIModel.GPT_4_1.value)
+
+    with patch("os.environ", {}):
+        with pytest.raises(
+            RuntimeError, match="OPENAI_API_KEY needs to be set for OpenAI provider"
+        ):
+            create_chat_model(config)
+
+        mock_openai_client.assert_not_called()
 
 
 @pytest.mark.parametrize(
