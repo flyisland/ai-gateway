@@ -215,10 +215,10 @@ class TestModelMetadataToParams:
             "custom_llm_provider": "bedrock",
         }
 
-    def test_without_api_key_uses_dummy_key(self):
+    def test_without_api_key_and_custom_openai_uses_dummy_key(self):
         model_metadata = ModelMetadata(
             name="model_family",
-            provider="provider",
+            provider="custom_openai",
             endpoint=HttpUrl("https://api.example.com"),
             api_key=None,
             identifier=None,
@@ -230,7 +230,7 @@ class TestModelMetadataToParams:
             "api_base": "https://api.example.com",
             "api_key": "dummy_key",
             "model": "model_family",
-            "custom_llm_provider": "provider",
+            "custom_llm_provider": "custom_openai",
         }
 
     def test_anthropic_provider(self):
