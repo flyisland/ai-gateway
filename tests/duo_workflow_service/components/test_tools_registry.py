@@ -80,7 +80,7 @@ _outbox = MagicMock(spec=asyncio.Queue)
                 "get_merge_request",
                 "list_merge_request_diffs",
                 "list_all_merge_request_notes",
-                "get_pipeline_errors",
+                "get_pipeline_errors_for_mr",
                 "get_project",
                 "gitlab_group_project_search",
                 "gitlab_issue_search",
@@ -131,7 +131,7 @@ _outbox = MagicMock(spec=asyncio.Queue)
                 "create_merge_request_note",
                 "list_all_merge_request_notes",
                 "update_merge_request",
-                "get_pipeline_errors",
+                "get_pipeline_errors_for_mr",
                 "get_project",
                 "gitlab_group_project_search",
                 "gitlab_issue_search",
@@ -258,7 +258,7 @@ def test_registry_initialization_initialises_tools_with_correct_attributes(
             metadata=tool_metadata
         ),
         "update_merge_request": tools.UpdateMergeRequest(metadata=tool_metadata),
-        "get_pipeline_errors": tools.GetPipelineErrorsForMergeRequest(
+        "get_pipeline_errors_for_mr": tools.GetPipelineErrorsForMergeRequest(
             metadata=tool_metadata
         ),
         "get_project": tools.GetProject(metadata=tool_metadata),
