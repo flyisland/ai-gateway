@@ -250,6 +250,7 @@ class TestModelMetadataToParams:
             "custom_llm_provider": "fireworks",
         }
         assert "api_key" not in params
+
     def test_anthropic_provider(self):
         model_metadata = ModelMetadata(
             identifier="model_identifier", name="base", provider="anthropic"
