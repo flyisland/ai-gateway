@@ -1,3 +1,4 @@
+import os
 from unittest.mock import AsyncMock, patch
 
 import pytest
@@ -39,14 +40,17 @@ async def test_middleware_distributed_trace_enabled_in_development(
     receive = AsyncMock()
     send = AsyncMock()
 
-    with patch(
-        "ai_gateway.api.middleware.base.tracing_context"
-    ) as mock_tracing_context:
-        await distributed_trace_middleware_development(scope, receive, send)
+    # pylint: disable=direct-environment-variable-reference
+    with patch.dict(os.environ, {"LANGCHAIN_TRACING_V2": "true"}):
+        with patch(
+            "ai_gateway.api.middleware.base.tracing_context"
+        ) as mock_tracing_context:
+            await distributed_trace_middleware_development(scope, receive, send)
 
-        mock_tracing_context.assert_called_once_with(
-            parent=current_run_id, enabled=True
-        )
+            mock_tracing_context.assert_called_once_with(
+                parent=current_run_id, enabled=True
+            )
+    # pylint: enable=direct-environment-variable-reference
 
     distributed_trace_middleware_development.app.assert_called_once_with(
         scope, receive, send
@@ -69,13 +73,16 @@ async def test_middleware_distributed_trace_disabled_in_development_without_head
     receive = AsyncMock()
     send = AsyncMock()
 
-    with patch(
-        "ai_gateway.api.middleware.base.tracing_context"
-    ) as mock_tracing_context:
-        await distributed_trace_middleware_development(scope, receive, send)
+    # pylint: disable=direct-environment-variable-reference
+    with patch.dict(os.environ, {"LANGCHAIN_TRACING_V2": "true"}):
+        with patch(
+            "ai_gateway.api.middleware.base.tracing_context"
+        ) as mock_tracing_context:
+            await distributed_trace_middleware_development(scope, receive, send)
 
-        # tracing_context should be called with parent=None and enabled=True in development
-        mock_tracing_context.assert_called_once_with(parent=None, enabled=True)
+            # tracing_context should be called with parent=None and enabled=True in development
+            mock_tracing_context.assert_called_once_with(parent=None, enabled=True)
+    # pylint: enable=direct-environment-variable-reference
 
     distributed_trace_middleware_development.app.assert_called_once_with(
         scope, receive, send
@@ -101,14 +108,17 @@ async def test_middleware_distributed_trace_disabled_in_non_development_environm
     receive = AsyncMock()
     send = AsyncMock()
 
-    with patch(
-        "ai_gateway.api.middleware.base.tracing_context"
-    ) as mock_tracing_context:
-        await distributed_trace_middleware_test(scope, receive, send)
+    # pylint: disable=direct-environment-variable-reference
+    with patch.dict(os.environ, {"LANGCHAIN_TRACING_V2": "true"}):
+        with patch(
+            "ai_gateway.api.middleware.base.tracing_context"
+        ) as mock_tracing_context:
+            await distributed_trace_middleware_test(scope, receive, send)
 
-        # tracing_context is called but with enabled=False in non-development environments
-        mock_tracing_context.assert_called_once_with(
-            parent=current_run_id, enabled=False
-        )
+            # tracing_context is called but with enabled=False in non-development environments
+            mock_tracing_context.assert_called_once_with(
+                parent=current_run_id, enabled=False
+            )
+    # pylint: enable=direct-environment-variable-reference
 
     distributed_trace_middleware_test.app.assert_called_once_with(scope, receive, send)

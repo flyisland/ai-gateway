@@ -277,15 +277,18 @@ def test_middleware_distributed_trace_in_development(test_path, expected):
     server = create_fast_api_server(config)
     client = TestClient(server)
 
-    with patch(
-        "ai_gateway.api.middleware.base.tracing_context"
-    ) as mock_tracing_context:
-        client.post(
-            test_path,
-            headers={
-                "langsmith-trace": "20240808T090953171943Z18dfa1db-1dfc-4a48-aaf8-a139960955ce"
-            },
-        )
+    # pylint: disable=direct-environment-variable-reference
+    with patch.dict(os.environ, {"LANGCHAIN_TRACING_V2": "true"}):
+        with patch(
+            "ai_gateway.api.middleware.base.tracing_context"
+        ) as mock_tracing_context:
+            client.post(
+                test_path,
+                headers={
+                    "langsmith-trace": "20240808T090953171943Z18dfa1db-1dfc-4a48-aaf8-a139960955ce"
+                },
+            )
+        # pylint: enable=direct-environment-variable-reference
         if expected:
             # Should be called with enabled=True in development
             mock_tracing_context.assert_called_once()
@@ -307,15 +310,18 @@ def test_middleware_distributed_trace_disabled_in_non_development(test_path):
     server = create_fast_api_server(config)
     client = TestClient(server)
 
-    with patch(
-        "ai_gateway.api.middleware.base.tracing_context"
-    ) as mock_tracing_context:
-        client.post(
-            test_path,
-            headers={
-                "langsmith-trace": "20240808T090953171943Z18dfa1db-1dfc-4a48-aaf8-a139960955ce"
-            },
-        )
+    # pylint: disable=direct-environment-variable-reference
+    with patch.dict(os.environ, {"LANGCHAIN_TRACING_V2": "true"}):
+        with patch(
+            "ai_gateway.api.middleware.base.tracing_context"
+        ) as mock_tracing_context:
+            client.post(
+                test_path,
+                headers={
+                    "langsmith-trace": "20240808T090953171943Z18dfa1db-1dfc-4a48-aaf8-a139960955ce"
+                },
+            )
+        # pylint: enable=direct-environment-variable-reference
         if test_path == "/v2/chat/agent":
             # tracing_context should be called but with enabled=False in non-development environments
             mock_tracing_context.assert_called_once()
@@ -338,10 +344,13 @@ def test_middleware_distributed_trace_disabled_without_header(test_path):
     server = create_fast_api_server(config)
     client = TestClient(server)
 
-    with patch(
-        "ai_gateway.api.middleware.base.tracing_context"
-    ) as mock_tracing_context:
-        client.post(test_path)  # No langsmith-trace header
+    # pylint: disable=direct-environment-variable-reference
+    with patch.dict(os.environ, {"LANGCHAIN_TRACING_V2": "true"}):
+        with patch(
+            "ai_gateway.api.middleware.base.tracing_context"
+        ) as mock_tracing_context:
+            client.post(test_path)  # No langsmith-trace header
+        # pylint: enable=direct-environment-variable-reference
         if test_path == "/v2/chat/agent":
             # tracing_context should be called but with enabled=True and parent=None in development
             mock_tracing_context.assert_called_once_with(parent=None, enabled=True)
