@@ -60,6 +60,7 @@ CONTEXT_BUILDER_TOOLS = [
     "list_epics",
     "get_repository_file",
     "list_epic_notes",
+    "get_epic_note",
     "get_commit",
     "list_commits",
     "get_commit_comments",
