@@ -1,0 +1,19 @@
+{%- if project %}
+
+Here is the project information for the current GitLab project:
+<project>
+  <project_id>{{ project.id }}</project_id>
+  <project_name>{{ project.name }}</project_name>
+  <project_url>{{ project.http_url_to_repo }}</project_url>
+</project>
+{%- endif %}
+
+{% if additional_context -%}
+{%- for item in additional_context %}
+{%- if item.category == "os_information" and item.content -%}
+Here is the information about the operating system where you are executing these tasks:
+<os_information>{{item.content}}</os_information>
+
+{% endif %}
+{%- endfor %}
+{%- endif %}

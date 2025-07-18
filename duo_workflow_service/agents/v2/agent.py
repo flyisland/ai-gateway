@@ -1,14 +1,16 @@
 from datetime import datetime, timezone
-from typing import Any, cast
+from typing import Any, Union, cast
 
-from langchain_core.messages import AIMessage, BaseMessage, HumanMessage
+from langchain_core.messages import AIMessage, BaseMessage, HumanMessage, SystemMessage
 from langchain_core.prompt_values import PromptValue
 from langchain_core.prompts import ChatPromptTemplate
 from langchain_core.prompts.chat import MessageLikeRepresentation
 from langchain_core.runnables import Runnable, RunnableConfig
 
 from ai_gateway.prompts import Prompt
-from ai_gateway.prompts.config.base import PromptConfig
+from ai_gateway.prompts.base import jinja2_formatter
+from ai_gateway.prompts.config.base import ModelConfig, PromptConfig
+from ai_gateway.prompts.config.models import ModelClassProvider
 from duo_workflow_service.entities.event import WorkflowEvent, WorkflowEventType
 from duo_workflow_service.entities.state import (
     DuoWorkflowStateType,
@@ -25,9 +27,10 @@ from duo_workflow_service.tools.handover import HandoverTool
 class AgentPromptTemplate(Runnable[DuoWorkflowStateType, PromptValue]):
     messages: list[BaseMessage]
 
-    def __init__(self, agent_name: str, prompt_template: dict[str, str]):
+    def __init__(self, agent_name: str, prompt_template: dict[str, str], **kwargs: Any):
         self.agent_name = agent_name
         self.prompt_template = prompt_template
+        self.template_kwargs = kwargs
 
     def invoke(
         self,
@@ -49,10 +52,21 @@ class AgentPromptTemplate(Runnable[DuoWorkflowStateType, PromptValue]):
         inputs["handover_tool_name"] = HandoverTool.tool_title
         inputs["get_plan_tool_name"] = "get_plan"
         inputs["set_task_status_tool_name"] = "set_task_status"
+        
+        # Merge template kwargs with runtime kwargs, giving priority to runtime kwargs
+        merged_kwargs = {**self.template_kwargs, **kwargs}
+        
+        # Add template kwargs to inputs so they're available in the Jinja template
+        inputs.update(merged_kwargs)
+        
+        print(f"DEBUG: inputs keys: {list(inputs.keys())}")
+        print(f"DEBUG: merged_kwargs: {merged_kwargs}")
+        print(f"DEBUG: is_anthropic_model in inputs: {'is_anthropic_model' in inputs}")
+        print(f"DEBUG: inputs['is_anthropic_model']: {inputs.get('is_anthropic_model', 'NOT FOUND')}")
 
         prompt_value = ChatPromptTemplate.from_messages(
             messages, template_format="jinja2"
-        ).invoke(inputs, config, **kwargs)
+        ).invoke(inputs, config, **merged_kwargs)
         self.messages = prompt_value.to_messages()
 
         return prompt_value
@@ -61,9 +75,31 @@ class AgentPromptTemplate(Runnable[DuoWorkflowStateType, PromptValue]):
         self, state: DuoWorkflowStateType, prompt_template: dict[str, str]
     ) -> list[MessageLikeRepresentation]:
         conversation_preamble: list[MessageLikeRepresentation] = []
+        
+        # Access is_anthropic_model from template_kwargs
+        is_anthropic_model = self.template_kwargs.get('is_anthropic_model', False)
 
-        if "system" in prompt_template:
-            conversation_preamble.append(("system", prompt_template["system"]))
+        if "system_static" in prompt_template:
+            if is_anthropic_model:
+                cached_static_content: list[Union[str, dict]] = [
+                    {
+                        "text": jinja2_formatter(prompt_template["system_static"]),
+                        "type": "text",
+                        "cache_control": {"type": "ephemeral"},
+                    }
+                ]
+                message = SystemMessage(content=cached_static_content)
+            else:
+                message = SystemMessage(content=jinja2_formatter(prompt_template["system_static"]))
+            conversation_preamble.append(message)
+
+        if "system_dynamic" in prompt_template:
+            message = SystemMessage(content=jinja2_formatter(
+                prompt_template["system_dynamic"],
+                **{k: state[k] for k in ["project", "additional_context"] if k in state and state[k] is not None}
+                )
+            )
+            conversation_preamble.append(message)
 
         if state.get("handover"):  # type: ignore
             conversation_preamble.extend(
@@ -76,7 +112,13 @@ class AgentPromptTemplate(Runnable[DuoWorkflowStateType, PromptValue]):
             )
 
         if "user" in prompt_template:
-            conversation_preamble.append(("user", prompt_template["user"]))
+            message = HumanMessage(
+                    jinja2_formatter(
+                        prompt_template["user"],
+                        goal = state.get('goal')
+                    )
+                )
+            conversation_preamble.append(message)
 
         return conversation_preamble
 
@@ -86,11 +128,28 @@ class Agent(Prompt[DuoWorkflowStateType, BaseMessage]):
     workflow_id: str
     http_client: GitlabHttpClient
 
+    @staticmethod
+    def _get_model_provider_attribute(config: PromptConfig) -> str | None:
+        model_config = getattr(config, 'model', None)
+        if model_config:
+            params = getattr(model_config, 'params', None)
+            if params:
+                model_class_provider = getattr(params, 'model_class_provider', None)
+                return model_class_provider
+        return None
+
     @classmethod
     def _build_prompt_template(
         cls, config: PromptConfig
     ) -> Runnable[DuoWorkflowStateType, PromptValue]:
-        return AgentPromptTemplate(config.name, config.prompt_template)
+        # Extract model config to determine if it's an Anthropic model
+        model_class_provider = cls._get_model_provider_attribute(config)
+        is_anthropic_model = model_class_provider is ModelClassProvider.ANTHROPIC
+        return AgentPromptTemplate(
+            config.name, 
+            config.prompt_template, 
+            is_anthropic_model=is_anthropic_model
+        )
 
     async def run(self, state: DuoWorkflowStateType) -> dict[str, Any]:
         with duo_workflow_metrics.time_compute(

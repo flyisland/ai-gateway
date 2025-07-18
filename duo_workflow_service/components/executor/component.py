@@ -8,6 +8,7 @@ from langchain_core.messages import AIMessage
 from langgraph.graph import StateGraph
 
 from ai_gateway.container import ContainerApplication
+from ai_gateway.prompts.config.models import ModelClassProvider
 from ai_gateway.prompts.registry import LocalPromptRegistry
 from duo_workflow_service.agents import (
     Agent,
