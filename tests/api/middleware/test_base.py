@@ -74,8 +74,8 @@ async def test_middleware_distributed_trace_disabled_in_development_without_head
     ) as mock_tracing_context:
         await distributed_trace_middleware_development(scope, receive, send)
 
-        # tracing_context should not be called when langsmith-trace header is missing
-        mock_tracing_context.assert_not_called()
+        # tracing_context should be called with parent=None and enabled=True in development
+        mock_tracing_context.assert_called_once_with(parent=None, enabled=True)
 
     distributed_trace_middleware_development.app.assert_called_once_with(
         scope, receive, send

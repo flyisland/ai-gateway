@@ -342,8 +342,12 @@ def test_middleware_distributed_trace_disabled_without_header(test_path):
         "ai_gateway.api.middleware.base.tracing_context"
     ) as mock_tracing_context:
         client.post(test_path)  # No langsmith-trace header
-        # tracing_context should not be called without the header
-        mock_tracing_context.assert_not_called()
+        if test_path == "/v2/chat/agent":
+            # tracing_context should be called but with enabled=True and parent=None in development
+            mock_tracing_context.assert_called_once_with(parent=None, enabled=True)
+        else:
+            # Health endpoint should skip tracing entirely
+            mock_tracing_context.assert_not_called()
 
 
 @pytest.mark.usefixtures("fastapi_server_app")
