@@ -25,6 +25,7 @@ class TestDuoWorkflowMetrics(unittest.TestCase):
             "llm_response_counter",
             "checkpoint_counter",
             "model_completion_error_counter",
+            "agent_platform_session_start_counter",
         ]:
             mock_histogram = MagicMock()
             setattr(self.metrics, metric_name, mock_histogram)
@@ -222,6 +223,26 @@ class TestDuoWorkflowMetrics(unittest.TestCase):
             provider="Anthropic",
             http_status="500",
             error_type="test_reason",
+        )
+
+    def test_request_duo_workflow_counter(self):
+        observe_mock = MagicMock()
+        labels_result_mock = MagicMock()
+        labels_result_mock.inc = observe_mock
+
+        cast(
+            MagicMock, self.metrics.agent_platform_session_start_counter.labels
+        ).return_value = labels_result_mock
+
+        self.metrics.count_agent_platform_session_start(
+            session_id="test_session_id",
+            flow_type="test_flow_type",
+        )
+
+        cast(
+            MagicMock, self.metrics.agent_platform_session_start_counter.labels
+        ).assert_called_once_with(
+            session_id="test_session_id", flow_type="test_flow_type"
         )
 
 

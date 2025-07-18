@@ -207,6 +207,9 @@ async def test_workflow_event_tracking_for_cancelled_workflow(
                     label=EventLabelEnum.WORKFLOW_START_LABEL.value,
                     property=EventPropertyEnum.WORKFLOW_ID.value,
                     value="1234",
+                    extra={
+                        "workflow_type": CategoryEnum.WORKFLOW_SOFTWARE_DEVELOPMENT.value
+                    },
                 ),
                 category=workflow_type.value,
             ),
@@ -285,6 +288,9 @@ async def test_workflow_context_manager_success(
                     label=EventLabelEnum.WORKFLOW_START_LABEL.value,
                     property=EventPropertyEnum.WORKFLOW_ID.value,
                     value="1234",
+                    extra={
+                        "workflow_type": CategoryEnum.WORKFLOW_SOFTWARE_DEVELOPMENT.value
+                    },
                 ),
                 category=workflow_type,
             ),
@@ -510,6 +516,7 @@ async def test_workflow_context_manager_resume_interrupted(
                     label=EventLabelEnum.WORKFLOW_RESUME_LABEL.value,
                     property=EventPropertyEnum.WORKFLOW_RESUME_BY_PLAN_AFTER_INPUT.value,
                     value=workflow_id,
+                    extra={"workflow_type": workflow_type.value},
                 ),
                 category=workflow_type,
             ),
@@ -560,6 +567,9 @@ async def test_workflow_context_manager_resume_interrupted_approval(
                     label=EventLabelEnum.WORKFLOW_RESUME_LABEL.value,
                     property=EventPropertyEnum.WORKFLOW_RESUME_BY_PLAN_AFTER_APPROVAL.value,
                     value=workflow_id,
+                    extra={
+                        "workflow_type": CategoryEnum.WORKFLOW_SOFTWARE_DEVELOPMENT.value
+                    },
                 ),
                 category=workflow_type,
             ),
@@ -613,6 +623,9 @@ async def test_workflow_context_manager_retry_success(
                     label=EventLabelEnum.WORKFLOW_RESUME_LABEL.value,
                     property=EventPropertyEnum.WORKFLOW_RESUME_BY_USER.value,
                     value=workflow_id,
+                    extra={
+                        "workflow_type": CategoryEnum.WORKFLOW_SOFTWARE_DEVELOPMENT.value
+                    },
                 ),
                 category=workflow_type,
             ),
@@ -686,6 +699,9 @@ async def test_workflow_context_manager_error(
                     label=EventLabelEnum.WORKFLOW_START_LABEL.value,
                     property=EventPropertyEnum.WORKFLOW_ID.value,
                     value="1234",
+                    extra={
+                        "workflow_type": CategoryEnum.WORKFLOW_SOFTWARE_DEVELOPMENT.value
+                    },
                 ),
                 category=workflow_type,
             ),

@@ -100,6 +100,13 @@ class DuoWorkflowMetrics:
             registry=registry,
         )
 
+        self.agent_platform_session_start_counter = Counter(
+            "agent_platform_session_start_total",
+            "Count of flow start events in Duo Workflow",
+            ["session_id", "flow_type"],
+            registry=registry,
+        )
+
     def count_llm_response(
         self, model="unknown", request_type="unknown", stop_reason="unknown"
     ):
@@ -135,6 +142,13 @@ class DuoWorkflowMetrics:
             provider=provider,
             http_status=http_status,
             error_type=error_type,
+        ).inc()
+
+    def count_agent_platform_session_start(
+        self, session_id="unknown", flow_type="unknown"
+    ):
+        self.agent_platform_session_start_counter.labels(
+            session_id=session_id, flow_type=flow_type
         ).inc()
 
     def time_llm_request(self, model="unknown", request_type="unknown"):
