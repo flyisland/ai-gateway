@@ -59,10 +59,10 @@ from lib.internal_events.client import InternalEventsClient
 pytest_plugins = ("pytest_asyncio",)
 
 
-# Configure test environment
-# AIGW_ENVIRONMENT is needed early in test setup before config system initialization
+# LANGCHAIN_TRACING_V2 is how Langchain decides whether to send traces
+# We do not want to send traces when running tests so we set it to false
+# see https://github.com/langchain-ai/langchain/issues/16429#issuecomment-1907051834
 # pylint: disable=direct-environment-variable-reference
-os.environ["AIGW_ENVIRONMENT"] = "test"
 os.environ["LANGCHAIN_TRACING_V2"] = "false"
 # pylint: enable=direct-environment-variable-reference
 
