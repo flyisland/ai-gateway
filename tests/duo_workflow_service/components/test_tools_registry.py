@@ -204,6 +204,7 @@ _outbox = MagicMock(spec=asyncio.Queue)
                 "get_plan",
                 "set_task_status",
                 "read_file",
+                "read_files",
                 "create_file_with_contents",
                 "edit_file",
                 "list_dir",
@@ -290,6 +291,7 @@ def test_registry_initialization_initialises_tools_with_correct_attributes(
         "gitlab_wiki_blob_search": tools.WikiBlobSearch(metadata=tool_metadata),
         "gitlab_note_search": tools.NoteSearch(metadata=tool_metadata),
         "read_file": tools.ReadFile(metadata=tool_metadata),
+        "read_files": tools.ReadFiles(metadata=tool_metadata),
         "list_dir": tools.ListDir(metadata=tool_metadata),
         "create_file_with_contents": tools.WriteFile(metadata=tool_metadata),
         "edit_file": tools.EditFile(metadata=tool_metadata),
@@ -465,6 +467,7 @@ def test_preapproved_tools_initialization(tool_metadata):
     # Tools from read_write_files privilege should be in preapproved_tools
     read_write_tools = {
         "read_file",
+        "read_files",
         "create_file_with_contents",
         "edit_file",
         "list_dir",
@@ -518,6 +521,7 @@ async def test_registry_configuration_with_preapproved_tools(gl_http_client):
 
     read_write_tools = {
         "read_file",
+        "read_files",
         "create_file_with_contents",
         "edit_file",
         "list_dir",

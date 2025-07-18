@@ -1,5 +1,5 @@
 from enum import IntEnum
-from typing import Type
+from typing import Type, List
 
 from pydantic import BaseModel, Field
 
@@ -31,6 +31,44 @@ class ReadFile(DuoBaseTool):
 
     def format_display_message(self, args: ReadFileInput) -> str:
         return "Read file"
+
+
+class ReadFilesInput(BaseModel):
+    file_paths: List[str] = Field(description="List of file paths to read")
+
+
+class ReadFiles(DuoBaseTool):
+    name: str = "read_files"
+    description: str = """Read the contents of multiple files at once.
+
+    This tool efficiently reads multiple files in a single operation, returning
+    the contents of each file with clear file path headers for easy identification.
+
+    IMPORTANT:
+    - Use this tool when you need to read multiple files simultaneously
+    - Results are returned with file path headers to distinguish content
+    - More efficient than multiple individual read_file calls
+
+    """
+    args_schema: Type[BaseModel] = ReadFilesInput  # type: ignore
+
+    async def _arun(self, file_paths: List[str]) -> str:
+        results = []
+        for file_path in file_paths:
+            try:
+                content = await _execute_action(
+                    self.metadata,  # type: ignore
+                    contract_pb2.Action(runReadFile=contract_pb2.ReadFile(filepath=file_path)),
+                )
+                results.append(f"=== {file_path} ===\n{content}")
+            except Exception as e:
+                results.append(f"=== {file_path} ===\nError reading file: {str(e)}")
+
+        return "\n\n".join(results)
+
+    def format_display_message(self, args: ReadFilesInput) -> str:
+        file_count = len(args.file_paths)
+        return f"Read {file_count} file{'s' if file_count != 1 else ''}"
 
 
 class WriteFileInput(BaseModel):

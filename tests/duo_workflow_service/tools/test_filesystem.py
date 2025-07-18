@@ -12,6 +12,8 @@ from duo_workflow_service.tools.filesystem import (  # Mkdir,
     ListDirInput,
     ReadFile,
     ReadFileInput,
+    ReadFiles,
+    ReadFilesInput,
     WriteFile,
     WriteFileInput,
 )
@@ -50,6 +52,73 @@ async def test_read_file_not_implemented_error():
 
     with pytest.raises(NotImplementedError):
         tool._run("./main.py")
+
+
+@pytest.mark.asyncio
+async def test_read_files():
+    mock_outbox = MagicMock()
+    mock_outbox.put = AsyncMock()
+
+    mock_inbox = MagicMock()
+    mock_inbox.get = AsyncMock(
+        side_effect=[
+            contract_pb2.ClientEvent(
+                actionResponse=contract_pb2.ActionResponse(response="content of file1")
+            ),
+            contract_pb2.ClientEvent(
+                actionResponse=contract_pb2.ActionResponse(response="content of file2")
+            ),
+        ]
+    )
+
+    metadata = {"outbox": mock_outbox, "inbox": mock_inbox}
+
+    tool = ReadFiles(description="Read multiple files")
+    tool.metadata = metadata
+    file_paths = ["./file1.py", "./file2.py"]
+
+    response = await tool._arun(file_paths)
+
+    expected_response = "=== ./file1.py ===\ncontent of file1\n\n=== ./file2.py ===\ncontent of file2"
+    assert response == expected_response
+
+    # Verify that outbox.put was called twice (once for each file)
+    assert mock_outbox.put.call_count == 2
+
+
+@pytest.mark.asyncio
+async def test_read_files_with_error():
+    mock_outbox = MagicMock()
+    mock_outbox.put = AsyncMock()
+
+    mock_inbox = MagicMock()
+    mock_inbox.get = AsyncMock(
+        side_effect=[
+            contract_pb2.ClientEvent(
+                actionResponse=contract_pb2.ActionResponse(response="content of file1")
+            ),
+            Exception("File not found"),
+        ]
+    )
+
+    metadata = {"outbox": mock_outbox, "inbox": mock_inbox}
+
+    tool = ReadFiles(description="Read multiple files")
+    tool.metadata = metadata
+    file_paths = ["./file1.py", "./file2.py"]
+
+    response = await tool._arun(file_paths)
+
+    expected_response = "=== ./file1.py ===\ncontent of file1\n\n=== ./file2.py ===\nError reading file: File not found"
+    assert response == expected_response
+
+
+@pytest.mark.asyncio
+async def test_read_files_not_implemented_error():
+    tool = ReadFiles(description="Read multiple files")
+
+    with pytest.raises(NotImplementedError):
+        tool._run(["./file1.py", "./file2.py"])
 
 
 @pytest.mark.asyncio
@@ -355,4 +424,20 @@ def test_edit_file_format_display_message():
     message = tool.format_display_message(input_data)
 
     expected_message = "Edit file"
+    assert message == expected_message
+
+
+def test_read_files_format_display_message():
+    tool = ReadFiles(description="Read multiple files")
+
+    # Test with single file
+    input_data = ReadFilesInput(file_paths=["./src/main.py"])
+    message = tool.format_display_message(input_data)
+    expected_message = "Read 1 file"
+    assert message == expected_message
+
+    # Test with multiple files
+    input_data = ReadFilesInput(file_paths=["./src/main.py", "./src/utils.py"])
+    message = tool.format_display_message(input_data)
+    expected_message = "Read 2 files"
     assert message == expected_message
