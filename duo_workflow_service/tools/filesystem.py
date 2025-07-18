@@ -191,7 +191,7 @@ full path relative to the project root.
 #
 #     async def _arun(self, directory_path: str) -> str:
 #         # Check path security before proceeding
-#         validate_duo_context_exclusions(file_path)
+#         validate_duo_context_exclusions(directory_path)
 #
 #         if ".." in directory_path:
 #             return "Creating directories above the current directory is not allowed"
