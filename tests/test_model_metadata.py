@@ -215,7 +215,7 @@ class TestModelMetadataToParams:
             "custom_llm_provider": "bedrock",
         }
 
-    def test_without_api_key_and_custom_openai_uses_dummy_key(self):
+    def test_without_api_key_uses_dummy_key_only_for_custom_openai(self):
         model_metadata = ModelMetadata(
             name="model_family",
             provider="custom_openai",
