@@ -53,18 +53,42 @@ class ReadFiles(DuoBaseTool):
     args_schema: Type[BaseModel] = ReadFilesInput  # type: ignore
 
     async def _arun(self, file_paths: List[str]) -> str:
-        results = []
-        for file_path in file_paths:
-            try:
-                content = await _execute_action(
+        # Use the new ReadFiles gRPC call for efficient multi-file reading
+        try:
+            # Check if the new ReadFiles action is available in the protocol
+            if hasattr(contract_pb2, 'ReadFiles') and hasattr(contract_pb2.Action, 'runReadFiles'):
+                return await _execute_action(
                     self.metadata,  # type: ignore
-                    contract_pb2.Action(runReadFile=contract_pb2.ReadFile(filepath=file_path)),
+                    contract_pb2.Action(runReadFiles=contract_pb2.ReadFiles(filepaths=file_paths)),
                 )
-                results.append(f"=== {file_path} ===\n{content}")
-            except Exception as e:
-                results.append(f"=== {file_path} ===\nError reading file: {str(e)}")
+            else:
+                # Fallback to individual ReadFile calls if ReadFiles is not available
+                results = []
+                for file_path in file_paths:
+                    try:
+                        content = await _execute_action(
+                            self.metadata,  # type: ignore
+                            contract_pb2.Action(runReadFile=contract_pb2.ReadFile(filepath=file_path)),
+                        )
+                        results.append(f"=== {file_path} ===\n{content}")
+                    except Exception as e:
+                        results.append(f"=== {file_path} ===\nError reading file: {str(e)}")
 
-        return "\n\n".join(results)
+                return "\n\n".join(results)
+        except Exception as e:
+            # Fallback to individual ReadFile calls on any error
+            results = []
+            for file_path in file_paths:
+                try:
+                    content = await _execute_action(
+                        self.metadata,  # type: ignore
+                        contract_pb2.Action(runReadFile=contract_pb2.ReadFile(filepath=file_path)),
+                    )
+                    results.append(f"=== {file_path} ===\n{content}")
+                except Exception as e:
+                    results.append(f"=== {file_path} ===\nError reading file: {str(e)}")
+
+            return "\n\n".join(results)
 
     def format_display_message(self, args: ReadFilesInput) -> str:
         file_count = len(args.file_paths)

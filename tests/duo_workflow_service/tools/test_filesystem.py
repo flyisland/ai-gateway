@@ -60,30 +60,31 @@ async def test_read_files():
     mock_outbox.put = AsyncMock()
 
     mock_inbox = MagicMock()
-    mock_inbox.get = AsyncMock(
-        side_effect=[
-            contract_pb2.ClientEvent(
-                actionResponse=contract_pb2.ActionResponse(response="content of file1")
-            ),
-            contract_pb2.ClientEvent(
-                actionResponse=contract_pb2.ActionResponse(response="content of file2")
-            ),
-        ]
-    )
 
-    metadata = {"outbox": mock_outbox, "inbox": mock_inbox}
+    # Mock the case where ReadFiles is available in contract_pb2
+    with patch.object(contract_pb2, 'ReadFiles', create=True) as mock_read_files_class:
+        with patch.object(contract_pb2.Action, 'runReadFiles', create=True):
+            mock_inbox.get = AsyncMock(
+                return_value=contract_pb2.ClientEvent(
+                    actionResponse=contract_pb2.ActionResponse(
+                        response="=== ./file1.py ===\ncontent of file1\n\n=== ./file2.py ===\ncontent of file2"
+                    )
+                )
+            )
 
-    tool = ReadFiles(description="Read multiple files")
-    tool.metadata = metadata
-    file_paths = ["./file1.py", "./file2.py"]
+            metadata = {"outbox": mock_outbox, "inbox": mock_inbox}
 
-    response = await tool._arun(file_paths)
+            tool = ReadFiles(description="Read multiple files")
+            tool.metadata = metadata
+            file_paths = ["./file1.py", "./file2.py"]
 
-    expected_response = "=== ./file1.py ===\ncontent of file1\n\n=== ./file2.py ===\ncontent of file2"
-    assert response == expected_response
+            response = await tool._arun(file_paths)
 
-    # Verify that outbox.put was called twice (once for each file)
-    assert mock_outbox.put.call_count == 2
+            expected_response = "=== ./file1.py ===\ncontent of file1\n\n=== ./file2.py ===\ncontent of file2"
+            assert response == expected_response
+
+            # Verify that outbox.put was called once (single ReadFiles call)
+            assert mock_outbox.put.call_count == 1
 
 
 @pytest.mark.asyncio
@@ -92,6 +93,8 @@ async def test_read_files_with_error():
     mock_outbox.put = AsyncMock()
 
     mock_inbox = MagicMock()
+
+    # Test fallback to individual ReadFile calls when ReadFiles is not available
     mock_inbox.get = AsyncMock(
         side_effect=[
             contract_pb2.ClientEvent(
@@ -111,6 +114,40 @@ async def test_read_files_with_error():
 
     expected_response = "=== ./file1.py ===\ncontent of file1\n\n=== ./file2.py ===\nError reading file: File not found"
     assert response == expected_response
+
+
+@pytest.mark.asyncio
+async def test_read_files_fallback_to_individual_calls():
+    """Test that ReadFiles falls back to individual ReadFile calls when ReadFiles is not available."""
+    mock_outbox = MagicMock()
+    mock_outbox.put = AsyncMock()
+
+    mock_inbox = MagicMock()
+    mock_inbox.get = AsyncMock(
+        side_effect=[
+            contract_pb2.ClientEvent(
+                actionResponse=contract_pb2.ActionResponse(response="content of file1")
+            ),
+            contract_pb2.ClientEvent(
+                actionResponse=contract_pb2.ActionResponse(response="content of file2")
+            ),
+        ]
+    )
+
+    metadata = {"outbox": mock_outbox, "inbox": mock_inbox}
+
+    tool = ReadFiles(description="Read multiple files")
+    tool.metadata = metadata
+    file_paths = ["./file1.py", "./file2.py"]
+
+    # Test fallback behavior when ReadFiles is not available
+    response = await tool._arun(file_paths)
+
+    expected_response = "=== ./file1.py ===\ncontent of file1\n\n=== ./file2.py ===\ncontent of file2"
+    assert response == expected_response
+
+    # Verify that outbox.put was called twice (fallback to individual ReadFile calls)
+    assert mock_outbox.put.call_count == 2
 
 
 @pytest.mark.asyncio
