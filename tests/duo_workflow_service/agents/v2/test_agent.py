@@ -1,5 +1,7 @@
 # pylint: disable=unused-import,unused-variable
 
+import json
+from typing import Any, cast
 from unittest.mock import ANY, Mock, patch
 
 import pytest
@@ -8,7 +10,7 @@ from langchain_core.messages import AIMessage, HumanMessage, SystemMessage
 from ai_gateway.model_metadata import TypeModelMetadata
 from ai_gateway.prompts.config.base import PromptConfig
 from ai_gateway.prompts.typing import TypeModelFactory
-from duo_workflow_service.agents.v2.agent import Agent
+from duo_workflow_service.agents.v2.agent import Agent, AgentPromptTemplate
 from duo_workflow_service.entities import WorkflowEventType
 from duo_workflow_service.entities.event import WorkflowEvent
 from duo_workflow_service.entities.state import (
@@ -22,8 +24,19 @@ from duo_workflow_service.gitlab.http_client import GitlabHttpClient
 
 @pytest.fixture
 def prompt_template() -> dict[str, str]:
+    system_static_template = """
+    {%- set content -%}
+    You are AGI entity capable of anything
+    {%- endset -%}
+    {%- if is_anthropic_model -%}
+    {{ [{"text": content, "type": "text", "cache_control": {"type": "ephemeral"}}] | tojson }}
+    {%- else -%}
+    {{ content }}
+    {%- endif -%}
+    """.strip()
+
     return {
-        "system": "You are AGI entity capable of anything",
+        "system_static": system_static_template,
         "user": "Your goal is: {{ goal }}",
     }
 
@@ -65,6 +78,35 @@ class TestAgent:
 
         assert result["conversation_history"][prompt_name] == [
             SystemMessage(content="You are AGI entity capable of anything"),
+            HumanMessage(content=f"Your goal is: {goal}"),
+            AIMessage.model_construct(content=model_response, id=ANY),
+        ]
+
+    @pytest.mark.asyncio
+    async def test_run_with_prompt_caching_enabled(
+        self,
+        agent: Agent,
+        workflow_state: DuoWorkflowStateType,
+        prompt_name: str,
+        goal: str,
+        model_response: str,
+    ):
+        agent_prompt_tpl = cast(AgentPromptTemplate, agent.prompt_tpl)
+        agent_prompt_tpl.template_kwargs = agent_prompt_tpl.template_kwargs or {}
+        agent_prompt_tpl.template_kwargs["is_anthropic_model"] = True
+
+        result = await agent.run(workflow_state)
+
+        expected_system_content: list[str | dict] = [
+            {
+                "text": "You are AGI entity capable of anything",
+                "type": "text",
+                "cache_control": {"type": "ephemeral"},
+            }
+        ]
+
+        assert result["conversation_history"][prompt_name] == [
+            SystemMessage(content=expected_system_content),
             HumanMessage(content=f"Your goal is: {goal}"),
             AIMessage.model_construct(content=model_response, id=ANY),
         ]
