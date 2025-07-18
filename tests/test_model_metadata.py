@@ -232,7 +232,25 @@ class TestModelMetadataToParams:
             "model": "model_family",
             "custom_llm_provider": "custom_openai",
         }
+        }
 
+    def test_without_api_key_and_non_custom_openai_no_dummy_key(self):
+        model_metadata = ModelMetadata(
+            name="model_family",
+            provider="fireworks",
+            endpoint=HttpUrl("https://api.example.com"),
+            api_key=None,
+            identifier=None,
+        )
+
+        params = model_metadata.to_params()
+
+        assert params == {
+            "api_base": "https://api.example.com",
+            "model": "model_family",
+            "custom_llm_provider": "fireworks",
+        }
+        assert "api_key" not in params
     def test_anthropic_provider(self):
         model_metadata = ModelMetadata(
             identifier="model_identifier", name="base", provider="anthropic"
