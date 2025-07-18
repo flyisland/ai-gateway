@@ -232,7 +232,6 @@ class TestModelMetadataToParams:
             "model": "model_family",
             "custom_llm_provider": "custom_openai",
         }
-        }
 
     def test_without_api_key_and_non_custom_openai_no_dummy_key(self):
         model_metadata = ModelMetadata(
