@@ -1,3 +1,4 @@
+import asyncio
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
@@ -113,20 +114,26 @@ class TestFindFiles:
         assert result == "file1.py\nfile2.py"
 
     @pytest.mark.asyncio
-    @patch("duo_workflow_service.tools.filesystem.FindFiles", autospec=True)
-    async def test_find_files_empty_result(self, mock_find_files_class):
-        # Create a mock instance with a mocked _arun method
-        mock_instance = mock_find_files_class.return_value
-        mock_instance._arun = AsyncMock(
-            return_value="No matches found for pattern '*.nonexistent'"
+    async def test_find_files_empty_result(self):
+        mock_outbox = MagicMock()
+        mock_outbox.put = AsyncMock()
+
+        mock_inbox = MagicMock()
+        mock_inbox.get = AsyncMock(
+            return_value=contract_pb2.ClientEvent(
+                actionResponse=contract_pb2.ActionResponse(
+                    response="No matches found for pattern '*.nonexistent'"
+                )
+            )
         )
 
-        # Now use the mock instance instead of creating a real one
+        metadata = {"outbox": mock_outbox, "inbox": mock_inbox}
+        tool = FindFiles()
+        tool.metadata = metadata
         name_pattern = "*.nonexistent"
-        result = await mock_instance._arun(name_pattern)
+        result = await tool._arun(name_pattern=name_pattern)
 
         assert "No matches found for pattern '*.nonexistent'" in result
-        mock_instance._arun.assert_called_once_with("*.nonexistent")
 
     def test_find_files_sync_run_method(self):
         tool = FindFiles()
