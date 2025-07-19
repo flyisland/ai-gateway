@@ -56,8 +56,19 @@ def prompt_template():
 
 
 @pytest.fixture(autouse=True)
-def stub_feature_flags():
-    current_feature_flag_context.set(["expanded_ai_logging"])
+def setup_test_logging():
+    # Configure logging for tests
+    setup_logging(
+        logging_config=ConfigLogging(
+            level="INFO",
+            format_json=False,
+            enable_request_logging=True,
+            enable_litellm_logging=False,
+            to_file=None
+        ),
+        custom_models_enabled=False,
+        cache_logger_on_first_use=False
+    )
     yield
 
 
@@ -67,6 +78,12 @@ def enable_request_logging():
     ENABLE_REQUEST_LOGGING = True
     yield
     ENABLE_REQUEST_LOGGING = original_value
+
+
+@pytest.fixture(autouse=True)
+def stub_feature_flags():
+    current_feature_flag_context.set(["expanded_ai_logging"])
+    yield
 
 
 class TestReActPlainTextParser:
