@@ -40,6 +40,11 @@ def mock_http(mock_http_handler: Mock):
 
 
 @pytest.fixture
+def response_text():
+    return '{"choices":[{"message":{"content":"Test response"}}],"usage":{"completion_tokens":999}}'
+
+
+@pytest.fixture
 def mock_http_handler(response_text: str):
     handler = AsyncMock()
     handler.post.return_value = httpx.Response(status_code=200, text=response_text)
@@ -52,6 +57,15 @@ def mock_sleep():  # So we don't have to wait
         yield
 
 
+@pytest.fixture(autouse=True)
+def mock_context_middleware():
+    """Mock the ContextDoesNotExistError for tests that don't have a request cycle."""
+    # Instead of trying to create a real context, let's patch the function
+    # that accesses the context to avoid errors
+    with patch("ai_gateway.api.middleware.self_hosted_logging.enabled_instance_verbose_ai_logs",
+              return_value=False):
+        yield
+        
 @pytest.mark.asyncio
 @pytest.mark.parametrize(("response_text"), ['{"error": "something went wrong"}'])
 async def test_ainvoke(
@@ -1066,7 +1080,7 @@ class TestLiteLlmTextGenModel:
             watcher.finish.assert_called_once()
 
     @pytest.mark.asyncio
-    async def test_generate_stream_instrumented(self, lite_llm_text_model):
+    async def test_generate_stream_instrumented(self, lite_llm_text_model, mock_http, mock_http_handler):
         async def mock_stream(*_args, **_kwargs):
             completions = [
                 AsyncMock(
@@ -1102,6 +1116,5 @@ class TestLiteLlmTextGenModel:
             mock_watch.assert_called_once_with(stream=True)
             watcher.register_error.assert_called_once()
             watcher.finish.assert_called_once()
-
-    mock_http.assert_not_called()
-    assert mock_http_handler.post.call_count == 1``
+            mock_http.assert_not_called()
+            assert mock_http_handler.post.call_count == 1

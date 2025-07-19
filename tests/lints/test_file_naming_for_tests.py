@@ -37,8 +37,16 @@ class TestFileNamingForTests(pylint.testutils.CheckerTestCase):
         with self.assertNoMessages():
             self.checker.visit_module(node)
 
+        # Check what paths the mock was called with
+        # We need to use string paths, not Path objects
+        # Check that we're using the right paths based on the file location
+        test_file_path = f"{os.getcwd()}/tests/path/to/test_filename.py"
+        expected_paths = [
+            "ai_gateway/path/to/filename.py",
+            "./path/to/filename.py",
+        ]
         mock_path_class.assert_has_calls(
-            [call("ai_gateway/path/to/filename.py"), call("./path/to/filename.py")],
+            [call(expected_paths[0]), call(expected_paths[1])],
             any_order=True,
         )
 
