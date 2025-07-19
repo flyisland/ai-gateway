@@ -124,10 +124,9 @@ def extract_project_id_from_workflow(workflow: dict):
 
 def extract_default_branch_from_project_repository(workflow: dict) -> Optional[str]:
     repository_str = (
-        workflow.get("project", {})
-        .get("statisticsDetailsPaths", {})
-        .get("repository", "")
-    )
+        workflow.get("project", {}).get("statisticsDetailsPaths") or {}
+    ).get("repository", "")
+
     default_branch = None
     if repository_str and isinstance(repository_str, str):
         default_branch = str(repository_str.split("/")[-1])
