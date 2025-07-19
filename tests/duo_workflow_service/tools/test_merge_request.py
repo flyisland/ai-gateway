@@ -171,8 +171,7 @@ async def test_create_merge_request(gitlab_client_mock, metadata):
     expected_response = json.dumps(
         {
             "status": "success",
-            "data": expected_data,
-            "response": '{"id": 1, "title": "New Feature", "source_branch": "feature", "target_branch": "main"}',
+            "merge_request": '{"id": 1, "title": "New Feature", "source_branch": "feature", "target_branch": "main"}',
         }
     )
 
@@ -231,12 +230,7 @@ async def test_create_merge_request_with_url_success(
     expected_response = json.dumps(
         {
             "status": "success",
-            "data": {
-                "source_branch": "feature",
-                "target_branch": "main",
-                "title": "Test Merge Request",
-            },
-            "response": {
+            "merge_request": {
                 "id": 1,
                 "title": "Test Merge Request",
                 "source_branch": "feature",
@@ -324,8 +318,7 @@ async def test_create_merge_request_minimal_params(gitlab_client_mock, metadata)
     expected_response = json.dumps(
         {
             "status": "success",
-            "data": expected_data,
-            "response": '{"id": 1, "title": "New Feature", "source_branch": "feature", "target_branch": "main"}',
+            "merge_request": '{"id": 1, "title": "New Feature", "source_branch": "feature", "target_branch": "main"}',
         }
     )
 

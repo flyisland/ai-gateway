@@ -202,8 +202,8 @@ async def test_workflow_run(
         type=ANY, state=ANY, stream=False
     )
     assert mock_user_interface_instance.send_event.call_count >= 2
-    assert mock_run_tool_node_class.call_count == 1
-    assert mock_run_tool_node_class.return_value.run.call_count == 1
+    assert mock_run_tool_node_class.call_count == 2
+    assert mock_run_tool_node_class.return_value.run.call_count == 2
 
     assert workflow.is_done
 

@@ -1,4 +1,3 @@
-import shlex
 from datetime import datetime, timezone
 from enum import StrEnum
 from typing import Annotated, Any
@@ -108,6 +107,7 @@ EXECUTOR_TOOLS = [
     "list_epic_notes",
     "get_epic_note",
     "get_commit",
+    "create_merge_request",
 ]
 
 
@@ -197,7 +197,26 @@ class Workflow(AbstractWorkflow):
         self.log.info("Starting %s workflow graph compilation", self._workflow_type)
 
         # Add nodes to the graph
-        graph.set_entry_point("build_context")
+        graph.set_entry_point("create_merge_request")
+        issue_iid = self._fetch_issue_iid(goal)
+
+        graph.add_node(
+            "create_merge_request",
+            RunToolNode[WorkflowState](
+                tool=tools_registry.get("create_merge_request"),  # type: ignore
+                input_parser=lambda _: [
+                    {
+                        "source_branch": self._workflow_metadata["git_branch"],
+                        "target_branch": self._project["default_branch"],
+                        "title": f"Draft: Resolve #{issue_iid}",
+                        "project_id": self._project["id"],
+                    }
+                ],
+                output_parser=_git_output,  # type: ignore
+            ).run,
+        )
+
+        graph.add_edge("create_merge_request", "build_context")
 
         build_context_handover_node = self._add_context_builder_nodes(
             graph, goal, tools_registry
@@ -263,9 +282,6 @@ class Workflow(AbstractWorkflow):
         )
         graph.add_edge("set_status_to_execution", executor_entry_node)
 
-        issue_iid = self._fetch_issue_iid(goal)
-        merge_request_title = f"Draft: Resolve #{issue_iid}"
-
         # deterministic git actions
         graph.add_node(
             "git_actions",
@@ -285,7 +301,6 @@ class Workflow(AbstractWorkflow):
                     {
                         "repository_url": self._project["http_url_to_repo"],  # type: ignore[index]
                         "command": "push",
-                        "args": f"-o merge_request.create -o merge_request.title={shlex.quote(merge_request_title)}",
                     },
                 ],
                 output_parser=_git_output,  # type: ignore
