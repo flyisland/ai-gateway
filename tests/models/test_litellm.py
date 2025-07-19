@@ -47,11 +47,14 @@ async def test_ainvoke(
     prompt: Prompt,
     response_text: str,
 ):
-    with pytest.raises(litellm.APIConnectionError, match="something went wrong"), patch(
-        "google.auth.default",
-        return_value=(
-            MagicMock(spec=Credentials, token="mock_token"),
-            "mock_project_id",
+    with (
+        pytest.raises(litellm.APIConnectionError, match="something went wrong"),
+        patch(
+            "google.auth.default",
+            return_value=(
+                MagicMock(spec=Credentials, token="mock_token"),
+                "mock_project_id",
+            ),
         ),
     ):
         await prompt.ainvoke({"name": "Duo", "content": "What's up?"})
@@ -76,13 +79,14 @@ async def test_astream(
 ):
     litellm.module_level_aclient = mock_http_handler
 
-    with pytest.raises(
-        litellm.InternalServerError, match="something went wrong"
-    ), patch(
-        "google.auth.default",
-        return_value=(
-            MagicMock(spec=Credentials, token="mock_token"),
-            "mock_project_id",
+    with (
+        pytest.raises(litellm.InternalServerError, match="something went wrong"),
+        patch(
+            "google.auth.default",
+            return_value=(
+                MagicMock(spec=Credentials, token="mock_token"),
+                "mock_project_id",
+            ),
         ),
     ):
         await anext(prompt.astream({"name": "Duo", "content": "What's up?"}))
@@ -1103,5 +1107,6 @@ class TestLiteLlmTextGenModel:
             mock_watch.assert_called_once_with(stream=True)
             watcher.register_error.assert_called_once()
             watcher.finish.assert_called_once()
+
     mock_http.assert_not_called()
     assert mock_http_handler.post.call_count == 1

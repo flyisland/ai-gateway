@@ -38,12 +38,16 @@ from ai_gateway.models.base_text import (
     TextGenModelChunk,
     TextGenModelOutput,
 )
+from ai_gateway.models.litellm import (  # added for tests referencing enum
+    KindLiteLlmModel,
+)
 from ai_gateway.prompts import Prompt
 from ai_gateway.prompts.config.base import ModelConfig, PromptConfig, PromptParams
 from ai_gateway.prompts.config.models import ChatLiteLLMParams, TypeModelParams
 from ai_gateway.prompts.typing import Model, TypeModelFactory
 from ai_gateway.safety_attributes import SafetyAttributes
 from ai_gateway.structured_logging import setup_logging
+from duo_workflow_service.entities.event import WorkflowEvent
 from duo_workflow_service.entities.state import (
     MessageTypeEnum,
     Plan,
@@ -51,6 +55,13 @@ from duo_workflow_service.entities.state import (
     WorkflowState,
     WorkflowStatusEnum,
 )
+from duo_workflow_service.gitlab.gitlab_project import Project
+
+# Added for test wiring and internal events mocking
+from duo_workflow_service.server import CONTAINER_APPLICATION_PACKAGES  # type: ignore
+from duo_workflow_service.workflows.type_definitions import AdditionalContext
+from lib.feature_flags.context import current_feature_flag_context
+from lib.internal_events.client import InternalEventsClient
 
 pytest_plugins = ("pytest_asyncio",)
 

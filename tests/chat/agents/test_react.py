@@ -64,10 +64,10 @@ def setup_test_logging():
             format_json=False,
             enable_request_logging=True,
             enable_litellm_logging=False,
-            to_file=None
+            to_file=None,
         ),
         custom_models_enabled=False,
-        cache_logger_on_first_use=False
+        cache_logger_on_first_use=False,
     )
     yield
 
