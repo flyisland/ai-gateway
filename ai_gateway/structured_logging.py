@@ -9,6 +9,9 @@ from asgi_correlation_id import CorrelationIdMiddleware
 from fastapi import FastAPI
 from structlog.types import EventDict, Processor
 
+from ai_gateway.api.middleware.self_hosted_logging import (
+    enabled_instance_verbose_ai_logs,
+)
 from ai_gateway.config import ConfigLogging
 from ai_gateway.model_metadata import ModelMetadata
 from lib.feature_flags import FeatureFlag, is_feature_enabled
@@ -18,19 +21,14 @@ ENABLE_REQUEST_LOGGING = False
 CUSTOM_MODELS_ENABLED = False
 
 
-# Import function but handle case when it's not in a request context
+# Handle case when it's not in a request context
 def safe_enabled_instance_verbose_ai_logs():
     try:
-        from ai_gateway.api.middleware.self_hosted_logging import (
-            enabled_instance_verbose_ai_logs,
-        )
-
-        try:
-            return enabled_instance_verbose_ai_logs()
-        except Exception:
-            # If context is not available, default to False
-            return False
+        return enabled_instance_verbose_ai_logs()
     except ImportError:
+        return False
+    except Exception:
+        # If context is not available, default to False
         return False
 
 

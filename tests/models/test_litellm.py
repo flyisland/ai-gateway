@@ -1,3 +1,4 @@
+# pylint: disable=too-many-lines
 from typing import Optional
 from unittest.mock import AsyncMock, MagicMock, Mock, patch
 
@@ -72,11 +73,11 @@ def mock_context_middleware():
 @pytest.mark.asyncio
 @pytest.mark.parametrize(("response_text"), ['{"error": "something went wrong"}'])
 async def test_ainvoke(
-    mock_sleep: Mock,
+    _mock_sleep: Mock,  # Prefix with underscore to indicate intentionally unused
     mock_http: Mock,
     mock_http_handler: AsyncMock,
     prompt: Prompt,
-    response_text: str,
+    _response_text: str,  # Prefix with underscore to indicate intentionally unused
 ):
     with (
         pytest.raises(litellm.APIConnectionError, match="something went wrong"),
@@ -102,11 +103,11 @@ async def test_ainvoke(
     ],
 )
 async def test_astream(
-    mock_sleep: Mock,
-    mock_http: Mock,
+    _mock_sleep: Mock,  # Prefix with underscore to indicate intentionally unused
+    _mock_http: Mock,  # Prefix with underscore to indicate intentionally unused
     mock_http_handler: AsyncMock,
     prompt: Prompt,
-    response_text: str,
+    _response_text: str,  # Prefix with underscore to indicate intentionally unused
 ):
     litellm.module_level_aclient = mock_http_handler
 
@@ -122,170 +123,166 @@ async def test_astream(
     ):
         await anext(prompt.astream({"name": "Duo", "content": "What's up?"}))
 
-    @pytest.mark.asyncio
-    async def test_generate(self, lite_llm_chat_model):
-        expected_messages = [{"role": "user", "content": "Test message"}]
 
-        with patch("ai_gateway.models.litellm.acompletion") as mock_acompletion:
-            mock_acompletion.return_value = AsyncMock(
-                choices=[AsyncMock(message=AsyncMock(content="Test response"))],
-                usage=AsyncMock(completion_tokens=999),
-            )
-            messages = [Message(content="Test message", role="user")]
-            output = await lite_llm_chat_model.generate(messages)
-            assert isinstance(output, TextGenModelOutput)
-            assert output.text == "Test response"
-            assert output.metadata.output_tokens == 999
+@pytest.mark.asyncio
+async def test_generate(lite_llm_chat_model):
+    expected_messages = [{"role": "user", "content": "Test message"}]
 
-            mock_acompletion.assert_called_with(
-                messages=expected_messages,
-                stream=False,
-                temperature=0.2,
-                top_p=0.95,
-                max_tokens=2048,
-                timeout=30.0,
-                stop=["</new_code>"],
-                api_base="http://127.0.0.1:1111/v1",
-                api_key="specified-api-key",
-                model="some-cool-model",
-                custom_llm_provider="provider",
-            )
+    with patch("ai_gateway.models.litellm.acompletion") as mock_acompletion:
+        mock_acompletion.return_value = AsyncMock(
+            choices=[AsyncMock(message=AsyncMock(content="Test response"))],
+            usage=AsyncMock(completion_tokens=999),
+        )
+        messages = [Message(content="Test message", role="user")]
+        output = await lite_llm_chat_model.generate(messages)
+        assert isinstance(output, TextGenModelOutput)
+        assert output.text == "Test response"
+        assert output.metadata.output_tokens == 999
 
-    @pytest.mark.asyncio
-    async def test_override_stream(self, endpoint, api_key, identifier):
-        chat_model = LiteLlmChatModel.from_model_name(
-            name="mistral",
-            endpoint=endpoint,
-            api_key=api_key,
-            identifier=identifier,
-            custom_models_enabled=True,
-            disable_streaming=True,
+        mock_acompletion.assert_called_with(
+            messages=expected_messages,
+            stream=False,
+            temperature=0.2,
+            top_p=0.95,
+            max_tokens=2048,
+            timeout=30.0,
+            stop=["</new_code>"],
+            api_base="http://127.0.0.1:1111/v1",
+            api_key="specified-api-key",
+            model="some-cool-model",
+            custom_llm_provider="provider",
         )
 
-        expected_messages = [{"role": "user", "content": "Test message"}]
 
-        with patch("ai_gateway.models.litellm.acompletion") as mock_acompletion:
-            mock_acompletion.return_value = AsyncMock(
-                choices=[AsyncMock(message=AsyncMock(content="Test response"))],
-                usage=AsyncMock(completion_tokens=999),
-            )
+@pytest.mark.asyncio
+async def test_override_stream(endpoint, api_key, identifier):
+    chat_model = LiteLlmChatModel.from_model_name(
+        name="mistral",
+        endpoint=endpoint,
+        api_key=api_key,
+        identifier=identifier,
+        custom_models_enabled=True,
+        disable_streaming=True,
+    )
 
-            messages = [Message(content="Test message", role=Role.USER)]
-            output = await chat_model.generate(
-                messages=messages,
-                stream=True,
-            )
+    expected_messages = [{"role": "user", "content": "Test message"}]
 
-            mock_acompletion.assert_called_with(
-                messages=expected_messages,
-                stream=False,
-                temperature=0.2,
-                top_p=0.95,
-                max_tokens=2048,
-                timeout=30.0,
-                stop=["</new_code>"],
-                api_base="http://127.0.0.1:1111/v1",
-                api_key="specified-api-key",
-                model="some-cool-model",
-                custom_llm_provider="provider",
-            )
-
-            assert isinstance(output, TextGenModelOutput)
-            assert output.text == "Test response"
-
-    @pytest.mark.asyncio
-    async def test_generate_stream(self, lite_llm_chat_model):
-        expected_messages = [{"role": "user", "content": "Test message"}]
-
-        streamed_response = AsyncMock()
-        streamed_response.__aiter__.return_value = iter(
-            [
-                AsyncMock(
-                    choices=[AsyncMock(delta=AsyncMock(content="Streamed content"))]
-                )
-            ]
+    with patch("ai_gateway.models.litellm.acompletion") as mock_acompletion:
+        mock_acompletion.return_value = AsyncMock(
+            choices=[AsyncMock(message=AsyncMock(content="Test response"))],
+            usage=AsyncMock(completion_tokens=999),
         )
 
-        with (
-            patch("ai_gateway.models.litellm.acompletion") as mock_acompletion,
-            patch(
-                "ai_gateway.instrumentators.model_requests.ModelRequestInstrumentator.watch"
-            ) as mock_watch,
-        ):
-            watcher = Mock()
-            mock_watch.return_value.__enter__.return_value = watcher
+        messages = [Message(content="Test message", role=Role.USER)]
+        output = await chat_model.generate(
+            messages=messages,
+            stream=True,
+        )
 
-            mock_acompletion.return_value = streamed_response
+        mock_acompletion.assert_called_with(
+            messages=expected_messages,
+            stream=False,
+            temperature=0.2,
+            top_p=0.95,
+            max_tokens=2048,
+            timeout=30.0,
+            stop=["</new_code>"],
+            api_base="http://127.0.0.1:1111/v1",
+            api_key="specified-api-key",
+            model="some-cool-model",
+            custom_llm_provider="provider",
+        )
 
-            messages = [Message(content="Test message", role="user")]
-            response = await lite_llm_chat_model.generate(
-                messages=messages,
-                stream=True,
-                temperature=0.3,
-                top_p=0.9,
-                max_output_tokens=1024,
-            )
+        assert isinstance(output, TextGenModelOutput)
+        assert output.text == "Test response"
 
-            content = []
-            async for chunk in response:
-                content.append(chunk.text)
-            assert content == ["Streamed content"]
 
-            mock_acompletion.assert_called_with(
-                messages=expected_messages,
-                stream=True,
-                temperature=0.3,
-                top_p=0.9,
-                max_tokens=1024,
-                timeout=30.0,
-                stop=["</new_code>"],
-                api_base="http://127.0.0.1:1111/v1",
-                api_key="specified-api-key",
-                model="some-cool-model",
-                custom_llm_provider="provider",
-            )
+@pytest.mark.asyncio
+async def test_generate_stream(lite_llm_chat_model):
+    expected_messages = [{"role": "user", "content": "Test message"}]
 
-            mock_watch.assert_called_once_with(stream=True)
-            watcher.finish.assert_called_once()
+    streamed_response = AsyncMock()
+    streamed_response.__aiter__.return_value = iter(
+        [AsyncMock(choices=[AsyncMock(delta=AsyncMock(content="Streamed content"))])]
+    )
 
-    @pytest.mark.asyncio
-    async def test_generate_stream_instrumented(self, lite_llm_chat_model):
-        async def mock_stream(*_args, **_kwargs):
-            completions = [
-                AsyncMock(
-                    choices=[AsyncMock(delta=AsyncMock(content="Streamed content"))]
-                ),
-                "break here",
-            ]
-            for item in completions:
-                if item == "break here":
-                    raise ValueError("broken")
-                yield item
+    with (
+        patch("ai_gateway.models.litellm.acompletion") as mock_acompletion,
+        patch(
+            "ai_gateway.instrumentators.model_requests.ModelRequestInstrumentator.watch"
+        ) as mock_watch,
+    ):
+        watcher = Mock()
+        mock_watch.return_value.__enter__.return_value = watcher
 
-        with (
-            patch("ai_gateway.models.litellm.acompletion") as mock_acompletion,
-            patch(
-                "ai_gateway.instrumentators.model_requests.ModelRequestInstrumentator.watch"
-            ) as mock_watch,
-        ):
-            watcher = Mock()
-            mock_watch.return_value.__enter__.return_value = watcher
+        mock_acompletion.return_value = streamed_response
 
-            mock_acompletion.side_effect = AsyncMock(side_effect=mock_stream)
+        messages = [Message(content="Test message", role="user")]
+        response = await lite_llm_chat_model.generate(
+            messages=messages,
+            stream=True,
+            temperature=0.3,
+            top_p=0.9,
+            max_output_tokens=1024,
+        )
 
-            messages = [Message(content="Test message", role="user")]
-            response = await lite_llm_chat_model.generate(
-                messages=messages, stream=True
-            )
+        content = []
+        async for chunk in response:
+            content.append(chunk.text)
+        assert content == ["Streamed content"]
 
-            watcher.finish.assert_not_called()
+        mock_acompletion.assert_called_with(
+            messages=expected_messages,
+            stream=True,
+            temperature=0.3,
+            top_p=0.9,
+            max_tokens=1024,
+            timeout=30.0,
+            stop=["</new_code>"],
+            api_base="http://127.0.0.1:1111/v1",
+            api_key="specified-api-key",
+            model="some-cool-model",
+            custom_llm_provider="provider",
+        )
 
-            with pytest.raises(ValueError):
-                _ = [item async for item in response]
+        mock_watch.assert_called_once_with(stream=True)
+        watcher.finish.assert_called_once()
 
-            mock_watch.assert_called_once_with(stream=True)
-            watcher.register_error.assert_called_once()
-            watcher.finish.assert_called_once()
+
+@pytest.mark.asyncio
+async def test_generate_stream_instrumented(lite_llm_chat_model):
+    async def mock_stream(*_args, **_kwargs):
+        completions = [
+            AsyncMock(choices=[AsyncMock(delta=AsyncMock(content="Streamed content"))]),
+            "break here",
+        ]
+        for item in completions:
+            if item == "break here":
+                raise ValueError("broken")
+            yield item
+
+    with (
+        patch("ai_gateway.models.litellm.acompletion") as mock_acompletion,
+        patch(
+            "ai_gateway.instrumentators.model_requests.ModelRequestInstrumentator.watch"
+        ) as mock_watch,
+    ):
+        watcher = Mock()
+        mock_watch.return_value.__enter__.return_value = watcher
+
+        mock_acompletion.side_effect = AsyncMock(side_effect=mock_stream)
+
+        messages = [Message(content="Test message", role="user")]
+        response = await lite_llm_chat_model.generate(messages=messages, stream=True)
+
+        watcher.finish.assert_not_called()
+
+        with pytest.raises(ValueError):
+            _ = [item async for item in response]
+
+        mock_watch.assert_called_once_with(stream=True)
+        watcher.register_error.assert_called_once()
+        watcher.finish.assert_called_once()
 
 
 class TestLiteLlmTextGenModel:

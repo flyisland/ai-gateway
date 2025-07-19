@@ -38,9 +38,6 @@ from ai_gateway.models.base_text import (
     TextGenModelChunk,
     TextGenModelOutput,
 )
-from ai_gateway.models.litellm import (  # added for tests referencing enum
-    KindLiteLlmModel,
-)
 from ai_gateway.prompts import Prompt
 from ai_gateway.prompts.config.base import ModelConfig, PromptConfig, PromptParams
 from ai_gateway.prompts.config.models import ChatLiteLLMParams, TypeModelParams
@@ -94,7 +91,7 @@ def stub_auth_provider():
 
 
 @pytest.fixture(scope="class")
-def test_client(fast_api_router, stub_auth_provider, request):
+def test_client(fast_api_router, stub_auth_provider):
     setup_logging(ConfigLogging(), custom_models_enabled=True)
     middlewares = [
         Middleware(RawContextMiddleware),
