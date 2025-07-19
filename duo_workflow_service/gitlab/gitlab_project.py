@@ -122,7 +122,7 @@ def extract_project_id_from_workflow(workflow: dict):
     return project_id
 
 
-def extract_default_branch_from_project_repository(workflow: dict) -> str:
+def extract_default_branch_from_project_repository(workflow: dict) -> Optional[str]:
     repository_str = (
         workflow.get("project", {})
         .get("statisticsDetailsPaths", {})
