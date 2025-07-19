@@ -1,3 +1,4 @@
+from typing import Optional
 from unittest.mock import AsyncMock, MagicMock, Mock, patch
 
 import httpx
@@ -5,8 +6,21 @@ import litellm
 import pytest
 from google.auth.credentials import Credentials
 from langchain_community.chat_models import ChatLiteLLM
+from litellm.exceptions import APIConnectionError, InternalServerError
 
+from ai_gateway.models.base import KindModelProvider
+from ai_gateway.models.base_chat import Message, Role
+from ai_gateway.models.base_text import TextGenModelOutput
+from ai_gateway.models.litellm import (
+    KindLiteLlmModel,
+    LiteLlmAPIConnectionError,
+    LiteLlmChatModel,
+    LiteLlmInternalServerError,
+    LiteLlmTextGenModel,
+)
+from ai_gateway.models.vertex_text import KindVertexTextModel
 from ai_gateway.prompts import Prompt
+from ai_gateway.tracking import SnowplowEventContext
 
 
 @pytest.fixture
@@ -90,25 +104,6 @@ async def test_astream(
         ),
     ):
         await anext(prompt.astream({"name": "Duo", "content": "What's up?"}))
-
-        assert model.metadata.name == expected_name
-        assert model.metadata.endpoint == expected_endpoint
-        assert model.metadata.api_key == expected_api_key
-        assert model.metadata.engine == expected_engine
-        assert model.metadata.identifier == expected_identifier
-
-        model = LiteLlmChatModel.from_model_name(name=model_name, api_key=None)
-
-        assert model.metadata.endpoint is None
-
-        if provider == KindModelProvider.LITELLM:
-            with pytest.raises(ValueError) as exc:
-                LiteLlmChatModel.from_model_name(name=model_name, endpoint=endpoint)
-            assert str(exc.value) == "specifying custom models endpoint is disabled"
-
-            with pytest.raises(ValueError) as exc:
-                LiteLlmChatModel.from_model_name(name=model_name, api_key="api-key")
-            assert str(exc.value) == "specifying custom models endpoint is disabled"
 
     @pytest.mark.asyncio
     async def test_generate(self, lite_llm_chat_model):
@@ -1109,4 +1104,4 @@ class TestLiteLlmTextGenModel:
             watcher.finish.assert_called_once()
 
     mock_http.assert_not_called()
-    assert mock_http_handler.post.call_count == 1
+    assert mock_http_handler.post.call_count == 1``

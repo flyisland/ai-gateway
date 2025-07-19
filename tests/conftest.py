@@ -29,7 +29,7 @@ from ai_gateway.code_suggestions.processing.typing import (
     MetadataCodeContent,
     MetadataPromptBuilder,
 )
-from ai_gateway.config import Config, ConfigLogging
+from ai_gateway.config import Config, ConfigLogging, ConfigModelLimits
 from ai_gateway.container import ContainerApplication
 from ai_gateway.model_metadata import TypeModelMetadata, current_model_metadata_context
 from ai_gateway.models.base import ModelMetadata, TokensConsumptionMetadata
@@ -657,7 +657,7 @@ def internal_event_client():
 
 @pytest.fixture
 def model_limits():
-    return ConfigModelLimits()
+    return ConfigModelLimits(root={})
 
 
 @pytest.fixture
@@ -756,3 +756,10 @@ def reset_context():
     yield
     current_feature_flag_context.set(set[str]())
     current_model_metadata_context.set(None)
+
+
+@pytest.fixture(autouse=True)
+def set_test_env_vars(monkeypatch):
+    """Set environment variables needed for tests."""
+    # Set a dummy Anthropic API key to prevent failures in tests
+    monkeypatch.setenv("ANTHROPIC_API_KEY", "dummy-test-key-for-ci")

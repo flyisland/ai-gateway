@@ -107,6 +107,8 @@ include:
   - component: ${CI_SERVER_FQDN}/gitlab-org/components/danger-review/danger-review@2.1.0
     rules:
       - if: $CI_SERVER_HOST == "gitlab.com"
+    inputs:
+      ruby_version: '3.2'
 
 cache:
   key:
