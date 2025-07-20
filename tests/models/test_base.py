@@ -42,14 +42,14 @@ class MockInstrumentor:
 
 def _side_effect_few_shot_tpl(
     content: str,
-    _suffix: str,
+    _: str,  # suffix (unused)
     filename: str,
     model_output: str,
     safety_attributes: SafetyAttributes,
 ):
     lang_id = ops.lang_from_filename(filename)
 
-    def _fn(prompt: str, _suffix: str):
+    def _fn(prompt: str, _: str):  # suffix (unused)
         if lang_id is not None:
             assert lang_id.name.lower() in prompt
         assert content in prompt
@@ -63,12 +63,12 @@ def _side_effect_few_shot_tpl(
 
 def _side_effect_unknown_tpl(
     content: str,
-    _suffix: str,
-    _: str,
+    _: str,  # suffix (unused)
+    __: str,  # filename (unused)
     model_output: str,
     safety_attributes: SafetyAttributes,
 ):
-    def _fn(prompt: str, _suffix: str):
+    def _fn(prompt: str, _: str):  # suffix (unused)
         assert content == prompt
 
         return TextGenModelOutput(
@@ -80,12 +80,12 @@ def _side_effect_unknown_tpl(
 
 def _side_effect_unknown_tpl_palm(
     prefix: str,
-    _suffix: str,
+    _: str,  # suffix (unused)
     filename: str,
     model_output: str,
     safety_attributes: SafetyAttributes,
 ):
-    def _fn(prompt: str, _suffix: str):
+    def _fn(prompt: str, _: str):  # suffix (unused)
         assert filename in prompt
 
         return [
@@ -99,14 +99,14 @@ def _side_effect_unknown_tpl_palm(
 
 def _side_effect_lang_prepended(
     content: str,
-    _suffix: str,
+    _: str,  # suffix (unused)
     filename: str,
     model_output: str,
     safety_attributes: SafetyAttributes,
 ):
     lang_id = ops.lang_from_filename(filename)
 
-    def _fn(prompt: str, _suffix: str):
+    def _fn(prompt: str, _: str):  # suffix (unused)
         if lang_id is not None:
             assert prompt.startswith(f"<{lang_id.name.lower()}>")
         assert prompt.endswith(content)
@@ -148,11 +148,11 @@ def _side_effect_with_suffix(
 def _side_effect_with_imports(
     content: str,
     suffix: str,
-    filename: str,
+    _: str,  # filename (unused)
     model_output: str,
     safety_attributes: SafetyAttributes,
 ):
-    def _fn(prompt: str, suffix: str):
+    def _fn(prompt: str, _suffix: str):
         assert content.startswith("import os\nimport pytest")
 
         return [
@@ -165,13 +165,13 @@ def _side_effect_with_imports(
 
 
 def _side_effect_with_tokens_consumption_metadata(
-    content: str,
-    suffix: str,
-    filename: str,
+    _: str,  # content (unused)
+    __: str,  # suffix (unused)
+    ___: str,  # filename (unused)
     model_output: str,
     safety_attributes: SafetyAttributes,
 ):
-    def _fn(prompt: str, suffix: str):
+    def _fn(prompt: str, _: str):  # suffix (unused)
         return [
             TextGenModelOutput(
                 text=model_output,
@@ -185,26 +185,26 @@ def _side_effect_with_tokens_consumption_metadata(
 
 
 def _side_effect_with_connection_exception(
-    content: str,
-    suffix: str,
-    filename: str,
-    model_output: str,
-    safety_attributes: SafetyAttributes,
+    _: str,  # content (unused)
+    __: str,  # suffix (unused)
+    ___: str,  # filename (unused)
+    ____: str,  # model_output (unused)
+    _____: SafetyAttributes,  # safety_attributes (unused)
 ):
-    def _fn(prompt: str, suffix: str):
+    def _fn(prompt: str, _: str):  # suffix (unused)
         raise VertexAPIConnectionError("connection exception")
 
     return _fn
 
 
 def _side_effect_with_status_exception(
-    content: str,
-    suffix: str,
-    filename: str,
-    model_output: str,
-    safety_attributes: SafetyAttributes,
+    _: str,  # content (unused)
+    __: str,  # suffix (unused)
+    ___: str,  # filename (unused)
+    ____: str,  # model_output (unused)
+    _____: SafetyAttributes,  # safety_attributes (unused)
 ):
-    def _fn(prompt: str, suffix: str):
+    def _fn(prompt: str, _: str):  # suffix (unused)
         VertexAPIStatusError.code = 404
         raise VertexAPIStatusError("status exception")
 
