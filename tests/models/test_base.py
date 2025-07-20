@@ -63,11 +63,11 @@ def _side_effect_few_shot_tpl(
 
 def _side_effect_unknown_tpl(
     content: str,
-    _: str,  # suffix (unused)
-    __: str,  # filename (unused)
+    _suffix: str,  # suffix (unused)
+    _filename: str,  # filename (unused)
     model_output: str,
     safety_attributes: SafetyAttributes,
-):
+):  # pylint: disable=unused-argument
     def _fn(prompt: str, _: str):  # suffix (unused)
         assert content == prompt
 
@@ -165,12 +165,12 @@ def _side_effect_with_imports(
 
 
 def _side_effect_with_tokens_consumption_metadata(
-    _: str,  # content (unused)
-    __: str,  # suffix (unused)
-    ___: str,  # filename (unused)
+    _content: str,  # content (unused)
+    _suffix: str,  # suffix (unused)
+    _filename: str,  # filename (unused)
     model_output: str,
     safety_attributes: SafetyAttributes,
-):
+):  # pylint: disable=unused-argument
     def _fn(prompt: str, _: str):  # suffix (unused)
         return [
             TextGenModelOutput(
@@ -185,12 +185,12 @@ def _side_effect_with_tokens_consumption_metadata(
 
 
 def _side_effect_with_connection_exception(
-    _: str,  # content (unused)
-    __: str,  # suffix (unused)
-    ___: str,  # filename (unused)
-    ____: str,  # model_output (unused)
-    _____: SafetyAttributes,  # safety_attributes (unused)
-):
+    _content: str,  # content (unused)
+    _suffix: str,  # suffix (unused)
+    _filename: str,  # filename (unused)
+    _model_output: str,  # model_output (unused)
+    _safety_attributes: SafetyAttributes,  # safety_attributes (unused)
+):  # pylint: disable=unused-argument
     def _fn(prompt: str, _: str):  # suffix (unused)
         raise VertexAPIConnectionError("connection exception")
 
@@ -198,12 +198,12 @@ def _side_effect_with_connection_exception(
 
 
 def _side_effect_with_status_exception(
-    _: str,  # content (unused)
-    __: str,  # suffix (unused)
-    ___: str,  # filename (unused)
-    ____: str,  # model_output (unused)
-    _____: SafetyAttributes,  # safety_attributes (unused)
-):
+    _content: str,  # content (unused)
+    _suffix: str,  # suffix (unused)
+    _filename: str,  # filename (unused)
+    _model_output: str,  # model_output (unused)
+    _safety_attributes: SafetyAttributes,  # safety_attributes (unused)
+):  # pylint: disable=unused-argument
     def _fn(prompt: str, _: str):  # suffix (unused)
         VertexAPIStatusError.code = 404
         raise VertexAPIStatusError("status exception")
@@ -583,7 +583,7 @@ async def test_model_engine_palm(
     expected_input_tokens,
     expected_output_tokens,
     estimate_tokens_consumption,
-):
+):  # pylint: disable=too-many-arguments
     model_name = "palm-model"
     model_engine = "vertex-ai"
     _side_effect = model_gen_func(
@@ -792,7 +792,7 @@ async def test_prompt_building_model_engine_palm(
     expected_imports: list[str],
     expected_functions: list[str],
     expected_contexts: list[str],
-):
+):  # pylint: disable=too-many-arguments
     engine = ModelEngineCompletions(
         model=text_gen_base_model,
         tokenization_strategy=tokenization_strategy,

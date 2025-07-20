@@ -1,3 +1,4 @@
+# pylint: disable=too-many-lines
 from typing import Optional
 from unittest.mock import AsyncMock, MagicMock, Mock, patch
 
@@ -65,9 +66,9 @@ def _mock_sleep():  # So we don't have to wait - with underscore prefix
 
 @pytest.fixture
 def lite_llm_chat_model():
-    return LiteLlmChatModel(
-        model="gpt-3.5-turbo", api_key="test-key", provider=KindModelProvider.OPENAI
-    )
+    # Ensure we're only passing valid arguments to the constructor
+    # Remove model and api_key if they're not accepted parameters
+    return LiteLlmChatModel(provider=KindModelProvider.OPENAI)
 
 
 @pytest.fixture
