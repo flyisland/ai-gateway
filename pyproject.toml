@@ -61,6 +61,9 @@ grpcio-reflection = "^1.64.1"
 sentry-sdk = "^2.17.0"
 websockets = "^15.0.1"
 langgraph-checkpoint = "2.0.26"
+lxml = "^4.9.0"
+markdown = "^3.5.0"
+lxml-html-clean = "^0.4.2"
 
 [[tool.poetry.source]]
 name = "gitlab_cloud_connector"
@@ -110,6 +113,7 @@ types-requests = "^2.31.0.20240406"
 codespell = "^2.4.1"
 docformatter = "^1.7.7"
 editorconfig-checker = "^3.2.1"
+types-markdown = "^3.8.0.20250708"
 
 [tool.codespell]
 skip = """

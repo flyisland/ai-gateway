@@ -2,6 +2,10 @@
 import re
 from typing import Any, Callable
 
+from lxml import html
+from lxml_html_clean import Cleaner
+from markdown import markdown
+
 
 def _apply_recursively(response: Any, func: Callable[[str], str]) -> Any:
     """Apply a function recursively to strings in dict/list structures.
@@ -187,7 +191,7 @@ def strip_other_hidden_content(response: str | dict | list) -> str | dict | list
 
 
 def strip_hidden_markdown_content(response: str | dict | list) -> str | dict | list:
-    """Strip hidden markdown content that could contain prompt injection.
+    """Strip hidden markdown content.
 
     This function removes:
     - Hidden HTML comments (including nested/malformed patterns)
@@ -201,21 +205,21 @@ def strip_hidden_markdown_content(response: str | dict | list) -> str | dict | l
         response: The response data to process
 
     Returns:
-        Response with hidden markdown content removed
+        Response with hidden Markdown content removed
     """
 
     def _strip_all_hidden_content(text: str) -> str:
         # Order matters - more specific patterns first, then generic ones
         # Apply each stripping function's inner logic directly to avoid type issues
 
+        # Strip Mermaid code blocks FIRST (before HTML comments to avoid conflicts with -->)
+        text = re.sub(r"```mermaid.*?```", "", text, flags=re.DOTALL | re.IGNORECASE)
+
         # Strip HTML comments
         text = re.sub(r"<<!--.*?-->!--.*?-->", "", text, flags=re.DOTALL)
         text = re.sub(r"<!--.*?-->", "", text, flags=re.DOTALL)
         text = re.sub(r"<!--[^>]*", "", text, flags=re.DOTALL)
         text = re.sub(r"[^<]*-->", "", text, flags=re.DOTALL)
-
-        # Strip Mermaid code blocks
-        text = re.sub(r"```mermaid.*?```", "", text, flags=re.DOTALL | re.IGNORECASE)
 
         # Strip HTML details tags
         text = re.sub(
@@ -249,3 +253,120 @@ def strip_hidden_markdown_content(response: str | dict | list) -> str | dict | l
         return text
 
     return _apply_recursively(response, _strip_all_hidden_content)
+
+
+def get_user_visible_text(content: str) -> str:
+    """Convert markdown/HTML to the text representation that users actually see. This is much more robust than regex-
+    based stripping.
+
+    Args:
+        content: Markdown or HTML content to process
+
+    Returns:
+        User-visible text content with hidden elements removed
+    """
+    if not content or not isinstance(content, str):
+        return content
+
+    try:
+        # Step 1: Comprehensive HTML comment removal
+        # Handle complex malformed patterns first: <<!--stuff-->!-- stuff-->
+        content_no_comments = re.sub(
+            r"<<!--.*?-->!--.*?-->", "", content, flags=re.DOTALL
+        )
+
+        # Handle standard HTML comments
+        content_no_comments = re.sub(
+            r"<!--.*?-->", "", content_no_comments, flags=re.DOTALL
+        )
+
+        # Handle malformed comments like <!-- > or <!-- without proper closing
+        # Remove from <!-- to end of line if no closing -->
+        content_no_comments = re.sub(
+            r"<!--(?!.*-->).*?(?=\n|$)", "", content_no_comments, flags=re.DOTALL
+        )
+
+        # Clean up any remaining orphaned --> patterns (but preserve regular text with -->)
+        # Only remove --> that appears to be orphaned (at start of line or after whitespace)
+        content_no_comments = re.sub(
+            r"^\s*-->", "", content_no_comments, flags=re.MULTILINE
+        )
+
+        # Step 2: Convert Markdown to HTML
+        html_content = markdown(
+            content_no_comments,
+            extensions=["fenced_code", "tables", "codehilite", "toc"],
+        )
+
+        # Step 3: Parse HTML properly
+        # Wrap in a div to ensure we have a single root element
+        try:
+            doc = html.fromstring(f"<div>{html_content}</div>")
+        except Exception:
+            # If HTML parsing fails, fall back to regex approach
+            result = strip_hidden_markdown_content(content)
+            return result if isinstance(result, str) else content
+
+        # Step 4: Use lxml.html.clean.Cleaner for proper sanitization
+        cleaner = Cleaner(
+            scripts=True,  # Remove <script> tags
+            javascript=True,  # Remove javascript: URLs and onclick attributes
+            comments=True,  # Remove HTML comments
+            style=True,  # Remove <style> tags
+            links=False,  # Keep links but sanitize them
+            meta=True,  # Remove <meta> tags
+            page_structure=False,  # Keep basic structure (div, p, etc.)
+            processing_instructions=True,  # Remove <?xml ... ?>
+            embedded=True,  # Remove <embed>, <object>, etc.
+            frames=True,  # Remove <frame>, <iframe>
+            forms=True,  # Remove forms as well
+            annoying_tags=True,  # Remove <blink>, <marquee>, etc.
+            remove_unknown_tags=False,
+            safe_attrs_only=True,
+            safe_attrs=frozenset(
+                ["href", "src", "alt", "title", "class", "id", "name"]
+            ),
+        )
+
+        # Step 5: Clean the HTML
+        cleaned_doc = cleaner.clean_html(doc)
+
+        # Step 6: Extract text content (what user actually sees)
+        text_content = cleaned_doc.text_content()
+
+        # Step 7: Clean up whitespace while preserving structure
+        # Replace multiple whitespace with single space, but preserve line breaks
+        text_content = re.sub(
+            r"[ \t]+", " ", text_content
+        )  # Multiple spaces/tabs -> single space
+        text_content = re.sub(
+            r"\n\s*\n\s*\n+", "\n\n", text_content
+        )  # Multiple newlines -> double newline
+        text_content = text_content.strip()
+
+        return text_content
+
+    except Exception:
+        # Fallback: return regex-based processing if parsing fails
+        result = strip_hidden_markdown_content(content)
+        return result if isinstance(result, str) else content
+
+
+def strip_hidden_markdown_content_robust(
+    response: str | dict | list,
+) -> str | dict | list:
+    """
+    Robust approach: Extract only the user-visible text content from markdown/HTML.
+
+    This eliminates hidden content while preserving legitimate information that
+    the user would actually see when the Markdown is rendered.
+
+    Uses proper HTML/Markdown parsing with fallback to regex approach on errors.
+
+    Args:
+        response: The response data to process (string, dict, or list)
+
+    Returns:
+        Response with only user-visible content preserved
+    """
+    return _apply_recursively(response, get_user_visible_text)
