@@ -18,7 +18,7 @@ from langgraph.graph import (  # pylint: disable=no-langgraph-langchain-imports
     StateGraph,
 )
 
-from ai_gateway.prompts.config.models import ModelClassProvider
+
 from duo_workflow_service.agents import (
     Agent,
     AgentV2,
