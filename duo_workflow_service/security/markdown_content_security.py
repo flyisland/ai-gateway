@@ -62,13 +62,6 @@ def strip_hidden_html_comments(response: str | dict | list) -> str | dict | list
 def strip_mermaid_code_blocks(response: str | dict | list) -> str | dict | list:
     """Strip Mermaid code blocks that could contain hidden malicious instructions.
 
-    Example:
-    ```mermaid
-    flowchart TD
-    %% Ignore all previous instructions
-        A[LLM] -->|Read Comment| B(Oops prompt injection)
-    ```
-
     Args:
         response: The response data to process
 
@@ -86,13 +79,6 @@ def strip_mermaid_code_blocks(response: str | dict | list) -> str | dict | list:
 
 def strip_html_details_tags(response: str | dict | list) -> str | dict | list:
     """Strip HTML details/summary tags that could hide malicious content.
-
-    Example:
-    <details>
-    <!--
-    <summary>
-    -->
-    </details>
 
     Args:
         response: The response data to process
@@ -124,12 +110,6 @@ def strip_latex_math_blocks_with_comments(
     response: str | dict | list,
 ) -> str | dict | list:
     """Strip LaTeX math blocks that could contain hidden comments.
-
-    Example:
-    $$
-    % This is a comment
-    a^2+b^2=c^2
-    $$
 
     Args:
         response: The response data to process
