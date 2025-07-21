@@ -215,11 +215,19 @@ def strip_hidden_markdown_content(response: str | dict | list) -> str | dict | l
         # Strip Mermaid code blocks FIRST (before HTML comments to avoid conflicts with -->)
         text = re.sub(r"```mermaid.*?```", "", text, flags=re.DOTALL | re.IGNORECASE)
 
-        # Strip HTML comments
+        # Strip HTML comments - handle malformed patterns first
+        # Handle complex malformed patterns: <<!--stuff-->!-- stuff-->
         text = re.sub(r"<<!--.*?-->!--.*?-->", "", text, flags=re.DOTALL)
+        # Handle malformed <!--> patterns FIRST (replace with single space)
+        text = re.sub(r"<!-->", " ", text, flags=re.DOTALL)
+        # Handle malformed comments like <!-- > patterns (remove to end of line)
+        text = re.sub(r"<!--\s*>.*?(?=\n|$)", "", text, flags=re.DOTALL)
+        # Handle standard HTML comments
         text = re.sub(r"<!--.*?-->", "", text, flags=re.DOTALL)
-        text = re.sub(r"<!--[^>]*", "", text, flags=re.DOTALL)
-        text = re.sub(r"[^<]*-->", "", text, flags=re.DOTALL)
+        # Handle incomplete opening comments (<!-- without closing) - but not <!--> which is already handled
+        text = re.sub(r"<!--(?!>)(?!.*-->).*", "", text, flags=re.DOTALL)
+        # Clean up orphaned closing tags
+        text = re.sub(r"^\s*-->.*?$", "", text, flags=re.MULTILINE)
 
         # Strip HTML details tags
         text = re.sub(
@@ -248,6 +256,7 @@ def strip_hidden_markdown_content(response: str | dict | list) -> str | dict | l
 
         # Clean up any extra whitespace left behind
         text = re.sub(r"\n\s*\n", "\n\n", text)  # Remove excessive blank lines
+        text = re.sub(r" {3,}", "  ", text)  # Replace 3+ spaces with 2 spaces
         text = text.strip()
 
         return text
@@ -355,8 +364,7 @@ def get_user_visible_text(content: str) -> str:
 def strip_hidden_markdown_content_robust(
     response: str | dict | list,
 ) -> str | dict | list:
-    """
-    Robust approach: Extract only the user-visible text content from markdown/HTML.
+    """Extract only the user-visible text content from markdown/HTML.
 
     This eliminates hidden content while preserving legitimate information that
     the user would actually see when the Markdown is rendered.
