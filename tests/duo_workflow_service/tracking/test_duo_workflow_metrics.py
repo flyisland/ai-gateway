@@ -3,6 +3,8 @@ import unittest
 from typing import Any, cast
 from unittest.mock import MagicMock
 
+import pytest
+
 from duo_workflow_service.tracking.duo_workflow_metrics import DuoWorkflowMetrics
 
 
@@ -27,6 +29,7 @@ class TestDuoWorkflowMetrics(unittest.TestCase):
             "model_completion_error_counter",
             "agent_platform_session_start_counter",
             "agent_platform_session_success_counter",
+            "agent_platform_session_failure_counter",
         ]:
             mock_histogram = MagicMock()
             setattr(self.metrics, metric_name, mock_histogram)
@@ -264,6 +267,46 @@ class TestDuoWorkflowMetrics(unittest.TestCase):
             MagicMock, self.metrics.agent_platform_session_success_counter.labels
         ).assert_called_once_with(
             session_id="test_session_id", flow_type="test_flow_type"
+        )
+
+    def test_agent_platform_session_failure_counter(self):
+        observe_mock = MagicMock()
+        labels_result_mock = MagicMock()
+        labels_result_mock.inc = observe_mock
+
+        cast(
+            MagicMock, self.metrics.agent_platform_session_failure_counter.labels
+        ).return_value = labels_result_mock
+
+        self.metrics.count_agent_platform_session_failure(
+            session_id="test_session_id",
+            flow_type="test_flow_type",
+            failure_reason="modelerror",
+        )
+
+        cast(
+            MagicMock, self.metrics.agent_platform_session_failure_counter.labels
+        ).assert_called_once_with(
+            session_id="test_session_id",
+            flow_type="test_flow_type",
+            failure_reason="modelerror",
+        )
+
+    def test_agent_platform_session_failure_counter_with_defaults(self):
+        observe_mock = MagicMock()
+        labels_result_mock = MagicMock()
+        labels_result_mock.inc = observe_mock
+
+        cast(
+            MagicMock, self.metrics.agent_platform_session_failure_counter.labels
+        ).return_value = labels_result_mock
+
+        self.metrics.count_agent_platform_session_failure()
+
+        cast(
+            MagicMock, self.metrics.agent_platform_session_failure_counter.labels
+        ).assert_called_once_with(
+            session_id="unknown", flow_type="unknown", failure_reason="unknown"
         )
 
 

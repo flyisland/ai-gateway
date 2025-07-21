@@ -114,6 +114,13 @@ class DuoWorkflowMetrics:  # pylint: disable=too-many-instance-attributes
             registry=registry,
         )
 
+        self.agent_platform_session_failure_counter = Counter(
+            "agent_platform_session_failure_total",
+            "Count of failed flows in Duo Workflow",
+            ["session_id", "flow_type", "failure_reason"],
+            registry=registry,
+        )
+
     def count_llm_response(
         self, model="unknown", request_type="unknown", stop_reason="unknown"
     ):
@@ -155,14 +162,28 @@ class DuoWorkflowMetrics:  # pylint: disable=too-many-instance-attributes
         self, session_id: str = "unknown", flow_type: str = "unknown"
     ) -> None:
         self.agent_platform_session_start_counter.labels(
-            session_id=session_id, flow_type=flow_type
+            session_id=session_id,
+            flow_type=flow_type,
         ).inc()
 
     def count_agent_platform_session_success(
         self, session_id: str = "unknown", flow_type: str = "unknown"
     ) -> None:
         self.agent_platform_session_success_counter.labels(
-            session_id=session_id, flow_type=flow_type
+            session_id=session_id,
+            flow_type=flow_type,
+        ).inc()
+
+    def count_agent_platform_session_failure(
+        self,
+        session_id: str = "unknown",
+        flow_type: str = "unknown",
+        failure_reason: str = "unknown",
+    ) -> None:
+        self.agent_platform_session_failure_counter.labels(
+            session_id=session_id,
+            flow_type=flow_type,
+            failure_reason=failure_reason,
         ).inc()
 
     def time_llm_request(self, model="unknown", request_type="unknown"):

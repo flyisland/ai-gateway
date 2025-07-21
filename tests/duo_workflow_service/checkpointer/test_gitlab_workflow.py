@@ -324,9 +324,11 @@ async def test_workflow_context_manager_success(
 
 
 @pytest.mark.asyncio
+@patch("duo_workflow_service.checkpointer.gitlab_workflow.duo_workflow_metrics")
 @patch("duo_workflow_service.checkpointer.gitlab_workflow.log_exception")
 async def test_workflow_context_manager_startup_error(
     mock_log_exception,
+    mock_duo_workflow_metrics,
     http_client,
     workflow_id,
     workflow_type,
@@ -389,6 +391,7 @@ async def test_workflow_context_manager_startup_error(
             label=EventLabelEnum.WORKFLOW_FINISH_LABEL.value,
             property="ValueError('Startup error simulated')",
             value=workflow_id,
+            extra={"error_type": "ValueError"},
         ),
         category=workflow_type,
     )
@@ -396,11 +399,20 @@ async def test_workflow_context_manager_startup_error(
     # The log_exception for status update shouldn't be called since the second status update succeeded
     mock_log_exception.assert_not_called()
 
+    # Verify the failure metric was called
+    mock_duo_workflow_metrics.count_agent_platform_session_failure.assert_called_once_with(
+        session_id=workflow_id,
+        flow_type=workflow_type.value,
+        failure_reason="ValueError",
+    )
+
 
 @pytest.mark.asyncio
+@patch("duo_workflow_service.checkpointer.gitlab_workflow.duo_workflow_metrics")
 @patch("duo_workflow_service.checkpointer.gitlab_workflow.log_exception")
 async def test_workflow_context_manager_startup_error_with_status_update_failure(
     mock_log_exception,
+    mock_duo_workflow_metrics,
     http_client,
     workflow_id,
     workflow_type,
@@ -475,6 +487,7 @@ async def test_workflow_context_manager_startup_error_with_status_update_failure
             label=EventLabelEnum.WORKFLOW_FINISH_LABEL.value,
             property="ValueError('Startup error simulated')",
             value=workflow_id,
+            extra={"error_type": "ValueError"},
         ),
         category=workflow_type,
     )
@@ -486,6 +499,13 @@ async def test_workflow_context_manager_startup_error_with_status_update_failure
             "workflow_id": workflow_id,
             "context": "Failed to update workflow status during startup error",
         },
+    )
+
+    # Verify the failure metric was called
+    mock_duo_workflow_metrics.count_agent_platform_session_failure.assert_called_once_with(
+        session_id=workflow_id,
+        flow_type=workflow_type.value,
+        failure_reason="ValueError",
     )
 
 
@@ -731,10 +751,18 @@ async def test_workflow_context_manager_error(
                     label=EventLabelEnum.WORKFLOW_FINISH_LABEL.value,
                     property="ValueError('Test error')",
                     value="1234",
+                    extra={"error_type": "ValueError"},
                 ),
                 category=workflow_type,
             ),
         ]
+    )
+
+    # Verify the failure metric was called
+    mock_duo_workflow_metrics.count_agent_platform_session_failure.assert_called_once_with(
+        session_id=workflow_id,
+        flow_type=workflow_type.value,
+        failure_reason="ValueError",
     )
 
 
