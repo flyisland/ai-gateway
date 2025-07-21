@@ -198,10 +198,7 @@ class GitLabWorkflow(BaseCheckpointSaver[Any], AbstractAsyncContextManager[Any])
         if self._offline_mode:
             return
 
-        self._record_metric(
-            event_name=event_name,
-            additional_properties=additional_properties,
-        )
+        self._record_metric(event_name=event_name)
 
         self._logger.info("Tracking Internal event %s", event_name.value)
         self._internal_event_client.track_event(
@@ -213,22 +210,21 @@ class GitLabWorkflow(BaseCheckpointSaver[Any], AbstractAsyncContextManager[Any])
     def _record_metric(
         self,
         event_name: EventEnum,
-        additional_properties: InternalEventAdditionalProperties,
     ) -> None:
         """Records metrics to prometheus for real-time monitoring."""
 
         # For flow start events
-        if (
-            str(event_name) == EventEnum.WORKFLOW_START.value
-            or event_name == EventEnum.WORKFLOW_START
-        ):
-            session_id = additional_properties.value or "unknown"
-            flow_type = additional_properties.extra.get("extra", {}).get(
-                "workflow_type", "unknown"
-            )
+        if event_name == EventEnum.WORKFLOW_START:
             duo_workflow_metrics.count_agent_platform_session_start(
-                session_id=session_id,
-                flow_type=flow_type,
+                session_id=self._workflow_id,
+                flow_type=self._workflow_type.value,
+            )
+
+        # For session success events
+        if event_name == EventEnum.WORKFLOW_FINISH_SUCCESS:
+            duo_workflow_metrics.count_agent_platform_session_success(
+                session_id=self._workflow_id,
+                flow_type=self._workflow_type.value,
             )
 
     async def __aenter__(self) -> BaseCheckpointSaver:
@@ -257,7 +253,6 @@ class GitLabWorkflow(BaseCheckpointSaver[Any], AbstractAsyncContextManager[Any])
                 label=label.value,
                 property=event_property.value,
                 value=self._workflow_id,
-                extra={"workflow_type": self._workflow_type.value},
             )
             self._track_internal_event(
                 event_name=event_name,

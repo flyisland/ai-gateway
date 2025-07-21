@@ -66,6 +66,7 @@ class InternalEventsClient:
         context: EventContext = current_event_context.get()
         new_context = {**context.model_dump(), **kwargs}
         new_context["extra"] = additional_properties.extra
+
         structured_event = StructuredEvent(
             context=[SelfDescribingJson(self.STANDARD_CONTEXT_SCHEMA, new_context)],
             category=category,  # type: ignore[arg-type]

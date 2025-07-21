@@ -1,10 +1,8 @@
-import base64
 import json
 from typing import Any, Optional, Sequence, TypedDict
 from unittest.mock import AsyncMock, Mock, call, patch
 
 import pytest
-from dependency_injector import containers
 from langchain_core.messages import SystemMessage
 from langchain_core.runnables import RunnableConfig
 from langgraph.checkpoint.base import (
@@ -147,7 +145,9 @@ def checkpoint_metadata():
 
 
 @pytest.mark.asyncio
+@patch("duo_workflow_service.checkpointer.gitlab_workflow.duo_workflow_metrics")
 async def test_workflow_event_tracking_for_cancelled_workflow(
+    mock_duo_workflow_metrics,
     gitlab_workflow,
     http_client,
     workflow_id,
@@ -198,6 +198,11 @@ async def test_workflow_event_tracking_for_cancelled_workflow(
         use_http_response=True,
     )
 
+    mock_duo_workflow_metrics.count_agent_platform_session_start.assert_called_once_with(
+        session_id=workflow_id,
+        flow_type=workflow_type.value,
+    )
+
     assert internal_event_client.track_event.call_count == 2
     internal_event_client.track_event.assert_has_calls(
         [
@@ -207,9 +212,6 @@ async def test_workflow_event_tracking_for_cancelled_workflow(
                     label=EventLabelEnum.WORKFLOW_START_LABEL.value,
                     property=EventPropertyEnum.WORKFLOW_ID.value,
                     value="1234",
-                    extra={
-                        "workflow_type": CategoryEnum.WORKFLOW_SOFTWARE_DEVELOPMENT.value
-                    },
                 ),
                 category=workflow_type.value,
             ),
@@ -225,9 +227,16 @@ async def test_workflow_event_tracking_for_cancelled_workflow(
         ]
     )
 
+    mock_duo_workflow_metrics.count_agent_platform_session_success.assert_called_once_with(
+        session_id=workflow_id,
+        flow_type=workflow_type.value,
+    )
+
 
 @pytest.mark.asyncio
+@patch("duo_workflow_service.checkpointer.gitlab_workflow.duo_workflow_metrics")
 async def test_workflow_context_manager_success(
+    mock_duo_workflow_metrics,
     gitlab_workflow,
     http_client,
     workflow_id,
@@ -278,6 +287,11 @@ async def test_workflow_context_manager_success(
         use_http_response=True,
     )
 
+    mock_duo_workflow_metrics.count_agent_platform_session_start.assert_called_once_with(
+        session_id=workflow_id,
+        flow_type=workflow_type.value,
+    )
+
     assert internal_event_client.track_event.call_count == 2
 
     internal_event_client.track_event.assert_has_calls(
@@ -288,9 +302,6 @@ async def test_workflow_context_manager_success(
                     label=EventLabelEnum.WORKFLOW_START_LABEL.value,
                     property=EventPropertyEnum.WORKFLOW_ID.value,
                     value="1234",
-                    extra={
-                        "workflow_type": CategoryEnum.WORKFLOW_SOFTWARE_DEVELOPMENT.value
-                    },
                 ),
                 category=workflow_type,
             ),
@@ -304,6 +315,11 @@ async def test_workflow_context_manager_success(
                 category=workflow_type,
             ),
         ]
+    )
+
+    mock_duo_workflow_metrics.count_agent_platform_session_success.assert_called_once_with(
+        session_id=workflow_id,
+        flow_type=workflow_type.value,
     )
 
 
@@ -516,7 +532,6 @@ async def test_workflow_context_manager_resume_interrupted(
                     label=EventLabelEnum.WORKFLOW_RESUME_LABEL.value,
                     property=EventPropertyEnum.WORKFLOW_RESUME_BY_PLAN_AFTER_INPUT.value,
                     value=workflow_id,
-                    extra={"workflow_type": workflow_type.value},
                 ),
                 category=workflow_type,
             ),
@@ -567,9 +582,6 @@ async def test_workflow_context_manager_resume_interrupted_approval(
                     label=EventLabelEnum.WORKFLOW_RESUME_LABEL.value,
                     property=EventPropertyEnum.WORKFLOW_RESUME_BY_PLAN_AFTER_APPROVAL.value,
                     value=workflow_id,
-                    extra={
-                        "workflow_type": CategoryEnum.WORKFLOW_SOFTWARE_DEVELOPMENT.value
-                    },
                 ),
                 category=workflow_type,
             ),
@@ -578,7 +590,9 @@ async def test_workflow_context_manager_resume_interrupted_approval(
 
 
 @pytest.mark.asyncio
+@patch("duo_workflow_service.checkpointer.gitlab_workflow.duo_workflow_metrics")
 async def test_workflow_context_manager_retry_success(
+    mock_duo_workflow_metrics,
     gitlab_workflow,
     http_client_for_retry,
     workflow_id,
@@ -623,9 +637,6 @@ async def test_workflow_context_manager_retry_success(
                     label=EventLabelEnum.WORKFLOW_RESUME_LABEL.value,
                     property=EventPropertyEnum.WORKFLOW_RESUME_BY_USER.value,
                     value=workflow_id,
-                    extra={
-                        "workflow_type": CategoryEnum.WORKFLOW_SOFTWARE_DEVELOPMENT.value
-                    },
                 ),
                 category=workflow_type,
             ),
@@ -641,9 +652,16 @@ async def test_workflow_context_manager_retry_success(
         ]
     )
 
+    mock_duo_workflow_metrics.count_agent_platform_session_success.assert_called_once_with(
+        session_id=workflow_id,
+        flow_type=workflow_type.value,
+    )
+
 
 @pytest.mark.asyncio
+@patch("duo_workflow_service.checkpointer.gitlab_workflow.duo_workflow_metrics")
 async def test_workflow_context_manager_error(
+    mock_duo_workflow_metrics,
     gitlab_workflow,
     http_client,
     workflow_id,
@@ -689,6 +707,11 @@ async def test_workflow_context_manager_error(
         use_http_response=True,
     )
 
+    mock_duo_workflow_metrics.count_agent_platform_session_start.assert_called_once_with(
+        session_id=workflow_id,
+        flow_type=workflow_type.value,
+    )
+
     assert internal_event_client.track_event.call_count == 2
 
     internal_event_client.track_event.assert_has_calls(
@@ -699,9 +722,6 @@ async def test_workflow_context_manager_error(
                     label=EventLabelEnum.WORKFLOW_START_LABEL.value,
                     property=EventPropertyEnum.WORKFLOW_ID.value,
                     value="1234",
-                    extra={
-                        "workflow_type": CategoryEnum.WORKFLOW_SOFTWARE_DEVELOPMENT.value
-                    },
                 ),
                 category=workflow_type,
             ),

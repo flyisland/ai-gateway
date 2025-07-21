@@ -33,7 +33,7 @@ ANTHROPIC_STOP_REASONS = [
 ]
 
 
-class DuoWorkflowMetrics:
+class DuoWorkflowMetrics:  # pylint: disable=too-many-instance-attributes
     def __init__(self, registry=REGISTRY):
         self.workflow_duration = Histogram(
             "duo_workflow_total_seconds",
@@ -107,6 +107,13 @@ class DuoWorkflowMetrics:
             registry=registry,
         )
 
+        self.agent_platform_session_success_counter = Counter(
+            "agent_platform_session_success_total",
+            "Count of successful flow completions in Duo Workflow",
+            ["session_id", "flow_type"],
+            registry=registry,
+        )
+
     def count_llm_response(
         self, model="unknown", request_type="unknown", stop_reason="unknown"
     ):
@@ -145,9 +152,16 @@ class DuoWorkflowMetrics:
         ).inc()
 
     def count_agent_platform_session_start(
-        self, session_id="unknown", flow_type="unknown"
-    ):
+        self, session_id: str = "unknown", flow_type: str = "unknown"
+    ) -> None:
         self.agent_platform_session_start_counter.labels(
+            session_id=session_id, flow_type=flow_type
+        ).inc()
+
+    def count_agent_platform_session_success(
+        self, session_id: str = "unknown", flow_type: str = "unknown"
+    ) -> None:
+        self.agent_platform_session_success_counter.labels(
             session_id=session_id, flow_type=flow_type
         ).inc()
 
