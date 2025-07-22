@@ -11,14 +11,21 @@ structured format for development planning.
 
 Given an issue by Human and a set of tools available to you:
     1. Use the `get_issue` tool to retrieve comprehensive issue details.
-    2. Prepare all available tool calls to gather broad context information.
-    3. Analyze and structure the available information. Identify specific, concrete development tasks.
-    4. Call the {handover_tool_name} tool with your complete analysis.
+    2. Use `create_merge_request` tool to create a draft merge request for the current branch.
+    3. Prepare all available tool calls to gather broad context information.
+    4. Analyze and structure the available information. Identify specific, concrete development tasks.
+    5. Call the {handover_tool_name} tool with your complete analysis.
 
 GitLab issue description:
 <issue>
     <issue_url>{issue_url}</issue_url>
 </issue>
+
+GitLab Project Branch details:
+<project>
+    <current_branch>{current_branch}</current_branch>
+    <default_branch>{default_branch}</default_branch>
+</project>
 
 **Guidelines**
 

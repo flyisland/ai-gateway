@@ -1,4 +1,3 @@
-import json
 from datetime import datetime, timezone
 from enum import StrEnum
 from typing import Annotated, Any
@@ -27,6 +26,7 @@ from duo_workflow_service.entities import (
     WorkflowState,
     WorkflowStatusEnum,
 )
+from duo_workflow_service.gitlab.url_parser import GitLabUrlParseError, GitLabUrlParser
 from duo_workflow_service.llm_factory import create_chat_model
 from duo_workflow_service.tracking import log_exception
 from duo_workflow_service.workflows.abstract_workflow import (
@@ -36,7 +36,6 @@ from duo_workflow_service.workflows.abstract_workflow import (
 from duo_workflow_service.workflows.issue_to_merge_request.prompts import (
     BUILD_CONTEXT_SYSTEM_MESSAGE,
 )
-from duo_workflow_service.workflows.type_definitions import AdditionalContext
 
 CONTEXT_BUILDER_TOOLS = [
     "list_issues",
@@ -68,6 +67,7 @@ CONTEXT_BUILDER_TOOLS = [
     "get_work_item",
     "list_work_items",
     "get_work_item_notes",
+    "create_merge_request",
 ]
 
 PLANNER_TOOLS = [
@@ -108,7 +108,6 @@ EXECUTOR_TOOLS = [
     "list_epic_notes",
     "get_epic_note",
     "get_commit",
-    "create_merge_request",
 ]
 
 
@@ -198,28 +197,7 @@ class Workflow(AbstractWorkflow):
         self.log.info("Starting %s workflow graph compilation", self._workflow_type)
 
         # Add nodes to the graph
-        graph.set_entry_point("fetch_issue")
-
-        graph.add_node(
-            "fetch_issue",
-            RunToolNode[WorkflowState](
-                tool=tools_registry.get("get_issue"),  # type: ignore
-                input_parser=lambda _: [{"url": goal}],
-                output_parser=self._set_issue_context,  # type: ignore
-            ).run,
-        )
-
-        graph.add_edge("fetch_issue", "create_merge_request")
-        graph.add_node(
-            "create_merge_request",
-            RunToolNode[WorkflowState](
-                tool=tools_registry.get("create_merge_request"),  # type: ignore
-                input_parser=self._create_merge_request,
-                output_parser=self._set_merge_request_context,  # type: ignore
-            ).run,
-        )
-
-        graph.add_edge("create_merge_request", "build_context")
+        graph.set_entry_point("build_context")
 
         build_context_handover_node = self._add_context_builder_nodes(
             graph, goal, tools_registry
@@ -285,6 +263,7 @@ class Workflow(AbstractWorkflow):
         )
         graph.add_edge("set_status_to_execution", executor_entry_node)
 
+        issue_iid = self._fetch_issue_iid(goal)
         # deterministic git actions
         graph.add_node(
             "git_actions",
@@ -292,34 +271,24 @@ class Workflow(AbstractWorkflow):
                 tool=tools_registry.get("run_git_command"),  # type: ignore
                 input_parser=lambda _: [
                     {
-                        "repository_url": self._project["http_url_to_repo"],  # type: ignore[index]
+                        "repository_url": self._project["http_url_to_repo"],
                         "command": "add",
                         "args": "-A",
                     },
                     {
-                        "repository_url": self._project["http_url_to_repo"],  # type: ignore[index]
+                        "repository_url": self._project["http_url_to_repo"],
                         "command": "commit",
                         "args": f"-m 'Duo Workflow: Resolve issue #{issue_iid}'",
                     },
                     {
-                        "repository_url": self._project["http_url_to_repo"],  # type: ignore[index]
+                        "repository_url": self._project["http_url_to_repo"],
                         "command": "push",
                     },
                 ],
                 output_parser=_git_output,  # type: ignore
             ).run,
         )
-        graph.add_edge("git_actions", "update_merge_request")
-        graph.add_node(
-            "update_merge_request",
-            RunToolNode[WorkflowState](
-                tool=tools_registry.get("update_merge_request"),  # type: ignore
-                input_parser=self._update_merge_request,
-                output_parser=_git_output,  # type: ignore
-            ).run,
-        )
-
-        graph.add_edge("update_merge_request", END)
+        graph.add_edge("git_actions", END)
         return graph
 
     def _add_context_builder_nodes(
@@ -371,6 +340,8 @@ class Workflow(AbstractWorkflow):
             system_prompt=BUILD_CONTEXT_SYSTEM_MESSAGE.format(
                 handover_tool_name=HANDOVER_TOOL_NAME,
                 issue_url=goal,
+                current_branch=self._workflow_metadata["git_branch"],
+                default_branch=self._project["default_branch"],
             ),
             toolset=context_builder_toolset,
             workflow_id=self._workflow_id,
@@ -410,116 +381,10 @@ class Workflow(AbstractWorkflow):
     def _fetch_issue_iid(self, issue_url: str):
         try:
             gitlab_host = GitLabUrlParser.extract_host_from_url(
-                self._project["web_url"]  # type: ignore[index]
+                self._project["web_url"]
             )
             _, issue_iid = GitLabUrlParser.parse_issue_url(issue_url, gitlab_host)
             return issue_iid
         except GitLabUrlParseError as e:
             log_exception(e, extra={"workflow_id": self._workflow_id})
             return ""
-
-    def _set_issue_context(self, issue_output: list[str], state: WorkflowState):
-        issue_nested = json.loads(issue_output[-1])
-        issue_details = json.loads(issue_nested["issue"])
-        issue_context = AdditionalContext(
-            category="issue",
-            id=str(issue_details["iid"]),
-            content=issue_details["description"],
-            metadata={
-                "title": issue_details["title"],
-                "state": issue_details["state"],
-                "assignees": issue_details["assignees"],
-                "labels": issue_details["labels"],
-            },
-        )
-        if self._additional_context is not None:
-            self._additional_context.append(issue_context)
-        else:
-            self._additional_context = [issue_context]
-
-        return {"status": state["status"]}
-
-    def _set_merge_request_context(
-        self, merge_request_output: list[str], state: WorkflowState
-    ):
-        mr_details = (json.loads(merge_request_output[-1])).get("merge_request", {})
-        metadata = {
-            "state": mr_details["state"],
-            "url": mr_details["web_url"],
-            "assignees": [mr_details["author"]["id"]],
-        }
-        self._set_additional_context(
-            category="merge_request",
-            context_id=str(mr_details["iid"]),
-            content=mr_details["description"],
-            metadata=metadata,
-        )
-
-        return {"status": state["status"]}
-
-    def _set_additional_context(
-        self, category: str, context_id: str, content: str, metadata: dict
-    ):
-        additional_context = AdditionalContext(
-            category=category, id=context_id, content=content, metadata=metadata
-        )
-        if self._additional_context is not None:
-            self._additional_context.append(additional_context)
-        else:
-            self._additional_context = [additional_context]
-
-    def _fetch_additional_context(self, context_type: str) -> AdditionalContext:
-        additional_context = None
-
-        if self._additional_context is not None:
-            for workflow_context in self._additional_context:
-                if workflow_context.category == context_type:
-                    additional_context = workflow_context
-                    break
-
-        if additional_context is None:
-            raise RuntimeError("Additional context not found")
-        return additional_context
-
-    def _create_merge_request(
-        self, state: WorkflowState
-    ):  # pylint: disable=unused-argument
-        issue_details = self._fetch_additional_context("issue")
-        if issue_details is None or issue_details.metadata is None:
-            raise RuntimeError("Issue context not found")
-
-        merge_request_title = f"Draft: Resolve {issue_details.metadata['title']}"
-        return [
-            {
-                "source_branch": self._workflow_metadata["git_branch"],
-                "target_branch": self._project["default_branch"],
-                "title": merge_request_title,
-                "project_id": self._project["id"],
-                "labels": issue_details.metadata["labels"],
-            }
-        ]
-
-    def _update_merge_request(
-        self, state: WorkflowState
-    ):  # pylint: disable=unused-argument
-        issue_details = self._fetch_additional_context("issue")
-        issue_assignees = [
-            assignee["id"]
-            for assignee in (issue_details.metadata or {}).get("assignees", [])
-            if isinstance(assignee, dict) and "id" in assignee
-        ]
-
-        mr_details = self._fetch_additional_context("merge_request")
-        mr_assignees = (
-            mr_details.metadata.get("assignees", []) if mr_details.metadata else []
-        )
-
-        return [
-            {
-                "project_id": self._project["id"],
-                "merge_request_iid": int(mr_details.id),  # type: ignore
-                "reviewer_ids": issue_assignees,
-                "add_labels": ["built with gitlab duo"],
-                "assignee_ids": mr_assignees,
-            }
-        ]
