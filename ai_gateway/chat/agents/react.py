@@ -173,7 +173,8 @@ class ReActPromptTemplate(Runnable[ReActAgentInputs, PromptValue]):
                 raise ValueError("Unsupported message")
 
         if not isinstance(messages[-1], HumanMessage):
-            raise ValueError("Last message must be a human message")
+            request_log.warning("Last message must be a human message")
+            messages.append(HumanMessage(content="Please continue."))
 
         if "assistant" in self.prompt_template:
             messages.append(

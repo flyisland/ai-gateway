@@ -1,6 +1,6 @@
 import fastapi
 import pytest
-from langchain_core.messages import SystemMessage
+from langchain_core.messages import SystemMessage, HumanMessage
 from starlette_context import context, request_cycle_context
 from structlog.testing import capture_logs
 
@@ -12,6 +12,7 @@ from ai_gateway.chat.agents.react import (
     ReActAgent,
     ReActAgentInputs,
     ReActPlainTextParser,
+    ReActPromptTemplate,
 )
 from ai_gateway.chat.agents.typing import (
     AdditionalContext,
@@ -28,6 +29,7 @@ from ai_gateway.prompts.config.models import (
     ModelClassProvider,
     TypeModelParams,
 )
+from ai_gateway.prompts.config import ModelConfig
 from lib.feature_flags.context import current_feature_flag_context
 
 
@@ -59,6 +61,72 @@ def prompt_template():
 def stub_feature_flags():
     current_feature_flag_context.set(["expanded_ai_logging"])
     yield
+
+
+class TestReActPromptTemplate:
+    def test_append_human_message_when_last_message_not_human(self):
+        """Test that a HumanMessage is appended when the last message is not a HumanMessage."""
+        prompt_template = {
+            "system": "{% include 'chat/react/system/1.0.0.jinja' %}",
+            "user": "{% include 'chat/react/user/1.0.0.jinja' %}",
+            "assistant": "{% include 'chat/react/assistant/1.0.0.jinja' %}",
+        }
+        
+        model_config = ModelConfig(
+            name="test-model",
+            params=ChatLiteLLMParams(model_class_provider=ModelClassProvider.LITE_LLM)
+        )
+        template = ReActPromptTemplate(prompt_template, model_config)
+        
+        inputs = ReActAgentInputs(
+            messages=[
+                Message(role=Role.USER, content="Hi"),
+                Message(role=Role.ASSISTANT, content="Hello!"),
+            ]
+        )
+        
+        result = template.invoke(inputs)
+        
+        # Check that a HumanMessage was appended
+        messages = result.to_messages()
+        human_messages = [msg for msg in messages if isinstance(msg, HumanMessage)]
+        
+        # There should be 2 HumanMessages: the original "Hi" and the appended "Please continue."
+        assert len(human_messages) == 2
+        assert human_messages[-1].content == "Please continue."
+
+    def test_no_append_when_last_message_is_human(self):
+        """Test that no HumanMessage is appended when the last message is already a HumanMessage."""
+        prompt_template = {
+            "system": "{% include 'chat/react/system/1.0.0.jinja' %}",
+            "user": "{% include 'chat/react/user/1.0.0.jinja' %}",
+            "assistant": "{% include 'chat/react/assistant/1.0.0.jinja' %}",
+        }
+        
+        model_config = ModelConfig(
+            name="test-model",
+            params=ChatLiteLLMParams(model_class_provider=ModelClassProvider.LITE_LLM)
+        )
+        template = ReActPromptTemplate(prompt_template, model_config)
+        
+        inputs = ReActAgentInputs(
+            messages=[
+                Message(role=Role.USER, content="Hi"),
+                Message(role=Role.ASSISTANT, content="Hello!"),
+                Message(role=Role.USER, content="How are you?"),
+            ]
+        )
+        
+        result = template.invoke(inputs)
+        
+        # Check that the last message is still a user message without appending "Please continue."
+        messages = result.to_messages()
+        human_messages = [msg for msg in messages if isinstance(msg, HumanMessage)]
+        
+        # There should be 2 HumanMessages only (no "Please continue." appended)
+        assert len(human_messages) == 2
+        # The content should contain "How are you?" (template may add formatting)
+        assert "How are you?" in human_messages[-1].content
 
 
 class TestReActPlainTextParser:
