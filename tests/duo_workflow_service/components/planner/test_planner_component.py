@@ -13,16 +13,20 @@ from duo_workflow_service.tools import DuoBaseTool
 
 @pytest.fixture
 def approval_component(mock_toolset):
-    return MagicMock(
+    mock = MagicMock(
         spec=PlanApprovalComponent,
         toolset=mock_toolset,
     )
+    mock.attach.return_value = END
+    return mock
 
 
 @pytest.fixture
 def mock_tool():
     mock = MagicMock(DuoBaseTool)
     mock.args_schema = None
+    mock.name = "test_tool"
+    mock.description = "Test tool description"
     return mock
 
 
@@ -34,11 +38,58 @@ def mock_toolset(mock_tool):
 
 
 @pytest.fixture
-def mock_tool_registry():
+def mock_tool_registry(mock_tool):
     """Create a mock tool registry."""
     registry = MagicMock(ToolsRegistry)
-    registry.get.return_value = MagicMock(name="test_tool")
+    registry.get.return_value = mock_tool
     return registry
+
+
+@pytest.fixture
+def mock_create_model():
+    with patch(
+        "duo_workflow_service.components.planner.component.create_chat_model"
+    ) as mock:
+        mock.return_value = mock
+        mock.bind_tools.return_value = mock
+        yield mock
+
+
+@pytest.fixture
+def mock_agent():
+    with patch("duo_workflow_service.components.planner.component.Agent") as mock:
+        yield mock
+
+
+@pytest.fixture
+def mock_tools_executor():
+    with patch(
+        "duo_workflow_service.components.planner.component.ToolsExecutor"
+    ) as mock:
+        mock.return_value.run.return_value = {
+            "plan": Plan(steps=[MagicMock(spec=Task)]),
+            "status": WorkflowStatusEnum.EXECUTION,
+            "conversation_history": {},
+        }
+
+        yield mock
+
+
+@pytest.fixture
+def mock_supervisor_agent():
+    with patch(
+        "duo_workflow_service.components.planner.component.PlanSupervisorAgent"
+    ) as mock:
+        mock.return_value.run.return_value = {
+            "conversation_history": {
+                "planner": [
+                    HumanMessage(
+                        content="What is the next task? Call handover agent if task is complete"
+                    )
+                ]
+            }
+        }
+        yield mock
 
 
 class TestPlannerComponent:
@@ -64,6 +115,20 @@ class TestPlannerComponent:
     def planner_component(self, mock_dependencies):
         return PlannerComponent(**mock_dependencies)
 
+    @pytest.fixture
+    def compiled_graph(self, planner_component, approval_component):
+        graph = StateGraph(WorkflowState)
+
+        entry_point = planner_component.attach(
+            graph=graph,
+            exit_node=END,
+            next_node=END,
+            approval_component=approval_component,
+        )
+        graph.set_entry_point(entry_point)
+
+        return graph.compile()
+
     def test_init(self, mock_dependencies):
         """Test PlannerComponent initialization."""
         component = PlannerComponent(**mock_dependencies)
@@ -78,28 +143,18 @@ class TestPlannerComponent:
         assert component.project == mock_dependencies["project"]
         assert component.http_client == mock_dependencies["http_client"]
 
-    @patch("duo_workflow_service.components.planner.component.create_chat_model")
-    @patch("duo_workflow_service.components.planner.component.Agent")
-    @patch("duo_workflow_service.components.planner.component.ToolsExecutor")
-    @patch("duo_workflow_service.components.planner.component.PlanSupervisorAgent")
     def test_attach_creates_nodes_and_edges(
         self,
-        mock_supervisor,
-        mock_executor,
+        mock_supervisor_agent,
+        mock_tools_executor,
         mock_agent,
         mock_create_model,
         planner_component,
+        compiled_graph,
     ):
         """Test that attach method creates all necessary nodes and edges."""
         # Setup mocks
         mock_graph = Mock(spec=StateGraph)
-        mock_model = Mock()
-        mock_create_model.return_value = mock_model
-
-        mock_tool = Mock()
-        mock_tool.name = "test_tool"
-        mock_tool.description = "Test tool description"
-        planner_component.tools_registry.get.return_value = mock_tool
 
         # Execute
         entry_node = planner_component.attach(
@@ -109,8 +164,8 @@ class TestPlannerComponent:
         # Verify nodes are added
         expected_calls = [
             call("planning", mock_agent.return_value.run),
-            call("update_plan", mock_executor.return_value.run),
-            call("planning_supervisor", mock_supervisor.return_value.run),
+            call("update_plan", mock_tools_executor.return_value.run),
+            call("planning_supervisor", mock_supervisor_agent.return_value.run),
         ]
         mock_graph.add_node.assert_has_calls(expected_calls)
 
@@ -132,17 +187,11 @@ class TestPlannerComponent:
         # Verify return value
         assert entry_node == "planning"
 
-    @patch("duo_workflow_service.components.planner.component.create_chat_model")
-    @patch("duo_workflow_service.components.planner.component.Agent")
     def test_attach_creates_agent_with_correct_parameters(
         self, mock_agent, mock_create_model, planner_component
     ):
         """Test that Agent is created with correct parameters."""
         mock_graph = Mock(spec=StateGraph)
-
-        mock_tool = Mock()
-        mock_tool.name = "test_tool"
-        planner_component.tools_registry.get.return_value = mock_tool
 
         planner_component.attach(mock_graph, "exit_node", "next_node", None)
 
@@ -156,10 +205,6 @@ class TestPlannerComponent:
         assert call_args[1]["workflow_type"] == "test-workflow-type"
 
     @pytest.mark.asyncio
-    @patch("duo_workflow_service.components.planner.component.create_chat_model")
-    @patch("duo_workflow_service.components.planner.component.Agent")
-    @patch("duo_workflow_service.components.planner.component.ToolsExecutor")
-    @patch("duo_workflow_service.components.planner.component.PlanSupervisorAgent")
     async def test_component_run_with_no_approval_component(
         self,
         mock_supervisor_agent,
@@ -170,9 +215,8 @@ class TestPlannerComponent:
         graph_input,
         graph_config,
         mock_tool_registry,
+        compiled_graph,
     ):
-        graph = StateGraph(WorkflowState)
-
         mock_agent.return_value.run.side_effect = [
             {
                 "plan": Plan(steps=[]),
@@ -223,27 +267,6 @@ class TestPlannerComponent:
                 },
             },
         ]
-        mock_supervisor_agent.return_value.run.return_value = {
-            "conversation_history": {
-                "planner": [
-                    HumanMessage(
-                        content="What is the next task? Call handover agent if task is complete"
-                    )
-                ]
-            }
-        }
-
-        mock_tools_executor.return_value.run.return_value = {
-            "plan": Plan(steps=[MagicMock(spec=Task)]),
-            "status": WorkflowStatusEnum.EXECUTION,
-            "conversation_history": {},
-        }
-
-        entry_point = planner_component.attach(
-            graph=graph, exit_node=END, next_node=END, approval_component=None
-        )
-        graph.set_entry_point(entry_point)
-        compiled_graph = graph.compile()
 
         response = await compiled_graph.ainvoke(input=graph_input, config=graph_config)
 
@@ -255,9 +278,6 @@ class TestPlannerComponent:
         assert len(response["conversation_history"]["planner"]) == 6
 
     @pytest.mark.asyncio
-    @patch("duo_workflow_service.components.planner.component.create_chat_model")
-    @patch("duo_workflow_service.components.planner.component.Agent")
-    @patch("duo_workflow_service.components.planner.component.ToolsExecutor")
     async def test_component_run_with_approval_component(
         self,
         mock_tools_executor,
@@ -268,9 +288,8 @@ class TestPlannerComponent:
         graph_input,
         graph_config,
         mock_tool_registry,
+        compiled_graph,
     ):
-        graph = StateGraph(WorkflowState)
-
         mock_agent.return_value.run.side_effect = [
             {
                 "plan": Plan(steps=[]),
@@ -311,23 +330,6 @@ class TestPlannerComponent:
             },
         ]
 
-        mock_tools_executor.return_value.run.return_value = {
-            "plan": Plan(steps=[MagicMock(spec=Task)]),
-            "status": WorkflowStatusEnum.EXECUTION,
-            "conversation_history": {},
-        }
-        approval_component_instance = approval_component.return_value
-        approval_component_instance.attach.return_value = END
-
-        entry_point = planner_component.attach(
-            graph=graph,
-            exit_node=END,
-            next_node=END,
-            approval_component=approval_component_instance,
-        )
-        graph.set_entry_point(entry_point)
-        compiled_graph = graph.compile()
-
         response = await compiled_graph.ainvoke(input=graph_input, config=graph_config)
         mock_tools_executor.return_value.run.assert_called_once()
 
@@ -335,4 +337,4 @@ class TestPlannerComponent:
 
         assert response["status"] == WorkflowStatusEnum.PLAN_APPROVAL_REQUIRED
         assert len(response["conversation_history"]["planner"]) == 4
-        approval_component_instance.attach.assert_called_once()
+        approval_component.attach.assert_called_once()
