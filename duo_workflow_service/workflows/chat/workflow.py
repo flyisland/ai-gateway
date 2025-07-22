@@ -11,16 +11,21 @@ from langgraph.types import Command
 
 from ai_gateway.model_metadata import current_model_metadata_context
 from duo_workflow_service.agents.chat_agent import ChatAgent
+from duo_workflow_service.agents.history_compactor import HistoryCompactor
 from duo_workflow_service.agents.tools_executor import ToolsExecutor
 from duo_workflow_service.checkpointer.gitlab_workflow import WorkflowStatusEventEnum
 from duo_workflow_service.components.tools_registry import ToolsRegistry
 from duo_workflow_service.entities.state import (
     ApprovalStateRejection,
     ChatWorkflowState,
+    MAX_CONTEXT_TOKENS,
     MessageTypeEnum,
     ToolStatus,
     UiChatLog,
     WorkflowStatusEnum,
+)
+from duo_workflow_service.token_counter.approximate_token_counter import (
+    ApproximateTokenCounter,
 )
 from duo_workflow_service.tracking.errors import log_exception
 from duo_workflow_service.workflows.abstract_workflow import AbstractWorkflow
@@ -37,6 +42,7 @@ class Routes(StrEnum):
     NO_CONVERSATION_HISTORY = "no_conversation_history"
     SHOW_AGENT_MESSAGE = "show_agent_message"
     TOOL_USE = "tool_use"
+    COMPACT_HISTORY = "compact_history"
     STOP = "stop"
 
 
@@ -107,8 +113,9 @@ RUN_COMMAND_TOOLS = ["run_command"]
 class Workflow(AbstractWorkflow):
     _stream: bool = True
     _agent: ChatAgent
+    _history_compactor: HistoryCompactor
 
-    def _are_tools_called(self, state: ChatWorkflowState) -> Routes:
+    def _needs_history_compaction_or_tools_called(self, state: ChatWorkflowState) -> Routes:
         if state["status"] in [WorkflowStatusEnum.CANCELLED, WorkflowStatusEnum.ERROR]:
             return Routes.STOP
 
@@ -116,6 +123,15 @@ class Workflow(AbstractWorkflow):
             return Routes.STOP
 
         history: List[BaseMessage] = state["conversation_history"][self._agent.name]
+
+        # Check if history needs compaction first
+        token_counter = ApproximateTokenCounter(self._agent.name)
+        total_tokens = token_counter.count_tokens(history)
+
+        if total_tokens > MAX_CONTEXT_TOKENS:
+            return Routes.COMPACT_HISTORY
+
+        # Then check for tool calls
         last_message = history[-1]
         if isinstance(last_message, AIMessage) and len(last_message.tool_calls) > 0:
             return Routes.TOOL_USE
@@ -226,6 +242,15 @@ class Workflow(AbstractWorkflow):
         )
         self._agent.tools_registry = tools_registry
 
+        # Initialize HistoryCompactor
+        self._history_compactor: HistoryCompactor = self._prompt_registry.get_on_behalf(  # type: ignore[assignment]
+            user=self._user,
+            prompt_id="history_compactor",
+            prompt_version="^1.0.0",
+            model_metadata=None,
+            internal_event_category=__name__,
+        )
+
         tools_runner = ToolsExecutor(
             tools_agent_name=self._agent.name,
             toolset=agents_toolset,
@@ -235,18 +260,21 @@ class Workflow(AbstractWorkflow):
 
         graph.add_node("agent", self._agent.run)
         graph.add_node("run_tools", tools_runner)
+        graph.add_node("compact_history", self._history_compactor.run)
 
         graph.set_entry_point("agent")
 
         graph.add_conditional_edges(
             "agent",
-            self._are_tools_called,
+            self._needs_history_compaction_or_tools_called,
             {
                 Routes.TOOL_USE: "run_tools",
+                Routes.COMPACT_HISTORY: "compact_history",
                 Routes.STOP: END,
             },
         )
         graph.add_edge("run_tools", "agent")
+        graph.add_edge("compact_history", "agent")
 
         return graph.compile(checkpointer=checkpointer)
 
