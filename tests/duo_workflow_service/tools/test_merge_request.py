@@ -330,6 +330,37 @@ async def test_create_merge_request_minimal_params(gitlab_client_mock, metadata)
 
 
 @pytest.mark.asyncio
+async def test_create_merge_request_with_server_error(gitlab_client_mock, metadata):
+    gitlab_client_mock.apost = AsyncMock(
+        return_value={"status": 409, "message": "Duplicate request"}
+    )
+
+    tool = CreateMergeRequest(metadata=metadata)
+
+    input_data = {
+        "project_id": 1,
+        "source_branch": "feature",
+        "target_branch": "main",
+        "title": "New Feature",
+    }
+
+    response = await tool.arun(input_data)
+    expected_response = json.dumps({"error": "Failed to create merge request"})
+
+    expected_data = {
+        "source_branch": "feature",
+        "target_branch": "main",
+        "title": "New Feature",
+    }
+
+    assert response == expected_response
+
+    gitlab_client_mock.apost.assert_called_once_with(
+        path="/api/v4/projects/1/merge_requests", body=json.dumps(expected_data)
+    )
+
+
+@pytest.mark.asyncio
 async def test_get_merge_request(gitlab_client_mock, metadata):
     gitlab_client_mock.aget = AsyncMock(
         return_value='{"id": 1, "title": "Test MR", "source_branch": "feature", "target_branch": "main"}'

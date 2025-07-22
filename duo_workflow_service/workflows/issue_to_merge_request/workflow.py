@@ -271,17 +271,17 @@ class Workflow(AbstractWorkflow):
                 tool=tools_registry.get("run_git_command"),  # type: ignore
                 input_parser=lambda _: [
                     {
-                        "repository_url": self._project["http_url_to_repo"],
+                        "repository_url": self._project["http_url_to_repo"],  # type: ignore[index]
                         "command": "add",
                         "args": "-A",
                     },
                     {
-                        "repository_url": self._project["http_url_to_repo"],
+                        "repository_url": self._project["http_url_to_repo"],  # type: ignore[index]
                         "command": "commit",
                         "args": f"-m 'Duo Workflow: Resolve issue #{issue_iid}'",
                     },
                     {
-                        "repository_url": self._project["http_url_to_repo"],
+                        "repository_url": self._project["http_url_to_repo"],  # type: ignore[index]
                         "command": "push",
                     },
                 ],
@@ -341,7 +341,8 @@ class Workflow(AbstractWorkflow):
                 handover_tool_name=HANDOVER_TOOL_NAME,
                 issue_url=goal,
                 current_branch=self._workflow_metadata["git_branch"],
-                default_branch=self._project["default_branch"],
+                default_branch=self._project["default_branch"],  # type: ignore[index]
+                project_id=self._project["id"],  # type: ignore[index]
             ),
             toolset=context_builder_toolset,
             workflow_id=self._workflow_id,
@@ -381,7 +382,7 @@ class Workflow(AbstractWorkflow):
     def _fetch_issue_iid(self, issue_url: str):
         try:
             gitlab_host = GitLabUrlParser.extract_host_from_url(
-                self._project["web_url"]
+                self._project["web_url"]  # type: ignore[index]
             )
             _, issue_iid = GitLabUrlParser.parse_issue_url(issue_url, gitlab_host)
             return issue_iid
