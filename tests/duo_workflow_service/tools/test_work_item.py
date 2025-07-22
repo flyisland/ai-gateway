@@ -4,6 +4,8 @@ from unittest.mock import AsyncMock, Mock
 import pytest
 
 from duo_workflow_service.tools.work_item import (
+    CreateWorkItem,
+    CreateWorkItemInput,
     GetWorkItem,
     GetWorkItemNotes,
     GetWorkItemNotesInput,
@@ -11,6 +13,7 @@ from duo_workflow_service.tools.work_item import (
     ListWorkItemsInput,
     ResolvedParent,
     ResolvedWorkItem,
+    ResolvedWorkItemData,
     WorkItemResourceInput,
 )
 
@@ -70,9 +73,10 @@ def work_items_list_fixture():
     ]
 
 
-def test_validate_parent_url_with_group_id(metadata):
+@pytest.mark.asyncio
+async def test_validate_parent_url_with_group_id(metadata):
     tool = GetWorkItem(description="test tool", metadata=metadata)
-    result = tool._validate_parent_url(
+    result = await tool._validate_parent_url(
         url=None,
         group_id="namespace/group",
         project_id=None,
@@ -82,9 +86,10 @@ def test_validate_parent_url_with_group_id(metadata):
     assert result.full_path == "namespace/group"
 
 
-def test_validate_parent_url_with_project_id(metadata):
+@pytest.mark.asyncio
+async def test_validate_parent_url_with_project_id(metadata):
     tool = GetWorkItem(description="test tool", metadata=metadata)
-    result = tool._validate_parent_url(
+    result = await tool._validate_parent_url(
         url=None,
         group_id=None,
         project_id="namespace/project",
@@ -94,9 +99,10 @@ def test_validate_parent_url_with_project_id(metadata):
     assert result.full_path == "namespace/project"
 
 
-def test_validate_parent_url_with_group_url(metadata):
+@pytest.mark.asyncio
+async def test_validate_parent_url_with_group_url(metadata):
     tool = GetWorkItem(description="test tool", metadata=metadata)
-    result = tool._validate_parent_url(
+    result = await tool._validate_parent_url(
         url="https://gitlab.com/groups/namespace/group",
         group_id=None,
         project_id=None,
@@ -106,9 +112,10 @@ def test_validate_parent_url_with_group_url(metadata):
     assert result.full_path == "namespace/group"
 
 
-def test_validate_parent_url_with_project_url(metadata):
+@pytest.mark.asyncio
+async def test_validate_parent_url_with_project_url(metadata):
     tool = GetWorkItem(description="test tool", metadata=metadata)
-    result = tool._validate_parent_url(
+    result = await tool._validate_parent_url(
         url="https://gitlab.com/namespace/project",
         group_id=None,
         project_id=None,
@@ -118,9 +125,10 @@ def test_validate_parent_url_with_project_url(metadata):
     assert result.full_path == "namespace/project"
 
 
-def test_validate_parent_url_with_invalid_url(metadata):
+@pytest.mark.asyncio
+async def test_validate_parent_url_with_invalid_url(metadata):
     tool = GetWorkItem(description="test tool", metadata=metadata)
-    result = tool._validate_parent_url(
+    result = await tool._validate_parent_url(
         url="https://example.com/not-gitlab",
         group_id=None,
         project_id=None,
@@ -129,16 +137,21 @@ def test_validate_parent_url_with_invalid_url(metadata):
     assert "Failed to parse parent work item URL" in result
 
 
-def test_validate_parent_url_with_no_params(metadata):
+@pytest.mark.asyncio
+async def test_validate_parent_url_with_no_params(metadata):
     tool = GetWorkItem(description="test tool", metadata=metadata)
-    result = tool._validate_parent_url(url=None, group_id=None, project_id=None)
+    result = await tool._validate_parent_url(url=None, group_id=None, project_id=None)
     assert isinstance(result, str)
     assert "Must provide either URL, group_id, or project_id" in result
 
 
-def test_validate_work_item_url_with_group_id_and_iid(metadata):
+@pytest.mark.asyncio
+async def test_validate_work_item_url_with_group_id_and_iid(metadata):
     tool = GetWorkItem(description="test tool", metadata=metadata)
-    result = tool._validate_work_item_url(
+    resolved_parent = ResolvedParent(type="group", full_path="namespace/group")
+    tool._validate_parent_url = AsyncMock(return_value=resolved_parent)
+
+    result = await tool._validate_work_item_url(
         url=None,
         group_id="namespace/group",
         project_id=None,
@@ -150,9 +163,13 @@ def test_validate_work_item_url_with_group_id_and_iid(metadata):
     assert result.work_item_iid == 42
 
 
-def test_validate_work_item_url_with_project_id_and_iid(metadata):
+@pytest.mark.asyncio
+async def test_validate_work_item_url_with_project_id_and_iid(metadata):
     tool = GetWorkItem(description="test tool", metadata=metadata)
-    result = tool._validate_work_item_url(
+    resolved_parent = ResolvedParent(type="project", full_path="namespace/project")
+    tool._validate_parent_url = AsyncMock(return_value=resolved_parent)
+
+    result = await tool._validate_work_item_url(
         url=None,
         group_id=None,
         project_id="namespace/project",
@@ -164,9 +181,10 @@ def test_validate_work_item_url_with_project_id_and_iid(metadata):
     assert result.work_item_iid == 42
 
 
-def test_validate_work_item_url_with_group_url(metadata):
+@pytest.mark.asyncio
+async def test_validate_work_item_url_with_group_url(metadata):
     tool = GetWorkItem(description="test tool", metadata=metadata)
-    result = tool._validate_work_item_url(
+    result = await tool._validate_work_item_url(
         url="https://gitlab.com/groups/namespace/group/-/work_items/42",
         group_id=None,
         project_id=None,
@@ -178,9 +196,10 @@ def test_validate_work_item_url_with_group_url(metadata):
     assert result.work_item_iid == 42
 
 
-def test_validate_work_item_url_with_project_url(metadata):
+@pytest.mark.asyncio
+async def test_validate_work_item_url_with_project_url(metadata):
     tool = GetWorkItem(description="test tool", metadata=metadata)
-    result = tool._validate_work_item_url(
+    result = await tool._validate_work_item_url(
         url="https://gitlab.com/namespace/project/-/work_items/42",
         group_id=None,
         project_id=None,
@@ -192,9 +211,10 @@ def test_validate_work_item_url_with_project_url(metadata):
     assert result.work_item_iid == 42
 
 
-def test_validate_work_item_url_with_no_iid(metadata):
+@pytest.mark.asyncio
+async def test_validate_work_item_url_with_no_iid(metadata):
     tool = GetWorkItem(description="test tool", metadata=metadata)
-    result = tool._validate_work_item_url(
+    result = await tool._validate_work_item_url(
         url=None,
         group_id="namespace/group",
         project_id=None,
@@ -204,9 +224,10 @@ def test_validate_work_item_url_with_no_iid(metadata):
     assert "Must provide work_item_iid if no URL is given" in result
 
 
-def test_validate_work_item_url_with_invalid_url_without_work_item_iid(metadata):
+@pytest.mark.asyncio
+async def test_validate_work_item_url_with_invalid_url_without_work_item_iid(metadata):
     tool = GetWorkItem(description="test tool", metadata=metadata)
-    result = tool._validate_work_item_url(
+    result = await tool._validate_work_item_url(
         url="https://example.com/namespace/project/-/work_items/42",
         group_id=None,
         project_id=None,
@@ -266,12 +287,13 @@ async def test_list_work_items_with_project_id(
 async def test_list_work_items_with_group_url(
     gitlab_client_mock, metadata, work_items_list
 ):
-    graphql_response = {
-        "data": {"namespace": {"workItems": {"nodes": work_items_list}}}
-    }
+    resolved_parent = ResolvedParent(type="group", full_path="namespace/group")
+
+    graphql_response = {"namespace": {"workItems": {"nodes": work_items_list}}}
     gitlab_client_mock.graphql = AsyncMock(return_value=graphql_response)
 
     tool = ListWorkItems(description="list work items", metadata=metadata)
+    tool._validate_parent_url = AsyncMock(return_value=resolved_parent)
 
     response = await tool._arun(
         url="https://gitlab.com/groups/namespace/group", state="opened"
@@ -397,14 +419,30 @@ async def test_get_work_item_with_group_url(
 
     tool = GetWorkItem(description="get work item", metadata=metadata)
 
-    response = await tool._arun(
+    resolved_item = ResolvedWorkItem(
+        parent=ResolvedParent(type="group", full_path="namespace/group"),
+        work_item_iid=42,
+    )
+    tool._validate_work_item_url = AsyncMock(return_value=resolved_item)
+
+    result = await tool._arun(
         url="https://gitlab.com/groups/namespace/group/-/work_items/42"
     )
 
-    expected_response = json.dumps({"work_item": work_item_data})
-    assert response == expected_response
+    expected = json.dumps({"work_item": work_item_data})
+    assert result == expected
+
+    tool._validate_work_item_url.assert_called_once_with(
+        url="https://gitlab.com/groups/namespace/group/-/work_items/42",
+        group_id=None,
+        project_id=None,
+        work_item_iid=None,
+    )
 
     gitlab_client_mock.graphql.assert_called_once()
+    call_args = gitlab_client_mock.graphql.call_args[0]
+    assert "namespace" in call_args[1]["fullPath"]
+    assert call_args[1]["iid"] == "42"
 
 
 @pytest.mark.asyncio
@@ -593,6 +631,12 @@ async def test_get_work_item_notes_with_project_id(
 async def test_get_work_item_notes_with_group_url(
     gitlab_client_mock, metadata, work_item_notes
 ):
+    # Mock the _validate_work_item_url method
+    resolved_work_item = ResolvedWorkItem(
+        parent=ResolvedParent(type="group", full_path="namespace/group"),
+        work_item_iid=42,
+    )
+
     graphql_response = {
         "namespace": {
             "workItems": {
@@ -603,6 +647,7 @@ async def test_get_work_item_notes_with_group_url(
     gitlab_client_mock.graphql = AsyncMock(return_value=graphql_response)
 
     tool = GetWorkItemNotes(description="get work item notes", metadata=metadata)
+    tool._validate_work_item_url = AsyncMock(return_value=resolved_work_item)
 
     response = await tool._arun(
         url="https://gitlab.com/groups/namespace/group/-/work_items/42"
@@ -733,5 +778,345 @@ async def test_get_work_item_notes_with_invalid_url(gitlab_client_mock, metadata
 )
 def test_get_work_item_notes_format_display_message(input_data, expected_message):
     tool = GetWorkItemNotes(description="get work item notes")
+    message = tool.format_display_message(input_data)
+    assert message == expected_message
+
+
+@pytest.fixture
+def created_work_item_data():
+    """Fixture for created work item data."""
+    return {
+        "id": "gid://gitlab/WorkItem/123",
+        "iid": "42",
+        "title": "New Work Item",
+        "description": "This is a newly created work item",
+        "state": "opened",
+        "createdAt": "2025-04-29T11:35:36.000+02:00",
+        "author": {"username": "test_user", "name": "Test User"},
+    }
+
+
+@pytest.fixture
+def work_item_type_data():
+    """Fixture for work item type data."""
+    return {
+        "namespace": {
+            "workItemTypes": {
+                "nodes": [
+                    {
+                        "id": "gid://gitlab/WorkItems::Type/1",
+                        "name": "Issue",
+                    },
+                    {
+                        "id": "gid://gitlab/WorkItems::Type/2",
+                        "name": "Epic",
+                    },
+                    {
+                        "id": "gid://gitlab/WorkItems::Type/3",
+                        "name": "Task",
+                    },
+                ]
+            }
+        }
+    }
+
+
+@pytest.mark.asyncio
+async def test_create_work_item_with_group_id(
+    gitlab_client_mock, metadata, created_work_item_data, work_item_type_data
+):
+    gitlab_client_mock.graphql = AsyncMock()
+    gitlab_client_mock.graphql.side_effect = [
+        work_item_type_data,
+        {
+            "data": {
+                "workItemCreate": {"workItem": created_work_item_data, "errors": []}
+            }
+        },
+    ]
+
+    tool = CreateWorkItem(description="create work item", metadata=metadata)
+
+    response = await tool._arun(
+        group_id="namespace/group",
+        title="New Work Item",
+        type_name="issue",
+        description="This is a description",
+    )
+
+    response_json = json.loads(response)
+    assert "created_work_item" in response_json
+    assert response_json["created_work_item"] == created_work_item_data
+    assert response_json["errors"] is None
+
+    # Verify graphql was called with correct parameters
+    assert gitlab_client_mock.graphql.call_count == 2
+    # First call to get work item types
+    first_call_args = gitlab_client_mock.graphql.call_args_list[0][0]
+    assert "workItemTypes" in first_call_args[0]
+    # Second call to create work item
+    second_call_args = gitlab_client_mock.graphql.call_args_list[1][0]
+    assert "workItemCreate" in second_call_args[0]
+    assert second_call_args[1]["input"]["title"] == "New Work Item"
+    assert second_call_args[1]["input"]["namespacePath"] == "namespace/group"
+
+
+@pytest.mark.asyncio
+async def test_create_work_item_with_all_supported_widgets(
+    gitlab_client_mock, metadata, created_work_item_data, work_item_type_data
+):
+    gitlab_client_mock.graphql = AsyncMock()
+    gitlab_client_mock.graphql.side_effect = [
+        work_item_type_data,
+        {
+            "data": {
+                "workItemCreate": {"workItem": created_work_item_data, "errors": []}
+            }
+        },
+    ]
+
+    tool = CreateWorkItem(description="create work item", metadata=metadata)
+    tool._validate_parent_url = AsyncMock(
+        return_value=ResolvedParent(type="group", full_path="namespace/group")
+    )
+
+    response = await tool._arun(
+        group_id="namespace/group",
+        title="Full Widget Test",
+        type_name="issue",
+        description="Testing all supported widgets",
+        assignee_ids=[123, 456],
+        label_ids=["789", "101"],
+        confidential=True,
+        start_date="2025-07-01",
+        due_date="2025-07-10",
+        is_fixed=True,
+        health_status="onTrack",
+    )
+
+    response_json = json.loads(response)
+    assert "created_work_item" in response_json
+    gql_input = gitlab_client_mock.graphql.call_args_list[1][0][1]["input"]
+
+    assert gql_input["confidential"] is True
+    assert gql_input["assigneesWidget"]["assigneeIds"] == [
+        "gid://gitlab/User/123",
+        "gid://gitlab/User/456",
+    ]
+    assert gql_input["labelsWidget"]["labelIds"] == [
+        "gid://gitlab/Label/789",
+        "gid://gitlab/Label/101",
+    ]
+    assert gql_input["startAndDueDateWidget"] == {
+        "startDate": "2025-07-01",
+        "dueDate": "2025-07-10",
+        "isFixed": True,
+    }
+    assert gql_input["healthStatusWidget"]["healthStatus"] == "onTrack"
+
+
+@pytest.mark.asyncio
+async def test_create_work_item_with_group_url(
+    gitlab_client_mock, metadata, created_work_item_data, work_item_type_data
+):
+    gitlab_client_mock.graphql = AsyncMock()
+    gitlab_client_mock.graphql.side_effect = [
+        work_item_type_data,
+        {
+            "data": {
+                "workItemCreate": {"workItem": created_work_item_data, "errors": []}
+            }
+        },
+    ]
+    tool = CreateWorkItem(description="create work item", metadata=metadata)
+
+    resolved_parent = ResolvedParent(type="group", full_path="namespace/group")
+    tool._validate_parent_url = AsyncMock(return_value=resolved_parent)
+
+    response = await tool._arun(
+        url="https://gitlab.com/groups/namespace/group",
+        title="New Work Item",
+        type_name="epic",
+        health_status="onTrack",
+    )
+
+    response_json = json.loads(response)
+    assert "created_work_item" in response_json
+    assert response_json["created_work_item"] == created_work_item_data
+
+    second_call_args = gitlab_client_mock.graphql.call_args_list[1][0]
+    assert "healthStatusWidget" in second_call_args[1]["input"]
+    assert (
+        second_call_args[1]["input"]["healthStatusWidget"]["healthStatus"] == "onTrack"
+    )
+
+
+@pytest.mark.asyncio
+async def test_create_work_item_with_project_id(
+    gitlab_client_mock, metadata, created_work_item_data, work_item_type_data
+):
+    gitlab_client_mock.graphql = AsyncMock()
+    gitlab_client_mock.graphql.side_effect = [
+        work_item_type_data,
+        {
+            "data": {
+                "workItemCreate": {"workItem": created_work_item_data, "errors": []}
+            }
+        },
+    ]
+
+    tool = CreateWorkItem(description="create work item", metadata=metadata)
+
+    response = await tool._arun(
+        project_id="namespace/project",
+        title="New Task",
+        type_name="task",
+        description="Project-level work item",
+    )
+
+    response_json = json.loads(response)
+    assert "created_work_item" in response_json
+    assert response_json["created_work_item"] == created_work_item_data
+    assert response_json["errors"] is None
+
+    gql_input = gitlab_client_mock.graphql.call_args_list[1][0][1]["input"]
+    assert gql_input["title"] == "New Task"
+    assert gql_input["namespacePath"] == "namespace/project"
+
+
+@pytest.mark.asyncio
+async def test_create_work_item_with_project_url(
+    gitlab_client_mock, metadata, created_work_item_data, work_item_type_data
+):
+    gitlab_client_mock.graphql = AsyncMock()
+    gitlab_client_mock.graphql.side_effect = [
+        work_item_type_data,
+        {
+            "data": {
+                "workItemCreate": {"workItem": created_work_item_data, "errors": []}
+            }
+        },
+    ]
+
+    tool = CreateWorkItem(description="create work item", metadata=metadata)
+    tool._validate_parent_url = AsyncMock(
+        return_value=ResolvedParent(type="project", full_path="namespace/project")
+    )
+
+    response = await tool._arun(
+        url="https://gitlab.com/namespace/project",
+        title="Work Item via URL",
+        type_name="task",
+    )
+
+    response_json = json.loads(response)
+    assert "created_work_item" in response_json
+    assert response_json["created_work_item"] == created_work_item_data
+
+    gql_input = gitlab_client_mock.graphql.call_args_list[1][0][1]["input"]
+    assert gql_input["namespacePath"] == "namespace/project"
+
+
+@pytest.mark.asyncio
+async def test_create_work_item_with_error_response(
+    gitlab_client_mock, metadata, work_item_type_data
+):
+    gitlab_client_mock.graphql = AsyncMock()
+    gitlab_client_mock.graphql.side_effect = [
+        work_item_type_data,
+        {
+            "data": {
+                "workItemCreate": {
+                    "workItem": None,
+                    "errors": ["Title cannot be blank"],
+                }
+            }
+        },
+    ]
+
+    tool = CreateWorkItem(description="create work item", metadata=metadata)
+
+    resolved_parent = ResolvedParent(type="group", full_path="namespace/group")
+    tool._validate_parent_url = AsyncMock(return_value=resolved_parent)
+
+    response = await tool._arun(
+        group_id="namespace/group",
+        title="",  # Empty title to trigger error
+        type_name="issue",
+    )
+
+    response_json = json.loads(response)
+    assert "errors" in response_json
+    assert response_json["errors"] == ["Title cannot be blank"]
+
+
+@pytest.mark.asyncio
+async def test_create_work_item_invalid_type(
+    gitlab_client_mock, metadata, work_item_type_data
+):
+    gitlab_client_mock.graphql = AsyncMock()
+    gitlab_client_mock.graphql.side_effect = [work_item_type_data]
+
+    tool = CreateWorkItem(description="create work item", metadata=metadata)
+
+    resolved_parent = ResolvedParent(type="group", full_path="namespace/group")
+    tool._validate_parent_url = AsyncMock(return_value=resolved_parent)
+
+    response = await tool._arun(
+        group_id="namespace/group",
+        title="New Work Item",
+        type_name="invalid_type",  # Type that doesn't exist
+    )
+
+    response_json = json.loads(response)
+    assert "error" in response_json
+    assert "Unknown work item type: 'invalid_type'" in response_json["error"]
+
+
+@pytest.mark.asyncio
+async def test_create_epic_in_project_error(
+    gitlab_client_mock, metadata, work_item_type_data
+):
+    gitlab_client_mock.graphql = AsyncMock()
+    gitlab_client_mock.graphql.side_effect = [work_item_type_data]
+
+    tool = CreateWorkItem(description="create work item", metadata=metadata)
+
+    resolved_parent = ResolvedParent(type="project", full_path="namespace/project")
+    tool._validate_parent_url = AsyncMock(return_value=resolved_parent)
+
+    response = await tool._arun(
+        project_id="namespace/project",
+        title="New Epic",
+        type_name="epic",  # Epics can only be created in groups
+    )
+
+    response_json = json.loads(response)
+    assert "error" in response_json
+    assert (
+        "Work item type 'epic' cannot be created in a project – only in groups."
+        in response_json["error"]
+    )
+
+
+@pytest.mark.parametrize(
+    "input_data,expected_message",
+    [
+        (
+            CreateWorkItemInput(
+                group_id="namespace/group", title="Test Item", type_name="issue"
+            ),
+            "Create work item 'Test Item' in group namespace/group",
+        ),
+        (
+            CreateWorkItemInput(
+                project_id="namespace/project", title="Test Item", type_name="task"
+            ),
+            "Create work item 'Test Item' in project namespace/project",
+        ),
+    ],
+)
+def test_create_work_item_format_display_message(input_data, expected_message):
+    tool = CreateWorkItem(description="create work item")
     message = tool.format_display_message(input_data)
     assert message == expected_message
