@@ -100,7 +100,7 @@ CHAT_MUTATION_TOOLS = [
     # "mkdir",
 ]
 
-RUN_COMMAND_TOOLS = ["run_command"]
+RUN_COMMAND_TOOLS = ["run_command", "run_git_command"]
 
 
 class Workflow(AbstractWorkflow):

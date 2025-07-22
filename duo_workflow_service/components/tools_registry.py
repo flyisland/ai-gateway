@@ -115,6 +115,7 @@ _AGENT_PRIVILEGES: dict[str, list[Type[BaseTool]]] = {
     "read_only_gitlab": _READ_ONLY_GITLAB_TOOLS,
     "run_commands": [
         tools.RunCommand,
+        tools.git.Command,
     ],
     _RUN_MCP_TOOLS_PRIVILEGE: [],
 }

@@ -25,6 +25,7 @@ from duo_workflow_service.security.prompt_security import (
     PromptSecurity,
     SecurityException,
 )
+from duo_workflow_service.tools import Command as GitCommand
 from duo_workflow_service.tools import (
     PipelineException,
     RunCommand,
@@ -47,6 +48,7 @@ _ACTION_HANDLERS = [
 
 _COMMAND_OUTPUT_TOOLS = {
     "run_command": RunCommand,
+    "run_git_command": GitCommand,
 }
 
 
