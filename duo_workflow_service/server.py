@@ -3,6 +3,7 @@
 import asyncio
 import json
 import os
+from operator import itemgetter
 from typing import AsyncIterable, AsyncIterator, Optional
 
 import aiohttp
@@ -69,11 +70,11 @@ CONTAINER_APPLICATION_PACKAGES = ["duo_workflow_service"]
 log = structlog.stdlib.get_logger("server")
 
 catalog = data_model.load_catalog()
-allowed_ijwt_scopes = {
-    unit_primitive.name
+allowed_ijwt_scopes = [
+    [ unit_primitive.name, unit_primitive.add_ons ]
     for unit_primitive in catalog.unit_primitives
     if "duo_workflow_service" in unit_primitive.backend_services
-}
+]
 
 
 def string_to_category_enum(category_string: str) -> CategoryEnum:
@@ -325,15 +326,20 @@ class DuoWorkflowService(contract_pb2_grpc.DuoWorkflowServicer):
                 )
 
         metadata = dict(context.invocation_metadata())
+        gitlab_enablement_type = metadata.get("x-gitlab-feature-enablement-type")
         global_user_id = metadata.get("x-gitlab-global-user-id")
         gitlab_realm = metadata.get("x-gitlab-realm")
         gitlab_instance_id = metadata.get("x-gitlab-instance-id")
 
         scopes = []
+        all_scopes = list(map(itemgetter(0), allowed_ijwt_scopes))
         if user.is_debug:
-            scopes = list(allowed_ijwt_scopes)
+            scopes = all_scopes
+        elif gitlab_enablement_type == "duo_core":
+            core_scopes = [scope[0] for scope in allowed_ijwt_scopes if ("duo_core" in scope[1]) or scope[1]==[]]
+            scopes = list(set(user.claims.scopes) & set(core_scopes))
         else:
-            scopes = list(set(user.claims.scopes) & allowed_ijwt_scopes)
+            scopes = list(set(user.claims.scopes) & set(all_scopes))
 
         token_authority = TokenAuthority(
             os.environ.get("DUO_WORKFLOW_SELF_SIGNED_JWT__SIGNING_KEY")
