@@ -170,6 +170,177 @@ class TestConvertV1ToV2Inputs:
                 m.model_dump() for m in agent_request.messages
             ] == request.getfixturevalue("chat_response")
 
+    def test_convert_v1_to_v2_inputs_ends_with_assistant_message(self):
+        """Test that conversations ending with assistant messages are truncated to last user message."""
+        current_feature_flag_context.set({FeatureFlag.CHAT_V1_REDIRECT})
+        
+        # Create a conversation that ends with an assistant message
+        chat_messages = [
+            {"role": "user", "content": "Hello"},
+            {"role": "assistant", "content": "Hi there!"},
+            {"role": "user", "content": "How are you?"},
+            {"role": "assistant", "content": "I'm doing well!"}
+        ]
+        
+        request_body = {
+            "prompt_components": [
+                {
+                    "type": "prompt",
+                    "metadata": {"source": "test", "version": "1.0.0"},
+                    "payload": {
+                        "content": chat_messages,
+                        "provider": "anthropic",
+                        "model": KindAnthropicModel.CLAUDE_2_1.value,
+                    },
+                }
+            ],
+            "stream": False,
+        }
+        
+        chat_request = ChatRequest(**request_body)
+        agent_request = convert_v1_to_v2_inputs(chat_request)
+        
+        # Should truncate to the last user message
+        assert len(agent_request.messages) == 3
+        assert agent_request.messages[-1].role == Role.USER
+        assert agent_request.messages[-1].content == "How are you?"
+
+    def test_convert_v1_to_v2_inputs_ends_with_user_message(self):
+        """Test that conversations ending with user messages are preserved."""
+        current_feature_flag_context.set({FeatureFlag.CHAT_V1_REDIRECT})
+        
+        chat_messages = [
+            {"role": "user", "content": "Hello"},
+            {"role": "assistant", "content": "Hi there!"},
+            {"role": "user", "content": "How are you?"}
+        ]
+        
+        request_body = {
+            "prompt_components": [
+                {
+                    "type": "prompt",
+                    "metadata": {"source": "test", "version": "1.0.0"},
+                    "payload": {
+                        "content": chat_messages,
+                        "provider": "anthropic",
+                        "model": KindAnthropicModel.CLAUDE_2_1.value,
+                    },
+                }
+            ],
+            "stream": False,
+        }
+        
+        chat_request = ChatRequest(**request_body)
+        agent_request = convert_v1_to_v2_inputs(chat_request)
+        
+        # Should preserve all messages since it ends with user message
+        assert len(agent_request.messages) == 3
+        assert agent_request.messages[-1].role == Role.USER
+        assert agent_request.messages[-1].content == "How are you?"
+
+    def test_convert_v1_to_v2_inputs_no_user_messages(self):
+        """Test fallback when no user messages exist."""
+        current_feature_flag_context.set({FeatureFlag.CHAT_V1_REDIRECT})
+        
+        chat_messages = [
+            {"role": "system", "content": "You are a helpful assistant"},
+            {"role": "assistant", "content": "Hello, I'm ready to help!"}
+        ]
+        
+        request_body = {
+            "prompt_components": [
+                {
+                    "type": "prompt",
+                    "metadata": {"source": "test", "version": "1.0.0"},
+                    "payload": {
+                        "content": chat_messages,
+                        "provider": "anthropic",
+                        "model": KindAnthropicModel.CLAUDE_2_1.value,
+                    },
+                }
+            ],
+            "stream": False,
+        }
+        
+        chat_request = ChatRequest(**request_body)
+        agent_request = convert_v1_to_v2_inputs(chat_request)
+        
+        # Should add a fallback user message
+        assert len(agent_request.messages) == 2
+        assert agent_request.messages[-1].role == Role.USER
+        assert agent_request.messages[-1].content == "Please continue."
+
+    def test_convert_v1_to_v2_inputs_multiple_assistant_messages_at_end(self):
+        """Test truncation when multiple assistant messages are at the end."""
+        current_feature_flag_context.set({FeatureFlag.CHAT_V1_REDIRECT})
+        
+        chat_messages = [
+            {"role": "user", "content": "Tell me a story"},
+            {"role": "assistant", "content": "Once upon a time..."},
+            {"role": "assistant", "content": "The story continues..."},
+            {"role": "assistant", "content": "And they lived happily ever after."}
+        ]
+        
+        request_body = {
+            "prompt_components": [
+                {
+                    "type": "prompt",
+                    "metadata": {"source": "test", "version": "1.0.0"},
+                    "payload": {
+                        "content": chat_messages,
+                        "provider": "anthropic",
+                        "model": KindAnthropicModel.CLAUDE_2_1.value,
+                    },
+                }
+            ],
+            "stream": False,
+        }
+        
+        chat_request = ChatRequest(**request_body)
+        agent_request = convert_v1_to_v2_inputs(chat_request)
+        
+        # Should truncate to just the user message
+        assert len(agent_request.messages) == 1
+        assert agent_request.messages[-1].role == Role.USER
+        assert agent_request.messages[-1].content == "Tell me a story"
+
+    def test_convert_v1_to_v2_inputs_system_messages_with_assistant_end(self):
+        """Test system message handling when conversation ends with assistant message."""
+        current_feature_flag_context.set({FeatureFlag.CHAT_V1_REDIRECT})
+        
+        chat_messages = [
+            {"role": "system", "content": "You are helpful"},
+            {"role": "user", "content": "Hello"},
+            {"role": "assistant", "content": "Hi!"},
+            {"role": "system", "content": "Be more detailed"},
+            {"role": "user", "content": "How are you?"},
+            {"role": "assistant", "content": "I'm doing great, thanks for asking!"}
+        ]
+        
+        request_body = {
+            "prompt_components": [
+                {
+                    "type": "prompt",
+                    "metadata": {"source": "test", "version": "1.0.0"},
+                    "payload": {
+                        "content": chat_messages,
+                        "provider": "anthropic",
+                        "model": KindAnthropicModel.CLAUDE_2_1.value,
+                    },
+                }
+            ],
+            "stream": False,
+        }
+        
+        chat_request = ChatRequest(**request_body)
+        agent_request = convert_v1_to_v2_inputs(chat_request)
+        
+        # Should truncate to the last user message (which includes system message)
+        assert len(agent_request.messages) == 2
+        assert agent_request.messages[-1].role == Role.USER
+        assert "Be more detailed" in agent_request.messages[-1].content
+        assert "How are you?" in agent_request.messages[-1].content
+
 
 class TestRedirectedV1ChatEndpoint:
     @pytest.mark.asyncio

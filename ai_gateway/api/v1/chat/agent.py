@@ -94,6 +94,22 @@ def convert_v1_to_v2_inputs(chat_request: ChatRequest) -> AgentRequest:
                 message = Message(**message_data.model_dump())
                 messages.append(message)
 
+        # Ensure the last message is always a user message
+        if messages and messages[-1].role != Role.USER:
+            # Find the last user message to continue the conversation
+            last_user_index = -1
+            for i in range(len(messages) - 1, -1, -1):
+                if messages[i].role == Role.USER:
+                    last_user_index = i
+                    break
+            
+            if last_user_index >= 0:
+                # Remove all messages after the last user message
+                messages = messages[:last_user_index + 1]
+            else:
+                # Fallback: if no user message exists, create a generic one
+                messages.append(Message(role=Role.USER, content="Please continue."))
+
     return AgentRequest(
         messages=messages,
         options=None,

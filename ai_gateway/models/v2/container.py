@@ -44,6 +44,10 @@ class ContainerModels(containers.DeclarativeContainer):
             ChatAnthropic,
             async_client=http_async_client_anthropic,
             betas=["extended-cache-ttl-2025-04-11"],
+            thinking={
+                "type": "enabled", 
+                "budget_tokens": 2000
+            },
         ),
         mocked=providers.Factory(mock.FakeModel),
     )

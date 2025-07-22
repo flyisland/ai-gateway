@@ -3,6 +3,7 @@ name: Chat Agent
 model:
   config_file: claude_4_0
   params:
+    temperature: 1.0
     max_tokens: 8_192
 unit_primitives:
   - duo_chat

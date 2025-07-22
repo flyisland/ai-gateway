@@ -108,7 +108,15 @@ class Prompt(RunnableBinding[Input, Output]):
             model_factory, config.model, disable_streaming, model_override
         )
 
-        if tools and isinstance(model, BaseChatModel):
+        if model.thinking and isinstance(model, BaseChatModel):
+            # We can't have tool calling binded to the model for extended thinking
+            # Only tool_choice: {"type": "auto"} (the default) and tool_choice: {"type": "none"} are compatible with extended thinking.
+            # https://docs.anthropic.com/en/docs/build-with-claude/extended-thinking#feature-compatibility
+            model = self._build_model(
+                model_factory, config.model, disable_streaming, model_override
+            )
+
+        elif tools and isinstance(model, BaseChatModel):
             model = model.bind_tools(tools, tool_choice=tool_choice)  # type: ignore[assignment]
 
         prompt = self._build_prompt_template(config)
