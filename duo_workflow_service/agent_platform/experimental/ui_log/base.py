@@ -17,6 +17,25 @@ __all__ = [
 
 
 class BaseUILogEvents(StrEnum):
+    """Base class for UI log event enumerations.
+
+    This class provides a base for defining event enumerations for UI logging.
+    It enforces naming conventions for enum values and keys.
+
+    Enum values must:
+    - Start with 'on_' prefix
+    - Have keys that are uppercase versions of the values
+
+    Example:
+        class MyUIEvents(BaseUILogEvents):
+            ON_START = "on_start"  # Correct naming
+            ON_END = "on_end"      # Correct naming
+
+            # The following would raise errors:
+            # START = "start"      # Missing 'on_' prefix
+            # Start = "on_start"   # Key not uppercase version of value
+    """
+
     def __init_subclass__(cls, **kwargs):
         super().__init_subclass__(**kwargs)
 
@@ -51,6 +70,56 @@ class _UILogCallback(Protocol):
 
 
 class BaseUILogWriter[E: BaseUILogEvents](ABC):
+    """Abstract base class for UI log writers.
+
+    Provides a base implementation for writing UI logs with different log levels.
+    Subclasses must implement the events_type property and appropriate _create_*_log methods
+    for each supported log level.
+
+    By default, the supported log levels are 'success', 'error', and 'warning'.
+
+    Args:
+        log_callback: A callback function that will be called with each log entry
+        levels: Optional sequence of log level names to support. Defaults to ["success", "error", "warning"]
+
+    Example:
+        class MyEvents(BaseUILogEvents):
+            ON_START = "on_start"
+            ON_END = "on_end"
+
+        class MyWriter(BaseUILogWriter[MyEvents]):
+            @property
+            def events_type(self) -> type[MyEvents]:
+                return MyEvents
+
+            def _create_success_log(self, message: str, **kwargs) -> UiChatLog:
+                return UiChatLog(
+                    message_type="text",
+                    content=message,
+                    timestamp="2023-01-01T12:00:00"
+                )
+
+            def _create_error_log(self, message: str, **kwargs) -> UiChatLog:
+                return UiChatLog(
+                    message_type="error",
+                    content=f"ERROR: {message}",
+                    timestamp="2023-01-01T12:00:00"
+                )
+
+        # Create a writer with a callback
+        def log_callback(entry: _UILogEntry) -> None:
+            print(f"Logged: {entry.record.content}")
+
+        writer = MyWriter(log_callback, levels=["success", "error"])
+
+        # Log messages with different levels
+        writer.success("Operation successful", event=MyEvents.ON_END)
+        writer.error("Operation failed", event=MyEvents.ON_END)
+
+        # The following will raise an error as the `warning` logging is not implemented
+        writer.warning("Proceeding with caution", event=MyEvents.ON_START)
+    """
+
     def __init__(
         self, log_callback: _UILogCallback, levels: Optional[Sequence[str]] = None
     ):
@@ -97,6 +166,45 @@ class BaseUILogWriter[E: BaseUILogEvents](ABC):
 
 
 class UIHistory[W: BaseUILogWriter, E: BaseUILogEvents](BaseModel):
+    """A model for tracking UI log history.
+
+    Maintains a history of UI log entries and provides access to a log writer.
+    Only logs events that are included in the events list.
+
+    Attributes:
+        writer_class: The BaseUILogWriter subclass to use for creating logs
+        events: A list of event enum values to include in the history
+
+    Example:
+        class MyEvents(BaseUILogEvents):
+            ON_START = "on_start"
+            ON_END = "on_end"
+
+        class MyWriter(BaseUILogWriter[MyEvents]):
+            @property
+            def events_type(self) -> type[MyEvents]:
+                return MyEvents
+
+            def _create_success_log(self, message: str, **kwargs) -> UiChatLog:
+                return UiChatLog(
+                    message_type="text",
+                    content=message,
+                    timestamp="2023-01-01T12:00:00"
+                )
+
+        # Create a history tracking specific events
+        history = UIHistory(writer_class=MyWriter, events=[MyEvents.ON_START])
+
+        # Use the log writer to create logs
+        history.log.success("Starting process", event=MyEvents.ON_START)
+
+        # The following will raise an error as the ON_END event was not enabled
+        history.log.success("Starting process", event=MyEvents.ON_END)
+
+        # Access the state containing all logs
+        state = history.state
+    """
+
     model_config = ConfigDict(arbitrary_types_allowed=True)
     writer_class: type[W]
     events: list[E]
