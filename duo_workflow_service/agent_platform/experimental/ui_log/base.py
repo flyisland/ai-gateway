@@ -10,7 +10,6 @@ from duo_workflow_service.entities import UiChatLog
 
 __all__ = [
     "BaseUILogEvents",
-    "_UILogEntry",
     "BaseUILogWriter",
     "UIHistory",
 ]
