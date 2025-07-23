@@ -173,6 +173,8 @@ class ChatAgent(Prompt[ChatWorkflowState, BaseMessage]):
             )
             new_messages.append(agent_response)
 
+            parsed_response = self._parse_extended_response(agent_response)
+
             if isinstance(agent_response, AIMessage):
                 self._track_tokens_data(agent_response)
 
@@ -193,11 +195,25 @@ class ChatAgent(Prompt[ChatWorkflowState, BaseMessage]):
                 not isinstance(agent_response, AIMessage)
                 or len(agent_response.tool_calls) == 0
             ):
+                # Determine message type based on parsed response
+                message_type = (
+                    MessageTypeEnum.EXTENDED_THINKING_AGENT
+                    if parsed_response.get("content", {}).get("thinking")
+                    else MessageTypeEnum.AGENT
+                )
+                
+                # Use the text content from parsed response if available, otherwise fallback to original content
+                content = (
+                    parsed_response.get("content", {}).get("text", "")
+                    or StrOutputParser().invoke(agent_response)
+                    or ""
+                )
+                
                 result["ui_chat_log"] = [
                     UiChatLog(  # type: ignore[list-item]
-                        message_type=MessageTypeEnum.AGENT,
+                        message_type=message_type,
                         message_sub_type=None,
-                        content=StrOutputParser().invoke(agent_response) or "",
+                        content=content,
                         timestamp=datetime.now(timezone.utc).isoformat(),
                         status=ToolStatus.SUCCESS,
                         correlation_id=None,
@@ -237,6 +253,34 @@ class ChatAgent(Prompt[ChatWorkflowState, BaseMessage]):
                     )
                 ],
             }
+        
+    def _parse_extended_response(self, agent_response: AIMessage) -> dict:
+        thinking_content = None
+        text_content = ""
+        signature = None
+        
+        # Handle both list and string content formats
+        if isinstance(agent_response.content, list):
+            for block in agent_response.content:
+                if isinstance(block, dict):
+                    if block.get('type') == 'thinking':
+                        thinking_content = block.get('thinking')
+                        signature = block.get('signature')
+                    elif block.get('type') == 'text':
+                        text_content = block.get('text', '')
+        elif isinstance(agent_response.content, str):
+            text_content = agent_response.content
+        
+        return {
+            "response_type": "ai_message_extended",
+            "content": {
+                "text": text_content,
+                "thinking": thinking_content,
+                "signature": signature
+            },
+            "metadata": agent_response.response_metadata,
+            "usage": agent_response.usage_metadata
+        }
 
     def _track_tokens_data(self, message: AIMessage):
         if not self.internal_event_client:

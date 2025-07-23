@@ -60,6 +60,7 @@ class WorkflowStatusEnum(StrEnum):
 
 
 class MessageTypeEnum(StrEnum):
+    EXTENDED_THINKING_AGENT = "extended_thinking_agent"
     AGENT = "agent"
     USER = "user"
     TOOL = "tool"

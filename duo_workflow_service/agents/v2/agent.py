@@ -154,7 +154,7 @@ class Agent(Prompt[DuoWorkflowStateType, BaseMessage]):
                 if isinstance(item, dict) and item.get("text", False)
             ),
             None,
-        )
+        )   
 
     def _create_ui_chat_log(self, content: str) -> UiChatLog:
         return UiChatLog(

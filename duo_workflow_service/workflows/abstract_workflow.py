@@ -262,8 +262,7 @@ class AbstractWorkflow(ABC):
 
                 compiled_graph = self._compile(goal, tools_registry, checkpointer)
                 graph_input = await self.get_graph_input(goal, status_event)
-
-                import pdb; pdb.set_trace()
+                
                 async for type, state in compiled_graph.astream(
                     input=graph_input,
                     config=graph_config,
