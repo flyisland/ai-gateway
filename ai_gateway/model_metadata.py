@@ -6,6 +6,7 @@ from pydantic import AnyUrl, BaseModel, StringConstraints, UrlConstraints
 
 from ai_gateway.api.auth_utils import StarletteUser
 from ai_gateway.model_selection import ModelSelectionConfig
+from ai_gateway.config import Config
 
 
 class BaseModelMetadata(BaseModel):
@@ -95,11 +96,30 @@ def parameters_for_gitlab_provider(parameters) -> dict[str, Any]:
             "Argument error: either identifier or feature_setting must be present."
         )
 
-    return {
+    result = {
         "provider": gitlab_model.provider,
         "identifier": gitlab_model.provider_identifier,
         "name": gitlab_model.family or "base",
     }
+
+    if gitlab_model.provider == "fireworks_ai":
+        config = Config()
+
+        if config.model_endpoints.fireworks_current_region_endpoint:
+            if gitlab_model.gitlab_identifier == "codestral_2501_fireworks":
+                model_config = (
+                    config.model_endpoints.fireworks_current_region_endpoint.get(
+                        "codestral-2501", {}
+                    )
+                )
+                if model_config:
+                    result["endpoint"] = model_config.get("endpoint")
+                    result["api_key"] = config.model_keys.fireworks_api_key
+                    result["identifier"] = (
+                        f"text-completion-openai/{model_config.get('identifier')}"
+                    )
+
+    return result
 
 
 def create_model_metadata(data: Dict[str, Any]) -> Optional[TypeModelMetadata]:
@@ -111,6 +131,22 @@ def create_model_metadata(data: Dict[str, Any]) -> Optional[TypeModelMetadata]:
             return AmazonQModelMetadata(**data)
         case "gitlab":
             return ModelMetadata(**parameters_for_gitlab_provider(data))
+        case "anthropic":
+            return ModelMetadata(
+                name=data.get("name"),
+                provider="anthropic",
+                endpoint=data.get("endpoint"),
+                api_key=data.get("api_key"),
+                identifier=data.get("identifier"),
+            )
+        case "vertex-ai" | "vertex_ai":
+            return ModelMetadata(
+                name=data.get("name") or "codestral-2501",
+                provider="vertex-ai",
+                endpoint=data.get("endpoint"),
+                api_key=data.get("api_key"),
+                identifier=data.get("identifier"),
+            )
 
     return ModelMetadata(**data)
 
