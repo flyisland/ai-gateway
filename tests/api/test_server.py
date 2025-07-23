@@ -237,7 +237,10 @@ def test_middleware_log_request(fastapi_server_app: FastAPI):
     with capture_logs() as cap_logs:
         client.post("/v2/chat/agent")
         correlation_ids = [log.get("correlation_id") for log in cap_logs]
-        assert len(correlation_ids) > 0
+        # Assert at least one correlation_id is present and is not None or 'undefined'
+        assert any(
+            cid not in (None, "undefined") for cid in correlation_ids
+        ), f"No valid correlation_id found in logs: {correlation_ids}"
 
 
 @pytest.mark.usefixtures("fastapi_server_app")

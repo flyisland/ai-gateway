@@ -1,23 +1,22 @@
-import asyncio
-from typing import Awaitable, Callable
 from unittest import mock
-from unittest.mock import ANY, Mock, patch
+from unittest.mock import ANY, Mock
 
 import pytest
 from structlog.testing import capture_logs
 
 from ai_gateway.instrumentators.threads import monitor_threads
 
-max_loop_counter = 1
+MAX_LOOP_COUNTER = 1
 
 
-def mock_run_once():
-    global max_loop_counter
+class LoopCounter:
+    def __init__(self, max_count):
+        self.count = max_count
 
-    if max_loop_counter > 0:
-        max_loop_counter -= 1
-        return True
-    else:
+    def should_run(self):
+        if self.count > 0:
+            self.count -= 1
+            return True
         return False
 
 
@@ -25,8 +24,9 @@ def mock_run_once():
 @mock.patch("prometheus_client.Gauge.labels")
 @mock.patch("ai_gateway.instrumentators.threads.asyncio.sleep")
 async def test_monitor_threads(mock_sleep, mock_gauges):
+    loop_counter = LoopCounter(MAX_LOOP_COUNTER)
     mock_loop = Mock()
-    mock_loop.is_running = mock_run_once
+    mock_loop.is_running = loop_counter.should_run
     interval = 0.001
 
     with capture_logs() as cap_logs:

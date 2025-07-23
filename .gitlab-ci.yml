@@ -23,6 +23,16 @@ variables:
   PIP_CACHE_DIR: "$CI_PROJECT_DIR/.cache/pip"
   POETRY_CACHE_DIR: "$CI_PROJECT_DIR/.cache/poetry"
 
+
+  DOCKER_AUTH_CONFIG: |
+    {
+      "auths": {
+        "$CI_DEPENDENCY_PROXY_SERVER": {
+          "auth": "$CI_DEPENDENCY_PROXY_AUTH"
+        }
+      }
+    }
+
   DOCKER_VERSION: "20.10.23"
   DOCKER_TLS_CERTDIR: "/certs"
   DOCKER_MODEL_GATEWAY: "$CI_REGISTRY_IMAGE/model-gateway"

@@ -29,7 +29,7 @@ from ai_gateway.code_suggestions.processing.typing import (
     MetadataCodeContent,
     MetadataPromptBuilder,
 )
-from ai_gateway.config import Config, ConfigModelLimits
+from ai_gateway.config import Config, ConfigLogging, ConfigModelLimits
 from ai_gateway.container import ContainerApplication
 from ai_gateway.model_metadata import TypeModelMetadata, current_model_metadata_context
 from ai_gateway.models.base import ModelMetadata, TokensConsumptionMetadata
@@ -43,6 +43,7 @@ from ai_gateway.prompts.config.base import ModelConfig, PromptConfig, PromptPara
 from ai_gateway.prompts.config.models import ChatLiteLLMParams, TypeModelParams
 from ai_gateway.prompts.typing import Model, TypeModelFactory
 from ai_gateway.safety_attributes import SafetyAttributes
+from ai_gateway.structured_logging import setup_logging
 from duo_workflow_service.entities.event import WorkflowEvent
 from duo_workflow_service.entities.state import (
     MessageTypeEnum,
@@ -52,7 +53,9 @@ from duo_workflow_service.entities.state import (
     WorkflowStatusEnum,
 )
 from duo_workflow_service.gitlab.gitlab_project import Project
-from duo_workflow_service.server import CONTAINER_APPLICATION_PACKAGES
+
+# Added for test wiring and internal events mocking
+from duo_workflow_service.server import CONTAINER_APPLICATION_PACKAGES  # type: ignore
 from duo_workflow_service.workflows.type_definitions import AdditionalContext
 from lib.feature_flags.context import current_feature_flag_context
 from lib.internal_events.client import InternalEventsClient
@@ -89,6 +92,7 @@ def stub_auth_provider():
 
 @pytest.fixture(scope="class")
 def test_client(fast_api_router, stub_auth_provider):
+    setup_logging(ConfigLogging(), custom_models_enabled=True)
     middlewares = [
         Middleware(RawContextMiddleware),
         Middleware(AccessLogMiddleware, skip_endpoints=[]),
@@ -97,6 +101,7 @@ def test_client(fast_api_router, stub_auth_provider):
     ]
     app = FastAPI(middleware=middlewares)
     app.include_router(fast_api_router)
+
     client = TestClient(app)
 
     return client
@@ -649,7 +654,7 @@ def internal_event_client():
 
 @pytest.fixture
 def model_limits():
-    return ConfigModelLimits()
+    return ConfigModelLimits(root={})
 
 
 @pytest.fixture
@@ -749,3 +754,10 @@ def reset_context():
     yield
     current_feature_flag_context.set(set[str]())
     current_model_metadata_context.set(None)
+
+
+@pytest.fixture(autouse=True)
+def set_test_env_vars(monkeypatch):
+    """Set environment variables needed for tests."""
+    # Set a dummy Anthropic API key to prevent failures in tests
+    monkeypatch.setenv("ANTHROPIC_API_KEY", "dummy-test-key-for-ci")

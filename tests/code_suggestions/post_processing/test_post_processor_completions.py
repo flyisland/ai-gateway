@@ -3,6 +3,20 @@ from unittest.mock import Mock, patch
 import pytest
 
 from ai_gateway.code_suggestions.processing import LanguageId
+
+
+@pytest.fixture(autouse=True)
+def mock_context_middleware():
+    """Mock the ContextDoesNotExistError for tests that don't have a request cycle."""
+    # Instead of trying to create a real context, let's patch the function
+    # that accesses the context to avoid errors
+    with patch(
+        "ai_gateway.api.middleware.self_hosted_logging.enabled_instance_verbose_ai_logs",
+        return_value=False,
+    ):
+        yield
+
+
 from ai_gateway.code_suggestions.processing.post.completions import (
     PostProcessor as PostProcessorCompletions,
 )

@@ -21,6 +21,7 @@ from ai_gateway.chat.agents.typing import (
 )
 from ai_gateway.chat.context.current_page import Context, IssueContext
 from ai_gateway.chat.tools.gitlab import IssueReader, MergeRequestReader
+from ai_gateway.config import ConfigLogging
 from ai_gateway.models.base_chat import Role
 from ai_gateway.prompts.config.models import (
     ChatAnthropicParams,
@@ -28,6 +29,7 @@ from ai_gateway.prompts.config.models import (
     ModelClassProvider,
     TypeModelParams,
 )
+from ai_gateway.structured_logging import ENABLE_REQUEST_LOGGING, setup_logging
 from lib.feature_flags.context import current_feature_flag_context
 
 
@@ -53,6 +55,39 @@ def prompt_template():
         "user": "{% include 'chat/react/user/1.0.0.jinja' %}",
         "assistant": "{% include 'chat/react/assistant/1.0.0.jinja' %}",
     }
+
+
+@pytest.fixture(autouse=True)
+def setup_test_logging():
+    # Configure logging for tests
+    setup_logging(
+        logging_config=ConfigLogging(
+            level="INFO",
+            format_json=False,
+            enable_request_logging=True,
+            enable_litellm_logging=False,
+            to_file=None,
+        ),
+        custom_models_enabled=False,
+        cache_logger_on_first_use=False,
+    )
+    yield
+
+
+@pytest.fixture(autouse=True)
+def enable_request_logging():
+    from ai_gateway.structured_logging import ENABLE_REQUEST_LOGGING
+
+    # Store the original value
+    original_value = ENABLE_REQUEST_LOGGING
+
+    # Set it to True for the test
+    import ai_gateway.structured_logging
+
+    ai_gateway.structured_logging.ENABLE_REQUEST_LOGGING = True
+    yield
+    # Restore the original value
+    ai_gateway.structured_logging.ENABLE_REQUEST_LOGGING = original_value
 
 
 @pytest.fixture(autouse=True)

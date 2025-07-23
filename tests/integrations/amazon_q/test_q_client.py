@@ -5,6 +5,9 @@ import pytest
 from botocore.exceptions import ClientError
 from fastapi import HTTPException
 from pydantic import BaseModel
+from starlette_context import context as starlette_context
+from starlette_context.errors import ContextDoesNotExistError
+from starlette_context.middleware import RawContextMiddleware
 
 from ai_gateway.api.auth_utils import StarletteUser
 from ai_gateway.auth.glgo import GlgoAuthority
@@ -21,6 +24,18 @@ class AccessDeniedException(ClientError):
             },
             operation_name="SendEvent",
         )
+
+
+@pytest.fixture(autouse=True)
+def mock_context_middleware():
+    """Mock the ContextDoesNotExistError for tests that don't have a request cycle."""
+    # Instead of trying to create a real context, let's patch the function
+    # that accesses the context to avoid errors
+    with patch(
+        "ai_gateway.api.middleware.self_hosted_logging.enabled_instance_verbose_ai_logs",
+        return_value=False,
+    ):
+        yield
 
 
 class TestAmazonQClientFactory:
