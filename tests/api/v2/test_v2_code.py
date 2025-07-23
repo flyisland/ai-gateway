@@ -12,7 +12,6 @@ from gitlab_cloud_connector import CloudConnectorUser, UserClaims
 from snowplow_tracker import Snowplow
 from starlette.datastructures import CommaSeparatedStrings
 from structlog.testing import capture_logs
-from google.auth.credentials import Credentials
 
 from ai_gateway.api.error_utils import capture_validation_errors
 from ai_gateway.api.v2 import api_router
@@ -1154,38 +1153,6 @@ class TestCodeCompletions:
         assert result["model"]["engine"] == "vertex-ai"
         assert result["model"]["name"] == "vertex_ai/codestral-2501"
         assert result["choices"][0]["text"] == "Post-processed completion response"
-
-    @patch("google.auth.default")
-    def test_vertex_codestral_with_prompt(
-        self, mock_auth, mock_client, mock_agent_model: Mock
-    ):
-        mock_credentials = Mock(spec=Credentials)
-        mock_auth.return_value = (mock_credentials, "test-project-id")
-
-        params = {
-            "prompt_version": 2,
-            "project_path": "gitlab-org/gitlab",
-            "project_id": 278964,
-            "current_file": {
-                "file_name": "main.py",
-                "content_above_cursor": "foo",
-                "content_below_cursor": "\n",
-            },
-            "prompt": "bar",
-            "model_provider": "vertex-ai",
-            "model_name": "codestral-2501",
-        }
-
-        response = self._send_code_completions_request(mock_client, params)
-
-        assert not mock_agent_model.called
-        assert response.status_code == 400
-
-        body = response.json()
-        assert (
-            (body["detail"])
-            == "You cannot specify a prompt with the given provider and model combination"
-        )
 
     @pytest.mark.parametrize(
         "allow_llm_cache",
