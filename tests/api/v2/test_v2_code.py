@@ -1154,9 +1154,11 @@ class TestCodeCompletions:
         assert result["model"]["engine"] == "vertex-ai"
         assert result["model"]["name"] == "vertex_ai/codestral-2501"
         assert result["choices"][0]["text"] == "Post-processed completion response"
-    
-    @patch('google.auth.default')
-    def test_vertex_codestral_with_prompt(self, mock_auth,mock_client, mock_agent_model: Mock):
+
+    @patch("google.auth.default")
+    def test_vertex_codestral_with_prompt(
+        self, mock_auth, mock_client, mock_agent_model: Mock
+    ):
         mock_credentials = Mock(spec=Credentials)
         mock_auth.return_value = (mock_credentials, "test-project-id")
 

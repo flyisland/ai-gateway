@@ -78,6 +78,7 @@ __all__ = [
 @dataclass
 class CompletionConfig:
     """Configuration for code completion providers."""
+
     factory: Factory[CodeCompletions]
     handler_class: Optional[type] = None
     requires_prompt_registry: bool = False
@@ -486,13 +487,27 @@ def _get_provider_config(
     completions_amazon_q_factory: Factory[CodeCompletions],
     completions_litellm_vertex_codestral_factory: Factory[CodeCompletions],
     region: str,
+    payload: CompletionsRequestWithVersion,
 ) -> CompletionConfig:
     """Get the appropriate completion configuration for the given provider."""
+
+    def _should_include_context(provider: KindModelProvider) -> bool:
+        """Determine if this provider should include context"""
+
+        return provider not in [KindModelProvider.ANTHROPIC, KindModelProvider.AMAZON_Q]
+
+    def _get_context_kwargs(provider: KindModelProvider) -> Dict[str, Any]:
+        """Get context kwargs if needed for this provider"""
+
+        if _should_include_context(provider) and payload.context:
+            return {"code_context": [ctx.content for ctx in payload.context]}
+        return {}
 
     if provider == KindModelProvider.ANTHROPIC:
         return CompletionConfig(
             factory=completions_anthropic_factory,
             handler_class=AnthropicHandler,
+            extra_kwargs=_get_context_kwargs(provider),
         )
 
     elif provider in (KindModelProvider.LITELLM, KindModelProvider.MISTRALAI):
@@ -500,12 +515,14 @@ def _get_provider_config(
             factory=completions_litellm_factory,
             handler_class=LiteLlmHandler,
             requires_prompt_registry=True,
+            extra_kwargs=_get_context_kwargs(provider),
         )
 
     elif provider == KindModelProvider.AMAZON_Q:
         return CompletionConfig(
             factory=completions_amazon_q_factory,
             unit_primitive=GitLabUnitPrimitive.AMAZON_Q_INTEGRATION,
+            extra_kwargs=_get_context_kwargs(provider),
         )
 
     elif provider == KindModelProvider.FIREWORKS or not _allow_vertex_codestral(region):
@@ -513,16 +530,20 @@ def _get_provider_config(
             factory=completions_fireworks_factory,
             handler_class=FireworksHandler,
             requires_prompt_registry=True,
+            extra_kwargs=_get_context_kwargs(provider),
         )
 
     else:
+        base_kwargs = {
+            "temperature": 0.7,
+            "max_output_tokens": 64,
+            "context_max_percent": 0.3,
+        }
+        base_kwargs.update(_get_context_kwargs(provider))
+
         return CompletionConfig(
             factory=completions_litellm_vertex_codestral_factory,
-            extra_kwargs={
-                "temperature": 0.7,
-                "max_output_tokens": 64,
-                "context_max_percent": 0.3,
-            }
+            extra_kwargs=base_kwargs,
         )
 
 
@@ -606,6 +627,7 @@ def _build_code_completions(
             completions_amazon_q_factory,
             completions_litellm_vertex_codestral_factory,
             region,
+            payload,
         )
 
         kwargs = {}
@@ -637,9 +659,6 @@ def _build_code_completions(
             code_completions = config.factory()
 
         kwargs.update(config.extra_kwargs)
-
-        if (payload.model_provider not in [KindModelProvider.ANTHROPIC, KindModelProvider.AMAZON_Q] and payload.context):
-            kwargs.update({"code_context": [ctx.content for ctx in payload.context]})
 
         unit_primitive = config.unit_primitive or GitLabUnitPrimitive.COMPLETE_CODE
         tracking_event = f"request_{unit_primitive}"
