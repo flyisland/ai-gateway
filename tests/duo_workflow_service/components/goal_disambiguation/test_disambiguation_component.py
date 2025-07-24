@@ -2,20 +2,15 @@ import os
 from unittest.mock import AsyncMock, MagicMock, call, patch
 
 import pytest
-from langchain_core.language_models.chat_models import BaseChatModel
-from langchain_core.messages import (
-    AIMessage,
-    BaseMessage,
-    HumanMessage,
-    SystemMessage,
-    ToolMessage,
-)
+from langchain_core.messages import AIMessage, HumanMessage, SystemMessage
 from langchain_core.runnables import RunnableConfig
-from langgraph.checkpoint.memory import MemorySaver
 from langgraph.graph import END, StateGraph
 
 from duo_workflow_service.agents.agent import Agent
-from duo_workflow_service.components import GoalDisambiguationComponent, ToolsRegistry
+from duo_workflow_service.components import ToolsRegistry
+from duo_workflow_service.components.goal_disambiguation import (
+    GoalDisambiguationComponent,
+)
 from duo_workflow_service.components.goal_disambiguation.component import _AGENT_NAME
 from duo_workflow_service.components.goal_disambiguation.prompts import (
     ASSIGNMENT_PROMPT,
@@ -25,19 +20,28 @@ from duo_workflow_service.components.goal_disambiguation.prompts import (
 from duo_workflow_service.entities import (
     MessageTypeEnum,
     Plan,
-    ToolStatus,
-    UiChatLog,
     WorkflowEventType,
     WorkflowState,
     WorkflowStatusEnum,
 )
 from duo_workflow_service.gitlab.http_client import GitlabHttpClient
+from duo_workflow_service.llm_factory import AnthropicConfig
 from duo_workflow_service.tools import HandoverTool
 from duo_workflow_service.tools.request_user_clarification import (
     RequestUserClarificationTool,
 )
 from lib.feature_flags import current_feature_flag_context
 from lib.internal_events.event_enum import CategoryEnum
+
+
+@pytest.fixture
+def mock_create_model():
+    with patch(
+        "duo_workflow_service.components.goal_disambiguation.component.create_chat_model"
+    ) as mock:
+        mock.return_value = mock
+        mock.bind_tools.return_value = mock
+        yield mock
 
 
 class TestGoalDisambiguationComponent:
@@ -51,12 +55,6 @@ class TestGoalDisambiguationComponent:
             recursion_limit=50,
             configurable={"thread_id": "test-workflow"},
         )
-
-    @pytest.fixture
-    def chat_mock(self):
-        mock = MagicMock(BaseChatModel)
-        mock.bind_tools.return_value = mock
-        return mock
 
     @pytest.fixture
     def tools_registry_mock(self):
@@ -104,11 +102,11 @@ class TestGoalDisambiguationComponent:
             ("USE_MEMSAVER", "True"),
         ],
     )
+    @pytest.mark.usefixtures("mock_create_model")
     async def test_attach_with_feature_disabled(
         self,
         env_var: str,
         env_var_val: str,
-        chat_mock: BaseChatModel,
         tools_registry_mock: ToolsRegistry,
         mock_http_client: GitlabHttpClient,
         graph_config: RunnableConfig,
@@ -128,7 +126,7 @@ class TestGoalDisambiguationComponent:
                 goal="fix that bug",
                 workflow_id=graph_config["configurable"]["thread_id"],
                 allow_agent_to_request_user=True,
-                model=chat_mock,
+                model_config=AnthropicConfig(model_name="claude-sonnet-4-20250514"),
                 tools_registry=tools_registry_mock,
                 http_client=mock_http_client,
                 workflow_type=CategoryEnum.WORKFLOW_SOFTWARE_DEVELOPMENT,
@@ -145,10 +143,10 @@ class TestGoalDisambiguationComponent:
             ), "Then disambiguation component should be skipped"
 
     @pytest.mark.asyncio
+    @pytest.mark.usefixtures("mock_create_model")
     @patch.dict(os.environ, {"FEATURE_GOAL_DISAMBIGUATION": "True"})
     async def test_attach_without_allow_agent_to_request_user(
         self,
-        chat_mock: BaseChatModel,
         tools_registry_mock: ToolsRegistry,
         mock_http_client: GitlabHttpClient,
         graph_config: RunnableConfig,
@@ -165,7 +163,7 @@ class TestGoalDisambiguationComponent:
                 goal="fix that bug",
                 workflow_id=graph_config["configurable"]["thread_id"],
                 allow_agent_to_request_user=False,
-                model=chat_mock,
+                model_config=AnthropicConfig(model_name="claude-sonnet-4-20250514"),
                 tools_registry=tools_registry_mock,
                 http_client=mock_http_client,
                 workflow_type=CategoryEnum.WORKFLOW_SOFTWARE_DEVELOPMENT,
@@ -182,10 +180,10 @@ class TestGoalDisambiguationComponent:
             ), "Then disambiguation component should be skipped"
 
     @pytest.mark.asyncio
+    @pytest.mark.usefixtures("mock_create_model")
     @patch.dict(os.environ, {"FEATURE_GOAL_DISAMBIGUATION": "True"})
     async def test_component_prompt_construction(
         self,
-        chat_mock: BaseChatModel,
         tools_registry_mock: ToolsRegistry,
         mock_http_client: GitlabHttpClient,
         graph_input: WorkflowState,
@@ -239,7 +237,7 @@ class TestGoalDisambiguationComponent:
                 goal=goal,
                 workflow_id=graph_config["configurable"]["thread_id"],  # etype:ignore
                 allow_agent_to_request_user=True,
-                model=chat_mock,
+                model_config=AnthropicConfig(model_name="claude-sonnet-4-20250514"),
                 tools_registry=tools_registry_mock,
                 http_client=mock_http_client,
                 workflow_type=CategoryEnum.WORKFLOW_SOFTWARE_DEVELOPMENT,
@@ -261,10 +259,10 @@ class TestGoalDisambiguationComponent:
             )
 
     @pytest.mark.asyncio
+    @pytest.mark.usefixtures("mock_create_model")
     @patch.dict(os.environ, {"FEATURE_GOAL_DISAMBIGUATION": "True"})
     async def test_component_run_with_clear_goal(
         self,
-        chat_mock: BaseChatModel,
         tools_registry_mock: ToolsRegistry,
         mock_http_client: GitlabHttpClient,
         graph_input: WorkflowState,
@@ -310,7 +308,7 @@ class TestGoalDisambiguationComponent:
                 goal="Fix all the bugs",
                 workflow_id=graph_config["configurable"]["thread_id"],
                 allow_agent_to_request_user=True,
-                model=chat_mock,
+                model_config=AnthropicConfig(model_name="claude-sonnet-4-20250514"),
                 tools_registry=tools_registry_mock,
                 http_client=mock_http_client,
                 workflow_type=CategoryEnum.WORKFLOW_SOFTWARE_DEVELOPMENT,
@@ -332,12 +330,12 @@ class TestGoalDisambiguationComponent:
             assert response["handover"][-1] == AIMessage(content="This is a summary")
 
     @pytest.mark.asyncio
+    @pytest.mark.usefixtures("mock_create_model")
     @patch("duo_workflow_service.components.goal_disambiguation.component.interrupt")
     @patch.dict(os.environ, {"FEATURE_GOAL_DISAMBIGUATION": "True"})
     async def test_component_run_with_unclear_goal(
         self,
         mock_interrupt,
-        chat_mock: BaseChatModel,
         tools_registry_mock: ToolsRegistry,
         mock_http_client: GitlabHttpClient,
         graph_input: WorkflowState,
@@ -384,7 +382,7 @@ class TestGoalDisambiguationComponent:
                 goal="Fix all the bugs",
                 workflow_id=graph_config["configurable"]["thread_id"],
                 allow_agent_to_request_user=True,
-                model=chat_mock,
+                model_config=AnthropicConfig(model_name="claude-sonnet-4-20250514"),
                 tools_registry=tools_registry_mock,
                 http_client=mock_http_client,
                 workflow_type=CategoryEnum.WORKFLOW_SOFTWARE_DEVELOPMENT,
@@ -426,12 +424,12 @@ class TestGoalDisambiguationComponent:
             assert response["handover"][-1].content == "This is a summary"
 
     @pytest.mark.asyncio
+    @pytest.mark.usefixtures("mock_create_model")
     @patch("duo_workflow_service.components.goal_disambiguation.component.interrupt")
     @patch.dict(os.environ, {"FEATURE_GOAL_DISAMBIGUATION": "True"})
     async def test_component_run_with_string_recommendations(
         self,
         mock_interrupt,
-        chat_mock: BaseChatModel,
         tools_registry_mock: ToolsRegistry,
         mock_http_client: GitlabHttpClient,
         graph_input: WorkflowState,
@@ -471,7 +469,7 @@ class TestGoalDisambiguationComponent:
                 goal="Fix all the bugs",
                 workflow_id=graph_config["configurable"]["thread_id"],
                 allow_agent_to_request_user=True,
-                model=chat_mock,
+                model_config=AnthropicConfig(model_name="claude-sonnet-4-20250514"),
                 tools_registry=tools_registry_mock,
                 http_client=mock_http_client,
                 workflow_type=CategoryEnum.WORKFLOW_SOFTWARE_DEVELOPMENT,
@@ -499,12 +497,12 @@ class TestGoalDisambiguationComponent:
             )
 
     @pytest.mark.asyncio
+    @pytest.mark.usefixtures("mock_create_model")
     @patch("duo_workflow_service.components.goal_disambiguation.component.interrupt")
     @patch.dict(os.environ, {"FEATURE_GOAL_DISAMBIGUATION": "True"})
     async def test_component_run_with_resume(
         self,
         mock_interrupt,
-        chat_mock: BaseChatModel,
         tools_registry_mock: ToolsRegistry,
         mock_http_client: GitlabHttpClient,
         graph_input: WorkflowState,
@@ -545,7 +543,7 @@ class TestGoalDisambiguationComponent:
                 goal="Fix all the bugs",
                 workflow_id=graph_config["configurable"]["thread_id"],
                 allow_agent_to_request_user=True,
-                model=chat_mock,
+                model_config=AnthropicConfig(model_name="claude-sonnet-4-20250514"),
                 tools_registry=tools_registry_mock,
                 http_client=mock_http_client,
                 workflow_type=CategoryEnum.WORKFLOW_SOFTWARE_DEVELOPMENT,
@@ -565,12 +563,12 @@ class TestGoalDisambiguationComponent:
             assert mock_interrupt.call_count == 2
 
     @pytest.mark.asyncio
+    @pytest.mark.usefixtures("mock_create_model")
     @patch("duo_workflow_service.components.goal_disambiguation.component.interrupt")
     @patch.dict(os.environ, {"FEATURE_GOAL_DISAMBIGUATION": "True"})
     async def test_component_run_with_stop_event(
         self,
         mock_interrupt,
-        chat_mock: BaseChatModel,
         tools_registry_mock: ToolsRegistry,
         mock_http_client: GitlabHttpClient,
         graph_input: WorkflowState,
@@ -598,7 +596,7 @@ class TestGoalDisambiguationComponent:
                 goal="Fix bug in pipeline configuration",
                 workflow_id=graph_config["configurable"]["thread_id"],
                 allow_agent_to_request_user=True,
-                model=chat_mock,
+                model_config=AnthropicConfig(model_name="claude-sonnet-4-20250514"),
                 tools_registry=tools_registry_mock,
                 http_client=mock_http_client,
                 workflow_type=CategoryEnum.WORKFLOW_SOFTWARE_DEVELOPMENT,
@@ -621,12 +619,12 @@ class TestGoalDisambiguationComponent:
             assert response["handover"] == graph_input["handover"]
 
     @pytest.mark.asyncio
+    @pytest.mark.usefixtures("mock_create_model")
     @patch.dict(os.environ, {"FEATURE_GOAL_DISAMBIGUATION": "True"})
     @patch("duo_workflow_service.components.goal_disambiguation.component.interrupt")
     async def test_component_run_with_agent_stop_response(
         self,
         mock_interrupt,
-        chat_mock: BaseChatModel,
         tools_registry_mock: ToolsRegistry,
         mock_http_client: GitlabHttpClient,
         graph_input: WorkflowState,
@@ -646,7 +644,7 @@ class TestGoalDisambiguationComponent:
                 goal="Fix bug in pipeline configuration",
                 workflow_id=graph_config["configurable"]["thread_id"],
                 allow_agent_to_request_user=True,
-                model=chat_mock,
+                model_config=AnthropicConfig(model_name="claude-sonnet-4-20250514"),
                 tools_registry=tools_registry_mock,
                 http_client=mock_http_client,
                 workflow_type=CategoryEnum.WORKFLOW_SOFTWARE_DEVELOPMENT,
