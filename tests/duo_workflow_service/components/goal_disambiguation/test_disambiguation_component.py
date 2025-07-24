@@ -1,5 +1,5 @@
 import os
-from unittest.mock import AsyncMock, MagicMock, call, patch
+from unittest.mock import MagicMock, call, patch
 
 import pytest
 from langchain_core.messages import AIMessage, HumanMessage, SystemMessage
@@ -46,13 +46,54 @@ def mock_create_model():
 
 
 @pytest.fixture
-def mock_agent():
+def llm_judge_response_unclear() -> AIMessage:
+    return AIMessage(
+        content="Please list which bugs you want to be fixed",
+        tool_calls=[
+            {
+                "id": "1",
+                "name": "request_user_clarification_tool",
+                "args": {
+                    "recommendations": ["List issue links for bugs to fix"],
+                    "message": "I need to understand which bug do you need to fix",
+                    "clarity_score": 2.1,
+                    "clarity_verdict": "UNCLEAR",
+                },
+            }
+        ],
+    )
+
+
+@pytest.fixture
+def mock_agent(llm_judge_response_unclear: AIMessage):
     with patch(
         "duo_workflow_service.components.goal_disambiguation.component.Agent"
     ) as mock:
         mock_agent = MagicMock(spec=Agent)
         mock.return_value = mock_agent
+        mock_agent.run.side_effect = [
+            {
+                "conversation_history": {"clarity_judge": [llm_judge_response_unclear]},
+            },
+            {
+                "conversation_history": {
+                    "clarity_judge": [AIMessage(content="All clear please proceed")]
+                },
+            },
+        ]
         yield mock_agent
+
+
+@pytest.fixture
+def mock_interrupt():
+    with patch(
+        "duo_workflow_service.components.goal_disambiguation.component.interrupt"
+    ) as mock:
+        mock.return_value = {
+            "event_type": WorkflowEventType.MESSAGE,
+            "message": "Bugs are described in issues 1, 2, 3, and 4",
+        }
+        yield mock
 
 
 class TestGoalDisambiguationComponent:
@@ -133,24 +174,6 @@ class TestGoalDisambiguationComponent:
             additional_context=None,
         )
 
-    @pytest.fixture
-    def llm_judge_response_unclear(self) -> AIMessage:
-        return AIMessage(
-            content="Please list which bugs you want to be fixed",
-            tool_calls=[
-                {
-                    "id": "1",
-                    "name": "request_user_clarification_tool",
-                    "args": {
-                        "recommendations": ["List issue links for bugs to fix"],
-                        "message": "I need to understand which bug do you need to fix",
-                        "clarity_score": 2.1,
-                        "clarity_verdict": "UNCLEAR",
-                    },
-                }
-            ],
-        )
-
     @pytest.mark.asyncio
     @pytest.mark.parametrize(
         "component_env",
@@ -210,11 +233,6 @@ class TestGoalDisambiguationComponent:
             goal=None,
             additional_context=None,
         )
-        mock_agent.run.return_value = {
-            "conversation_history": {
-                "clarity_judge": [AIMessage(content="All clear please proceed")]
-            },
-        }
 
         await compiled_graph.ainvoke(input=graph_input, config=graph_config)
 
@@ -233,34 +251,25 @@ class TestGoalDisambiguationComponent:
         compiled_graph: CompiledStateGraph,
     ):
         current_feature_flag_context.set({"duo_workflow_use_handover_summary"})
-        input = WorkflowState(
-            plan=Plan(steps=[]),
-            status=WorkflowStatusEnum.NOT_STARTED,
-            conversation_history={},
-            last_human_input=None,
-            handover=[],
-            ui_chat_log=[],
-            project=None,
-            goal=None,
-            additional_context=None,
-        )
 
-        mock_agent.run.return_value = {
-            "conversation_history": {
-                "clarity_judge": [
-                    AIMessage(
-                        content="All clear please proceed",
-                        tool_calls=[
-                            {
-                                "id": "1",
-                                "name": "handover_tool",
-                                "args": {"summary": "This is a summary"},
-                            }
-                        ],
-                    )
-                ]
-            },
-        }
+        mock_agent.run.side_effect = [
+            {
+                "conversation_history": {
+                    "clarity_judge": [
+                        AIMessage(
+                            content="All clear please proceed",
+                            tool_calls=[
+                                {
+                                    "id": "1",
+                                    "name": "handover_tool",
+                                    "args": {"summary": "This is a summary"},
+                                }
+                            ],
+                        )
+                    ]
+                },
+            }
+        ]
 
         response = await compiled_graph.ainvoke(input=graph_input, config=graph_config)
 
@@ -269,7 +278,6 @@ class TestGoalDisambiguationComponent:
 
     @pytest.mark.asyncio
     @pytest.mark.usefixtures("mock_create_model")
-    @patch("duo_workflow_service.components.goal_disambiguation.component.interrupt")
     async def test_component_run_with_unclear_goal(
         self,
         mock_interrupt,
@@ -280,10 +288,6 @@ class TestGoalDisambiguationComponent:
         compiled_graph: CompiledStateGraph,
     ):
         current_feature_flag_context.set({"duo_workflow_use_handover_summary"})
-        mock_interrupt.return_value = {
-            "event_type": WorkflowEventType.MESSAGE,
-            "message": "Bugs are described in issues 1, 2, 3, and 4",
-        }
 
         mock_agent.run.side_effect = [
             {
@@ -334,7 +338,6 @@ class TestGoalDisambiguationComponent:
 
     @pytest.mark.asyncio
     @pytest.mark.usefixtures("mock_create_model")
-    @patch("duo_workflow_service.components.goal_disambiguation.component.interrupt")
     async def test_component_run_with_string_recommendations(
         self,
         mock_interrupt,
@@ -344,32 +347,16 @@ class TestGoalDisambiguationComponent:
         mock_agent: MagicMock,
         compiled_graph: CompiledStateGraph,
     ):
-
         llm_judge_response_unclear.tool_calls[0]["args"][
             "recommendations"
         ] = "List issue links for bugs to fix"
-
-        mock_interrupt.return_value = {
-            "event_type": WorkflowEventType.MESSAGE,
-            "message": "Bugs are described in issues 1, 2, 3, and 4",
-        }
-
-        mock_agent.run.side_effect = [
-            {
-                "conversation_history": {"clarity_judge": [llm_judge_response_unclear]},
-            },
-            {
-                "conversation_history": {
-                    "clarity_judge": [AIMessage(content="All clear please proceed")]
-                },
-            },
-        ]
 
         response = await compiled_graph.ainvoke(input=graph_input, config=graph_config)
 
         # assert that the component requested user input
         mock_interrupt.assert_called_once()
         # assert correct ui communication between the component and UI client
+
         assert len(response["ui_chat_log"]) == 2
         assert (
             response["ui_chat_log"][0]["content"]
@@ -378,13 +365,11 @@ class TestGoalDisambiguationComponent:
 
     @pytest.mark.asyncio
     @pytest.mark.usefixtures("mock_create_model")
-    @patch("duo_workflow_service.components.goal_disambiguation.component.interrupt")
     async def test_component_run_with_resume(
         self,
         mock_interrupt,
         graph_input: WorkflowState,
         graph_config: RunnableConfig,
-        llm_judge_response_unclear: AIMessage,
         mock_agent: MagicMock,
         compiled_graph: CompiledStateGraph,
     ):
@@ -399,17 +384,6 @@ class TestGoalDisambiguationComponent:
             },
         ]
 
-        mock_agent.run.side_effect = [
-            {
-                "conversation_history": {"clarity_judge": [llm_judge_response_unclear]},
-            },
-            {
-                "conversation_history": {
-                    "clarity_judge": [AIMessage(content="All clear please proceed")]
-                },
-            },
-        ]
-
         await compiled_graph.ainvoke(input=graph_input, config=graph_config)
 
         # Assert that interrupt was called twice - first for cancellation, then for message event
@@ -417,13 +391,11 @@ class TestGoalDisambiguationComponent:
 
     @pytest.mark.asyncio
     @pytest.mark.usefixtures("mock_create_model")
-    @patch("duo_workflow_service.components.goal_disambiguation.component.interrupt")
     async def test_component_run_with_stop_event(
         self,
         mock_interrupt,
         graph_input: WorkflowState,
         graph_config: RunnableConfig,
-        llm_judge_response_unclear: AIMessage,
         mock_agent: MagicMock,
         compiled_graph: CompiledStateGraph,
     ):
@@ -434,10 +406,6 @@ class TestGoalDisambiguationComponent:
             },
         ]
 
-        mock_agent.run.return_value = {
-            "conversation_history": {"clarity_judge": [llm_judge_response_unclear]},
-        }
-
         response = await compiled_graph.ainvoke(input=graph_input, config=graph_config)
 
         assert mock_agent.run.call_count == 1
@@ -446,18 +414,16 @@ class TestGoalDisambiguationComponent:
 
     @pytest.mark.asyncio
     @pytest.mark.usefixtures("mock_create_model")
-    @patch("duo_workflow_service.components.goal_disambiguation.component.interrupt")
     async def test_component_run_with_agent_stop_response(
         self,
         mock_interrupt,
         graph_input: WorkflowState,
         graph_config: RunnableConfig,
-        llm_judge_response_unclear: AIMessage,
         mock_agent: MagicMock,
         compiled_graph: CompiledStateGraph,
     ):
 
-        mock_agent.run.return_value = {"status": WorkflowStatusEnum.CANCELLED}
+        mock_agent.run.side_effect = [{"status": WorkflowStatusEnum.CANCELLED}]
 
         response = await compiled_graph.ainvoke(input=graph_input, config=graph_config)
 
