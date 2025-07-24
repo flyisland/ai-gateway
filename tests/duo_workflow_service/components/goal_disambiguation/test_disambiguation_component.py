@@ -1,10 +1,11 @@
 import os
-from unittest.mock import MagicMock, call, patch
+from unittest.mock import AsyncMock, MagicMock, call, patch
 
 import pytest
 from langchain_core.messages import AIMessage, HumanMessage, SystemMessage
 from langchain_core.runnables import RunnableConfig
 from langgraph.graph import END, StateGraph
+from langgraph.graph.state import CompiledStateGraph
 
 from duo_workflow_service.agents.agent import Agent
 from duo_workflow_service.components import ToolsRegistry
@@ -69,6 +70,56 @@ class TestGoalDisambiguationComponent:
         return mock
 
     @pytest.fixture
+    def goal(str) -> str:
+        return "Fix all the bugs"
+
+    @pytest.fixture
+    def graph(self) -> StateGraph:
+        return StateGraph(WorkflowState)
+
+    @pytest.fixture
+    def component_env(self) -> dict[str, str]:
+        return {"FEATURE_GOAL_DISAMBIGUATION": "True"}
+
+    @pytest.fixture
+    def allow_agent_to_request_user(self) -> bool:
+        return True
+
+    @pytest.fixture
+    def entry_point(
+        self,
+        component_env: dict[str, str],
+        goal: str,
+        allow_agent_to_request_user: bool,
+        graph_config: RunnableConfig,
+        tools_registry_mock: ToolsRegistry,
+        gl_http_client: GitlabHttpClient,
+        graph: StateGraph,
+    ) -> str:
+        with patch.dict(os.environ, component_env):
+            component = GoalDisambiguationComponent(
+                goal=goal,
+                workflow_id=graph_config["configurable"]["thread_id"],
+                allow_agent_to_request_user=allow_agent_to_request_user,
+                model_config=AnthropicConfig(model_name="claude-sonnet-4-20250514"),
+                tools_registry=tools_registry_mock,
+                http_client=gl_http_client,
+                workflow_type=CategoryEnum.WORKFLOW_SOFTWARE_DEVELOPMENT,
+            )
+
+        return component.attach(
+            graph=graph,
+            component_exit_node=END,
+            component_execution_state=WorkflowStatusEnum.PLANNING,
+            graph_termination_node=END,
+        )
+
+    @pytest.fixture
+    def compiled_graph(self, graph: StateGraph, entry_point: str):
+        graph.set_entry_point(entry_point)
+        return graph.compile()
+
+    @pytest.fixture
     def graph_input(self) -> WorkflowState:
         return WorkflowState(
             plan=Plan(steps=[]),
@@ -102,90 +153,34 @@ class TestGoalDisambiguationComponent:
 
     @pytest.mark.asyncio
     @pytest.mark.parametrize(
-        ("env_var", "env_var_val"),
+        "component_env",
         [
-            ("FEATURE_GOAL_DISAMBIGUATION", "False"),
-            ("USE_MEMSAVER", "True"),
+            {"FEATURE_GOAL_DISAMBIGUATION": "False"},
+            {"USE_MEMSAVER": "True"},
         ],
     )
     @pytest.mark.usefixtures("mock_create_model")
-    async def test_attach_with_feature_disabled(
-        self,
-        env_var: str,
-        env_var_val: str,
-        tools_registry_mock: ToolsRegistry,
-        gl_http_client: GitlabHttpClient,
-        graph_config: RunnableConfig,
-    ):
-        graph = StateGraph(WorkflowState)
+    async def test_attach_with_feature_disabled(self, entry_point: str):
+        assert entry_point == END, "Then disambiguation component should be skipped"
 
-        with (patch.dict(os.environ, {env_var: env_var_val}),):
-            component = GoalDisambiguationComponent(
-                goal="fix that bug",
-                workflow_id=graph_config["configurable"]["thread_id"],
-                allow_agent_to_request_user=True,
-                model_config=AnthropicConfig(model_name="claude-sonnet-4-20250514"),
-                tools_registry=tools_registry_mock,
-                http_client=gl_http_client,
-                workflow_type=CategoryEnum.WORKFLOW_SOFTWARE_DEVELOPMENT,
-            )
-            entry_point = component.attach(
-                graph=graph,
-                component_exit_node="test_node",
-                component_execution_state=WorkflowStatusEnum.PLANNING,
-                graph_termination_node=END,
-            )
-
-            assert (
-                entry_point == "test_node"
-            ), "Then disambiguation component should be skipped"
+    @pytest.mark.asyncio
+    @pytest.mark.parametrize("allow_agent_to_request_user", [False])
+    @pytest.mark.usefixtures("mock_create_model")
+    async def test_attach_without_allow_agent_to_request_user(self, entry_point: str):
+        assert entry_point == END, "Then disambiguation component should be skipped"
 
     @pytest.mark.asyncio
     @pytest.mark.usefixtures("mock_create_model")
-    @patch.dict(os.environ, {"FEATURE_GOAL_DISAMBIGUATION": "True"})
-    async def test_attach_without_allow_agent_to_request_user(
-        self,
-        tools_registry_mock: ToolsRegistry,
-        gl_http_client: GitlabHttpClient,
-        graph_config: RunnableConfig,
-    ):
-        graph = StateGraph(WorkflowState)
-
-        component = GoalDisambiguationComponent(
-            goal="fix that bug",
-            workflow_id=graph_config["configurable"]["thread_id"],
-            allow_agent_to_request_user=False,
-            model_config=AnthropicConfig(model_name="claude-sonnet-4-20250514"),
-            tools_registry=tools_registry_mock,
-            http_client=gl_http_client,
-            workflow_type=CategoryEnum.WORKFLOW_SOFTWARE_DEVELOPMENT,
-        )
-        entry_point = component.attach(
-            graph=graph,
-            component_exit_node="test_node",
-            component_execution_state=WorkflowStatusEnum.PLANNING,
-            graph_termination_node=END,
-        )
-
-        assert (
-            entry_point == "test_node"
-        ), "Then disambiguation component should be skipped"
-
-    @pytest.mark.asyncio
-    @pytest.mark.usefixtures("mock_create_model")
-    @patch.dict(os.environ, {"FEATURE_GOAL_DISAMBIGUATION": "True"})
     async def test_component_prompt_construction(
         self,
-        tools_registry_mock: ToolsRegistry,
-        gl_http_client: GitlabHttpClient,
         graph_input: WorkflowState,
         graph_config: RunnableConfig,
         mock_agent: MagicMock,
+        goal: str,
+        compiled_graph: CompiledStateGraph,
     ):
-        graph = StateGraph(WorkflowState)
         human_msg = HumanMessage(content="Please fix all the bugs in my code")
         ai_msg = AIMessage(content="Sure, will do")
-        goal = "Fix all the bugs"
         graph_input["handover"] = [human_msg, ai_msg]
 
         expected_state = WorkflowState(
@@ -221,24 +216,6 @@ class TestGoalDisambiguationComponent:
             },
         }
 
-        component = GoalDisambiguationComponent(
-            goal=goal,
-            workflow_id=graph_config["configurable"]["thread_id"],  # etype:ignore
-            allow_agent_to_request_user=True,
-            model_config=AnthropicConfig(model_name="claude-sonnet-4-20250514"),
-            tools_registry=tools_registry_mock,
-            http_client=gl_http_client,
-            workflow_type=CategoryEnum.WORKFLOW_SOFTWARE_DEVELOPMENT,
-        )
-        entry_point = component.attach(
-            graph=graph,
-            component_exit_node=END,
-            component_execution_state=WorkflowStatusEnum.PLANNING,
-            graph_termination_node=END,
-        )
-        graph.set_entry_point(entry_point)
-        compiled_graph = graph.compile()
-
         await compiled_graph.ainvoke(input=graph_input, config=graph_config)
 
         mock_agent.run.assert_has_calls(
@@ -248,17 +225,14 @@ class TestGoalDisambiguationComponent:
 
     @pytest.mark.asyncio
     @pytest.mark.usefixtures("mock_create_model")
-    @patch.dict(os.environ, {"FEATURE_GOAL_DISAMBIGUATION": "True"})
     async def test_component_run_with_clear_goal(
         self,
-        tools_registry_mock: ToolsRegistry,
-        gl_http_client: GitlabHttpClient,
         graph_input: WorkflowState,
         graph_config: RunnableConfig,
         mock_agent: MagicMock,
+        compiled_graph: CompiledStateGraph,
     ):
         current_feature_flag_context.set({"duo_workflow_use_handover_summary"})
-        graph = StateGraph(WorkflowState)
         input = WorkflowState(
             plan=Plan(steps=[]),
             status=WorkflowStatusEnum.NOT_STARTED,
@@ -288,24 +262,6 @@ class TestGoalDisambiguationComponent:
             },
         }
 
-        component = GoalDisambiguationComponent(
-            goal="Fix all the bugs",
-            workflow_id=graph_config["configurable"]["thread_id"],
-            allow_agent_to_request_user=True,
-            model_config=AnthropicConfig(model_name="claude-sonnet-4-20250514"),
-            tools_registry=tools_registry_mock,
-            http_client=gl_http_client,
-            workflow_type=CategoryEnum.WORKFLOW_SOFTWARE_DEVELOPMENT,
-        )
-        entry_point = component.attach(
-            graph=graph,
-            component_exit_node=END,
-            component_execution_state=WorkflowStatusEnum.PLANNING,
-            graph_termination_node=END,
-        )
-        graph.set_entry_point(entry_point)
-        compiled_graph = graph.compile()
-
         response = await compiled_graph.ainvoke(input=graph_input, config=graph_config)
 
         assert len(response["handover"]) == 1
@@ -314,19 +270,16 @@ class TestGoalDisambiguationComponent:
     @pytest.mark.asyncio
     @pytest.mark.usefixtures("mock_create_model")
     @patch("duo_workflow_service.components.goal_disambiguation.component.interrupt")
-    @patch.dict(os.environ, {"FEATURE_GOAL_DISAMBIGUATION": "True"})
     async def test_component_run_with_unclear_goal(
         self,
         mock_interrupt,
-        tools_registry_mock: ToolsRegistry,
-        gl_http_client: GitlabHttpClient,
         graph_input: WorkflowState,
         graph_config: RunnableConfig,
         llm_judge_response_unclear: AIMessage,
         mock_agent: MagicMock,
+        compiled_graph: CompiledStateGraph,
     ):
         current_feature_flag_context.set({"duo_workflow_use_handover_summary"})
-        graph = StateGraph(WorkflowState)
         mock_interrupt.return_value = {
             "event_type": WorkflowEventType.MESSAGE,
             "message": "Bugs are described in issues 1, 2, 3, and 4",
@@ -353,24 +306,6 @@ class TestGoalDisambiguationComponent:
                 },
             },
         ]
-
-        component = GoalDisambiguationComponent(
-            goal="Fix all the bugs",
-            workflow_id=graph_config["configurable"]["thread_id"],
-            allow_agent_to_request_user=True,
-            model_config=AnthropicConfig(model_name="claude-sonnet-4-20250514"),
-            tools_registry=tools_registry_mock,
-            http_client=gl_http_client,
-            workflow_type=CategoryEnum.WORKFLOW_SOFTWARE_DEVELOPMENT,
-        )
-        entry_point = component.attach(
-            graph=graph,
-            component_exit_node=END,
-            component_execution_state=WorkflowStatusEnum.PLANNING,
-            graph_termination_node=END,
-        )
-        graph.set_entry_point(entry_point)
-        compiled_graph = graph.compile()
 
         response = await compiled_graph.ainvoke(input=graph_input, config=graph_config)
 
@@ -400,23 +335,20 @@ class TestGoalDisambiguationComponent:
     @pytest.mark.asyncio
     @pytest.mark.usefixtures("mock_create_model")
     @patch("duo_workflow_service.components.goal_disambiguation.component.interrupt")
-    @patch.dict(os.environ, {"FEATURE_GOAL_DISAMBIGUATION": "True"})
     async def test_component_run_with_string_recommendations(
         self,
         mock_interrupt,
-        tools_registry_mock: ToolsRegistry,
-        gl_http_client: GitlabHttpClient,
         graph_input: WorkflowState,
         graph_config: RunnableConfig,
         llm_judge_response_unclear: AIMessage,
         mock_agent: MagicMock,
+        compiled_graph: CompiledStateGraph,
     ):
 
         llm_judge_response_unclear.tool_calls[0]["args"][
             "recommendations"
         ] = "List issue links for bugs to fix"
 
-        graph = StateGraph(WorkflowState)
         mock_interrupt.return_value = {
             "event_type": WorkflowEventType.MESSAGE,
             "message": "Bugs are described in issues 1, 2, 3, and 4",
@@ -433,24 +365,6 @@ class TestGoalDisambiguationComponent:
             },
         ]
 
-        component = GoalDisambiguationComponent(
-            goal="Fix all the bugs",
-            workflow_id=graph_config["configurable"]["thread_id"],
-            allow_agent_to_request_user=True,
-            model_config=AnthropicConfig(model_name="claude-sonnet-4-20250514"),
-            tools_registry=tools_registry_mock,
-            http_client=gl_http_client,
-            workflow_type=CategoryEnum.WORKFLOW_SOFTWARE_DEVELOPMENT,
-        )
-        entry_point = component.attach(
-            graph=graph,
-            component_exit_node=END,
-            component_execution_state=WorkflowStatusEnum.PLANNING,
-            graph_termination_node=END,
-        )
-        graph.set_entry_point(entry_point)
-        compiled_graph = graph.compile()
-
         response = await compiled_graph.ainvoke(input=graph_input, config=graph_config)
 
         # assert that the component requested user input
@@ -465,18 +379,15 @@ class TestGoalDisambiguationComponent:
     @pytest.mark.asyncio
     @pytest.mark.usefixtures("mock_create_model")
     @patch("duo_workflow_service.components.goal_disambiguation.component.interrupt")
-    @patch.dict(os.environ, {"FEATURE_GOAL_DISAMBIGUATION": "True"})
     async def test_component_run_with_resume(
         self,
         mock_interrupt,
-        tools_registry_mock: ToolsRegistry,
-        gl_http_client: GitlabHttpClient,
         graph_input: WorkflowState,
         graph_config: RunnableConfig,
         llm_judge_response_unclear: AIMessage,
         mock_agent: MagicMock,
+        compiled_graph: CompiledStateGraph,
     ):
-        graph = StateGraph(WorkflowState)
         mock_interrupt.side_effect = [
             {
                 "event_type": WorkflowEventType.RESUME,
@@ -499,24 +410,6 @@ class TestGoalDisambiguationComponent:
             },
         ]
 
-        component = GoalDisambiguationComponent(
-            goal="Fix all the bugs",
-            workflow_id=graph_config["configurable"]["thread_id"],
-            allow_agent_to_request_user=True,
-            model_config=AnthropicConfig(model_name="claude-sonnet-4-20250514"),
-            tools_registry=tools_registry_mock,
-            http_client=gl_http_client,
-            workflow_type=CategoryEnum.WORKFLOW_SOFTWARE_DEVELOPMENT,
-        )
-        entry_point = component.attach(
-            graph=graph,
-            component_exit_node=END,
-            component_execution_state=WorkflowStatusEnum.PLANNING,
-            graph_termination_node=END,
-        )
-        graph.set_entry_point(entry_point)
-        compiled_graph = graph.compile()
-
         await compiled_graph.ainvoke(input=graph_input, config=graph_config)
 
         # Assert that interrupt was called twice - first for cancellation, then for message event
@@ -525,18 +418,15 @@ class TestGoalDisambiguationComponent:
     @pytest.mark.asyncio
     @pytest.mark.usefixtures("mock_create_model")
     @patch("duo_workflow_service.components.goal_disambiguation.component.interrupt")
-    @patch.dict(os.environ, {"FEATURE_GOAL_DISAMBIGUATION": "True"})
     async def test_component_run_with_stop_event(
         self,
         mock_interrupt,
-        tools_registry_mock: ToolsRegistry,
-        gl_http_client: GitlabHttpClient,
         graph_input: WorkflowState,
         graph_config: RunnableConfig,
         llm_judge_response_unclear: AIMessage,
         mock_agent: MagicMock,
+        compiled_graph: CompiledStateGraph,
     ):
-        graph = StateGraph(WorkflowState)
         mock_interrupt.side_effect = [
             {
                 "event_type": WorkflowEventType.STOP,
@@ -548,24 +438,6 @@ class TestGoalDisambiguationComponent:
             "conversation_history": {"clarity_judge": [llm_judge_response_unclear]},
         }
 
-        component = GoalDisambiguationComponent(
-            goal="Fix bug in pipeline configuration",
-            workflow_id=graph_config["configurable"]["thread_id"],
-            allow_agent_to_request_user=True,
-            model_config=AnthropicConfig(model_name="claude-sonnet-4-20250514"),
-            tools_registry=tools_registry_mock,
-            http_client=gl_http_client,
-            workflow_type=CategoryEnum.WORKFLOW_SOFTWARE_DEVELOPMENT,
-        )
-        entry_point = component.attach(
-            graph=graph,
-            component_exit_node=END,
-            component_execution_state=WorkflowStatusEnum.PLANNING,
-            graph_termination_node=END,
-        )
-        graph.set_entry_point(entry_point)
-        compiled_graph = graph.compile()
-
         response = await compiled_graph.ainvoke(input=graph_input, config=graph_config)
 
         assert mock_agent.run.call_count == 1
@@ -574,39 +446,18 @@ class TestGoalDisambiguationComponent:
 
     @pytest.mark.asyncio
     @pytest.mark.usefixtures("mock_create_model")
-    @patch.dict(os.environ, {"FEATURE_GOAL_DISAMBIGUATION": "True"})
     @patch("duo_workflow_service.components.goal_disambiguation.component.interrupt")
     async def test_component_run_with_agent_stop_response(
         self,
         mock_interrupt,
-        tools_registry_mock: ToolsRegistry,
-        gl_http_client: GitlabHttpClient,
         graph_input: WorkflowState,
         graph_config: RunnableConfig,
         llm_judge_response_unclear: AIMessage,
         mock_agent: MagicMock,
+        compiled_graph: CompiledStateGraph,
     ):
-        graph = StateGraph(WorkflowState)
 
         mock_agent.run.return_value = {"status": WorkflowStatusEnum.CANCELLED}
-
-        component = GoalDisambiguationComponent(
-            goal="Fix bug in pipeline configuration",
-            workflow_id=graph_config["configurable"]["thread_id"],
-            allow_agent_to_request_user=True,
-            model_config=AnthropicConfig(model_name="claude-sonnet-4-20250514"),
-            tools_registry=tools_registry_mock,
-            http_client=gl_http_client,
-            workflow_type=CategoryEnum.WORKFLOW_SOFTWARE_DEVELOPMENT,
-        )
-        entry_point = component.attach(
-            graph=graph,
-            component_exit_node=END,
-            component_execution_state=WorkflowStatusEnum.PLANNING,
-            graph_termination_node=END,
-        )
-        graph.set_entry_point(entry_point)
-        compiled_graph = graph.compile()
 
         response = await compiled_graph.ainvoke(input=graph_input, config=graph_config)
 
