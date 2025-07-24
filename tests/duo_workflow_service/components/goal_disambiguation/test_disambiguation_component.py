@@ -1,5 +1,5 @@
 import os
-from unittest.mock import AsyncMock, MagicMock, call, patch
+from unittest.mock import MagicMock, call, patch
 
 import pytest
 from langchain_core.messages import AIMessage, HumanMessage, SystemMessage
@@ -55,10 +55,6 @@ def mock_agent():
 
 
 class TestGoalDisambiguationComponent:
-    @pytest.fixture
-    def mock_http_client(self):
-        return AsyncMock(spec=GitlabHttpClient)
-
     @pytest.fixture
     def graph_config(self) -> RunnableConfig:
         return RunnableConfig(
@@ -118,7 +114,7 @@ class TestGoalDisambiguationComponent:
         env_var: str,
         env_var_val: str,
         tools_registry_mock: ToolsRegistry,
-        mock_http_client: GitlabHttpClient,
+        gl_http_client: GitlabHttpClient,
         graph_config: RunnableConfig,
     ):
         graph = StateGraph(WorkflowState)
@@ -130,7 +126,7 @@ class TestGoalDisambiguationComponent:
                 allow_agent_to_request_user=True,
                 model_config=AnthropicConfig(model_name="claude-sonnet-4-20250514"),
                 tools_registry=tools_registry_mock,
-                http_client=mock_http_client,
+                http_client=gl_http_client,
                 workflow_type=CategoryEnum.WORKFLOW_SOFTWARE_DEVELOPMENT,
             )
             entry_point = component.attach(
@@ -150,7 +146,7 @@ class TestGoalDisambiguationComponent:
     async def test_attach_without_allow_agent_to_request_user(
         self,
         tools_registry_mock: ToolsRegistry,
-        mock_http_client: GitlabHttpClient,
+        gl_http_client: GitlabHttpClient,
         graph_config: RunnableConfig,
     ):
         graph = StateGraph(WorkflowState)
@@ -161,7 +157,7 @@ class TestGoalDisambiguationComponent:
             allow_agent_to_request_user=False,
             model_config=AnthropicConfig(model_name="claude-sonnet-4-20250514"),
             tools_registry=tools_registry_mock,
-            http_client=mock_http_client,
+            http_client=gl_http_client,
             workflow_type=CategoryEnum.WORKFLOW_SOFTWARE_DEVELOPMENT,
         )
         entry_point = component.attach(
@@ -181,7 +177,7 @@ class TestGoalDisambiguationComponent:
     async def test_component_prompt_construction(
         self,
         tools_registry_mock: ToolsRegistry,
-        mock_http_client: GitlabHttpClient,
+        gl_http_client: GitlabHttpClient,
         graph_input: WorkflowState,
         graph_config: RunnableConfig,
         mock_agent: MagicMock,
@@ -231,7 +227,7 @@ class TestGoalDisambiguationComponent:
             allow_agent_to_request_user=True,
             model_config=AnthropicConfig(model_name="claude-sonnet-4-20250514"),
             tools_registry=tools_registry_mock,
-            http_client=mock_http_client,
+            http_client=gl_http_client,
             workflow_type=CategoryEnum.WORKFLOW_SOFTWARE_DEVELOPMENT,
         )
         entry_point = component.attach(
@@ -256,7 +252,7 @@ class TestGoalDisambiguationComponent:
     async def test_component_run_with_clear_goal(
         self,
         tools_registry_mock: ToolsRegistry,
-        mock_http_client: GitlabHttpClient,
+        gl_http_client: GitlabHttpClient,
         graph_input: WorkflowState,
         graph_config: RunnableConfig,
         mock_agent: MagicMock,
@@ -298,7 +294,7 @@ class TestGoalDisambiguationComponent:
             allow_agent_to_request_user=True,
             model_config=AnthropicConfig(model_name="claude-sonnet-4-20250514"),
             tools_registry=tools_registry_mock,
-            http_client=mock_http_client,
+            http_client=gl_http_client,
             workflow_type=CategoryEnum.WORKFLOW_SOFTWARE_DEVELOPMENT,
         )
         entry_point = component.attach(
@@ -323,7 +319,7 @@ class TestGoalDisambiguationComponent:
         self,
         mock_interrupt,
         tools_registry_mock: ToolsRegistry,
-        mock_http_client: GitlabHttpClient,
+        gl_http_client: GitlabHttpClient,
         graph_input: WorkflowState,
         graph_config: RunnableConfig,
         llm_judge_response_unclear: AIMessage,
@@ -364,7 +360,7 @@ class TestGoalDisambiguationComponent:
             allow_agent_to_request_user=True,
             model_config=AnthropicConfig(model_name="claude-sonnet-4-20250514"),
             tools_registry=tools_registry_mock,
-            http_client=mock_http_client,
+            http_client=gl_http_client,
             workflow_type=CategoryEnum.WORKFLOW_SOFTWARE_DEVELOPMENT,
         )
         entry_point = component.attach(
@@ -409,7 +405,7 @@ class TestGoalDisambiguationComponent:
         self,
         mock_interrupt,
         tools_registry_mock: ToolsRegistry,
-        mock_http_client: GitlabHttpClient,
+        gl_http_client: GitlabHttpClient,
         graph_input: WorkflowState,
         graph_config: RunnableConfig,
         llm_judge_response_unclear: AIMessage,
@@ -443,7 +439,7 @@ class TestGoalDisambiguationComponent:
             allow_agent_to_request_user=True,
             model_config=AnthropicConfig(model_name="claude-sonnet-4-20250514"),
             tools_registry=tools_registry_mock,
-            http_client=mock_http_client,
+            http_client=gl_http_client,
             workflow_type=CategoryEnum.WORKFLOW_SOFTWARE_DEVELOPMENT,
         )
         entry_point = component.attach(
@@ -474,7 +470,7 @@ class TestGoalDisambiguationComponent:
         self,
         mock_interrupt,
         tools_registry_mock: ToolsRegistry,
-        mock_http_client: GitlabHttpClient,
+        gl_http_client: GitlabHttpClient,
         graph_input: WorkflowState,
         graph_config: RunnableConfig,
         llm_judge_response_unclear: AIMessage,
@@ -509,7 +505,7 @@ class TestGoalDisambiguationComponent:
             allow_agent_to_request_user=True,
             model_config=AnthropicConfig(model_name="claude-sonnet-4-20250514"),
             tools_registry=tools_registry_mock,
-            http_client=mock_http_client,
+            http_client=gl_http_client,
             workflow_type=CategoryEnum.WORKFLOW_SOFTWARE_DEVELOPMENT,
         )
         entry_point = component.attach(
@@ -534,7 +530,7 @@ class TestGoalDisambiguationComponent:
         self,
         mock_interrupt,
         tools_registry_mock: ToolsRegistry,
-        mock_http_client: GitlabHttpClient,
+        gl_http_client: GitlabHttpClient,
         graph_input: WorkflowState,
         graph_config: RunnableConfig,
         llm_judge_response_unclear: AIMessage,
@@ -558,7 +554,7 @@ class TestGoalDisambiguationComponent:
             allow_agent_to_request_user=True,
             model_config=AnthropicConfig(model_name="claude-sonnet-4-20250514"),
             tools_registry=tools_registry_mock,
-            http_client=mock_http_client,
+            http_client=gl_http_client,
             workflow_type=CategoryEnum.WORKFLOW_SOFTWARE_DEVELOPMENT,
         )
         entry_point = component.attach(
@@ -584,7 +580,7 @@ class TestGoalDisambiguationComponent:
         self,
         mock_interrupt,
         tools_registry_mock: ToolsRegistry,
-        mock_http_client: GitlabHttpClient,
+        gl_http_client: GitlabHttpClient,
         graph_input: WorkflowState,
         graph_config: RunnableConfig,
         llm_judge_response_unclear: AIMessage,
@@ -600,7 +596,7 @@ class TestGoalDisambiguationComponent:
             allow_agent_to_request_user=True,
             model_config=AnthropicConfig(model_name="claude-sonnet-4-20250514"),
             tools_registry=tools_registry_mock,
-            http_client=mock_http_client,
+            http_client=gl_http_client,
             workflow_type=CategoryEnum.WORKFLOW_SOFTWARE_DEVELOPMENT,
         )
         entry_point = component.attach(
