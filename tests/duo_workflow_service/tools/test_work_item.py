@@ -13,7 +13,6 @@ from duo_workflow_service.tools.work_item import (
     ListWorkItemsInput,
     ResolvedParent,
     ResolvedWorkItem,
-    ResolvedWorkItemData,
     WorkItemResourceInput,
 )
 

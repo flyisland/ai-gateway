@@ -20,7 +20,7 @@ from duo_workflow_service.tools.queries.work_items import (
 
 # Supported work item types in GitLab
 GROUP_ONLY_TYPES = {"epic", "objective", "key_result"}
-ALL_TYPES = {"issue", "task", "test_case", *GROUP_ONLY_TYPES}
+ALL_TYPES = {"issue", "task", *GROUP_ONLY_TYPES}
 
 PARENT_IDENTIFICATION_DESCRIPTION = """To identify the parent (group or project) you must provide either:
 - group_id parameter, or
@@ -52,11 +52,6 @@ class ResolvedParent(NamedTuple):
 class ResolvedWorkItem(NamedTuple):
     parent: ResolvedParent
     work_item_iid: int
-
-
-class ResolvedWorkItemData(NamedTuple):
-    id: str
-    full_data: dict
 
 
 class WorkItemBaseTool(DuoBaseTool):
