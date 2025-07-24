@@ -14,7 +14,6 @@ from duo_workflow_service.agents.tools_executor import ToolsExecutor
 from duo_workflow_service.checkpointer.gitlab_workflow import WorkflowStatusEventEnum
 from duo_workflow_service.components.tools_registry import ToolsRegistry
 from duo_workflow_service.entities.state import (
-    ApprovalStateRejection,
     ChatWorkflowState,
     MessageTypeEnum,
     ToolStatus,
@@ -164,11 +163,15 @@ class Workflow(AbstractWorkflow):
                 match self._approval and self._approval.WhichOneof("user_decision"):
                     case "approval":
                         next_step = "run_tools"
+                    case "approved_tool":
+                        next_step = "run_tools"
+                        tool_name = self._approval.approved_tool.name  # type: ignore
+                        state_update["approval"] = {"approved_tools": [tool_name]}
                     case "rejection":
                         new_chat_message = self._approval.rejection.message  # type: ignore
-                        state_update["approval"] = ApprovalStateRejection(
-                            message=new_chat_message
-                        )
+                        state_update["approval"] = {
+                            "rejection": {"message": new_chat_message}
+                        }
                     case _:
                         state_update["conversation_history"] = {
                             self._agent.name: [

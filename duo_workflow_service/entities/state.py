@@ -337,8 +337,29 @@ class SearchAndReplaceWorkflowState(TypedDict):
     pending_files: List[str]
 
 
-class ApprovalStateRejection(BaseModel):
-    message: Optional[str]
+class ApprovalStateRejection(TypedDict):
+    message: Optional[str] = None
+
+
+class ApprovalState(TypedDict):
+    approved_tools: list[str] = []
+    rejection: Optional[ApprovalStateRejection] = None
+
+
+def _approval_state_reducer(
+    current: Optional[ApprovalState], new: Optional[ApprovalState]
+) -> ApprovalState:
+    if current is None:
+        return new
+
+    if new is None:
+        return current
+
+    return ApprovalState(
+        approved_tools=current.get("approved_tools", [])
+        + new.get("approved_tools", []),
+        rejection=new.get("rejection", None),
+    )
 
 
 class ChatWorkflowState(TypedDict):
@@ -351,7 +372,7 @@ class ChatWorkflowState(TypedDict):
     last_human_input: Union[WorkflowEvent, None]
     project: Project | None
     namespace: Namespace | None
-    approval: ApprovalStateRejection | None
+    approval: Annotated[Optional[ApprovalState], _approval_state_reducer]
 
 
 DuoWorkflowStateType = Union[

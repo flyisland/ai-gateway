@@ -5,7 +5,6 @@ from langchain_core.messages import AIMessage, HumanMessage, SystemMessage, Tool
 
 from duo_workflow_service.entities.state import (
     AdditionalContext,
-    ApprovalStateRejection,
     SearchAndReplaceConfig,
 )
 
@@ -30,7 +29,6 @@ class CustomEncoder(json.JSONEncoder):
                 AIMessage,
                 ToolMessage,
                 SearchAndReplaceConfig,
-                ApprovalStateRejection,
                 AdditionalContext,
             ),
         ):
