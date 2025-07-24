@@ -1,9 +1,21 @@
 import json
 import urllib
-from typing import Any, Dict, List, Literal, NamedTuple, Optional, Type, Union
+from enum import Enum
+from typing import (
+    Annotated,
+    Any,
+    Dict,
+    List,
+    Literal,
+    NamedTuple,
+    Optional,
+    Tuple,
+    Type,
+    Union,
+)
 
 from gitlab_cloud_connector import GitLabUnitPrimitive
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, StringConstraints
 
 from duo_workflow_service.gitlab.url_parser import GitLabUrlParseError, GitLabUrlParser
 from duo_workflow_service.tools.duo_base_tool import DuoBaseTool
@@ -16,6 +28,7 @@ from duo_workflow_service.tools.queries.work_items import (
     GET_WORK_ITEM_TYPE_BY_NAME_QUERY,
     LIST_GROUP_WORK_ITEMS_QUERY,
     LIST_PROJECT_WORK_ITEMS_QUERY,
+    UPDATE_WORK_ITEM_MUTATION,
 )
 
 # Supported work item types in GitLab
@@ -51,7 +64,19 @@ class ResolvedParent(NamedTuple):
 
 class ResolvedWorkItem(NamedTuple):
     parent: ResolvedParent
-    work_item_iid: int
+    full_path: Optional[str] = None
+    work_item_iid: Optional[int] = None
+    id: Optional[str] = None
+    full_data: Optional[dict] = None
+
+
+class HealthStatus(str, Enum):
+    ON_TRACK = "onTrack"
+    NEEDS_ATTENTION = "needsAttention"
+    AT_RISK = "atRisk"
+
+
+DateString = Annotated[str, StringConstraints(pattern=r"^\d{4}-\d{2}-\d{2}$")]
 
 
 class WorkItemBaseTool(DuoBaseTool):
@@ -202,13 +227,14 @@ class WorkItemBaseTool(DuoBaseTool):
         type_id: str,
         input_kwargs: Dict[str, Any],
     ) -> str:
+        input_fields, warnings = self._build_work_item_input_fields(input_kwargs)
         variables = {
             "input": {
                 "namespacePath": namespace_path,
                 "workItemTypeId": type_id,
             }
         }
-        variables["input"].update(self._build_work_item_input_fields(input_kwargs))
+        variables["input"].update(input_fields)
 
         response = await self.gitlab_client.graphql(
             CREATE_WORK_ITEM_MUTATION, variables
@@ -231,15 +257,20 @@ class WorkItemBaseTool(DuoBaseTool):
                 }
             )
 
-        return json.dumps(
-            {
-                "message": f"Work item '{created.get('title')}' created successfully.",
-                "work_item": created,
-            }
-        )
+        result = {
+            "message": f"Work item '{created.get('title')}' created successfully.",
+            "work_item": created,
+        }
+
+        if warnings:
+            result["warnings"] = warnings
+
+        return json.dumps(result)
 
     @staticmethod
-    def _build_work_item_input_fields(kwargs: Dict[str, Any]) -> Dict[str, Any]:
+    def _build_work_item_input_fields(
+        kwargs: Dict[str, Any],
+    ) -> Tuple[Dict[str, Any], List[str]]:
         input_data = {}
         type_name = kwargs.get("type_name")
 
@@ -270,31 +301,148 @@ class WorkItemBaseTool(DuoBaseTool):
         if kwargs.get("confidential") is not None:
             input_data["confidential"] = kwargs["confidential"]
 
+        warnings = []
+
         if kwargs.get("assignee_ids") is not None:
-            input_data["assigneesWidget"] = {
-                "assigneeIds": [
-                    (
-                        assignee
-                        if isinstance(assignee, str) and assignee.startswith("gid://")
-                        else f"gid://gitlab/User/{assignee}"
-                    )
-                    for assignee in kwargs["assignee_ids"]
-                ]
-            }
+            valid_ids, invalid_ids = WorkItemBaseTool._normalize_gids(
+                kwargs["assignee_ids"], "User"
+            )
+            if valid_ids:
+                input_data["assigneesWidget"] = {"assigneeIds": valid_ids}
+            if invalid_ids:
+                warnings.append(
+                    f"Some assignee_ids were invalid and skipped: {invalid_ids}"
+                )
 
-        if kwargs.get("label_ids") is not None:
-            input_data["labelsWidget"] = {
-                "labelIds": [
-                    (
-                        label
-                        if isinstance(label, str) and label.startswith("gid://")
-                        else f"gid://gitlab/Label/{label}"
-                    )
-                    for label in kwargs["label_ids"]
-                ]
-            }
+        labels_widget = WorkItemBaseTool._build_labels_widget(kwargs, warnings)
 
-        return input_data
+        if labels_widget:
+            input_data["labelsWidget"] = labels_widget
+
+        return input_data, warnings
+
+    @staticmethod
+    def _build_labels_widget(
+        kwargs: Dict[str, Any], warnings: List[str]
+    ) -> Optional[Dict[str, Any]]:
+        widget = {}
+
+        # For work item creation, use labelIds
+        if kwargs.get("label_ids"):
+            valid_labels, invalid_labels = WorkItemBaseTool._normalize_gids(
+                kwargs["label_ids"], "Label"
+            )
+            if valid_labels:
+                widget["labelIds"] = valid_labels
+            if invalid_labels:
+                warnings.append(
+                    f"Some label_ids were invalid and skipped: {invalid_labels}"
+                )
+
+        # For work item updates, use addLabelIds and removeLabelIds
+        if kwargs.get("add_label_ids"):
+            valid_add, invalid_add = WorkItemBaseTool._normalize_gids(
+                kwargs["add_label_ids"], "Label"
+            )
+            if valid_add:
+                widget["addLabelIds"] = valid_add
+            if invalid_add:
+                warnings.append(
+                    f"Some add_label_ids were invalid and skipped: {invalid_add}"
+                )
+
+        if kwargs.get("remove_label_ids"):
+            valid_remove, invalid_remove = WorkItemBaseTool._normalize_gids(
+                kwargs["remove_label_ids"], "Label"
+            )
+            if valid_remove:
+                widget["removeLabelIds"] = valid_remove
+            if invalid_remove:
+                warnings.append(
+                    f"Some remove_label_ids were invalid and skipped: {invalid_remove}"
+                )
+
+        return widget
+
+    @staticmethod
+    def _normalize_gids(ids: list[Any], gid_type: str) -> tuple[list[str], list[Any]]:
+        """Return (valid GIDs, invalid entries) for given user or label IDs."""
+        valid = []
+        invalid = []
+
+        prefix = f"gid://gitlab/{gid_type}/"
+
+        for value in ids:
+            if not value:
+                continue
+            if isinstance(value, str) and value.startswith("gid://"):
+                valid.append(value)
+            elif isinstance(value, (int, str)) and str(value).isdigit():
+                valid.append(f"{prefix}{value}")
+            else:
+                invalid.append(value)
+
+        return valid, invalid
+
+    async def _resolve_work_item_data(
+        self,
+        *,
+        url: Optional[str],
+        group_id: Optional[str],
+        project_id: Optional[str],
+        work_item_iid: Optional[int],
+    ) -> Union[str, ResolvedWorkItem]:
+        resolved = await self._validate_work_item_url(
+            url=url,
+            group_id=group_id,
+            project_id=project_id,
+            work_item_iid=work_item_iid,
+        )
+
+        if isinstance(resolved, str):
+            return resolved
+
+        return await self._fetch_work_item_data(resolved)
+
+    async def _fetch_work_item_data(
+        self, resolved: ResolvedWorkItem
+    ) -> Union[str, ResolvedWorkItem]:
+        query = (
+            GET_GROUP_WORK_ITEM_QUERY
+            if resolved.parent.type == "group"
+            else GET_PROJECT_WORK_ITEM_QUERY
+        )
+
+        variables = {
+            "fullPath": resolved.parent.full_path,
+            "iid": str(resolved.work_item_iid),
+        }
+
+        response = await self.gitlab_client.graphql(query, variables)
+        if not isinstance(response, dict):
+            return "GraphQL query returned no response or invalid format"
+
+        root_key = "namespace" if resolved.parent.type == "group" else "project"
+
+        if root_key not in response:
+            return f"No {root_key} found in response"
+
+        work_items = response.get(root_key, {}).get("workItems", {}).get("nodes", [])
+        work_item = work_items[0] if work_items else None
+
+        if not work_item:
+            return f"Work item {resolved.work_item_iid} not found"
+
+        work_item_id = work_item.get("id")
+        if not work_item_id:
+            return "Could not find work item ID"
+
+        return ResolvedWorkItem(
+            id=work_item_id,
+            full_data=work_item,
+            parent=resolved.parent,
+            work_item_iid=resolved.work_item_iid,
+        )
 
 
 class ParentResourceInput(BaseModel):
@@ -643,7 +791,7 @@ class GetWorkItemNotes(WorkItemBaseTool):
 
 
 class CreateWorkItemInput(ParentResourceInput):
-    title: str = Field(description="Title of the work item")
+    title: str = Field(description="Title of the work item.")
     type_name: str = Field(
         description="Work item type. One of: 'Issue', 'Epic', 'Task', 'Objective', 'Key Result'."
     )
@@ -740,3 +888,119 @@ class CreateWorkItem(WorkItemBaseTool):
         if args.group_id:
             return f"Create work item '{args.title}' in group {args.group_id}"
         return f"Create work item '{args.title}' in project {args.project_id}"
+
+
+class UpdateWorkItemInput(WorkItemResourceInput):
+    title: Optional[str] = Field(default=None, description="Title of the work item")
+    description: Optional[str] = Field(
+        default=None, description="Description of the work item."
+    )
+    assignee_ids: Optional[List[int]] = Field(
+        default=None, description="IDs of users to assign."
+    )
+    confidential: Optional[bool] = Field(
+        default=None, description="Set to true to make the work item confidential."
+    )
+    start_date: Optional[DateString] = Field(
+        default=None,
+        description="The start date. Date time string in the format YYYY-MM-DD.",
+    )
+    due_date: Optional[DateString] = Field(
+        default=None,
+        description="The due date. Date time string in the format YYYY-MM-DD.",
+    )
+    is_fixed: Optional[bool] = Field(
+        default=None, description="Whether the start and due dates are fixed."
+    )
+    health_status: Optional[HealthStatus] = Field(
+        default=None,
+        description="Health status of the work item. Values: 'onTrack', 'needsAttention', 'atRisk'.",
+    )
+    state: Optional[str] = Field(
+        default=None,
+        description="The state of the work item. Use 'opened' or 'closed'.",
+    )
+    add_label_ids: Optional[List[str]] = Field(
+        default=None,
+        description="Label global IDs or numeric IDs to add to the work item.",
+    )
+    remove_label_ids: Optional[List[str]] = Field(
+        default=None,
+        description="Label global IDs or numeric IDs to remove from the work item.",
+    )
+
+
+class UpdateWorkItem(WorkItemBaseTool):
+    name: str = "update_work_item"
+    description: str = f"""Update an existing work item in a GitLab group or project.
+
+    {WORK_ITEM_IDENTIFICATION_DESCRIPTION}
+
+    For example:
+    - update_work_item(group_id='namespace/group', work_item_iid=42, title="Updated title")
+    - update_work_item(project_id='namespace/project', work_item_iid=42, title="Updated title")
+    - update_work_item(url="https://gitlab.com/groups/namespace/group/-/work_items/42", title="Updated title")
+    - update_work_item(url="https://gitlab.com/namespace/project/-/work_items/42", title="Updated title")
+    """
+    args_schema: Type[BaseModel] = UpdateWorkItemInput
+
+    async def _arun(self, **kwargs: Any) -> str:
+        resolved = await self._resolve_work_item_data(
+            url=kwargs.get("url"),
+            group_id=kwargs.get("group_id"),
+            project_id=kwargs.get("project_id"),
+            work_item_iid=kwargs.get("work_item_iid"),
+        )
+
+        if isinstance(resolved, str):
+            return json.dumps({"error": resolved})
+
+        work_item_id = resolved.id
+
+        if not kwargs.get("type_name"):
+            kwargs["type_name"] = (
+                (resolved.full_data or {}).get("workItemType", {}).get("name", "")
+            )
+
+        input_fields, warnings = self._build_work_item_input_fields(kwargs)
+
+        state = kwargs.get("state")
+        if state == "closed":
+            input_fields["stateEvent"] = "CLOSE"
+        elif state == "opened":
+            input_fields["stateEvent"] = "REOPEN"
+
+        variables = {
+            "input": {
+                "id": work_item_id,
+                **input_fields,
+            }
+        }
+
+        try:
+            response = await self.gitlab_client.graphql(
+                UPDATE_WORK_ITEM_MUTATION, variables
+            )
+
+            if "errors" in response:
+                return json.dumps({"error": response["errors"]})
+
+            updated = (
+                response.get("data", {}).get("workItemUpdate", {}).get("workItem", {})
+            )
+            result = {"updated_work_item": updated}
+            if warnings:
+                result["warnings"] = warnings
+            return json.dumps(result)
+
+        except Exception as e:
+            return json.dumps({"error": str(e)})
+
+    def format_display_message(
+        self, args: UpdateWorkItemInput, _tool_response: Any = None
+    ) -> str:
+        if args.url:
+            return f"Update work item in {args.url}"
+        if args.group_id:
+            return f"Update work item #{args.work_item_iid} in group {args.group_id}"
+        return f"Update work item #{args.work_item_iid} in project {args.project_id}"
