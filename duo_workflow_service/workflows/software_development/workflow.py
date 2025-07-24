@@ -105,6 +105,7 @@ EXECUTOR_TOOLS = [
     "get_work_item",
     "list_work_items",
     "get_work_item_notes",
+    "update_work_item",
 ]
 
 CONTEXT_BUILDER_TOOLS = [

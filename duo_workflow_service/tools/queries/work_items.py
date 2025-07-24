@@ -195,3 +195,47 @@ query GetProjectWorkItemNotes($fullPath: ID!, $workItemIid: String!) {
     }
 }
 """
+
+UPDATE_WORK_ITEM_MUTATION = """
+mutation updateWorkItem($input: WorkItemUpdateInput!) {
+    workItemUpdate(input: $input) {
+        workItem {
+            id
+            iid
+            title
+            description
+            confidential
+            createdAt
+            updatedAt
+            widgets {
+                ... on WorkItemWidgetAssignees {
+                    assignees {
+                        nodes {
+                            id
+                            username
+                        }
+                    }
+                }
+                ... on WorkItemWidgetLabels {
+                    labels {
+                        nodes {
+                            id
+                            title
+                            color
+                        }
+                    }
+                }
+                ... on WorkItemWidgetHealthStatus {
+                    healthStatus
+                }
+                ... on WorkItemWidgetStartAndDueDate {
+                    startDate
+                    dueDate
+                    isFixed
+                }
+            }
+        }
+        errors
+    }
+}
+"""

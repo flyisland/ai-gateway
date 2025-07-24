@@ -76,6 +76,7 @@ CHAT_READ_ONLY_TOOLS = [
     "list_group_audit_events",
     "list_project_audit_events",
     "get_current_user",
+    "update_work_item",
 ]
 
 
@@ -89,6 +90,7 @@ CHAT_GITLAB_MUTATION_TOOLS = [
     "create_epic",
     "update_epic",
     "create_commit",
+    "update_work_item",
 ]
 
 
