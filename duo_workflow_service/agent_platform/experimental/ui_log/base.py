@@ -1,4 +1,4 @@
-from abc import ABC
+from abc import ABC, abstractmethod
 from enum import StrEnum, auto
 from typing import Any, Callable, NamedTuple, Protocol, Self
 
@@ -148,6 +148,7 @@ class BaseUILogWriter[E: BaseUILogEvents](ABC):
         }
 
     @property
+    @abstractmethod
     def events_type(self) -> type[E]:
         raise NotImplementedError
 
