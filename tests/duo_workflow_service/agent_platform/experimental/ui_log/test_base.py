@@ -179,9 +179,8 @@ class TestUIHistory:
         class OtherEvents(BaseUILogEvents):
             ON_OTHER = "on_other"
 
-        history = UIHistory(writer_class=MockWriter, events=[OtherEvents.ON_OTHER])
-
-        # Verify that adding the log raises ValueError due to the mismatch between enabled events in UIHistory
-        # and MockWriter's events
-        with pytest.raises(ValueError, match="Event .* is not enabled for logging"):
-            history.log.success("Test message", event=MockUILogEvents.ON_TEST)
+        with pytest.raises(
+            TypeError,
+            match="All items in 'events' must be instances of MockUILogEvents",
+        ):
+            _ = UIHistory(writer_class=MockWriter, events=[OtherEvents.ON_OTHER])

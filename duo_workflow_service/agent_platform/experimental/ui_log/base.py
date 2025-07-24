@@ -1,9 +1,8 @@
 from abc import ABC
 from enum import StrEnum, auto
-from functools import cached_property
-from typing import Any, Callable, NamedTuple, Protocol
+from typing import Any, Callable, NamedTuple, Protocol, Self
 
-from pydantic import BaseModel, ConfigDict, PrivateAttr
+from pydantic import BaseModel, ConfigDict, PrivateAttr, model_validator
 
 from duo_workflow_service.agent_platform.experimental.state import FlowStateKeys
 from duo_workflow_service.entities import UiChatLog
@@ -234,17 +233,29 @@ class UIHistory[W: BaseUILogWriter, E: BaseUILogEvents](BaseModel):
     events: list[E]
 
     _logs: list[_UILogEntry] = PrivateAttr(default_factory=list)
+    _writer: W = PrivateAttr()
+
+    @model_validator(mode="after")
+    def validate_ui_history_model(self) -> Self:
+        self._writer = self.writer_class(self._add_log_to_history)
+
+        is_valid_type = all(
+            isinstance(e, self._writer.events_type) for e in self.events
+        )
+        if not is_valid_type:
+            raise TypeError(
+                f"All items in 'events' must be instances of {self._writer.events_type.__name__}"
+            )
+
+        return self
 
     def _add_log_to_history(self, log_entry: _UILogEntry) -> None:
         """Callback function for writers."""
-        if log_entry.event not in self.events:
-            raise ValueError(f"Event '{log_entry.event}' is not enabled for logging.")
-
         self._logs.append(log_entry)
 
-    @cached_property
+    @property
     def log(self) -> W:
-        return self.writer_class(self._add_log_to_history)
+        return self._writer
 
     def pop_state_updates(self) -> dict[str, Any]:
         # Log only specified events
