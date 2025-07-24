@@ -200,8 +200,8 @@ class UIHistory[W: BaseUILogWriter, E: BaseUILogEvents](BaseModel):
         # The following will raise an error as the ON_END event was not enabled
         history.log.success("Starting process", event=MyEvents.ON_END)
 
-        # Access the state containing all logs
-        state = history.state
+        # Access the state updates containing all logs and clear UIHistory
+        state = history.pop_state_updates()
     """
 
     model_config = ConfigDict(arbitrary_types_allowed=True)
@@ -221,9 +221,9 @@ class UIHistory[W: BaseUILogWriter, E: BaseUILogEvents](BaseModel):
     def log(self) -> W:
         return self.writer_class(self._add_log_to_history)
 
-    @property
-    def state(self) -> dict[str, Any]:
+    def pop_state_updates(self) -> dict[str, Any]:
         # Log only specified events
         logs = [log.record for log in self._logs if log.event in self.events]
+        self._logs.clear()
 
         return {FlowStateKeys.UI_CHAT_LOG: logs}

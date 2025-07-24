@@ -169,10 +169,15 @@ class TestUIHistory:
         history.log.success("Test message", event=MockUILogEvents.ON_TEST)
 
         # Verify the message was added to history
-        state = history.state
+        # Get state (should flush logs)
+        state = history.pop_state_updates()
         assert FlowStateKeys.UI_CHAT_LOG in state
         assert len(state[FlowStateKeys.UI_CHAT_LOG]) == 1
         assert state[FlowStateKeys.UI_CHAT_LOG][0].content == "Test message"
+
+        # Get state again (should be empty since logs were flushed)
+        second_state = history.pop_state_updates()
+        assert len(second_state[FlowStateKeys.UI_CHAT_LOG]) == 0
 
     def test_invalid_event_log(self):
         # Test that logging with an event not in events list raises ValueError
