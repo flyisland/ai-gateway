@@ -70,6 +70,14 @@ include:
   - template: Jobs/SAST.latest.gitlab-ci.yml
   - template: Jobs/Secret-Detection.latest.gitlab-ci.yml
 
+  # Analyze commits to determine whether to cut a release
+  # see https://gitlab.com/gitlab-com/gl-infra/common-ci-tasks/-/blob/main/semantic-release.md
+  - project: 'gitlab-com/gl-infra/common-ci-tasks'
+    ref: v2.84.0
+    file: semantic-release.yml
+    rules:
+      - if: $CI_PROJECT_PATH == 'gitlab-org/modelops/applied-ml/code-suggestions/ai-assist' && $CI_API_V4_URL == "https://gitlab.com/api/v4"
+
   # Includes a base template for running kaniko easily
   # see https://gitlab.com/gitlab-com/gl-infra/common-ci-tasks/-/blob/main/kaniko.md
   - project: "gitlab-com/gl-infra/common-ci-tasks"
