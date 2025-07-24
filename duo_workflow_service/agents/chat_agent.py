@@ -18,6 +18,7 @@ from ai_gateway.prompts.config.base import PromptConfig
 from ai_gateway.prompts.config.models import ModelClassProvider
 from duo_workflow_service.components.tools_registry import ToolsRegistry
 from duo_workflow_service.entities.state import (
+    ApprovalState,
     ApprovalStateRejection,
     ChatWorkflowState,
     MessageTypeEnum,
@@ -137,13 +138,21 @@ class ChatAgent(Prompt[ChatWorkflowState, BaseMessage]):
     def _build_prompt_template(cls, config: PromptConfig) -> Runnable:
         return ChatAgentPromptTemplate(config.prompt_template)
 
-    def _get_approvals(self, message: AIMessage) -> tuple[bool, list[UiChatLog]]:
+    def _get_approvals(
+        self, message: AIMessage, approval_state: Optional[ApprovalState]
+    ) -> tuple[bool, list[UiChatLog]]:
         approval_required = False
         approval_messages = []
+        preapproved_tools = (
+            approval_state.get("preapproved_tools", []) if approval_state else []
+        )
 
         for call in message.tool_calls:
-            if self.tools_registry and self.tools_registry.approval_required(
-                call["name"]
+            if (
+                self.tools_registry
+                and self.tools_registry.approval_required(call["name"])
+                and call["name"] not in preapproved_tools
+                and not getattr(self.model, "_is_agentic_mock_model", False)
             ):
                 approval_required = True
                 approval_messages.append(
@@ -163,19 +172,21 @@ class ChatAgent(Prompt[ChatWorkflowState, BaseMessage]):
 
     async def run(self, input: ChatWorkflowState) -> Dict[str, Any]:
         new_messages = []
-        approval_state = input.get("approval", None)
+        approval_state = input.get("approval")
+        current_approval_state = approval_state and approval_state.get("current_state")
 
-        if isinstance(approval_state, ApprovalStateRejection):
+        if isinstance(current_approval_state, ApprovalStateRejection):
             last_message = input["conversation_history"][self.name][-1]
+            rejection_message = current_approval_state.message
 
             # An empty text box for tool cancellation results in a 'null' message. Converting to None
             # todo: remove this line once we have fixed the frontend to return None instead of 'null'
             # https://gitlab.com/gitlab-org/modelops/applied-ml/code-suggestions/ai-assist/-/issues/1259
-            if approval_state.message == "null":
-                approval_state.message = None
+            if rejection_message == "null":
+                rejection_message = None
 
-            if approval_state.message:
-                tool_message = f"Tool is cancelled temporarily as user has a comment. Comment: {approval_state.message}"
+            if rejection_message:
+                tool_message = f"Tool is cancelled temporarily as user has a comment. Comment: {rejection_message}"
             else:
                 tool_message = "Tool is cancelled by user. Don't run the command and stop tool execution in progress."
 
@@ -245,12 +256,10 @@ class ChatAgent(Prompt[ChatWorkflowState, BaseMessage]):
                 result["status"] = WorkflowStatusEnum.INPUT_REQUIRED
                 return result
 
-            tools_need_approval, approval_messages = self._get_approvals(agent_response)
-            if (
-                len(agent_response.tool_calls) > 0
-                and tools_need_approval
-                and not getattr(self.model, "_is_agentic_mock_model", False)
-            ):
+            tools_need_approval, approval_messages = self._get_approvals(
+                agent_response, approval_state
+            )
+            if len(agent_response.tool_calls) > 0 and tools_need_approval:
                 result["status"] = WorkflowStatusEnum.TOOL_CALL_APPROVAL_REQUIRED
                 result["ui_chat_log"] = approval_messages
 

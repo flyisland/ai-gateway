@@ -17,6 +17,7 @@ from duo_workflow_service.entities import (
     WorkflowStatusEnum,
 )
 from duo_workflow_service.entities.state import (
+    ApprovalState,
     ApprovalStateRejection,
     ChatWorkflowState,
 )
@@ -446,6 +447,7 @@ async def test_get_graph_input_resume_with_approval(workflow_with_approval):
     assert result.update["status"] == WorkflowStatusEnum.EXECUTION
     assert "conversation_history" not in result.update
     assert "ui_chat_log" not in result.update
+    assert "approval" in result.update
 
 
 @pytest.mark.asyncio
@@ -471,7 +473,7 @@ async def test_get_graph_input_resume_with_rejected_approval(
     assert result.goto == "agent"
     assert result.update["status"] == WorkflowStatusEnum.EXECUTION
     assert "conversation_history" not in result.update
-    assert result.update["approval"].message == rejection_message
+    assert result.update["approval"]["current_state"].message == rejection_message
 
     if rejection_message and rejection_message != "null":
         result.update["ui_chat_log"][-1]["content"] == rejection_message
@@ -667,6 +669,37 @@ async def test_agent_run_with_tool_approval_required(workflow_with_project):
 
 
 @pytest.mark.asyncio
+@pytest.mark.parametrize("tool_approval_required", [True])
+@pytest.mark.usefixtures("mock_fetch_workflow_and_container_data")
+async def test_agent_run_with_preapproved_tools(workflow_with_project):
+    """Test agent run method when executed with preapproved tools."""
+
+    state = ChatWorkflowState(
+        plan={"steps": []},
+        status=WorkflowStatusEnum.EXECUTION,
+        conversation_history={"test_prompt": [HumanMessage(content="Create a file")]},
+        ui_chat_log=[],
+        last_human_input=None,
+        project=None,
+        approval=ApprovalState(preapproved_tools=["create_file_with_contents"]),
+    )
+
+    ai_message = AIMessage(content="I'll create the file for you")
+    ai_message.tool_calls = [
+        {
+            "id": "toolu_approval_id",
+            "args": {"path": "/test/file.txt", "content": "Test content"},
+            "name": "create_file_with_contents",
+        }
+    ]
+
+    with patch("ai_gateway.prompts.base.Prompt.ainvoke", return_value=ai_message):
+        result = await workflow_with_project._agent.run(state)
+
+    assert result["status"] == WorkflowStatusEnum.EXECUTION
+
+
+@pytest.mark.asyncio
 @pytest.mark.parametrize(
     ("cancel_tool_message", "expected_tool_message"),
     [
@@ -710,7 +743,9 @@ async def test_agent_run_with_cancel_tool_message(
         ui_chat_log=[],
         last_human_input=None,
         project=None,
-        approval=ApprovalStateRejection(message=cancel_tool_message),
+        approval=ApprovalState(
+            current_state=ApprovalStateRejection(message=cancel_tool_message)
+        ),
     )
 
     ai_response_after_cancel = AIMessage(
@@ -737,7 +772,10 @@ async def test_agent_run_with_cancel_tool_message(
 @pytest.mark.asyncio
 async def test_workflow_with_approval_object():
     """Test creating a workflow with an approval object."""
-    approval = contract_pb2.Approval(approval=contract_pb2.Approval.Approved())
+    preapproved_tools = ["get_issue", "read_file"]
+    approval = contract_pb2.Approval(
+        approval=contract_pb2.Approval.Approved(preapproved_tools=preapproved_tools)
+    )
 
     workflow = Workflow(
         workflow_id="test-id",
@@ -748,6 +786,7 @@ async def test_workflow_with_approval_object():
 
     assert workflow._approval is not None
     assert workflow._approval.WhichOneof("user_decision") == "approval"
+    assert workflow._approval.approval.preapproved_tools == preapproved_tools
 
 
 @pytest.mark.asyncio

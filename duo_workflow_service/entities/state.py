@@ -341,6 +341,28 @@ class ApprovalStateRejection(BaseModel):
     message: Optional[str]
 
 
+class ApprovalState(TypedDict):
+    preapproved_tools: list[str]
+    current_state: Optional[ApprovalStateRejection]
+
+
+def _approval_state_reducer(
+    current: Optional[ApprovalState], new: Optional[ApprovalState]
+) -> Optional[ApprovalState]:
+    if not current:
+        return new
+
+    if not new:
+        return current
+
+    return ApprovalState(
+        preapproved_tools=list(
+            set(current.get("preapproved_tools", []) + new.get("preapproved_tools", []))
+        ),
+        current_state=new.get("current_state", None),
+    )
+
+
 class ChatWorkflowState(TypedDict):
     plan: Plan
     status: WorkflowStatusEnum
@@ -351,7 +373,7 @@ class ChatWorkflowState(TypedDict):
     last_human_input: Union[WorkflowEvent, None]
     project: Project | None
     namespace: Namespace | None
-    approval: ApprovalStateRejection | None
+    approval: Annotated[Optional[ApprovalState], _approval_state_reducer]
 
 
 DuoWorkflowStateType = Union[
