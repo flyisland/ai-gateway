@@ -1,14 +1,17 @@
+import json
 from datetime import datetime, timezone
 from typing import Any, cast
 
-from langchain_core.messages import AIMessage, BaseMessage, HumanMessage
+from langchain_core.messages import AIMessage, BaseMessage, HumanMessage, SystemMessage
 from langchain_core.prompt_values import PromptValue
 from langchain_core.prompts import ChatPromptTemplate
 from langchain_core.prompts.chat import MessageLikeRepresentation
 from langchain_core.runnables import Runnable, RunnableConfig
 
 from ai_gateway.prompts import Prompt
+from ai_gateway.prompts.base import jinja2_formatter
 from ai_gateway.prompts.config.base import PromptConfig
+from ai_gateway.prompts.config.models import ModelClassProvider
 from duo_workflow_service.entities.event import WorkflowEvent, WorkflowEventType
 from duo_workflow_service.entities.state import (
     DuoWorkflowStateType,
@@ -25,9 +28,10 @@ from duo_workflow_service.tools.handover import HandoverTool
 class AgentPromptTemplate(Runnable[DuoWorkflowStateType, PromptValue]):
     messages: list[BaseMessage]
 
-    def __init__(self, agent_name: str, prompt_template: dict[str, str]):
+    def __init__(self, agent_name: str, prompt_template: dict[str, str], **kwargs: Any):
         self.agent_name = agent_name
         self.prompt_template = prompt_template
+        self.template_kwargs = kwargs
 
     def invoke(
         self,
@@ -49,6 +53,9 @@ class AgentPromptTemplate(Runnable[DuoWorkflowStateType, PromptValue]):
         inputs["handover_tool_name"] = HandoverTool.tool_title
         inputs["get_plan_tool_name"] = "get_plan"
         inputs["set_task_status_tool_name"] = "set_task_status"
+        inputs["is_anthropic_model"] = self.template_kwargs.get(
+            "is_anthropic_model", False
+        )
 
         prompt_value = ChatPromptTemplate.from_messages(
             messages, template_format="jinja2"
@@ -62,8 +69,22 @@ class AgentPromptTemplate(Runnable[DuoWorkflowStateType, PromptValue]):
     ) -> list[MessageLikeRepresentation]:
         conversation_preamble: list[MessageLikeRepresentation] = []
 
-        if "system" in prompt_template:
-            conversation_preamble.append(("system", prompt_template["system"]))
+        if "system_static" in prompt_template:
+            cached_content = jinja2_formatter(
+                prompt_template["system_static"],
+                get_plan_tool_name="get_plan",
+                set_task_status_tool_name="set_task_status",
+                is_anthropic_model=self.template_kwargs.get("is_anthropic_model"),
+                handover_tool_name=HandoverTool.tool_title,
+            )
+            if self.template_kwargs.get("is_anthropic_model"):
+                parsed_content = json.loads(cached_content)
+                cached_content = parsed_content
+
+            conversation_preamble.append(SystemMessage(content=cached_content))
+
+        if "system_dynamic" in prompt_template:
+            conversation_preamble.append(("system", prompt_template["system_dynamic"]))
 
         if state.get("handover"):  # type: ignore
             conversation_preamble.extend(
@@ -86,11 +107,26 @@ class Agent(Prompt[DuoWorkflowStateType, BaseMessage]):
     workflow_id: str
     http_client: GitlabHttpClient
 
+    @staticmethod
+    def _get_model_provider_attribute(config: PromptConfig) -> str | None:
+        model_config = getattr(config, "model", None)
+        if model_config:
+            params = getattr(model_config, "params", None)
+            if params:
+                model_class_provider = getattr(params, "model_class_provider", None)
+                return model_class_provider
+        return None
+
     @classmethod
     def _build_prompt_template(
         cls, config: PromptConfig
     ) -> Runnable[DuoWorkflowStateType, PromptValue]:
-        return AgentPromptTemplate(config.name, config.prompt_template)
+        # Extract model config to determine if it's an Anthropic model
+        model_class_provider = cls._get_model_provider_attribute(config)
+        is_anthropic_model = model_class_provider is ModelClassProvider.ANTHROPIC
+        return AgentPromptTemplate(
+            config.name, config.prompt_template, is_anthropic_model=is_anthropic_model
+        )
 
     async def run(self, state: DuoWorkflowStateType) -> dict[str, Any]:
         with duo_workflow_metrics.time_compute(

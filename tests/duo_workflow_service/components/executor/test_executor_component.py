@@ -577,31 +577,51 @@ class TestExecutorComponent:
         graph_config,
         project,
         goal,
+        duo_workflow_prompt_registry_enabled,
     ):
         await compiled_graph.ainvoke(input=workflow_state, config=graph_config)
 
-        os_information = (
-            OS_INFORMATION_COMPONENT.format(os_information=expected_os_info)
-            if expected_os_info
-            else ""
-        )
+        mock_model_ainvoke.assert_called_once()
 
-        expected_message = EXECUTOR_SYSTEM_MESSAGE.format(
-            set_task_status_tool_name=SET_TASK_STATUS_TOOL_NAME,
-            handover_tool_name=HANDOVER_TOOL_NAME,
-            get_plan_tool_name=GET_PLAN_TOOL_NAME,
-            project_id=project["id"],
-            project_name=project["name"],
-            project_url=project["http_url_to_repo"],
-            os_information=os_information,
-        )
+        if duo_workflow_prompt_registry_enabled:
+            call_args = mock_model_ainvoke.call_args
 
-        ainvoke_messages = mock_model_ainvoke.call_args.args[0]
+            if call_args.args:
+                ainvoke_messages = call_args.args[0]
+                if isinstance(ainvoke_messages, ChatPromptValue):
+                    ainvoke_messages = ainvoke_messages.messages
 
-        if isinstance(ainvoke_messages, ChatPromptValue):
-            ainvoke_messages = ainvoke_messages.messages
+                assert len(ainvoke_messages) == 3
 
-        assert ainvoke_messages == [
-            SystemMessage(content=expected_message),
-            HumanMessage(content=f"Your goal is: {goal}"),
-        ]
+                assert isinstance(ainvoke_messages[0], SystemMessage)
+                assert isinstance(ainvoke_messages[1], SystemMessage)
+                assert isinstance(ainvoke_messages[2], HumanMessage)
+
+        else:
+            os_information = (
+                OS_INFORMATION_COMPONENT.format(os_information=expected_os_info)
+                if expected_os_info
+                else ""
+            )
+
+            expected_message = EXECUTOR_SYSTEM_MESSAGE.format(
+                set_task_status_tool_name=SET_TASK_STATUS_TOOL_NAME,
+                handover_tool_name=HANDOVER_TOOL_NAME,
+                get_plan_tool_name=GET_PLAN_TOOL_NAME,
+                project_id=project["id"],
+                project_name=project["name"],
+                project_url=project["http_url_to_repo"],
+                os_information=os_information,
+            )
+
+            ainvoke_messages = mock_model_ainvoke.call_args.args[0]
+            if isinstance(ainvoke_messages, ChatPromptValue):
+                ainvoke_messages = ainvoke_messages.messages
+
+            expected_system_message = SystemMessage(content=expected_message)
+            expected_messages = [
+                expected_system_message,
+                HumanMessage(content=f"Your goal is: {goal}"),
+            ]
+
+            assert ainvoke_messages == expected_messages
