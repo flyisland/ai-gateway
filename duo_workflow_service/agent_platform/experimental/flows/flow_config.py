@@ -1,6 +1,5 @@
-import inspect
 from pathlib import Path
-from typing import ClassVar, Self
+from typing import ClassVar, Self, cast
 
 import yaml
 from pydantic import BaseModel
@@ -63,7 +62,10 @@ def load_component_class(cls_name: str) -> type:
 
     component_class = getattr(components, cls_name)
 
-    if not inspect.isclass(component_class):
-        raise TypeError(f"'{cls_name}' is not a class")
+    # Some component classes may be decorated with @injected,
+    # which transforms them into callables (e.g., factory functions).
+    # Ensure the final result is still callable.
+    if not callable(component_class):
+        raise TypeError(f"'{cls_name}' is not callable")
 
-    return component_class
+    return cast(type, component_class)
