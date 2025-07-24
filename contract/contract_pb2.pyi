@@ -246,7 +246,7 @@ class AdditionalContext(_message.Message):
     def __init__(self, category: _Optional[str] = ..., id: _Optional[str] = ..., content: _Optional[str] = ..., metadata: _Optional[str] = ...) -> None: ...
 
 class Approval(_message.Message):
-    __slots__ = ("approval", "rejection")
+    __slots__ = ("approval", "rejection", "approved_tool")
     class Approved(_message.Message):
         __slots__ = ()
         def __init__(self) -> None: ...
@@ -255,11 +255,18 @@ class Approval(_message.Message):
         MESSAGE_FIELD_NUMBER: _ClassVar[int]
         message: str
         def __init__(self, message: _Optional[str] = ...) -> None: ...
+    class ApprovedTool(_message.Message):
+        __slots__ = ("name",)
+        NAME_FIELD_NUMBER: _ClassVar[int]
+        name: str
+        def __init__(self, name: _Optional[str] = ...) -> None: ...
     APPROVAL_FIELD_NUMBER: _ClassVar[int]
     REJECTION_FIELD_NUMBER: _ClassVar[int]
+    APPROVED_TOOL_FIELD_NUMBER: _ClassVar[int]
     approval: Approval.Approved
     rejection: Approval.Rejected
-    def __init__(self, approval: _Optional[_Union[Approval.Approved, _Mapping]] = ..., rejection: _Optional[_Union[Approval.Rejected, _Mapping]] = ...) -> None: ...
+    approved_tool: Approval.ApprovedTool
+    def __init__(self, approval: _Optional[_Union[Approval.Approved, _Mapping]] = ..., rejection: _Optional[_Union[Approval.Rejected, _Mapping]] = ..., approved_tool: _Optional[_Union[Approval.ApprovedTool, _Mapping]] = ...) -> None: ...
 
 class Mkdir(_message.Message):
     __slots__ = ("directory_path",)
