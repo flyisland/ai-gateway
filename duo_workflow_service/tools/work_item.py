@@ -185,7 +185,15 @@ class WorkItemBaseTool(DuoBaseTool):
             return {"error": response["errors"]}
 
         types = response.get("namespace", {}).get("workItemTypes", {}).get("nodes", [])
-        match = next((t for t in types if t["name"].lower() == type_name.lower()), None)
+        match = next(
+            (
+                t
+                for t in types
+                if t["name"].lower().replace(" ", "")
+                == type_name.lower().replace("_", "")
+            ),
+            None,
+        )
 
         if not match:
             return {"error": f"Work item type '{type_name}' not found."}
