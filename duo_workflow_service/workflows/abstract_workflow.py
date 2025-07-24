@@ -262,6 +262,9 @@ class AbstractWorkflow(ABC):
                     if type == "updates":
                         for step in state:
                             self.log.info(f"step: {step}")
+                            element = state[step]
+                            self.log_workflow_elements(element)
+
                     else:
                         await checkpoint_notifier.send_event(
                             type=type, state=state, stream=self._stream
@@ -289,6 +292,10 @@ class AbstractWorkflow(ABC):
 
     @abstractmethod
     def get_workflow_state(self, goal: str) -> DuoWorkflowStateType:
+        pass
+
+    @abstractmethod
+    def log_workflow_elements(self, element):
         pass
 
     async def cleanup(self, workflow_id: str):

@@ -23,6 +23,7 @@ from langchain_community.cache import SQLiteCache
 
 from ai_gateway.config import Config
 from ai_gateway.container import ContainerApplication
+from ai_gateway.structured_logging import can_log_request_data
 from contract import contract_pb2, contract_pb2_grpc
 from duo_workflow_service.gitlab.connection_pool import connection_pool
 from duo_workflow_service.interceptors.authentication_interceptor import (
@@ -87,8 +88,9 @@ def string_to_category_enum(category_string: str) -> CategoryEnum:
 def clean_start_request(start_workflow_request: contract_pb2.ClientEvent):
     request = contract_pb2.ClientEvent()
     request.CopyFrom(start_workflow_request)
-    # Remove the goal from being logged to prevent logging sensitive user content
-    request.startRequest.ClearField("goal")
+    if not can_log_request_data():
+        # Remove the goal from being logged to prevent logging sensitive user content
+        request.startRequest.ClearField("goal")
     request.startRequest.ClearField("workflowMetadata")
     return request
 
