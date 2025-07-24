@@ -1,7 +1,7 @@
 from abc import ABC
-from enum import StrEnum
+from enum import StrEnum, auto
 from functools import cached_property
-from typing import Any, Callable, NamedTuple, Optional, Protocol, Sequence
+from typing import Any, Callable, NamedTuple, Protocol
 
 from pydantic import BaseModel, ConfigDict, PrivateAttr
 
@@ -9,10 +9,17 @@ from duo_workflow_service.agent_platform.experimental.state import FlowStateKeys
 from duo_workflow_service.entities import UiChatLog
 
 __all__ = [
+    "LogLevels",
     "BaseUILogEvents",
     "BaseUILogWriter",
     "UIHistory",
 ]
+
+
+class LogLevels(StrEnum):
+    SUCCESS = auto()
+    ERROR = auto()
+    WARNING = auto()
 
 
 class BaseUILogEvents(StrEnum):
@@ -71,75 +78,93 @@ class _UILogCallback(Protocol):
 class BaseUILogWriter[E: BaseUILogEvents](ABC):
     """Abstract base class for UI log writers.
 
-    Provides a base implementation for writing UI logs with different log levels.
-    Subclasses must implement the events_type property and appropriate _create_*_log methods
-    for each supported log level.
+    This class provides a foundation for implementing UI log writers that can create logs at
+    different severity levels (success, error, warning) and associate them with specific events.
 
-    By default, the supported log levels are 'success', 'error', and 'warning'.
+    Subclasses must:
+    1. Implement the 'events_type' property to return the specific BaseUILogEvents enum type
+    2. Implement the '_log_success', '_log_error', and '_log_warning' methods to create UiChatLog objects
+
+    The class automatically provides methods named after each log level that can be called
+    to create and log messages.
 
     Args:
-        log_callback: A callback function that will be called with each log entry
-        levels: Optional sequence of log level names to support. Defaults to ["success", "error", "warning"]
+        log_callback: Callback function that receives log entries (_UILogEntry objects)
 
     Example:
-        class MyEvents(BaseUILogEvents):
-            ON_START = "on_start"
-            ON_END = "on_end"
+        ```python
+        # Define a custom events enum
+        class MyUIEvents(BaseUILogEvents):
+            ON_START = "on_start"  # Define events with 'on_' prefix
+            ON_END = "on_end"      # Keys must be uppercase version of values
 
-        class MyWriter(BaseUILogWriter[MyEvents]):
+        # Create a custom writer class
+        class MyUILogWriter(BaseUILogWriter[MyUIEvents]):
             @property
-            def events_type(self) -> type[MyEvents]:
-                return MyEvents
+            def events_type(self) -> type[MyUIEvents]:
+                return MyUIEvents
 
-            def _create_success_log(self, message: str, **kwargs) -> UiChatLog:
+            # Implement log methods for each severity level
+            def _log_success(self, message: str, **kwargs) -> UiChatLog:
                 return UiChatLog(
                     message_type="text",
                     content=message,
                     timestamp="2023-01-01T12:00:00"
                 )
 
-            def _create_error_log(self, message: str, **kwargs) -> UiChatLog:
+            def _log_error(self, message: str, **kwargs) -> UiChatLog:
                 return UiChatLog(
-                    message_type="error",
+                    message_type="text",
                     content=f"ERROR: {message}",
                     timestamp="2023-01-01T12:00:00"
                 )
 
-        # Create a writer with a callback
-        def log_callback(entry: _UILogEntry) -> None:
-            print(f"Logged: {entry.record.content}")
+            def _log_warning(self, message: str, **kwargs) -> UiChatLog:
+                return UiChatLog(
+                    message_type="text",
+                    content=f"WARNING: {message}",
+                    timestamp="2023-01-01T12:00:00"
+                )
 
-        writer = MyWriter(log_callback, levels=["success", "error"])
+        # Usage:
+        # Create a callback function that will receive log entries
+        def my_log_handler(log_entry):
+            print(f"Event: {log_entry.event}, Message: {log_entry.record.content}")
 
-        # Log messages with different levels
-        writer.success("Operation successful", event=MyEvents.ON_END)
-        writer.error("Operation failed", event=MyEvents.ON_END)
+        # Instantiate the writer
+        log_writer = MyUILogWriter(my_log_handler)
 
-        # The following will raise an error as the `warning` logging is not implemented
-        writer.warning("Proceeding with caution", event=MyEvents.ON_START)
+        # Create logs for different events
+        log_writer.success("Process started successfully", event=MyUIEvents.ON_START)
+        log_writer.error("Process failed", event=MyUIEvents.ON_END)
+        ```
     """
 
-    def __init__(
-        self, log_callback: _UILogCallback, levels: Optional[Sequence[str]] = None
-    ):
+    def __init__(self, log_callback: _UILogCallback):
         self._log_callback = log_callback
-        self._levels = (
-            set(levels) if levels is not None else {"success", "error", "warning"}
-        )
+        self._levels = {
+            LogLevels.SUCCESS: self._log_success,
+            LogLevels.ERROR: self._log_error,
+            LogLevels.WARNING: self._log_warning,
+        }
 
     @property
     def events_type(self) -> type[E]:
         raise NotImplementedError
 
-    def _log(self, level: str, *args, **kwargs) -> None:
-        level_log_fn_name = f"_create_{level}_log"
-        level_log_fn = getattr(self, level_log_fn_name, None)
+    def _log_success(self, *args, **kwargs) -> UiChatLog:
+        raise NotImplementedError
 
-        if not callable(level_log_fn):
-            raise AttributeError(
-                f"{self.__class__.__name__} requires method"
-                f" '{level_log_fn_name}(*args, **kwargs)' for logging level '{level}'"
-            )
+    def _log_error(self, *args, **kwargs) -> UiChatLog:
+        raise NotImplementedError
+
+    def _log_warning(self, *args, **kwargs) -> UiChatLog:
+        raise NotImplementedError
+
+    def _log(self, level: LogLevels, *args, **kwargs) -> None:
+        fn = self._levels.get(level, None)
+        if not fn:
+            raise KeyError(f"No log function registered for the '{level.value} level'")
 
         event: E | None = kwargs.pop("event", None)
         if not event:
@@ -152,12 +177,12 @@ class BaseUILogWriter[E: BaseUILogEvents](ABC):
                 f"Expected 'event' to be an instance of {self.events_type}, got {type(event).__name__} instead"
             )
 
-        record = level_log_fn(*args, **kwargs)
+        record: UiChatLog = fn(*args, **kwargs)
         self._log_callback(_UILogEntry(record=record, event=event))
 
     def __getattr__(self, level: str) -> Callable[..., None]:
         if level in self._levels:
-            return lambda *args, **kwargs: self._log(level, *args, **kwargs)
+            return lambda *args, **kwargs: self._log(LogLevels(level), *args, **kwargs)
 
         raise AttributeError(
             f"'{self.__class__.__name__}' has no log level method '{level}'"

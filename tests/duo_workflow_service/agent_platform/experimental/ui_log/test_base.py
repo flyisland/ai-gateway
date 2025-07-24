@@ -24,8 +24,7 @@ class MockWriter(BaseUILogWriter[MockUILogEvents]):
     def events_type(self) -> type[MockUILogEvents]:
         return MockUILogEvents
 
-    @staticmethod
-    def _create_success_log(message: str, **_kwargs):
+    def _log_success(self, message: str, **_kwargs) -> UiChatLog:
         mock_record = MagicMock(spec=UiChatLog)
         mock_record.content = message
         return mock_record
@@ -65,20 +64,17 @@ class TestBaseUILogWriter:
         def events_type(self) -> type[MockUILogEvents]:
             return MockUILogEvents
 
-        @staticmethod
-        def _create_success_log(message: str, **_kwargs):
+        def _log_success(self, message: str, **_kwargs) -> UiChatLog:
             mock_record = MagicMock(spec=UiChatLog)
             mock_record.content = message
             return mock_record
 
-        @staticmethod
-        def _create_error_log(message: str, **_kwargs):
+        def _log_error(self, message: str, **_kwargs) -> UiChatLog:
             mock_record = MagicMock(spec=UiChatLog)
             mock_record.content = f"ERROR: {message}"
             return mock_record
 
-        @staticmethod
-        def _create_warning_log(message: str, **_kwargs):
+        def _log_warning(self, message: str, **_kwargs) -> UiChatLog:
             mock_record = MagicMock(spec=UiChatLog)
             mock_record.content = f"WARNING: {message}"
             return mock_record
@@ -122,26 +118,25 @@ class TestBaseUILogWriter:
     def test_invalid_log_level(self):
         # Test that invalid log level raises AttributeError
         mock_callback = MagicMock()
-        writer = self.MockWriter(mock_callback, levels=["info"])
+        writer = self.MockWriter(mock_callback)
 
         with pytest.raises(AttributeError, match="has no log level method"):
-            writer.error("Test message", event=MockUILogEvents.ON_TEST)
+            # Try to use a non-existent log level
+            writer.info("Test message", event=MockUILogEvents.ON_TEST)
 
-    def test_missing_level_method(self):
+    def test_incomplete_writer(self):
         # Test that missing level method implementation raises AttributeError
         class IncompleteWriter(BaseUILogWriter[MockUILogEvents]):
             @property
             def events_type(self) -> type[MockUILogEvents]:
                 return MockUILogEvents
 
-            # Missing _create_success_log method
+            # Missing _log_success method
 
         mock_callback = MagicMock()
-        writer = IncompleteWriter(mock_callback, levels=["success"])
+        writer = IncompleteWriter(mock_callback)
 
-        with pytest.raises(
-            AttributeError, match="requires method '_create_success_log"
-        ):
+        with pytest.raises(NotImplementedError):
             writer.success("Test message", event=MockUILogEvents.ON_TEST)
 
 
