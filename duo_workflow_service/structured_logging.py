@@ -6,7 +6,7 @@ from pathlib import Path
 from typing import Optional
 
 import structlog
-from pydantic import Field
+from pydantic import Field, field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 from structlog.dev import ConsoleRenderer
 from structlog.processors import JSONRenderer
@@ -34,14 +34,13 @@ class LoggingConfig(BaseSettings):
         default="development", alias="DUO_WORKFLOW_SERVICE_ENVIRONMENT"
     )
 
+    @field_validator("level")
+    @classmethod
+    def level_to_upper(cls, v: str) -> str:
+        return v.upper()
+
 
 def setup_logging():
-    """Set up structured logging.
-
-    Args:s
-        json_format: Whether to use JSON formatting (default: True)
-        to_file: log file name (default: None)
-    """
     logging_config = LoggingConfig()
 
     # Configure basic logging
