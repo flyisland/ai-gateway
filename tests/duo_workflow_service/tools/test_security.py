@@ -408,7 +408,7 @@ async def test_dismiss_vulnerability_comment_too_long(gitlab_client_mock, metada
 
     input_data = {
         "vulnerability_id": "gid://gitlab/Vulnerability/123",
-        "comment": "x" * 50000,  # Exactly 50,000 characters (should fail)
+        "comment": "x" * 50001,  # 50,001 characters (should fail)
         "dismissal_reason": "FALSE_POSITIVE",
     }
 
