@@ -5,7 +5,7 @@ import pytest
 
 from duo_workflow_service.tools.pipeline import (
     GetPipelineErrorsForMergeRequest,
-    GetPipelineErrorsInput,
+    GetPipelineErrorsForMergeRequestInput,
     PipelineMergeRequestNotFoundError,
     PipelinesNotFoundError,
 )
@@ -25,7 +25,7 @@ def metadata(gitlab_client_mock):
 
 
 @pytest.mark.asyncio
-async def test_get_pipeline_errors(gitlab_client_mock, metadata):
+async def test_get_pipeline_errors_for_mr(gitlab_client_mock, metadata):
     responses = [
         {"id": 1, "title": "Merge Request 1"},
         [{"id": 10, "status": "success"}, {"id": 11, "status": "failed"}],
@@ -59,7 +59,7 @@ async def test_get_pipeline_errors(gitlab_client_mock, metadata):
 
 
 @pytest.mark.asyncio
-async def test_get_pipeline_errors_merge_request_not_found(
+async def test_get_pipeline_errors_for_mr_merge_request_not_found(
     gitlab_client_mock, metadata
 ):
     gitlab_client_mock.aget = AsyncMock(return_value={"status": 404})
@@ -75,7 +75,7 @@ async def test_get_pipeline_errors_merge_request_not_found(
 
 
 @pytest.mark.asyncio
-async def test_get_pipeline_errors_pipelines_not_found(gitlab_client_mock, metadata):
+async def test_get_pipeline_errors_for_mr_pipelines_not_found(gitlab_client_mock, metadata):
     gitlab_client_mock.aget = AsyncMock(
         side_effect=[
             {"id": 1, "title": "Merge Request 1"},
@@ -114,7 +114,7 @@ async def test_get_pipeline_errors_pipelines_not_found(gitlab_client_mock, metad
         ),
     ],
 )
-async def test_get_pipeline_errors_with_url_success(
+async def test_get_pipeline_errors_for_mr_with_url_success(
     url, project_id, merge_request_iid, expected_path, gitlab_client_mock, metadata
 ):
     merge_request_response = {"id": 1, "title": "Merge Request 1"}
@@ -180,7 +180,7 @@ async def test_get_pipeline_errors_with_url_success(
         ),
     ],
 )
-async def test_get_pipeline_errors_with_url_error(
+async def test_get_pipeline_errors_for_mr_with_url_error(
     url, project_id, merge_request_iid, error_contains, gitlab_client_mock, metadata
 ):
     tool = GetPipelineErrorsForMergeRequest(metadata=metadata)
@@ -199,18 +199,18 @@ async def test_get_pipeline_errors_with_url_error(
     "input_data,expected_message",
     [
         (
-            GetPipelineErrorsInput(project_id=123, merge_request_iid=456),
+            GetPipelineErrorsForMergeRequestInput(project_id=123, merge_request_iid=456),
             "Get pipeline error logs for merge request !456 in project 123",
         ),
         (
-            GetPipelineErrorsInput(
+            GetPipelineErrorsForMergeRequestInput(
                 url="https://gitlab.com/namespace/project/-/merge_requests/42"
             ),
             "Get pipeline error logs for https://gitlab.com/namespace/project/-/merge_requests/42",
         ),
     ],
 )
-def test_get_pipeline_errors_format_display_message(input_data, expected_message):
+def test_get_pipeline_errors_for_mr_format_display_message(input_data, expected_message):
     tool = GetPipelineErrorsForMergeRequest(
         description="Get pipeline errors description"
     )
@@ -262,7 +262,7 @@ async def test_validate_merge_request_url_missing_params(
 
 
 @pytest.mark.asyncio
-async def test_get_pipeline_errors_trace_exception(gitlab_client_mock, metadata):
+async def test_get_pipeline_errors_for_mr_trace_exception(gitlab_client_mock, metadata):
     # Set up mock responses
     merge_request_response = {"id": 1, "title": "Merge Request 1"}
     pipelines_response = [
