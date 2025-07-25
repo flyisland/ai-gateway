@@ -240,9 +240,7 @@ async def test_validate_work_item_url_with_invalid_url_without_work_item_iid(met
 async def test_list_work_items_with_group_id(
     gitlab_client_mock, metadata, work_items_list
 ):
-    graphql_response = {
-        "data": {"namespace": {"workItems": {"nodes": work_items_list}}}
-    }
+    graphql_response = {"namespace": {"workItems": {"nodes": work_items_list}}}
     gitlab_client_mock.graphql = AsyncMock(return_value=graphql_response)
 
     tool = ListWorkItems(description="list work items", metadata=metadata)
@@ -264,7 +262,7 @@ async def test_list_work_items_with_group_id(
 async def test_list_work_items_with_project_id(
     gitlab_client_mock, metadata, work_items_list
 ):
-    graphql_response = {"data": {"project": {"workItems": {"nodes": work_items_list}}}}
+    graphql_response = {"project": {"workItems": {"nodes": work_items_list}}}
     gitlab_client_mock.graphql = AsyncMock(return_value=graphql_response)
 
     tool = ListWorkItems(description="list work items", metadata=metadata)
@@ -287,7 +285,6 @@ async def test_list_work_items_with_group_url(
     gitlab_client_mock, metadata, work_items_list
 ):
     resolved_parent = ResolvedParent(type="group", full_path="namespace/group")
-
     graphql_response = {"namespace": {"workItems": {"nodes": work_items_list}}}
     gitlab_client_mock.graphql = AsyncMock(return_value=graphql_response)
 
@@ -308,7 +305,7 @@ async def test_list_work_items_with_group_url(
 async def test_list_work_items_with_project_url(
     gitlab_client_mock, metadata, work_items_list
 ):
-    graphql_response = {"data": {"project": {"workItems": {"nodes": work_items_list}}}}
+    graphql_response = {"project": {"workItems": {"nodes": work_items_list}}}
     gitlab_client_mock.graphql = AsyncMock(return_value=graphql_response)
 
     tool = ListWorkItems(description="list work items", metadata=metadata)
@@ -518,7 +515,7 @@ async def test_get_work_item_with_no_iid(gitlab_client_mock, metadata):
 
 @pytest.mark.asyncio
 async def test_get_work_item_missing_root_key(gitlab_client_mock, metadata):
-    graphql_response = {"data": {}}
+    graphql_response = {}
     gitlab_client_mock.graphql = AsyncMock(return_value=graphql_response)
 
     tool = GetWorkItem(description="get work item", metadata=metadata)
@@ -635,7 +632,6 @@ async def test_get_work_item_notes_with_group_url(
         parent=ResolvedParent(type="group", full_path="namespace/group"),
         work_item_iid=42,
     )
-
     graphql_response = {
         "namespace": {
             "workItems": {
@@ -827,11 +823,7 @@ async def test_create_work_item_with_group_id(
     gitlab_client_mock.graphql = AsyncMock()
     gitlab_client_mock.graphql.side_effect = [
         work_item_type_data,
-        {
-            "data": {
-                "workItemCreate": {"workItem": created_work_item_data, "errors": []}
-            }
-        },
+        {"workItemCreate": {"workItem": created_work_item_data, "errors": []}},
     ]
 
     tool = CreateWorkItem(description="create work item", metadata=metadata)
@@ -839,14 +831,15 @@ async def test_create_work_item_with_group_id(
     response = await tool._arun(
         group_id="namespace/group",
         title="New Work Item",
-        type_name="issue",
+        type_name="Issue",
         description="This is a description",
     )
 
     response_json = json.loads(response)
-    assert "created_work_item" in response_json
-    assert response_json["created_work_item"] == created_work_item_data
-    assert response_json["errors"] is None
+    assert "work_item" in response_json
+    assert response_json["work_item"] == created_work_item_data
+    assert "message" in response_json
+    assert "created successfully" in response_json["message"]
 
     # Verify graphql was called with correct parameters
     assert gitlab_client_mock.graphql.call_count == 2
@@ -867,11 +860,7 @@ async def test_create_work_item_with_all_supported_widgets(
     gitlab_client_mock.graphql = AsyncMock()
     gitlab_client_mock.graphql.side_effect = [
         work_item_type_data,
-        {
-            "data": {
-                "workItemCreate": {"workItem": created_work_item_data, "errors": []}
-            }
-        },
+        {"workItemCreate": {"workItem": created_work_item_data, "errors": []}},
     ]
 
     tool = CreateWorkItem(description="create work item", metadata=metadata)
@@ -882,7 +871,7 @@ async def test_create_work_item_with_all_supported_widgets(
     response = await tool._arun(
         group_id="namespace/group",
         title="Full Widget Test",
-        type_name="issue",
+        type_name="Issue",
         description="Testing all supported widgets",
         assignee_ids=[123, 456],
         label_ids=["789", "101"],
@@ -894,7 +883,8 @@ async def test_create_work_item_with_all_supported_widgets(
     )
 
     response_json = json.loads(response)
-    assert "created_work_item" in response_json
+    assert "work_item" in response_json
+    assert "message" in response_json
     gql_input = gitlab_client_mock.graphql.call_args_list[1][0][1]["input"]
 
     assert gql_input["confidential"] is True
@@ -921,11 +911,7 @@ async def test_create_work_item_with_group_url(
     gitlab_client_mock.graphql = AsyncMock()
     gitlab_client_mock.graphql.side_effect = [
         work_item_type_data,
-        {
-            "data": {
-                "workItemCreate": {"workItem": created_work_item_data, "errors": []}
-            }
-        },
+        {"workItemCreate": {"workItem": created_work_item_data, "errors": []}},
     ]
     tool = CreateWorkItem(description="create work item", metadata=metadata)
 
@@ -935,13 +921,14 @@ async def test_create_work_item_with_group_url(
     response = await tool._arun(
         url="https://gitlab.com/groups/namespace/group",
         title="New Work Item",
-        type_name="epic",
+        type_name="Epic",
         health_status="onTrack",
     )
 
     response_json = json.loads(response)
-    assert "created_work_item" in response_json
-    assert response_json["created_work_item"] == created_work_item_data
+    assert "work_item" in response_json
+    assert response_json["work_item"] == created_work_item_data
+    assert "message" in response_json
 
     second_call_args = gitlab_client_mock.graphql.call_args_list[1][0]
     assert "healthStatusWidget" in second_call_args[1]["input"]
@@ -957,11 +944,7 @@ async def test_create_work_item_with_project_id(
     gitlab_client_mock.graphql = AsyncMock()
     gitlab_client_mock.graphql.side_effect = [
         work_item_type_data,
-        {
-            "data": {
-                "workItemCreate": {"workItem": created_work_item_data, "errors": []}
-            }
-        },
+        {"workItemCreate": {"workItem": created_work_item_data, "errors": []}},
     ]
 
     tool = CreateWorkItem(description="create work item", metadata=metadata)
@@ -969,14 +952,14 @@ async def test_create_work_item_with_project_id(
     response = await tool._arun(
         project_id="namespace/project",
         title="New Task",
-        type_name="task",
+        type_name="Task",
         description="Project-level work item",
     )
 
     response_json = json.loads(response)
-    assert "created_work_item" in response_json
-    assert response_json["created_work_item"] == created_work_item_data
-    assert response_json["errors"] is None
+    assert "work_item" in response_json
+    assert response_json["work_item"] == created_work_item_data
+    assert "message" in response_json
 
     gql_input = gitlab_client_mock.graphql.call_args_list[1][0][1]["input"]
     assert gql_input["title"] == "New Task"
@@ -990,11 +973,7 @@ async def test_create_work_item_with_project_url(
     gitlab_client_mock.graphql = AsyncMock()
     gitlab_client_mock.graphql.side_effect = [
         work_item_type_data,
-        {
-            "data": {
-                "workItemCreate": {"workItem": created_work_item_data, "errors": []}
-            }
-        },
+        {"workItemCreate": {"workItem": created_work_item_data, "errors": []}},
     ]
 
     tool = CreateWorkItem(description="create work item", metadata=metadata)
@@ -1005,12 +984,13 @@ async def test_create_work_item_with_project_url(
     response = await tool._arun(
         url="https://gitlab.com/namespace/project",
         title="Work Item via URL",
-        type_name="task",
+        type_name="Task",
     )
 
     response_json = json.loads(response)
-    assert "created_work_item" in response_json
-    assert response_json["created_work_item"] == created_work_item_data
+    assert "work_item" in response_json
+    assert response_json["work_item"] == created_work_item_data
+    assert "message" in response_json
 
     gql_input = gitlab_client_mock.graphql.call_args_list[1][0][1]["input"]
     assert gql_input["namespacePath"] == "namespace/project"
@@ -1024,11 +1004,9 @@ async def test_create_work_item_with_error_response(
     gitlab_client_mock.graphql.side_effect = [
         work_item_type_data,
         {
-            "data": {
-                "workItemCreate": {
-                    "workItem": None,
-                    "errors": ["Title cannot be blank"],
-                }
+            "workItemCreate": {
+                "workItem": None,
+                "errors": ["Title cannot be blank"],
             }
         },
     ]
@@ -1041,12 +1019,13 @@ async def test_create_work_item_with_error_response(
     response = await tool._arun(
         group_id="namespace/group",
         title="",  # Empty title to trigger error
-        type_name="issue",
+        type_name="Issue",
     )
 
     response_json = json.loads(response)
-    assert "errors" in response_json
-    assert response_json["errors"] == ["Title cannot be blank"]
+    assert "error" in response_json
+    assert "details" in response_json
+    assert response_json["details"]["work_item_errors"] == ["Title cannot be blank"]
 
 
 @pytest.mark.asyncio
@@ -1087,13 +1066,13 @@ async def test_create_epic_in_project_error(
     response = await tool._arun(
         project_id="namespace/project",
         title="New Epic",
-        type_name="epic",  # Epics can only be created in groups
+        type_name="Epic",  # Epics can only be created in groups
     )
 
     response_json = json.loads(response)
     assert "error" in response_json
     assert (
-        "Work item type 'epic' cannot be created in a project – only in groups."
+        "Work item type 'Epic' cannot be created in a project – only in groups."
         in response_json["error"]
     )
 
@@ -1103,13 +1082,13 @@ async def test_create_epic_in_project_error(
     [
         (
             CreateWorkItemInput(
-                group_id="namespace/group", title="Test Item", type_name="issue"
+                group_id="namespace/group", title="Test Item", type_name="Issue"
             ),
             "Create work item 'Test Item' in group namespace/group",
         ),
         (
             CreateWorkItemInput(
-                project_id="namespace/project", title="Test Item", type_name="task"
+                project_id="namespace/project", title="Test Item", type_name="Task"
             ),
             "Create work item 'Test Item' in project namespace/project",
         ),

@@ -19,8 +19,8 @@ from duo_workflow_service.tools.queries.work_items import (
 )
 
 # Supported work item types in GitLab
-GROUP_ONLY_TYPES = {"epic", "objective", "key_result"}
-ALL_TYPES = {"issue", "task", *GROUP_ONLY_TYPES}
+GROUP_ONLY_TYPES = {"Epic", "Objective", "Key Result"}
+ALL_TYPES = {"Issue", "Task", *GROUP_ONLY_TYPES}
 
 PARENT_IDENTIFICATION_DESCRIPTION = """To identify the parent (group or project) you must provide either:
 - group_id parameter, or
@@ -185,18 +185,14 @@ class WorkItemBaseTool(DuoBaseTool):
             return {"error": response["errors"]}
 
         types = response.get("namespace", {}).get("workItemTypes", {}).get("nodes", [])
-        match = next(
-            (
-                t
-                for t in types
-                if t["name"].lower().replace(" ", "")
-                == type_name.lower().replace("_", "")
-            ),
-            None,
-        )
+        match = next((t for t in types if t["name"] == type_name), None)
 
         if not match:
-            return {"error": f"Work item type '{type_name}' not found."}
+            available = [t["name"] for t in types]
+            return {
+                "error": f"Work item type '{type_name}' not found.",
+                "available_types": available,
+            }
 
         return match["id"]
 
@@ -221,13 +217,24 @@ class WorkItemBaseTool(DuoBaseTool):
         if "errors" in response:
             return json.dumps({"error": response["errors"]})
 
-        created = response.get("data", {}).get("workItemCreate", {}).get("workItem", {})
-        errors = response.get("data", {}).get("workItemCreate", {}).get("errors", [])
+        created = response.get("workItemCreate", {}).get("workItem", {})
+        errors = response.get("workItemCreate", {}).get("errors", [])
+
+        if errors or not created.get("id"):
+            return json.dumps(
+                {
+                    "error": "Failed to create work item.",
+                    "details": {
+                        "graphql_errors": response.get("errors"),
+                        "work_item_errors": errors,
+                    },
+                }
+            )
 
         return json.dumps(
             {
-                "created_work_item": created,
-                "errors": errors if errors else None,
+                "message": f"Work item '{created.get('title')}' created successfully.",
+                "work_item": created,
             }
         )
 
@@ -236,7 +243,7 @@ class WorkItemBaseTool(DuoBaseTool):
         input_data = {}
         type_name = kwargs.get("type_name")
 
-        if type_name in ["issue", "epic"]:
+        if type_name in ["Issue", "Epic"]:
             start_and_due = {}
 
             for key in ["start_date", "due_date", "is_fixed"]:
@@ -257,7 +264,7 @@ class WorkItemBaseTool(DuoBaseTool):
         if kwargs.get("description") is not None:
             input_data["descriptionWidget"] = {"description": kwargs["description"]}
 
-        if kwargs.get("health_status") is not None and type_name in ["issue", "epic"]:
+        if kwargs.get("health_status") is not None and type_name in ["Issue", "Epic"]:
             input_data["healthStatusWidget"] = {"healthStatus": kwargs["health_status"]}
 
         if kwargs.get("confidential") is not None:
@@ -386,13 +393,14 @@ class ListWorkItems(WorkItemBaseTool):
 
         try:
             response = await self.gitlab_client.graphql(query, variables)
-            data = response.get("data", response)
             root_key = "namespace" if resolved.type == "group" else "project"
 
-            if root_key not in data:
+            if root_key not in response:
                 return json.dumps({"error": f"No {root_key} found in response"})
 
-            work_items = data.get(root_key, {}).get("workItems", {}).get("nodes", [])
+            work_items = (
+                response.get(root_key, {}).get("workItems", {}).get("nodes", [])
+            )
 
             return json.dumps({"work_items": work_items})
         except Exception as e:
@@ -563,7 +571,7 @@ class GetWorkItemNotes(WorkItemBaseTool):
 class CreateWorkItemInput(ParentResourceInput):
     title: str = Field(description="Title of the work item")
     type_name: str = Field(
-        description="Work item type. One of: 'issue', 'epic', 'task', 'objective', 'key_result', 'test_case'."
+        description="Work item type. One of: 'Issue', 'Epic', 'Task', 'Objective', 'Key Result'."
     )
     description: Optional[str] = Field(
         default=None, description="The description of the work item."
@@ -608,8 +616,7 @@ class CreateWorkItem(WorkItemBaseTool):
     args_schema: Type[BaseModel] = CreateWorkItemInput
 
     async def _arun(self, type_name: str, **kwargs: Any) -> str:
-        type_name_normalized = type_name.lower()
-        kwargs["type_name"] = type_name_normalized
+        kwargs["type_name"] = type_name
         url = kwargs.pop("url", None)
         group_id = kwargs.pop("group_id", None)
         project_id = kwargs.pop("project_id", None)
@@ -618,14 +625,16 @@ class CreateWorkItem(WorkItemBaseTool):
         if isinstance(resolved, str):
             return json.dumps({"error": resolved})
 
-        if type_name_normalized not in ALL_TYPES:
+        if type_name not in ALL_TYPES:
+            supported_types = ", ".join(sorted(ALL_TYPES))
             return json.dumps(
                 {
-                    "error": f"Unknown work item type: '{type_name}'. Supported types are: {', '.join(sorted(ALL_TYPES))}."
+                    "error": f"Unknown work item type: '{type_name}'. "
+                    f"Supported types are: {supported_types}."
                 }
             )
 
-        if resolved.type == "project" and type_name_normalized in GROUP_ONLY_TYPES:
+        if resolved.type == "project" and type_name in GROUP_ONLY_TYPES:
             return json.dumps(
                 {
                     "error": f"Work item type '{type_name}' cannot be created in a project – only in groups."
@@ -634,7 +643,7 @@ class CreateWorkItem(WorkItemBaseTool):
 
         try:
             type_id_or_error = await self._resolve_work_item_type_id(
-                resolved.full_path, type_name_normalized
+                resolved.full_path, type_name
             )
             if isinstance(type_id_or_error, dict):
                 return json.dumps(type_id_or_error)
