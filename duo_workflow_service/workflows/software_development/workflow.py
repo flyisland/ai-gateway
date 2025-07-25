@@ -77,6 +77,7 @@ EXECUTOR_TOOLS = [
     "list_all_merge_request_notes",
     "list_merge_request_diffs",
     "gitlab_issue_search",
+    "gitlab_blob_search",
     "gitlab_merge_request_search",
     "run_command",
     "read_file",
@@ -122,6 +123,7 @@ CONTEXT_BUILDER_TOOLS = [
     "list_all_merge_request_notes",
     "list_merge_request_diffs",
     "gitlab_issue_search",
+    "gitlab_blob_search",
     "gitlab_merge_request_search",
     "read_file",
     "find_files",
@@ -235,6 +237,7 @@ class Workflow(AbstractWorkflow):
         graph.add_edge(last_node_name, disambiguation_entry_node)
 
         planner_component = PlannerComponent(
+            user=self._user,
             workflow_id=self._workflow_id,
             workflow_type=self._workflow_type,
             planner_toolset=tools_registry.toolset(PLANNER_TOOLS),
