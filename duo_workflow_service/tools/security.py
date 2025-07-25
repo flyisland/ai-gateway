@@ -132,31 +132,16 @@ class ListVulnerabilities(DuoBaseTool):
     def format_display_message(self, args: ListVulnerabilitiesInput) -> str:
         return f"List vulnerabilities in project {args.project_full_path}"
 
+
 class DismissVulnerabilityInput(BaseModel):
-    vulnerability_id: str = Field(
-        description="ID of the vulnerability to be dismissed"
-    )
-    comment: Optional[str] = Field(
-        default=None,
+    vulnerability_id: str = Field(description="ID of the vulnerability to be dismissed")
+    comment: str = Field(
         description="Comment why vulnerability was dismissed (maximum 50,000 characters)."
     )
-    dismissal_reason: Optional[str] = Field(
-        default=None,
+    dismissal_reason: str = Field(
         description="Reason why vulnerability should be dismissed (ACCEPTABLE_RISK, FALSE_POSITIVE, MITIGATING_CONTROL, USED_IN_TESTS, NOT_APPLICABLE)"
     )
 
-class DismissVulnerabilityInput(BaseModel):
-    vulnerability_id: str = Field(
-        description="ID of the vulnerability to be dismissed"
-    )
-    comment: Optional[str] = Field(
-        default=None,
-        description="Comment why vulnerability was dismissed (maximum 50,000 characters)."
-    )
-    dismissal_reason: Optional[str] = Field(
-        default=None,
-        description="Reason why vulnerability should be dismissed (ACCEPTABLE_RISK, FALSE_POSITIVE, MITIGATING_CONTROL, USED_IN_TESTS, NOT_APPLICABLE)"
-    )
 
 class DismissVulnerability(DuoBaseTool):
     name: str = "dismiss_vulnerability"
@@ -165,13 +150,45 @@ class DismissVulnerability(DuoBaseTool):
     {PROJECT_IDENTIFICATION_DESCRIPTION}
 
     The tool supports dismissing a vulnerability by ID, with a dismissal reason, and comment.
+    The dismiss reason must be one of: ACCEPTABLE_RISK, FALSE_POSITIVE, MITIGATING_CONTROL, USED_IN_TESTS, NOT_APPLICABLE.
+    If a dismissal reason is not given, you will need to ask for one.
+
+    A comment explaining the reason for the dismissal is required and can be up to 50,000 characters.
+    If a comment is not given, you will need to ask for one.
+
+    For example:
+    - Dismiss a vulnerability for being a false positive:
+        dismiss_vulnerability(
+            vulnerability_id="gid://gitlab/Vulnerability/123",
+            dismissal_reason="FALSE_POSITIVE",
+            comment="Security review deemed this a false positive"
+        )
     """
     args_schema: Type[BaseModel] = DismissVulnerabilityInput
 
     async def _arun(self, **kwargs: Any) -> str:
         vulnerability_id = kwargs.pop("vulnerability_id")
-        comment = kwargs.pop("comment", None)
-        dismissal_reason = kwargs.pop("dismissal_reason", None)
+        comment = kwargs.pop("comment")
+        dismissal_reason = kwargs.pop("dismissal_reason")
+
+        # Validate severity value
+        valid_dismissal_reasons = {
+            "ACCEPTABLE_RISK",
+            "FALSE_POSITIVE",
+            "MITIGATING_CONTROL",
+            "USED_IN_TESTS",
+            "NOT_APPLICABLE",
+        }
+        if dismissal_reason not in valid_dismissal_reasons:
+            return json.dumps(
+                {
+                    "error": f"Invalid dismissal reason '{dismissal_reason}'. Must be one of: {', '.join(valid_dismissal_reasons)}"
+                }
+            )
+
+        # Validate comment length
+        if len(comment) >= 50000:
+            return json.dumps({"error": "Comment must be 50,000 characters or less"})
 
         # editorconfig-checker-disable
         # Build GraphQL mutation
@@ -215,9 +232,7 @@ class DismissVulnerability(DuoBaseTool):
             return json.dumps({"error": "; ".join(errors)})
 
         return json.dumps(
-            {
-                "vulnerability": response["data"]["vulnerabilityDismiss"]["vulnerability"]
-            }
+            {"vulnerability": response["data"]["vulnerabilityDismiss"]["vulnerability"]}
         )
 
     def format_display_message(self, args: DismissVulnerabilityInput) -> str:
