@@ -1,19 +1,9 @@
 import json
-import logging
 from typing import Any, Optional, Type
 
 from pydantic import BaseModel, Field
 
 from duo_workflow_service.tools.duo_base_tool import DuoBaseTool
-
-# Enable aiohttp debug logging to see full HTTP requests
-logging.basicConfig(level=logging.DEBUG)
-logging.getLogger("aiohttp").setLevel(logging.DEBUG)
-logging.getLogger("aiohttp.client").setLevel(logging.DEBUG)
-logging.getLogger("aiohttp.client_reqrep").setLevel(logging.DEBUG)
-
-# Create a logger for this module
-logger = logging.getLogger(__name__)
 
 PROJECT_IDENTIFICATION_DESCRIPTION = """The project must be specified using its full path (e.g., 'namespace/project' or 'group/subgroup/project')."""
 
@@ -187,7 +177,7 @@ class DismissVulnerability(DuoBaseTool):
             )
 
         # Validate comment length
-        if len(comment) >= 50000:
+        if len(comment) > 50000:
             return json.dumps({"error": "Comment must be 50,000 characters or less"})
 
         # editorconfig-checker-disable
