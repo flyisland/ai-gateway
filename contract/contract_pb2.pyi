@@ -261,8 +261,10 @@ class AdditionalContext(_message.Message):
 class Approval(_message.Message):
     __slots__ = ("approval", "rejection")
     class Approved(_message.Message):
-        __slots__ = ()
-        def __init__(self) -> None: ...
+        __slots__ = ("preapproved_tools",)
+        PREAPPROVED_TOOLS_FIELD_NUMBER: _ClassVar[int]
+        preapproved_tools: _containers.RepeatedScalarFieldContainer[str]
+        def __init__(self, preapproved_tools: _Optional[_Iterable[str]] = ...) -> None: ...
     class Rejected(_message.Message):
         __slots__ = ("message",)
         MESSAGE_FIELD_NUMBER: _ClassVar[int]

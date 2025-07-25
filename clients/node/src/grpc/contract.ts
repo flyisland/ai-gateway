@@ -180,6 +180,7 @@ export interface Approval {
 }
 
 export interface Approval_Approved {
+  preapprovedTools: string[];
 }
 
 export interface Approval_Rejected {
@@ -2664,11 +2665,14 @@ export const Approval: MessageFns<Approval> = {
 };
 
 function createBaseApproval_Approved(): Approval_Approved {
-  return {};
+  return { preapprovedTools: [] };
 }
 
 export const Approval_Approved: MessageFns<Approval_Approved> = {
-  encode(_: Approval_Approved, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
+  encode(message: Approval_Approved, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
+    for (const v of message.preapprovedTools) {
+      writer.uint32(10).string(v!);
+    }
     return writer;
   },
 
@@ -2679,6 +2683,14 @@ export const Approval_Approved: MessageFns<Approval_Approved> = {
     while (reader.pos < end) {
       const tag = reader.uint32();
       switch (tag >>> 3) {
+        case 1: {
+          if (tag !== 10) {
+            break;
+          }
+
+          message.preapprovedTools.push(reader.string());
+          continue;
+        }
       }
       if ((tag & 7) === 4 || tag === 0) {
         break;
@@ -2688,20 +2700,28 @@ export const Approval_Approved: MessageFns<Approval_Approved> = {
     return message;
   },
 
-  fromJSON(_: any): Approval_Approved {
-    return {};
+  fromJSON(object: any): Approval_Approved {
+    return {
+      preapprovedTools: globalThis.Array.isArray(object?.preapprovedTools)
+        ? object.preapprovedTools.map((e: any) => globalThis.String(e))
+        : [],
+    };
   },
 
-  toJSON(_: Approval_Approved): unknown {
+  toJSON(message: Approval_Approved): unknown {
     const obj: any = {};
+    if (message.preapprovedTools?.length) {
+      obj.preapprovedTools = message.preapprovedTools;
+    }
     return obj;
   },
 
   create<I extends Exact<DeepPartial<Approval_Approved>, I>>(base?: I): Approval_Approved {
     return Approval_Approved.fromPartial(base ?? ({} as any));
   },
-  fromPartial<I extends Exact<DeepPartial<Approval_Approved>, I>>(_: I): Approval_Approved {
+  fromPartial<I extends Exact<DeepPartial<Approval_Approved>, I>>(object: I): Approval_Approved {
     const message = createBaseApproval_Approved();
+    message.preapprovedTools = object.preapprovedTools?.map((e) => e) || [];
     return message;
   },
 };

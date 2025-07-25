@@ -165,7 +165,9 @@ message AdditionalContext {
 }
 
 message Approval {
-    message Approved {}
+    message Approved {
+        repeated string preapproved_tools = 1;
+    }
 
     message Rejected {
         optional string message = 1;
