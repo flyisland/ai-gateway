@@ -105,6 +105,7 @@ class GitlabHttpClient(ABC):
         parse_json: bool = True,
         use_http_response: bool = False,
         object_hook: Union[Callable, None] = None,
+        path: Optional[str] = None,
     ) -> Union[Dict[str, Any], list, str, None]:
         """Parse the response from the API call.
 
@@ -131,9 +132,15 @@ class GitlabHttpClient(ABC):
 
             return {}
         except json.JSONDecodeError as e:
-            logger.error(f"JSON decode error: {str(e)}. ")
             logger.error(
-                f"Raw response type: {type(response)}, content: {repr(response)}"
+                f"JSON decode error: {str(e)}. ",
+                exc_info=True,
+                extra={"path": path},
+            )
+            logger.error(
+                f"Raw response type: {type(response)}, content: {repr(response)}",
+                exc_info=True,
+                extra={"path": path},
             )
             return {}
 
