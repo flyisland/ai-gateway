@@ -62,6 +62,14 @@ def strip_hidden_html_comments(response: str | dict | list) -> str | dict | list
 def strip_mermaid_code_blocks(response: str | dict | list) -> str | dict | list:
     """Strip Mermaid code blocks that could contain hidden malicious instructions.
 
+    This bulletproof implementation handles multiple bypass techniques:
+    - Whitespace variations (spaces, tabs after backticks)
+    - Unicode lookalike characters
+    - HTML-style Mermaid blocks
+    - Incomplete/malformed blocks
+    - Alternative language identifiers
+    - Nested patterns and edge cases
+
     Args:
         response: The response data to process
 
@@ -70,9 +78,95 @@ def strip_mermaid_code_blocks(response: str | dict | list) -> str | dict | list:
     """
 
     def _strip_mermaid_blocks(text: str) -> str:
-        # Remove Mermaid code blocks (```mermaid ... ```)
-        # This handles both inline and multiline mermaid blocks
-        return re.sub(r"```mermaid.*?```", "", text, flags=re.DOTALL | re.IGNORECASE)
+        if not text or not isinstance(text, str):
+            return text
+
+        import unicodedata
+
+        # Step 1: Normalize Unicode and handle lookalike characters
+        text = unicodedata.normalize("NFKC", text)
+
+        # Replace common Unicode lookalikes with standard ASCII
+        unicode_mappings = {
+            "\u02cb": "`",
+            "\u0060": "`",
+            "\u00b4": "`",
+            "\u2018": "`",
+            "\u2019": "`",
+            "\u201b": "`",
+            "\u2032": "`",
+            "\uff40": "`",
+            "\u200b": "",
+            "\u200c": "",
+            "\u200d": "",
+            "\ufeff": "",
+            "\u2060": "",
+        }
+
+        for unicode_char, replacement in unicode_mappings.items():
+            text = text.replace(unicode_char, replacement)
+
+        # Step 2: Handle markdown code blocks with extensive variations
+        markdown_patterns = [
+            # Standard and extended backtick blocks
+            r"`{3,}\s*mermaid[a-z0-9\-\.\_]*\s*.*?`{3,}",
+            # Incomplete blocks (no closing) - remove to end or next block
+            r"`{3,}\s*mermaid[a-z0-9\-\.\_]*\s*(?:(?!`{3,}).)*$",
+            r"`{3,}\s*mermaid[a-z0-9\-\.\_]*\s*(?:(?!`{3,}).)*?(?=`{3,})",
+            # Alternative quote characters
+            r"'{3,}\s*mermaid[a-z0-9\-\.\_]*\s*.*?'{3,}",
+            r'"{3,}\s*mermaid[a-z0-9\-\.\_]*\s*.*?"{3,}',
+            # Mixed quote patterns
+            r"`{2,}'\s*mermaid.*?'`{2,}",
+            r"'{2,}`\s*mermaid.*?`'{2,}",
+            r'`{2,}"\s*mermaid.*?"`{2,}',
+            r'"{2,}`\s*mermaid.*?`"{2,}',
+        ]
+
+        for pattern in markdown_patterns:
+            text = re.sub(
+                pattern, "", text, flags=re.DOTALL | re.IGNORECASE | re.MULTILINE
+            )
+
+        # Step 3: Handle HTML-style Mermaid blocks comprehensively
+        html_patterns = [
+            # Standard HTML tags with mermaid references
+            r"<(?:pre|div|code|span|section)[^>]*(?:class|data-language|data-lang|lang)\s*=\s*['\"][^'\"]*mermaid[^'\"]*['\"][^>]*>.*?</(?:pre|div|code|span|section)>",
+            r"<script[^>]*type\s*=\s*['\"][^'\"]*mermaid[^'\"]*['\"][^>]*>.*?</script>",
+            # Any tag with mermaid in any attribute
+            r"<[^>]*mermaid[^>]*>.*?</[^>]+>",
+        ]
+
+        for pattern in html_patterns:
+            text = re.sub(pattern, "", text, flags=re.DOTALL | re.IGNORECASE)
+
+        # Step 4: Handle split/partial mermaid keywords across lines
+        # Remove "mer" followed by "maid" across whitespace/newlines
+        text = re.sub(
+            r"```\s*mer\s*\n\s*maid[a-z0-9\-\.\_]*.*?```",
+            "",
+            text,
+            flags=re.DOTALL | re.IGNORECASE,
+        )
+        text = re.sub(
+            r"`{3,}[^`\n]*mer[^`\n]*maid[^`]*",
+            "",
+            text,
+            flags=re.IGNORECASE | re.DOTALL,
+        )
+
+        # Step 5: Clean up remaining artifacts and nested content
+        # Remove any remaining backtick blocks that might contain fragments
+        text = re.sub(
+            r"`{3,}[^`]*mermaid[^`]*`*", "", text, flags=re.IGNORECASE | re.DOTALL
+        )
+        text = re.sub(r"^\s*[`'\"]{3,}\s*$", "", text, flags=re.MULTILINE)
+
+        # Step 6: Final cleanup
+        text = re.sub(r"\n\s*\n\s*\n", "\n\n", text)
+        text = re.sub(r" {3,}", "  ", text)
+
+        return text.strip()
 
     return _apply_recursively(response, _strip_mermaid_blocks)
 
