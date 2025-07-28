@@ -208,6 +208,7 @@ _outbox = MagicMock(spec=asyncio.Queue)
                 "get_plan",
                 "set_task_status",
                 "read_file",
+                "read_files",
                 "create_file_with_contents",
                 "edit_file",
                 "list_dir",
@@ -294,6 +295,7 @@ def test_registry_initialization_initialises_tools_with_correct_attributes(
         "gitlab_wiki_blob_search": tools.WikiBlobSearch(metadata=tool_metadata),
         "gitlab_note_search": tools.NoteSearch(metadata=tool_metadata),
         "read_file": tools.ReadFile(metadata=tool_metadata),
+        "read_files": tools.ReadFiles(metadata=tool_metadata),
         "list_dir": tools.ListDir(metadata=tool_metadata),
         "create_file_with_contents": tools.WriteFile(metadata=tool_metadata),
         "edit_file": tools.EditFile(metadata=tool_metadata),
@@ -378,7 +380,17 @@ async def test_registry_configuration(gl_http_client, mcp_tools):
             ["read_write_files"],
         ),
         (
+            "read_files",
+            tools.ReadFiles,
+            ["read_write_files"],
+        ),
+        (
             "read_file",
+            None,
+            ["read_only_gitlab"],
+        ),
+        (
+            "read_files",
             None,
             ["read_only_gitlab"],
         ),
@@ -389,7 +401,7 @@ async def test_registry_configuration(gl_http_client, mcp_tools):
         ),
         ("handover_tool", tools.HandoverTool, []),
     ],
-    ids=["approved_tool", "not_approved_tool", "nonexistent_tool", "handover_tool"],
+    ids=["approved_tool", "read_files_approved_tool", "not_approved_tool", "read_files_not_approved_tool", "nonexistent_tool", "handover_tool"],
 )
 def test_get_tool(tool_metadata, tool_name, expected_tool, config):
     registry = ToolsRegistry(
@@ -471,6 +483,7 @@ def test_preapproved_tools_initialization(tool_metadata):
     # Tools from read_write_files privilege should be in preapproved_tools
     read_write_tools = {
         "read_file",
+        "read_files",
         "create_file_with_contents",
         "edit_file",
         "list_dir",
@@ -524,6 +537,7 @@ async def test_registry_configuration_with_preapproved_tools(gl_http_client):
 
     read_write_tools = {
         "read_file",
+        "read_files",
         "create_file_with_contents",
         "edit_file",
         "list_dir",
