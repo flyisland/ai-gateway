@@ -33,14 +33,14 @@ class ComponentRegistry(BaseComponentRegistry):
 
     def register(self, name: str, component_class: type[BaseComponent]):
         if name in self._registry:
-            raise ValueError("TODO: already registered")
+            raise ValueError(f"Component '{name}' is already registered. Use a different name")
 
         self._registry[name] = component_class
 
     def get(self, name: str) -> type[BaseComponent]:
         klass = self._registry.get(name, None)
         if not klass:
-            raise KeyError("TODO: not found")
+            raise KeyError(f"Component '{name}' not found in registry")
 
         return klass
 
@@ -56,7 +56,7 @@ def register_component[T: BaseComponent](
 ) -> Callable:
     def decorator(cls: type[T]) -> T:
         if not (inspect.isclass(cls) and issubclass(cls, BaseComponent)):
-            raise TypeError(f"TODO: '{cls}' must inherit from the BaseComponent class")
+            raise TypeError(f"Invalid component class '{cls.__name__}'. Components must inherit from BaseComponent class")
 
         register_name = name or cls.__name__
         register_class = inject(cls) if has_injection else cls

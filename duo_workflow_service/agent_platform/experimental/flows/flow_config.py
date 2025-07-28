@@ -64,7 +64,7 @@ def load_component_class(cls_name: str) -> type:
         component_class = registry.get(cls_name)
     except KeyError as e:
         raise TypeError(
-            f"TODO: '{cls_name}' not found in the component registry"
+            f"Component class '{cls_name}' not found in the component registry"
         ) from e
 
     return component_class
