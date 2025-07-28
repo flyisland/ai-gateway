@@ -89,6 +89,16 @@ class HistoryCompactor:
                     "status": WorkflowStatusEnum.INPUT_REQUIRED,
                 }
             
+            # Ensure messages_to_compact doesn't have orphaned tool_use blocks
+            messages_to_compact = self._ensure_complete_tool_pairs(messages_to_compact)
+            
+            if not messages_to_compact:
+                # No safe messages to compact after tool pair validation
+                return {
+                    "conversation_history": {self._agent_name: history},
+                    "status": WorkflowStatusEnum.INPUT_REQUIRED,
+                }
+            
             # Create a temporary state with only the messages to be compacted for the prompt
             compact_input = input.copy()
             compact_input["conversation_history"] = {self._agent_name: messages_to_compact}
@@ -205,6 +215,54 @@ class HistoryCompactor:
                                         break
         
         return candidate_messages
+    
+    def _ensure_complete_tool_pairs(self, messages: List[BaseMessage]) -> List[BaseMessage]:
+        """
+        Ensure that the messages list doesn't contain AIMessages with tool_calls
+        that don't have corresponding ToolMessages. Remove incomplete tool pairs.
+        """
+        if not messages:
+            return messages
+        
+        # Work backwards to find the last safe message to compact
+        safe_messages = []
+        pending_tool_calls = set()
+        
+        for i in range(len(messages) - 1, -1, -1):
+            msg = messages[i]
+            
+            if isinstance(msg, ToolMessage):
+                # This tool result resolves a tool call
+                tool_call_id = getattr(msg, "tool_call_id", None)
+                if tool_call_id:
+                    pending_tool_calls.discard(tool_call_id)
+                safe_messages.insert(0, msg)
+                
+            elif isinstance(msg, AIMessage) and hasattr(msg, "tool_calls") and msg.tool_calls:
+                # This AI message has tool calls
+                tool_call_ids = [tc.get("id") for tc in msg.tool_calls if tc.get("id")]
+                
+                # If any of these tool calls are still pending (not resolved), 
+                # we can't include this message or any before it
+                has_unresolved_calls = any(tc_id in pending_tool_calls for tc_id in tool_call_ids)
+                
+                if has_unresolved_calls:
+                    # Stop here - can't safely include this message or earlier ones
+                    break
+                else:
+                    # Mark these tool calls as pending (they need results after this message)
+                    pending_tool_calls.update(tool_call_ids)
+                    safe_messages.insert(0, msg)
+            else:
+                # Regular message (HumanMessage, etc.) - always safe
+                safe_messages.insert(0, msg)
+        
+        # If we have pending tool calls at the end, we can't use any of these messages
+        if pending_tool_calls:
+            log.info(f"Skipping compaction due to {len(pending_tool_calls)} unresolved tool calls")
+            return []
+        
+        return safe_messages
     
     def _find_ai_message_with_tool_call(self, messages: List[BaseMessage], tool_call_id: str, max_index: int) -> int | None:
         """Find the AIMessage that contains the given tool_call_id, searching backwards from max_index."""
