@@ -1,5 +1,5 @@
 import inspect
-from typing import Callable, Optional, Self, cast
+from typing import Callable, Optional, Self
 
 from dependency_injector.wiring import inject
 
@@ -33,7 +33,9 @@ class ComponentRegistry(BaseComponentRegistry):
 
     def register(self, name: str, component_class: type[BaseComponent]):
         if name in self._registry:
-            raise ValueError(f"Component '{name}' is already registered. Use a different name")
+            raise KeyError(
+                f"Component '{name}' is already registered. Use a different name"
+            )
 
         self._registry[name] = component_class
 
@@ -50,19 +52,24 @@ class ComponentRegistry(BaseComponentRegistry):
     def __contains__(self, name: str) -> bool:
         return name in self._registry
 
+    def clear(self):
+        self._registry.clear()
+
 
 def register_component[T: BaseComponent](
     name: Optional[str] = None, has_injection: bool = False
 ) -> Callable:
-    def decorator(cls: type[T]) -> T:
+    def decorator(cls: type[T]) -> type[T]:
         if not (inspect.isclass(cls) and issubclass(cls, BaseComponent)):
-            raise TypeError(f"Invalid component class '{cls.__name__}'. Components must inherit from BaseComponent class")
+            raise TypeError(
+                f"Invalid component class '{cls.__name__}'. Components must inherit from BaseComponent class"
+            )
 
         register_name = name or cls.__name__
         register_class = inject(cls) if has_injection else cls
 
         ComponentRegistry.instance().register(register_name, register_class)
 
-        return cast(T, cls)
+        return cls
 
     return decorator
