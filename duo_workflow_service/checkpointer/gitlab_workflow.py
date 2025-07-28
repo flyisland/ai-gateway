@@ -220,23 +220,20 @@ class GitLabWorkflow(BaseCheckpointSaver[Any], AbstractAsyncContextManager[Any])
         # For flow start events
         if event_name == EventEnum.WORKFLOW_START:
             duo_workflow_metrics.count_agent_platform_session_start(
-                session_id=self._workflow_id,
                 flow_type=self._workflow_type.value,
             )
 
         # For session success events
         if event_name == EventEnum.WORKFLOW_FINISH_SUCCESS:
             duo_workflow_metrics.count_agent_platform_session_success(
-                session_id=self._workflow_id,
                 flow_type=self._workflow_type.value,
             )
 
         if event_name == EventEnum.WORKFLOW_FINISH_FAILURE:
-            error_type = additional_properties.extra.get("extra", {}).get("error_type")
+            error_type = additional_properties.extra.get("error_type", "unknown")
             if not error_type or error_type == "str":
                 error_type = "unknown"
             duo_workflow_metrics.count_agent_platform_session_failure(
-                session_id=self._workflow_id,
                 flow_type=self._workflow_type.value,
                 failure_reason=error_type,
             )
@@ -278,8 +275,9 @@ class GitLabWorkflow(BaseCheckpointSaver[Any], AbstractAsyncContextManager[Any])
                 label=EventLabelEnum.WORKFLOW_FINISH_LABEL.value,
                 property=repr(e),
                 value=self._workflow_id,
-                extra={"error_type": type(e).__name__},
+                error_type=type(e).__name__,
             )
+            self._logger.info(f"Additional properties: {failure_properties}")
             self._track_internal_event(
                 event_name=EventEnum.WORKFLOW_FINISH_FAILURE,
                 additional_properties=failure_properties,
@@ -374,7 +372,7 @@ class GitLabWorkflow(BaseCheckpointSaver[Any], AbstractAsyncContextManager[Any])
             label=EventLabelEnum.WORKFLOW_FINISH_LABEL.value,
             property=repr(exc_value),
             value=self._workflow_id,
-            extra={"error_type": type(exc_value).__name__},
+            error_type=type(exc_value).__name__,
         )
         self._track_internal_event(
             event_name=EventEnum.WORKFLOW_FINISH_FAILURE,

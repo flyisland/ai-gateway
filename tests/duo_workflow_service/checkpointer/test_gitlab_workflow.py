@@ -199,7 +199,6 @@ async def test_workflow_event_tracking_for_cancelled_workflow(
     )
 
     mock_duo_workflow_metrics.count_agent_platform_session_start.assert_called_once_with(
-        session_id=workflow_id,
         flow_type=workflow_type.value,
     )
 
@@ -228,7 +227,6 @@ async def test_workflow_event_tracking_for_cancelled_workflow(
     )
 
     mock_duo_workflow_metrics.count_agent_platform_session_success.assert_called_once_with(
-        session_id=workflow_id,
         flow_type=workflow_type.value,
     )
 
@@ -288,7 +286,6 @@ async def test_workflow_context_manager_success(
     )
 
     mock_duo_workflow_metrics.count_agent_platform_session_start.assert_called_once_with(
-        session_id=workflow_id,
         flow_type=workflow_type.value,
     )
 
@@ -318,7 +315,6 @@ async def test_workflow_context_manager_success(
     )
 
     mock_duo_workflow_metrics.count_agent_platform_session_success.assert_called_once_with(
-        session_id=workflow_id,
         flow_type=workflow_type.value,
     )
 
@@ -391,7 +387,7 @@ async def test_workflow_context_manager_startup_error(
             label=EventLabelEnum.WORKFLOW_FINISH_LABEL.value,
             property="ValueError('Startup error simulated')",
             value=workflow_id,
-            extra={"error_type": "ValueError"},
+            error_type="ValueError",
         ),
         category=workflow_type,
     )
@@ -401,7 +397,6 @@ async def test_workflow_context_manager_startup_error(
 
     # Verify the failure metric was called
     mock_duo_workflow_metrics.count_agent_platform_session_failure.assert_called_once_with(
-        session_id=workflow_id,
         flow_type=workflow_type.value,
         failure_reason="ValueError",
     )
@@ -487,7 +482,7 @@ async def test_workflow_context_manager_startup_error_with_status_update_failure
             label=EventLabelEnum.WORKFLOW_FINISH_LABEL.value,
             property="ValueError('Startup error simulated')",
             value=workflow_id,
-            extra={"error_type": "ValueError"},
+            error_type="ValueError",
         ),
         category=workflow_type,
     )
@@ -503,7 +498,6 @@ async def test_workflow_context_manager_startup_error_with_status_update_failure
 
     # Verify the failure metric was called
     mock_duo_workflow_metrics.count_agent_platform_session_failure.assert_called_once_with(
-        session_id=workflow_id,
         flow_type=workflow_type.value,
         failure_reason="ValueError",
     )
@@ -673,7 +667,6 @@ async def test_workflow_context_manager_retry_success(
     )
 
     mock_duo_workflow_metrics.count_agent_platform_session_success.assert_called_once_with(
-        session_id=workflow_id,
         flow_type=workflow_type.value,
     )
 
@@ -728,7 +721,6 @@ async def test_workflow_context_manager_error(
     )
 
     mock_duo_workflow_metrics.count_agent_platform_session_start.assert_called_once_with(
-        session_id=workflow_id,
         flow_type=workflow_type.value,
     )
 
@@ -751,7 +743,7 @@ async def test_workflow_context_manager_error(
                     label=EventLabelEnum.WORKFLOW_FINISH_LABEL.value,
                     property="ValueError('Test error')",
                     value="1234",
-                    extra={"error_type": "ValueError"},
+                    error_type="ValueError",
                 ),
                 category=workflow_type,
             ),
@@ -760,7 +752,6 @@ async def test_workflow_context_manager_error(
 
     # Verify the failure metric was called
     mock_duo_workflow_metrics.count_agent_platform_session_failure.assert_called_once_with(
-        session_id=workflow_id,
         flow_type=workflow_type.value,
         failure_reason="ValueError",
     )
