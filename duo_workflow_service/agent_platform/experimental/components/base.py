@@ -86,8 +86,14 @@ class EndComponent(BaseComponent):
 
 
 class BaseComponentRegistry(ABC):
+    """Abstract base class for component registries.
+
+    This class defines the interface that all component registries must implement to manage the registration, retrieval,
+    and listing of BaseComponent classes.
+    """
+
     @abstractmethod
-    def register(self, name: str, component_class: type[BaseComponent]):
+    def register(self, name: str, component_class: type[BaseComponent]) -> None:
         raise NotImplementedError
 
     @abstractmethod
@@ -96,7 +102,4 @@ class BaseComponentRegistry(ABC):
 
     @abstractmethod
     def list_registered(self) -> list[type[BaseComponent]]:
-        raise NotImplementedError
-
-    def __contains__(self, name: str) -> bool:
         raise NotImplementedError

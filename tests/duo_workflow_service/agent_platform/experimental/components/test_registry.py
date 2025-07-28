@@ -16,11 +16,9 @@ class MockBaseComponent(BaseComponent):
 
     def attach(self, graph, router=None):
         """Mock implementation."""
-        pass
 
     def __entry_hook__(self):
         """Mock implementation."""
-        return "test_entry"
 
 
 class TestComponentRegistry:
@@ -111,6 +109,7 @@ class TestRegisterComponentDecorator:
             pass
 
         registry = ComponentRegistry.instance()
+        # pylint: disable-next=unsupported-membership-test
         assert "TestComponent" in registry
         assert registry.get("TestComponent") is TestComponent
 
@@ -122,8 +121,10 @@ class TestRegisterComponentDecorator:
             pass
 
         registry = ComponentRegistry.instance()
-        assert "CustomName" in registry
         assert registry.get("CustomName") is TestComponent
+        # pylint: disable-next=unsupported-membership-test
+        assert "CustomName" in registry
+        # pylint: disable-next=unsupported-membership-test
         assert "TestComponent" not in registry
 
     @patch(
@@ -166,5 +167,5 @@ class TestRegisterComponentDecorator:
         with pytest.raises(TypeError, match="Invalid component class 'NotAComponent'"):
 
             @register_component()
-            class NotAComponent:
+            class _NotAComponent:
                 pass

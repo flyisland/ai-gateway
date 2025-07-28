@@ -58,4 +58,22 @@ class FlowConfig(BaseModel):
 
 
 def load_component_class(cls_name: str) -> type:
+    """Load a component class by name from the ComponentRegistry.
+
+    This function retrieves a registered component class from the global ComponentRegistry instance.
+    Please refer to `components.register_component` for more examples on how to register your FlowRegistry components.
+
+    Args:
+        cls_name: The name of the component class to load.
+
+    Returns:
+        The component class registered under the given name.
+
+    Raises:
+        KeyError: If no component is registered under the given name.
+
+    Example:
+        >>> component_class = load_component_class("AgentComponent")
+        >>> instance = component_class(name="agent", ...)
+    """
     return ComponentRegistry.instance().get(cls_name)
