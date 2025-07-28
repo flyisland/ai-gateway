@@ -169,6 +169,7 @@ export interface AdditionalContext {
 export interface Approval {
   approval?: Approval_Approved | undefined;
   rejection?: Approval_Rejected | undefined;
+  approvedTool?: Approval_ApprovedTool | undefined;
 }
 
 export interface Approval_Approved {
@@ -176,6 +177,10 @@ export interface Approval_Approved {
 
 export interface Approval_Rejected {
   message?: string | undefined;
+}
+
+export interface Approval_ApprovedTool {
+  name?: string | undefined;
 }
 
 export interface Mkdir {
@@ -2454,7 +2459,7 @@ export const AdditionalContext: MessageFns<AdditionalContext> = {
 };
 
 function createBaseApproval(): Approval {
-  return { approval: undefined, rejection: undefined };
+  return { approval: undefined, rejection: undefined, approvedTool: undefined };
 }
 
 export const Approval: MessageFns<Approval> = {
@@ -2464,6 +2469,9 @@ export const Approval: MessageFns<Approval> = {
     }
     if (message.rejection !== undefined) {
       Approval_Rejected.encode(message.rejection, writer.uint32(18).fork()).join();
+    }
+    if (message.approvedTool !== undefined) {
+      Approval_ApprovedTool.encode(message.approvedTool, writer.uint32(26).fork()).join();
     }
     return writer;
   },
@@ -2491,6 +2499,14 @@ export const Approval: MessageFns<Approval> = {
           message.rejection = Approval_Rejected.decode(reader, reader.uint32());
           continue;
         }
+        case 3: {
+          if (tag !== 26) {
+            break;
+          }
+
+          message.approvedTool = Approval_ApprovedTool.decode(reader, reader.uint32());
+          continue;
+        }
       }
       if ((tag & 7) === 4 || tag === 0) {
         break;
@@ -2504,6 +2520,7 @@ export const Approval: MessageFns<Approval> = {
     return {
       approval: isSet(object.approval) ? Approval_Approved.fromJSON(object.approval) : undefined,
       rejection: isSet(object.rejection) ? Approval_Rejected.fromJSON(object.rejection) : undefined,
+      approvedTool: isSet(object.approvedTool) ? Approval_ApprovedTool.fromJSON(object.approvedTool) : undefined,
     };
   },
 
@@ -2514,6 +2531,9 @@ export const Approval: MessageFns<Approval> = {
     }
     if (message.rejection !== undefined) {
       obj.rejection = Approval_Rejected.toJSON(message.rejection);
+    }
+    if (message.approvedTool !== undefined) {
+      obj.approvedTool = Approval_ApprovedTool.toJSON(message.approvedTool);
     }
     return obj;
   },
@@ -2528,6 +2548,9 @@ export const Approval: MessageFns<Approval> = {
       : undefined;
     message.rejection = (object.rejection !== undefined && object.rejection !== null)
       ? Approval_Rejected.fromPartial(object.rejection)
+      : undefined;
+    message.approvedTool = (object.approvedTool !== undefined && object.approvedTool !== null)
+      ? Approval_ApprovedTool.fromPartial(object.approvedTool)
       : undefined;
     return message;
   },
@@ -2630,6 +2653,64 @@ export const Approval_Rejected: MessageFns<Approval_Rejected> = {
   fromPartial<I extends Exact<DeepPartial<Approval_Rejected>, I>>(object: I): Approval_Rejected {
     const message = createBaseApproval_Rejected();
     message.message = object.message ?? undefined;
+    return message;
+  },
+};
+
+function createBaseApproval_ApprovedTool(): Approval_ApprovedTool {
+  return { name: undefined };
+}
+
+export const Approval_ApprovedTool: MessageFns<Approval_ApprovedTool> = {
+  encode(message: Approval_ApprovedTool, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
+    if (message.name !== undefined) {
+      writer.uint32(10).string(message.name);
+    }
+    return writer;
+  },
+
+  decode(input: BinaryReader | Uint8Array, length?: number): Approval_ApprovedTool {
+    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+    const end = length === undefined ? reader.len : reader.pos + length;
+    const message = createBaseApproval_ApprovedTool();
+    while (reader.pos < end) {
+      const tag = reader.uint32();
+      switch (tag >>> 3) {
+        case 1: {
+          if (tag !== 10) {
+            break;
+          }
+
+          message.name = reader.string();
+          continue;
+        }
+      }
+      if ((tag & 7) === 4 || tag === 0) {
+        break;
+      }
+      reader.skip(tag & 7);
+    }
+    return message;
+  },
+
+  fromJSON(object: any): Approval_ApprovedTool {
+    return { name: isSet(object.name) ? globalThis.String(object.name) : undefined };
+  },
+
+  toJSON(message: Approval_ApprovedTool): unknown {
+    const obj: any = {};
+    if (message.name !== undefined) {
+      obj.name = message.name;
+    }
+    return obj;
+  },
+
+  create<I extends Exact<DeepPartial<Approval_ApprovedTool>, I>>(base?: I): Approval_ApprovedTool {
+    return Approval_ApprovedTool.fromPartial(base ?? ({} as any));
+  },
+  fromPartial<I extends Exact<DeepPartial<Approval_ApprovedTool>, I>>(object: I): Approval_ApprovedTool {
+    const message = createBaseApproval_ApprovedTool();
+    message.name = object.name ?? undefined;
     return message;
   },
 };

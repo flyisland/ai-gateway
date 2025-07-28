@@ -162,9 +162,14 @@ message Approval {
         optional string message = 1;
     }
 
+    message ApprovedTool {
+        optional string name = 1;
+    }
+
     oneof user_decision {
         Approved approval = 1;
         Rejected rejection = 2;
+        ApprovedTool approved_tool = 3;
     }
 }
 
