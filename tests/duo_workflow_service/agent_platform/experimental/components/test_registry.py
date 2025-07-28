@@ -164,7 +164,7 @@ class TestRegisterComponentDecorator:
     def test_register_component_not_basecomponent_subclass(self):
         """Test decorator with class not inheriting from BaseComponent."""
 
-        with pytest.raises(TypeError, match="Invalid component class 'NotAComponent'"):
+        with pytest.raises(TypeError, match="Invalid component class '_NotAComponent'"):
 
             @register_component()
             class _NotAComponent:
