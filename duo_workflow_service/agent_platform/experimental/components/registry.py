@@ -25,23 +25,27 @@ class ComponentRegistry(BaseComponentRegistry):
     """
 
     _instance: Optional[Self] = None
-    _initialized: bool = False
 
-    def __new__(cls):
-        """Create or return the singleton instance.
+    def __new__(cls, force_new: bool = False):
+        """Create a new instance or return singleton based on usage.
+
+        Args:
+            force_new: If True, always create a new instance.
+                If False, create new instance (default for direct instantiation).
 
         Returns:
-            The singleton ComponentRegistry instance.
+            A ComponentRegistry instance.
         """
-        if cls._instance is None:
-            cls._instance = super().__new__(cls)
+        if force_new or cls._instance is None:
+            instance = super().__new__(cls)
+            return instance
         return cls._instance
 
-    def __init__(self):
-        """Initialize the registry if not already initialized."""
-        if not self._initialized:
+    def __init__(self, force_new: bool = False):
+        """Initialize the registry."""
+        # Always initialize for new instances, or if not already initialized for singleton
+        if force_new or not hasattr(self, "_registry"):
             self._registry: dict[str, type[BaseComponent]] = {}
-            ComponentRegistry._initialized = True
 
     @classmethod
     def instance(cls) -> Self:
@@ -51,7 +55,7 @@ class ComponentRegistry(BaseComponentRegistry):
             The singleton ComponentRegistry instance.
         """
         if cls._instance is None:
-            cls._instance = cls()
+            cls._instance = cls(force_new=True)
         return cls._instance
 
     def register(self, name: str, component_class: type[BaseComponent]) -> None:

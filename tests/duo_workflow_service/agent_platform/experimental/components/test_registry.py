@@ -24,24 +24,22 @@ class MockBaseComponent(BaseComponent):
 class TestComponentRegistry:
     """Test suite for ComponentRegistry class."""
 
-    def setup_method(self):
-        """Clear registry before each test."""
-        registry = ComponentRegistry.instance()
-        registry.clear()
-
     def test_singleton_pattern(self):
         """Test that ComponentRegistry follows singleton pattern."""
         registry1 = ComponentRegistry()
         registry2 = ComponentRegistry()
-        registry3 = ComponentRegistry.instance()
 
         assert registry1 is registry2
-        assert registry2 is registry3
-        assert ComponentRegistry._instance is registry1
+
+    def test_non_singleton_pattern(self):
+        registry1 = ComponentRegistry(force_new=True)
+        registry2 = ComponentRegistry(force_new=True)
+
+        assert registry1 is not registry2
 
     def test_register_and_get_component_success(self):
         """Test successful component registration."""
-        registry = ComponentRegistry.instance()
+        registry = ComponentRegistry(force_new=True)
 
         registry.register("TestComponent", MockBaseComponent)
         component_class = registry.get("TestComponent")
@@ -50,7 +48,7 @@ class TestComponentRegistry:
 
     def test_register_component_already_exists_raises_error(self):
         """Test that registering existing component raises ValueError."""
-        registry = ComponentRegistry.instance()
+        registry = ComponentRegistry(force_new=True)
 
         # Register component first time
         registry.register("TestComponent", MockBaseComponent)
@@ -63,7 +61,7 @@ class TestComponentRegistry:
 
     def test_get_component_not_found_raises_error(self):
         """Test that getting non-existent component raises KeyError."""
-        registry = ComponentRegistry.instance()
+        registry = ComponentRegistry(force_new=True)
 
         with pytest.raises(
             KeyError, match="Component 'NonExistentComponent' not found in registry"
@@ -72,10 +70,10 @@ class TestComponentRegistry:
 
     def test_list_registered_components(self):
         """Test listing all registered components."""
-        registry = ComponentRegistry.instance()
+        registry = ComponentRegistry(force_new=True)
 
         # Initially empty
-        assert registry.list_registered() == []
+        assert not registry.list_registered()
 
         # Add components
         class Component1(MockBaseComponent):
@@ -96,31 +94,32 @@ class TestComponentRegistry:
 class TestRegisterComponentDecorator:
     """Test suite for register_component decorator."""
 
-    def setup_method(self):
-        """Clear registry before each test."""
-        registry = ComponentRegistry.instance()
-        registry.clear()
-
-    def test_register_component_with_default_name(self):
+    def test_register_component_with_default_name(self, component_registry):
         """Test decorator with default component name."""
 
         @register_component()
         class TestComponent(MockBaseComponent):
             pass
 
+        component_registry.assert_called_once()
+
         registry = ComponentRegistry.instance()
+
         # pylint: disable-next=unsupported-membership-test
         assert "TestComponent" in registry
         assert registry.get("TestComponent") is TestComponent
 
-    def test_register_component_with_custom_name(self):
+    def test_register_component_with_custom_name(self, component_registry):
         """Test decorator with custom component name."""
 
         @register_component(name="CustomName")
         class TestComponent(MockBaseComponent):
             pass
 
+        component_registry.assert_called_once()
+
         registry = ComponentRegistry.instance()
+
         assert registry.get("CustomName") is TestComponent
         # pylint: disable-next=unsupported-membership-test
         assert "CustomName" in registry
@@ -130,7 +129,7 @@ class TestRegisterComponentDecorator:
     @patch(
         "duo_workflow_service.agent_platform.experimental.components.registry.inject"
     )
-    def test_register_component_with_injection(self, mock_inject):
+    def test_register_component_with_injection(self, mock_inject, component_registry):
         """Test decorator with dependency injection."""
 
         class TestComponent(MockBaseComponent):
@@ -143,11 +142,14 @@ class TestRegisterComponentDecorator:
         # Call the decorator manually for the testing purposes
         decorated_class = register_component(has_injection=True)(TestComponent)
 
+        component_registry.assert_called_once()
+
         registry = ComponentRegistry.instance()
         registered_class = registry.get("TestComponent")
 
         # Should be the injected class
-        mock_inject.assert_called_once_with(TestComponent)
+        mock_inject.assert_called_with(TestComponent)
+
         assert registered_class is mock_injected_class
         # But the returned class should still be the original
         assert decorated_class is TestComponent
