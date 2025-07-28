@@ -13,7 +13,7 @@ from duo_workflow_service.agent_platform.experimental.state import (
 from duo_workflow_service.entities.state import WorkflowStatusEnum
 from lib.internal_events.event_enum import CategoryEnum
 
-__all__ = ["RouterProtocol", "BaseComponent", "EndComponent"]
+__all__ = ["RouterProtocol", "BaseComponent", "EndComponent", "BaseComponentRegistry"]
 
 
 class RouterProtocol(Protocol):
@@ -83,3 +83,20 @@ class EndComponent(BaseComponent):
 
     async def _terminate_flow(self, _state: FlowState) -> dict:
         return {FlowStateKeys.STATUS: WorkflowStatusEnum.COMPLETED.value}
+
+
+class BaseComponentRegistry(ABC):
+    @abstractmethod
+    def register(self, name: str, component_class: type[BaseComponent]):
+        raise NotImplementedError
+
+    @abstractmethod
+    def get(self, name: str) -> type[BaseComponent]:
+        raise NotImplementedError
+
+    @abstractmethod
+    def list_registered(self) -> list[type[BaseComponent]]:
+        raise NotImplementedError
+
+    def __contains__(self, name: str) -> bool:
+        raise NotImplementedError

@@ -1,11 +1,12 @@
-import inspect
 from pathlib import Path
 from typing import ClassVar, Self
 
 import yaml
 from pydantic import BaseModel
 
-from duo_workflow_service.agent_platform.experimental import components
+from duo_workflow_service.agent_platform.experimental.components import (
+    ComponentRegistry,
+)
 
 __all__ = ["FlowConfig", "load_component_class"]
 
@@ -57,15 +58,13 @@ class FlowConfig(BaseModel):
 
 
 def load_component_class(cls_name: str) -> type:
-    # Check if the class exists in the module
-    if not hasattr(components, cls_name):
-        raise AttributeError(f"Component class '{cls_name}' not found")
+    registry = ComponentRegistry.instance()
 
-    component_class = getattr(components, cls_name)
-
-    if not inspect.isclass(component_class) or not issubclass(
-        component_class, components.BaseComponent
-    ):
-        raise TypeError(f"'{cls_name}' must inherit from the BaseComponent class")
+    try:
+        component_class = registry.get(cls_name)
+    except KeyError as e:
+        raise TypeError(
+            f"TODO: '{cls_name}' not found in the component registry"
+        ) from e
 
     return component_class
