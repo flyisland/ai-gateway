@@ -3,7 +3,7 @@ import re
 from typing import Callable, Dict, List
 
 from duo_workflow_service.security.markdown_content_security import (
-    strip_hidden_markdown_content,
+    strip_hidden_html_comments,
 )
 
 
@@ -71,7 +71,7 @@ class PromptSecurity:
         Callable[[str | dict | list], str | dict | list]
     ] = [
         encode_dangerous_tags,
-        strip_hidden_markdown_content,
+        strip_hidden_html_comments,
     ]
 
     # Tool-specific additional security functions

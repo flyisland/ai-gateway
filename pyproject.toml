@@ -64,6 +64,7 @@ langgraph-checkpoint = "2.0.26"
 lxml = "^4.9.0"
 markdown = "^3.5.0"
 lxml-html-clean = "^0.4.2"
+bleach = "^6.2.0"
 
 [[tool.poetry.source]]
 name = "gitlab_cloud_connector"
