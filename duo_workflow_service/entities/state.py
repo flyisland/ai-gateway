@@ -20,7 +20,7 @@ from duo_workflow_service.token_counter.approximate_token_counter import (
 from duo_workflow_service.workflows.type_definitions import AdditionalContext
 
 # max content tokens is 200K but adding a buffer of 10% just in case
-MAX_CONTEXT_TOKENS = int(200_000 * 0.90)
+MAX_CONTEXT_TOKENS = int(6_000 * 0.90)
 MAX_SINGLE_MESSAGE_TOKENS = int(MAX_CONTEXT_TOKENS * 0.65)
 
 logger = structlog.stdlib.get_logger("workflow")
@@ -147,6 +147,26 @@ def _plan_reducer(current: Plan, new: Optional[Plan]) -> Plan:
                 existing_step.update(step)
 
     return current
+
+# reducers can be called multiple times by the LangGraph framework. One MUST assure
+# that fully new object is returned from reducer function. If mutation happens instead,
+# results might be broken !!!!!!
+def _chat_conversation_history_reducer(
+    current: Dict[str, List[BaseMessage]], new: Optional[Dict[str, List[BaseMessage]]]
+) -> Dict[str, List[BaseMessage]]:
+    if new is None:
+        return current.copy()
+
+    # Create a new dictionary merging current and new
+    reduced = {**current}
+
+    for agent_name, new_messages in new.items():
+        if agent_name in reduced:
+            reduced[agent_name] = reduced[agent_name] + new_messages
+        else:
+            reduced[agent_name] = new_messages
+
+    return reduced
 
 
 # reducers can be called multiple times by the LangGraph framework. One MUST assure
@@ -345,7 +365,7 @@ class ChatWorkflowState(TypedDict):
     plan: Plan
     status: WorkflowStatusEnum
     conversation_history: Annotated[
-        Dict[str, List[BaseMessage]], _conversation_history_reducer
+        Dict[str, List[BaseMessage]], _chat_conversation_history_reducer
     ]
     ui_chat_log: Annotated[List[UiChatLog], _ui_chat_log_reducer]
     last_human_input: Union[WorkflowEvent, None]

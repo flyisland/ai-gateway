@@ -124,11 +124,19 @@ class Workflow(AbstractWorkflow):
 
         history: List[BaseMessage] = state["conversation_history"][self._agent.name]
 
+        import structlog
+        log = structlog.stdlib.get_logger("history_compactor")
+
+        log.info("JEFF"*50)
+
         # Check if history needs compaction first
         token_counter = ApproximateTokenCounter(self._agent.name)
         total_tokens = token_counter.count_tokens(history)
 
+        log.info(f"Pre compact token count {total_tokens}")
+
         if total_tokens > MAX_CONTEXT_TOKENS:
+            log.info("COMPACTING HISTORY")
             return Routes.COMPACT_HISTORY
 
         # Then check for tool calls
@@ -243,12 +251,9 @@ class Workflow(AbstractWorkflow):
         self._agent.tools_registry = tools_registry
 
         # Initialize HistoryCompactor
-        self._history_compactor: HistoryCompactor = self._prompt_registry.get_on_behalf(  # type: ignore[assignment]
-            user=self._user,
-            prompt_id="history_compactor",
-            prompt_version="^1.0.0",
-            model_metadata=None,
-            internal_event_category=__name__,
+        self._history_compactor = HistoryCompactor(
+            agent_name="history_compactor",
+            workflow_id=self._workflow_id,
         )
 
         tools_runner = ToolsExecutor(
