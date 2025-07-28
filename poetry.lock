@@ -5758,6 +5758,33 @@ shellingham = ">=1.3.0"
 typing-extensions = ">=3.7.4.3"
 
 [[package]]
+name = "types-bleach"
+version = "6.2.0.20250514"
+description = "Typing stubs for bleach"
+optional = false
+python-versions = ">=3.9"
+groups = ["lint"]
+files = [
+    {file = "types_bleach-6.2.0.20250514-py3-none-any.whl", hash = "sha256:380cb74f0db1e3c3b2e0cde217221108e975e07e95ef0970c9d41f7cd4e8ea3c"},
+    {file = "types_bleach-6.2.0.20250514.tar.gz", hash = "sha256:38c2e51d9cac51dc70c1b66121a11f4dad8bbf47fbad494bb7a77d8b8f3c4323"},
+]
+
+[package.dependencies]
+types-html5lib = "*"
+
+[[package]]
+name = "types-html5lib"
+version = "1.1.11.20250708"
+description = "Typing stubs for html5lib"
+optional = false
+python-versions = ">=3.9"
+groups = ["lint"]
+files = [
+    {file = "types_html5lib-1.1.11.20250708-py3-none-any.whl", hash = "sha256:bb898066b155de7081cb182179e2ded31b9e0e234605e2cb46536894e68a6954"},
+    {file = "types_html5lib-1.1.11.20250708.tar.gz", hash = "sha256:24321720fdbac71cee50d5a4bec9b7448495b7217974cffe3fcf1ede4eef7afe"},
+]
+
+[[package]]
 name = "types-markdown"
 version = "3.8.0.20250708"
 description = "Typing stubs for Markdown"
@@ -6641,4 +6668,4 @@ cffi = ["cffi (>=1.11)"]
 [metadata]
 lock-version = "2.1"
 python-versions = ">=3.12.0,<3.13.0"
-content-hash = "008258e4a0ab49ff9a5ffefaf6da5f4dbb767e1cc1780adedd6fd314153805e2"
+content-hash = "62972384841c8151419d9d5391a31598ea9410957449e4f489158fa7d0aa45c6"

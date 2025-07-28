@@ -115,6 +115,7 @@ codespell = "^2.4.1"
 docformatter = "^1.7.7"
 editorconfig-checker = "^3.2.1"
 types-markdown = "^3.8.0.20250708"
+types-bleach = "^6.2.0.20250514"
 
 [tool.codespell]
 skip = """
