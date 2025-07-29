@@ -62,7 +62,7 @@ class ComponentRegistry(MutableMapping):
         """Register a component class with the given name.
 
         Args:
-            key: The name to register the component under.
+            key: The unique name to register the component under.
             value: The component class to register.
 
         Raises:
