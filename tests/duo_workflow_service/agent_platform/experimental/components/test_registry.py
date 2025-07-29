@@ -41,7 +41,7 @@ class TestComponentRegistry:
         """Test successful component registration."""
         registry = ComponentRegistry(force_new=True)
 
-        registry.register("TestComponent", MockBaseComponent)
+        registry["TestComponent"] = MockBaseComponent
         component_class = registry.get("TestComponent")
 
         assert component_class is MockBaseComponent
@@ -51,13 +51,13 @@ class TestComponentRegistry:
         registry = ComponentRegistry(force_new=True)
 
         # Register component first time
-        registry.register("TestComponent", MockBaseComponent)
+        registry["TestComponent"] = MockBaseComponent
 
         # Try to register again
         with pytest.raises(
             KeyError, match="Component 'TestComponent' is already registered"
         ):
-            registry.register("TestComponent", MockBaseComponent)
+            registry["TestComponent"] = MockBaseComponent
 
     def test_get_component_not_found_raises_error(self):
         """Test that getting non-existent component raises KeyError."""
@@ -66,14 +66,14 @@ class TestComponentRegistry:
         with pytest.raises(
             KeyError, match="Component 'NonExistentComponent' not found in registry"
         ):
-            registry.get("NonExistentComponent")
+            _ = registry["NonExistentComponent"]
 
     def test_list_registered_components(self):
         """Test listing all registered components."""
         registry = ComponentRegistry(force_new=True)
 
         # Initially empty
-        assert not registry.list_registered()
+        assert len(registry) == 0
 
         # Add components
         class Component1(MockBaseComponent):
@@ -82,13 +82,12 @@ class TestComponentRegistry:
         class Component2(MockBaseComponent):
             pass
 
-        registry.register("Component1", Component1)
-        registry.register("Component2", Component2)
+        registry["Component1"] = Component1
+        registry["Component2"] = Component2
 
-        registered = registry.list_registered()
-        assert len(registered) == 2
-        assert Component1 in registered
-        assert Component2 in registered
+        assert len(registry) == 2
+        assert "Component1" in registry
+        assert "Component2" in registry
 
 
 class TestRegisterComponentDecorator:

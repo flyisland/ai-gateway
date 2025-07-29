@@ -76,4 +76,6 @@ def load_component_class(cls_name: str) -> type:
         >>> component_class = load_component_class("AgentComponent")
         >>> instance = component_class(name="agent", ...)
     """
-    return ComponentRegistry.instance().get(cls_name)
+    registry = ComponentRegistry.instance()
+
+    return registry[cls_name]

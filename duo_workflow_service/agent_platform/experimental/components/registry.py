@@ -1,4 +1,5 @@
 import inspect
+from collections.abc import MutableMapping
 from typing import Callable, Optional, Self, cast
 
 from dependency_injector.wiring import inject
@@ -10,7 +11,7 @@ from duo_workflow_service.agent_platform.experimental.components.base import (
 __all__ = ["ComponentRegistry", "register_component"]
 
 
-class ComponentRegistry:
+class ComponentRegistry(MutableMapping):
     """Singleton registry for managing BaseComponent classes.
 
     This registry implements the singleton pattern to ensure a single global
@@ -19,8 +20,8 @@ class ComponentRegistry:
 
     Example:
         >>> registry = ComponentRegistry.instance()
-        >>> registry.register("MyComponent", MyComponent)
-        >>> component_class = registry.get("MyComponent")
+        >>> registry["MyComponent"] = MyComponent
+        >>> component_class = registry["MyComponent"]
     """
 
     _instance: Optional[Self] = None
@@ -57,28 +58,28 @@ class ComponentRegistry:
             cls._instance = cls(force_new=True)
         return cls._instance
 
-    def register(self, name: str, component_class: type[BaseComponent]) -> None:
+    def __setitem__(self, key: str, value: type[BaseComponent]):
         """Register a component class with the given name.
 
         Args:
-            name: The name to register the component under.
-            component_class: The component class to register.
+            key: The name to register the component under.
+            value: The component class to register.
 
         Raises:
             KeyError: If a component with the same name is already registered.
         """
-        if name in self._registry:
+        if key in self._registry:
             raise KeyError(
-                f"Component '{name}' is already registered. Use a different name"
+                f"Component '{key}' is already registered. Use a different name"
             )
 
-        self._registry[name] = component_class
+        self._registry[key] = value
 
-    def get(self, name: str) -> type[BaseComponent]:
+    def __getitem__(self, key: str, /) -> type[BaseComponent]:
         """Retrieve a registered component class by name.
 
         Args:
-            name: The name of the component to retrieve.
+            key: The name of the component to retrieve.
 
         Returns:
             The component class registered under the given name.
@@ -86,34 +87,20 @@ class ComponentRegistry:
         Raises:
             KeyError: If no component is registered under the given name.
         """
-        klass = self._registry.get(name, None)
+        klass = self._registry.get(key, None)
         if not klass:
-            raise KeyError(f"Component '{name}' not found in registry")
+            raise KeyError(f"Component '{key}' not found in registry")
 
         return klass
 
-    def list_registered(self) -> list[type[BaseComponent]]:
-        """Get a list of all registered component classes.
+    def __delitem__(self, key: str, /):
+        self._registry.__delitem__(key)
 
-        Returns:
-            A list containing all registered component classes.
-        """
-        return list(self._registry.values())
+    def __len__(self) -> int:
+        return len(self._registry)
 
-    def __contains__(self, name: str) -> bool:
-        """Check if a component is registered under the given name.
-
-        Args:
-            name: The name to check for.
-
-        Returns:
-            True if a component is registered under the name, False otherwise.
-        """
-        return name in self._registry
-
-    def clear(self) -> None:
-        """Clear all registered components from the registry."""
-        self._registry.clear()
+    def __iter__(self):
+        yield from self._registry.__iter__()
 
 
 def register_component[T: BaseComponent](
@@ -160,7 +147,8 @@ def register_component[T: BaseComponent](
         register_name = name or cls.__name__
         register_class = inject(cls) if has_injection else cls
 
-        ComponentRegistry.instance().register(register_name, register_class)
+        registry = ComponentRegistry.instance()
+        registry[register_name] = register_class
 
         return cast(type[T], cls)
 
