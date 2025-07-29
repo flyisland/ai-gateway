@@ -8,7 +8,7 @@ They should not be added to CI pipelines at this time.
 
 You will need a GitLab environment, with runners deployed and configured.
 
-1. Clone GitLab Performance Tool (GPT), or use the Docker container.
+1. [Set up GitLab Performance Tool on a machine with access to the target GitLab environment](https://gitlab.com/gitlab-org/quality/performance/-/blob/main/docs/k6.md#docker-recommended)
 1. [Identify the appropriate ENVIRONMENT_FILE, or create a new one if it does not exist.](https://gitlab.com/gitlab-org/quality/performance/-/blob/main/docs/environment_prep.md#preparing-the-environment-file)
 1. [Identify the appropriate OPTIONS_FILE, or create a new one if it does not exist.](https://gitlab.com/gitlab-org/quality/performance/-/blob/main/docs/k6.md#options-rps)
 1. Data seeding via the GPT Data Seeder is NOT required for these tests, but you will need a project in the environment with the appropriate feature flags enabled to use Duo Agent (such as the one created by `rake gitlab:duo:setup` in GDK). This project's ID is your PROJECT_ID.
