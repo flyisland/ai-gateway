@@ -139,10 +139,8 @@ def register_component[T: BaseComponent](has_injection: bool = False) -> Callabl
 
         register_class = inject(cls) if has_injection else cls
 
-        print(cls)
-        print(register_class)
-
         registry = ComponentRegistry.instance()
+        # pylint: disable-next=unsupported-assignment-operation
         registry[cls.__name__] = register_class
 
         return cast(type[T], register_class)

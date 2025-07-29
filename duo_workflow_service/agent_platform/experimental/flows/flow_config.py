@@ -78,4 +78,5 @@ def load_component_class(cls_name: str) -> type:
     """
     registry = ComponentRegistry.instance()
 
+    # pylint: disable-next=unsubscriptable-object
     return registry[cls_name]

@@ -111,7 +111,9 @@ class TestRegisterComponentDecorator:
     @patch(
         "duo_workflow_service.agent_platform.experimental.components.registry.inject"
     )
-    def test_register_component_with_injection(self, mock_inject, component_registry_cls):
+    def test_register_component_with_injection(
+        self, mock_inject, component_registry_cls
+    ):
         """Test decorator with dependency injection."""
 
         class TestComponent(MockBaseComponent):
