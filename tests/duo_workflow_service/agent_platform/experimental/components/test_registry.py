@@ -93,8 +93,8 @@ class TestComponentRegistry:
 class TestRegisterComponentDecorator:
     """Test suite for register_component decorator."""
 
-    def test_register_component_with_default_name(self, component_registry):
-        """Test decorator with default component name."""
+    def test_register_component(self, component_registry):
+        """Test decorator."""
 
         @register_component()
         class TestComponent(MockBaseComponent):
@@ -107,23 +107,6 @@ class TestRegisterComponentDecorator:
         # pylint: disable-next=unsupported-membership-test
         assert "TestComponent" in registry
         assert registry.get("TestComponent") is TestComponent
-
-    def test_register_component_with_custom_name(self, component_registry):
-        """Test decorator with custom component name."""
-
-        @register_component(name="CustomName")
-        class TestComponent(MockBaseComponent):
-            pass
-
-        component_registry.assert_called_once()
-
-        registry = ComponentRegistry.instance()
-
-        assert registry.get("CustomName") is TestComponent
-        # pylint: disable-next=unsupported-membership-test
-        assert "CustomName" in registry
-        # pylint: disable-next=unsupported-membership-test
-        assert "TestComponent" not in registry
 
     @patch(
         "duo_workflow_service.agent_platform.experimental.components.registry.inject"

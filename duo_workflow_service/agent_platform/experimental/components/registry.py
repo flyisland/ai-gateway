@@ -103,16 +103,13 @@ class ComponentRegistry(MutableMapping):
         yield from self._registry.__iter__()
 
 
-def register_component[T: BaseComponent](
-    name: Optional[str] = None, has_injection: bool = False
-) -> Callable:
+def register_component[T: BaseComponent](has_injection: bool = False) -> Callable:
     """Decorator to automatically register a component class with the ComponentRegistry.
 
     This decorator registers the decorated class with the global ComponentRegistry
     instance, optionally applying dependency injection if requested.
 
     Args:
-        name: Optional custom name for the component. If not provided, uses the class name.
         has_injection: Whether to apply dependency injection to the component class.
             If True, the component will be wrapped with the @inject decorator from dependency_injector.
 
@@ -124,10 +121,6 @@ def register_component[T: BaseComponent](
 
     Example:
         >>> @register_component()
-        ... class MyComponent(BaseComponent):
-        ...     pass
-
-        >>> @register_component(name="CustomName")
         ... class MyComponent(BaseComponent):
         ...     pass
 
@@ -144,11 +137,10 @@ def register_component[T: BaseComponent](
                 f"Invalid component class '{cls.__name__}'. Components must inherit from BaseComponent class"
             )
 
-        register_name = name or cls.__name__
         register_class = inject(cls) if has_injection else cls
 
         registry = ComponentRegistry.instance()
-        registry[register_name] = register_class
+        registry[cls.__name__] = register_class
 
         return cast(type[T], cls)
 
