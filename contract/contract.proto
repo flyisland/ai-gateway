@@ -69,6 +69,7 @@ message Action {
         FindFiles findFiles = 11;
         RunMCPTool runMCPTool = 12;
         Mkdir mkdir = 13;
+        HeartbeatRequest heartbeat = 14;
     };
 }
 

@@ -83,6 +83,7 @@ export interface Action {
   findFiles?: FindFiles | undefined;
   runMCPTool?: RunMCPTool | undefined;
   mkdir?: Mkdir | undefined;
+  heartbeat?: HeartbeatRequest | undefined;
 }
 
 export interface RunCommandAction {
@@ -950,6 +951,7 @@ function createBaseAction(): Action {
     findFiles: undefined,
     runMCPTool: undefined,
     mkdir: undefined,
+    heartbeat: undefined,
   };
 }
 
@@ -993,6 +995,9 @@ export const Action: MessageFns<Action> = {
     }
     if (message.mkdir !== undefined) {
       Mkdir.encode(message.mkdir, writer.uint32(106).fork()).join();
+    }
+    if (message.heartbeat !== undefined) {
+      HeartbeatRequest.encode(message.heartbeat, writer.uint32(114).fork()).join();
     }
     return writer;
   },
@@ -1108,6 +1113,14 @@ export const Action: MessageFns<Action> = {
           message.mkdir = Mkdir.decode(reader, reader.uint32());
           continue;
         }
+        case 14: {
+          if (tag !== 114) {
+            break;
+          }
+
+          message.heartbeat = HeartbeatRequest.decode(reader, reader.uint32());
+          continue;
+        }
       }
       if ((tag & 7) === 4 || tag === 0) {
         break;
@@ -1132,6 +1145,7 @@ export const Action: MessageFns<Action> = {
       findFiles: isSet(object.findFiles) ? FindFiles.fromJSON(object.findFiles) : undefined,
       runMCPTool: isSet(object.runMCPTool) ? RunMCPTool.fromJSON(object.runMCPTool) : undefined,
       mkdir: isSet(object.mkdir) ? Mkdir.fromJSON(object.mkdir) : undefined,
+      heartbeat: isSet(object.heartbeat) ? HeartbeatRequest.fromJSON(object.heartbeat) : undefined,
     };
   },
 
@@ -1176,6 +1190,9 @@ export const Action: MessageFns<Action> = {
     if (message.mkdir !== undefined) {
       obj.mkdir = Mkdir.toJSON(message.mkdir);
     }
+    if (message.heartbeat !== undefined) {
+      obj.heartbeat = HeartbeatRequest.toJSON(message.heartbeat);
+    }
     return obj;
   },
 
@@ -1217,6 +1234,9 @@ export const Action: MessageFns<Action> = {
       ? RunMCPTool.fromPartial(object.runMCPTool)
       : undefined;
     message.mkdir = (object.mkdir !== undefined && object.mkdir !== null) ? Mkdir.fromPartial(object.mkdir) : undefined;
+    message.heartbeat = (object.heartbeat !== undefined && object.heartbeat !== null)
+      ? HeartbeatRequest.fromPartial(object.heartbeat)
+      : undefined;
     return message;
   },
 };
