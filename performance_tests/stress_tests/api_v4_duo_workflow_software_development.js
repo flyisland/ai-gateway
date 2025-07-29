@@ -1,14 +1,13 @@
 /*global __ENV : true  */
 /*
 @endpoint: `POST /api/v4/ai/duo_workflows/workflows`
-@description: API endpoint to begin a Duo Agent workflow for Software Development. This test is being used for a stress test, and should not be de-quarantined.
+@description: API endpoint to begin a Duo Agent workflow for Software Development.
 @gpt_data_version: 1
 @stressed_components: Postgres, Gitaly, Rails
 */
 
 import http from "k6/http";
-import { check } from "k6";
-import { group } from "k6";
+import { check, group } from "k6";
 import { Rate } from "k6/metrics";
 import {
   logError,
