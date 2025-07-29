@@ -163,10 +163,10 @@ class TestFlowConfig:
 class TestLoadComponentClass:
     """Test load_component_class function with ComponentRegistry."""
 
-    def test_load_component_class_success(self, component_registry):
+    def test_load_component_class_success(self, component_registry_cls):
         """Test loading existing component class successfully from registry."""
         # Mock component class
-        registry = component_registry()
+        registry = component_registry_cls()
         mock_component_class = type("TestComponent", (), {})
         registry["TestComponent"] = mock_component_class
 
@@ -174,7 +174,7 @@ class TestLoadComponentClass:
 
         assert result is mock_component_class
 
-    def test_load_component_class_not_found_raises_error(self, component_registry):
+    def test_load_component_class_not_found_raises_error(self, component_registry_cls):
         """Test loading non-existent component class raises TypeError."""
         with pytest.raises(KeyError):
             load_component_class("NonExistentComponent")

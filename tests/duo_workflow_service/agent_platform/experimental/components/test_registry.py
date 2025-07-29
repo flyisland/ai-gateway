@@ -93,14 +93,14 @@ class TestComponentRegistry:
 class TestRegisterComponentDecorator:
     """Test suite for register_component decorator."""
 
-    def test_register_component(self, component_registry):
+    def test_register_component(self, component_registry_cls):
         """Test decorator."""
 
         @register_component()
         class TestComponent(MockBaseComponent):
             pass
 
-        component_registry.assert_called_once()
+        component_registry_cls.assert_called_once()
 
         registry = ComponentRegistry.instance()
 
@@ -111,7 +111,7 @@ class TestRegisterComponentDecorator:
     @patch(
         "duo_workflow_service.agent_platform.experimental.components.registry.inject"
     )
-    def test_register_component_with_injection(self, mock_inject, component_registry):
+    def test_register_component_with_injection(self, mock_inject, component_registry_cls):
         """Test decorator with dependency injection."""
 
         class TestComponent(MockBaseComponent):
@@ -124,7 +124,7 @@ class TestRegisterComponentDecorator:
         # Call the decorator manually for the testing purposes
         register_component(has_injection=True)(TestComponent)
 
-        component_registry.assert_called_once()
+        component_registry_cls.assert_called_once()
 
         registry = ComponentRegistry.instance()
         registered_class = registry.get("TestComponent")
