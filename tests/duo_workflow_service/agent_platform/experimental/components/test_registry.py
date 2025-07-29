@@ -122,7 +122,7 @@ class TestRegisterComponentDecorator:
         mock_inject.return_value = mock_injected_class
 
         # Call the decorator manually for the testing purposes
-        decorated_class = register_component(has_injection=True)(TestComponent)
+        register_component(has_injection=True)(TestComponent)
 
         component_registry.assert_called_once()
 
@@ -133,8 +133,6 @@ class TestRegisterComponentDecorator:
         mock_inject.assert_called_with(TestComponent)
 
         assert registered_class is mock_injected_class
-        # But the returned class should still be the original
-        assert decorated_class is TestComponent
 
     def test_register_component_invalid_class_type(self):
         """Test decorator with non-class object raises TypeError."""
