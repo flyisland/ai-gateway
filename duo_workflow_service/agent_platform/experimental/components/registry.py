@@ -5,13 +5,12 @@ from dependency_injector.wiring import inject
 
 from duo_workflow_service.agent_platform.experimental.components.base import (
     BaseComponent,
-    BaseComponentRegistry,
 )
 
 __all__ = ["ComponentRegistry", "register_component"]
 
 
-class ComponentRegistry(BaseComponentRegistry):
+class ComponentRegistry:
     """Singleton registry for managing BaseComponent classes.
 
     This registry implements the singleton pattern to ensure a single global

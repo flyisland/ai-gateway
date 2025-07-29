@@ -13,7 +13,7 @@ from duo_workflow_service.agent_platform.experimental.state import (
 from duo_workflow_service.entities.state import WorkflowStatusEnum
 from lib.internal_events.event_enum import CategoryEnum
 
-__all__ = ["RouterProtocol", "BaseComponent", "EndComponent", "BaseComponentRegistry"]
+__all__ = ["RouterProtocol", "BaseComponent", "EndComponent"]
 
 
 class RouterProtocol(Protocol):
@@ -83,23 +83,3 @@ class EndComponent(BaseComponent):
 
     async def _terminate_flow(self, _state: FlowState) -> dict:
         return {FlowStateKeys.STATUS: WorkflowStatusEnum.COMPLETED.value}
-
-
-class BaseComponentRegistry(ABC):
-    """Abstract base class for component registries.
-
-    This class defines the interface that all component registries must implement to manage the registration, retrieval,
-    and listing of BaseComponent classes.
-    """
-
-    @abstractmethod
-    def register(self, name: str, component_class: type[BaseComponent]) -> None:
-        raise NotImplementedError
-
-    @abstractmethod
-    def get(self, name: str) -> type[BaseComponent]:
-        raise NotImplementedError
-
-    @abstractmethod
-    def list_registered(self) -> list[type[BaseComponent]]:
-        raise NotImplementedError
