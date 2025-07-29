@@ -507,18 +507,3 @@ class TestAgentComponentAttachEdges:
             RoutingError, match=f"Tool calls not found for component {component_name}"
         ):
             router_function(state_with_no_tools)
-
-
-class TestAgentComponentRegistration:
-    """Test suite for AgentComponent registration with decorator."""
-
-    def test_agent_component_is_registered_with_decorator(self):
-        """Test that AgentComponent is properly registered via decorator."""
-        from duo_workflow_service.agent_platform.experimental.components.registry import (
-            ComponentRegistry,
-        )
-
-        registry = ComponentRegistry.instance()
-
-        # AgentComponent should be registered due to @register_component decorator
-        assert "AgentComponent" in registry

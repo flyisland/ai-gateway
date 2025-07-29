@@ -1,10 +1,11 @@
 from pathlib import Path
-from typing import ClassVar, Self
+from typing import Callable, ClassVar, Self
 
 import yaml
 from pydantic import BaseModel
 
 from duo_workflow_service.agent_platform.experimental.components import (
+    BaseComponent,
     ComponentRegistry,
 )
 
@@ -57,7 +58,9 @@ class FlowConfig(BaseModel):
             raise yaml.YAMLError(f"Error parsing YAML file: {e}") from e
 
 
-def load_component_class(cls_name: str) -> type:
+def load_component_class(
+    cls_name: str,
+) -> type[BaseComponent] | Callable[..., BaseComponent]:
     """Load a component class by name from the ComponentRegistry.
 
     This function retrieves a registered component class from the global ComponentRegistry instance.

@@ -1,5 +1,3 @@
-from unittest.mock import Mock, patch
-
 import pytest
 
 from duo_workflow_service.agent_platform.experimental.components.base import (
@@ -14,11 +12,8 @@ from duo_workflow_service.agent_platform.experimental.components.registry import
 class MockBaseComponent(BaseComponent):
     """Mock implementation of BaseComponent for testing."""
 
-    def attach(self, graph, router=None):
-        """Mock implementation."""
-
-    def __entry_hook__(self):
-        """Mock implementation."""
+    def attach(self, graph, router=None): ...
+    def __entry_hook__(self): ...
 
 
 class TestComponentRegistry:
@@ -41,8 +36,8 @@ class TestComponentRegistry:
         """Test successful component registration."""
         registry = ComponentRegistry(force_new=True)
 
-        registry["TestComponent"] = MockBaseComponent
-        component_class = registry.get("TestComponent")
+        registry.register(MockBaseComponent, decorators=[])
+        component_class = registry.get("MockBaseComponent")
 
         assert component_class is MockBaseComponent
 
@@ -51,13 +46,13 @@ class TestComponentRegistry:
         registry = ComponentRegistry(force_new=True)
 
         # Register component first time
-        registry["TestComponent"] = MockBaseComponent
+        registry.register(MockBaseComponent, decorators=[])
 
         # Try to register again
         with pytest.raises(
-            KeyError, match="Component 'TestComponent' is already registered"
+            KeyError, match="Component 'MockBaseComponent' is already registered"
         ):
-            registry["TestComponent"] = MockBaseComponent
+            registry.register(MockBaseComponent, decorators=[])
 
     def test_get_component_not_found_raises_error(self):
         """Test that getting non-existent component raises KeyError."""
@@ -82,12 +77,48 @@ class TestComponentRegistry:
         class Component2(MockBaseComponent):
             pass
 
-        registry["Component1"] = Component1
-        registry["Component2"] = Component2
+        registry.register(Component1, decorators=[])
+        registry.register(Component2, decorators=[])
 
         assert len(registry) == 2
         assert "Component1" in registry
         assert "Component2" in registry
+
+    def test_register_with_decorator(self):
+        """Test with the decorator."""
+        registry = ComponentRegistry(force_new=True)
+
+        class TestComponent(MockBaseComponent):
+            wrapped: bool = False
+
+        def decorator(v: type[TestComponent]) -> type[TestComponent]:
+            v.wrapped = True
+            return v
+
+        registered_type = registry.register(TestComponent, decorators=[decorator])
+
+        assert registered_type.wrapped is True
+        assert registry.get("TestComponent") is TestComponent
+
+    def test_register_invalid_class_type(self):
+        """Test with non-class object raises TypeError."""
+        registry = ComponentRegistry(force_new=True)
+
+        def not_a_class():
+            pass
+
+        with pytest.raises(TypeError, match="Invalid component class 'not_a_class'"):
+            registry.register(not_a_class, decorators=[])
+
+    def test_register_component_not_basecomponent_subclass(self):
+        """Test decorator with class not inheriting from BaseComponent."""
+        registry = ComponentRegistry(force_new=True)
+
+        class _NotAComponent:
+            pass
+
+        with pytest.raises(TypeError, match="Invalid component class '_NotAComponent'"):
+            registry.register(_NotAComponent, decorators=[])
 
 
 class TestRegisterComponentDecorator:
@@ -108,48 +139,23 @@ class TestRegisterComponentDecorator:
         assert "TestComponent" in registry
         assert registry.get("TestComponent") is TestComponent
 
-    @patch(
-        "duo_workflow_service.agent_platform.experimental.components.registry.inject"
-    )
-    def test_register_component_with_injection(
-        self, mock_inject, component_registry_instance_type
-    ):
-        """Test decorator with dependency injection."""
+    def test_register_component_with_decorators(self, component_registry_instance_type):
+        """Test with additional decorators."""
 
+        def decorator(v: type["TestComponent"]) -> type["TestComponent"]:
+            v.wrapped = True
+            return v
+
+        @register_component(decorators=[decorator])
         class TestComponent(MockBaseComponent):
-            pass
-
-        # Mock inject to return a modified class
-        mock_injected_class = Mock()
-        mock_inject.return_value = mock_injected_class
-
-        # Call the decorator manually for the testing purposes
-        register_component(has_injection=True)(TestComponent)
+            wrapped: bool = False
 
         component_registry_instance_type.assert_called_once()
 
         registry = ComponentRegistry.instance()
         registered_class = registry.get("TestComponent")
 
-        # Should be the injected class
-        mock_inject.assert_called_with(TestComponent)
-
-        assert registered_class is mock_injected_class
-
-    def test_register_component_invalid_class_type(self):
-        """Test decorator with non-class object raises TypeError."""
-
-        with pytest.raises(TypeError, match="Invalid component class 'not_a_class'"):
-
-            @register_component()
-            def not_a_class():
-                pass
-
-    def test_register_component_not_basecomponent_subclass(self):
-        """Test decorator with class not inheriting from BaseComponent."""
-
-        with pytest.raises(TypeError, match="Invalid component class '_NotAComponent'"):
-
-            @register_component()
-            class _NotAComponent:
-                pass
+        # pylint: disable-next=unsupported-membership-test
+        assert "TestComponent" in registry
+        assert registered_class is TestComponent
+        assert registered_class.wrapped is True

@@ -1,10 +1,16 @@
 from pathlib import Path
+from typing import Annotated
 from unittest.mock import patch
 
 import pytest
 import yaml
+from langgraph.graph import StateGraph
 from pydantic import ValidationError
 
+from duo_workflow_service.agent_platform.experimental.components import (
+    BaseComponent,
+    RouterProtocol,
+)
 from duo_workflow_service.agent_platform.experimental.flows.flow_config import (
     FlowConfig,
     load_component_class,
@@ -165,10 +171,15 @@ class TestLoadComponentClass:
 
     def test_load_component_class_success(self, component_registry_instance_type):
         """Test loading existing component class successfully from registry."""
-        # Mock component class
+
+        class TestComponent(BaseComponent):
+            def attach(self, graph: StateGraph, router: RouterProtocol) -> None: ...
+            def __entry_hook__(self) -> Annotated[str, "Components entry node name"]:
+                return "mock"
+
         registry = component_registry_instance_type()
-        mock_component_class = type("TestComponent", (), {})
-        registry["TestComponent"] = mock_component_class
+        mock_component_class = TestComponent
+        registry.register(mock_component_class, decorators=[])
 
         result = load_component_class("TestComponent")
 

@@ -1,8 +1,5 @@
-import inspect
-from collections.abc import MutableMapping
-from typing import Callable, Optional, Self, cast
-
-from dependency_injector.wiring import inject
+from collections.abc import Mapping
+from typing import Callable, Optional, Self, Sequence, TypeAlias
 
 from duo_workflow_service.agent_platform.experimental.components.base import (
     BaseComponent,
@@ -11,7 +8,11 @@ from duo_workflow_service.agent_platform.experimental.components.base import (
 __all__ = ["ComponentRegistry", "register_component"]
 
 
-class ComponentRegistry(MutableMapping):
+ComponentClassAlias: TypeAlias = type[BaseComponent] | Callable[..., BaseComponent]
+DecoratorAlias: TypeAlias = Callable[[ComponentClassAlias], ComponentClassAlias]
+
+
+class ComponentRegistry(Mapping):
     """Singleton registry for managing BaseComponent classes.
 
     This registry implements the singleton pattern to ensure a single global
@@ -45,7 +46,7 @@ class ComponentRegistry(MutableMapping):
         """Initialize the registry."""
         # Always initialize for new instances, or if not already initialized for singleton
         if force_new or not hasattr(self, "_registry"):
-            self._registry: dict[str, type[BaseComponent]] = {}
+            self._registry: dict[str, ComponentClassAlias] = {}
 
     @classmethod
     def instance(cls) -> Self:
@@ -58,7 +59,11 @@ class ComponentRegistry(MutableMapping):
             cls._instance = cls(force_new=True)
         return cls._instance
 
-    def __setitem__(self, key: str, value: type[BaseComponent]):
+    def register(
+        self,
+        value: type[BaseComponent],
+        decorators: Sequence[DecoratorAlias],
+    ) -> ComponentClassAlias:
         """Register a component class with the given name.
 
         Args:
@@ -67,15 +72,28 @@ class ComponentRegistry(MutableMapping):
 
         Raises:
             KeyError: If a component with the same name is already registered.
+            TypeError: If a component doesn't inherit from BaseComponent.
         """
-        if key in self._registry:
-            raise KeyError(
-                f"Component '{key}' is already registered. Use a different name"
+        if not issubclass(value, BaseComponent):
+            raise TypeError(
+                f"Invalid component class '{value.__name__}'. Components must inherit from BaseComponent class"
             )
 
-        self._registry[key] = value
+        register_name = value.__name__
 
-    def __getitem__(self, key: str, /) -> type[BaseComponent]:
+        for decorator in decorators:
+            value: ComponentClassAlias = decorator(value)  # type: ignore[no-redef]
+
+        if register_name in self._registry:
+            raise KeyError(
+                f"Component '{register_name}' is already registered. Use a different name"
+            )
+
+        self._registry[register_name] = value
+
+        return value
+
+    def __getitem__(self, key: str, /) -> ComponentClassAlias:
         """Retrieve a registered component class by name.
 
         Args:
@@ -93,9 +111,6 @@ class ComponentRegistry(MutableMapping):
 
         return klass
 
-    def __delitem__(self, key: str, /):
-        self._registry.__delitem__(key)
-
     def __len__(self) -> int:
         return len(self._registry)
 
@@ -103,7 +118,9 @@ class ComponentRegistry(MutableMapping):
         yield from self._registry.__iter__()
 
 
-def register_component[T: BaseComponent](has_injection: bool = False) -> Callable:
+def register_component(
+    decorators: Optional[Sequence[DecoratorAlias]] = None,
+) -> Callable:
     """Decorator to automatically register a component class with the ComponentRegistry.
 
     This decorator registers the decorated class with the global ComponentRegistry
@@ -117,6 +134,7 @@ def register_component[T: BaseComponent](has_injection: bool = False) -> Callabl
         A decorator function that registers the component and returns the original class.
 
     Raises:
+        KeyError: If a component with the same name is already registered.
         TypeError: If the decorated object is not a class or doesn't inherit from BaseComponent.
 
     Example:
@@ -131,18 +149,10 @@ def register_component[T: BaseComponent](has_injection: bool = False) -> Callabl
         ...     ]
     """
 
-    def decorator(cls: type[T]) -> type[T]:
-        if not (inspect.isclass(cls) and issubclass(cls, BaseComponent)):
-            raise TypeError(
-                f"Invalid component class '{cls.__name__}'. Components must inherit from BaseComponent class"
-            )
-
-        register_class = inject(cls) if has_injection else cls
-
+    def decorator(cls: type[BaseComponent]) -> ComponentClassAlias:
         registry = ComponentRegistry.instance()
-        # pylint: disable-next=unsupported-assignment-operation
-        registry[cls.__name__] = register_class
+        registered_class = registry.register(cls, decorators if decorators else [])
 
-        return cast(type[T], register_class)
+        return registered_class
 
     return decorator

@@ -1,6 +1,6 @@
 from typing import Annotated, ClassVar, Literal
 
-from dependency_injector.wiring import Provide
+from dependency_injector.wiring import Provide, inject
 from langchain_core.messages import AIMessage, BaseMessage
 from langgraph.graph import StateGraph
 from pydantic import Field
@@ -43,7 +43,7 @@ class RoutingError(Exception):
     """Exception raised when edge routers encounter unexpected conditions."""
 
 
-@register_component(has_injection=True)
+@register_component(decorators=[inject])
 class AgentComponent(BaseComponent):
     _final_answer_key: ClassVar[IOKeyTemplate] = IOKeyTemplate(
         target="context",
