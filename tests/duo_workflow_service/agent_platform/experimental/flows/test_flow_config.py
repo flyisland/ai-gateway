@@ -163,39 +163,18 @@ class TestFlowConfig:
 class TestLoadComponentClass:
     """Test load_component_class function with ComponentRegistry."""
 
-    @patch(
-        "duo_workflow_service.agent_platform.experimental.components.ComponentRegistry.get"
-    )
-    def test_load_component_class_success(
-        self, component_registry_get, component_registry
-    ):
+    def test_load_component_class_success(self, component_registry):
         """Test loading existing component class successfully from registry."""
         # Mock component class
+        registry = component_registry()
         mock_component_class = type("TestComponent", (), {})
-
-        # Mock registry 'get'
-        component_registry_get.return_value = mock_component_class
+        registry["TestComponent"] = mock_component_class
 
         result = load_component_class("TestComponent")
 
-        # Verify registry was accessed correctly
-        component_registry.assert_called_once()
-        component_registry_get.assert_called_once_with("TestComponent")
         assert result is mock_component_class
 
-    @patch(
-        "duo_workflow_service.agent_platform.experimental.components.ComponentRegistry.get"
-    )
-    def test_load_component_class_not_found_raises_error(
-        self, component_registry_get, component_registry
-    ):
+    def test_load_component_class_not_found_raises_error(self, component_registry):
         """Test loading non-existent component class raises TypeError."""
-        # Mock registry 'get'
-        component_registry_get.side_effect = KeyError(
-            "Component 'NonExistentComponent' not found"
-        )
-
         with pytest.raises(KeyError):
             load_component_class("NonExistentComponent")
-
-        component_registry.assert_called_once()
