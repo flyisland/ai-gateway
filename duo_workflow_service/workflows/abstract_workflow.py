@@ -253,7 +253,6 @@ class AbstractWorkflow(ABC):
 
                 compiled_graph = self._compile(goal, tools_registry, checkpointer)
                 graph_input = await self.get_graph_input(goal, status_event)
-
                 async for type, state in compiled_graph.astream(
                     input=graph_input,
                     config=graph_config,
@@ -266,7 +265,6 @@ class AbstractWorkflow(ABC):
                         await checkpoint_notifier.send_event(
                             type=type, state=state, stream=self._stream
                         )
-
         except BaseException as e:
             await self._handle_workflow_failure(e, compiled_graph, graph_config)
             raise TraceableException(e)
