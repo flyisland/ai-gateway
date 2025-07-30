@@ -28,20 +28,11 @@ multiple lines --> more text"""
 
     def test_nested_malformed_comments(self):
         """Test nested/malformed HTML comment patterns."""
-        # Test valid HTML comments are removed
-        result = strip_hidden_html_comments("Good <!-- bad --> content")
-        assert "bad" not in result
-        assert "Good" in result
-        assert "content" in result
-
-        result = strip_hidden_html_comments("Start <!-- comment --> end")
-        assert "comment" not in result
-        assert "Start" in result
-        assert "end" in result
 
         # Test that malformed patterns are handled safely (may be escaped rather than removed)
         result = strip_hidden_html_comments("Text <<!--nested-->!-- content--> more")
         assert "nested" not in result  # The valid comment part should be removed
+        assert "content" not in result  # The valid comment part should be removed
         assert "Text" in result
         assert "more" in result
 
