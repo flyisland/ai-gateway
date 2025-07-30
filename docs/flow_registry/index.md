@@ -12,36 +12,33 @@ Follow these steps to build a basic AI agent flow that can interact with the rep
 
 1. Create a YAML file in `duo_workflow_service/agent_platform/experimental/flows/configs/` which will configure your flow. A name of the file will become flow identifier used to trigger it later on. The file should has this basic structure:
 
-    ```yaml
-    version: "experimental"
-    environment: remote
-
-    components:
+   ```yaml
+   version: "experimental"
+   environment: remote
+   components:
       - name: "my_agent"
         type: AgentComponent
         prompt_id: "your_prompt_id"
         prompt_version: "^1.0.0"
         inputs: ["context:goal"]
         toolset: ["read_file", "create_file_with_contents"]
-
-    routers:
+   routers:
       - from: "my_agent"
         to: "end"
-
-    flow:
+   flow:
       entry_point: "my_agent"
-    ```
+   ```
 
 1. Create a prompt template in the AI Gateway prompt registry at `ai_gateway/prompts/definitions/your_prompt_id/base/1.0.0.yml`:
 
    ```yaml
-    name: Your prompt name
-    model:
+   name: Your prompt name
+   model:
       config_file: claude_4_0
       params:
-        max_tokens: 8_192
-    unit_primitives: []
-    prompt_template:
+         max_tokens: 8_192
+      unit_primitives: []
+   prompt_template:
       system: |
         You are GitLab Duo Chat, an agentic AI Coding assistant built by GitLab.
         Your role is to help the user complete their request by using the available tools.
@@ -50,9 +47,9 @@ Follow these steps to build a basic AI agent flow that can interact with the rep
         Here is my task:
         {{goal}}
       placeholder: history
-    params:
+   params:
       timeout: 30
-    ```
+   ```
 
 1. Accessing the new Flow
 
@@ -60,9 +57,11 @@ Follow these steps to build a basic AI agent flow that can interact with the rep
    To use your new flow in the Duo Chat interface within VSCode, follow this workaround:
 
    1. In the workflow registry file `duo_workflow_service/server.py`, uncomment the line:
+
       ```python
       workflow_class: FlowFactory = resolve_workflow_class("prototype/experimental")
       ```
+
    1. After making this change, your new flow will be available in the Duo Chat interface for interaction in VSCode
 
 ## Key Framework Concepts
@@ -146,6 +145,7 @@ inputs:
 ```
 
 The `as` keyword provides these benefits:
+
 - **Simplifying prompt templates**: Instead of referencing `{{findings}}` in your prompt, you use `{{analysis_results}}`
 - **Making flows more readable**: Clear, descriptive names improve flow understanding
 - **Reducing coupling**: Components don't need to know internal structure of other components' outputs
@@ -201,6 +201,7 @@ routers:
 ```
 
 This router examines the `final_answer` output from the "decision_maker" component and routes to different components based on the content:
+
 - If the answer equals to "approve", route to the "approval_handler" component
 - If the answer equals to "reject", route to the "rejection_handler" component
 - For any other content, route to the "manual_review" component (default_route)
