@@ -1,3 +1,5 @@
+from unittest.mock import patch
+
 import pytest
 
 from duo_workflow_service.agent_platform.experimental.components.base import (
@@ -21,10 +23,15 @@ class TestComponentRegistry:
 
     def test_singleton_pattern(self):
         """Test that ComponentRegistry follows singleton pattern."""
-        registry1 = ComponentRegistry()
-        registry2 = ComponentRegistry()
+        with patch.object(ComponentRegistry, "_instance", None):
+            assert ComponentRegistry._instance is None
 
-        assert registry1 is registry2
+            registry1 = ComponentRegistry()
+            registry2 = ComponentRegistry()
+            registry3 = ComponentRegistry.instance()
+
+            assert registry1 is registry2
+            assert registry1 is registry3
 
     def test_non_singleton_pattern(self):
         registry1 = ComponentRegistry(force_new=True)

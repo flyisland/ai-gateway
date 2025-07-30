@@ -32,9 +32,13 @@ class ComponentRegistry(Mapping):
 
     def __new__(cls, force_new: bool = False):
         """Create a new instance or return singleton based on usage."""
-        if force_new or cls._instance is None:
-            instance = super().__new__(cls)
-            return instance
+        if force_new:
+            # Return new instance without storing it
+            return super().__new__(cls)
+
+        if cls._instance is None:
+            cls._instance = super().__new__(cls)
+
         return cls._instance
 
     def __init__(self, force_new: bool = False):
