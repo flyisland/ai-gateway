@@ -92,6 +92,11 @@ def strip_hidden_html_comments(response: str | dict | list) -> str | dict | list
                 strip_comments=True,
                 strip=False,
             )
+
+            # After Bleach processing, handle any remaining malformed comment patterns
+            # that might have been escaped instead of removed
+            result = re.sub(r"&lt;!--.*?--&gt;", "", result, flags=re.DOTALL)
+
             return result
         except Exception:
             # If Bleach fails, fall back to regex (simple but less robust)
