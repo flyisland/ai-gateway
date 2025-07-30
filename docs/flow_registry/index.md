@@ -10,7 +10,7 @@ This guide provides the practical knowledge developers need to build flows effec
 This section provides a step-by-step approach to creating your first flow.
 Follow these steps to build a basic AI agent flow that can interact with the repository files and respond to user requests.
 
-1. Create a `prototype.yml` YAML file in `duo_workflow_service/agent_platform/experimental/flows/configs/` with this basic structure:
+1. Create a YAML file in `duo_workflow_service/agent_platform/experimental/flows/configs/` which will configure your flow. A name of the file will become flow identifier used to trigger it later on. The file should has this basic structure:
 
     ```yaml
     version: "experimental"
@@ -68,8 +68,8 @@ Follow these steps to build a basic AI agent flow that can interact with the rep
 ## Key Framework Concepts
 
 A **Component** is a reusable building block that performs a specific task in your flow.
-Each component has defined inputs, outputs, and capabilities (like available tools).
-Components are stateless and compose together to create complex workflows.
+Each component declares its outputs, which will be available for subsequent components to read from. In addition each component may request inputs, that should be sourced from outputs of proceeding components, or initial flow trigger request data. Finally some components accepts additional configuration parameters like  _tools_ or _prompt_id_ and _prompt_version_. Consult component documentation to understand how it can be used, and what configuration it requires
+Components are stateless and compose together to create complex flows.
 
 A **Router** determines the flow control between components.
 Routers are either simple (always go to the next component) or conditional (route based on some condition).
@@ -101,8 +101,7 @@ flow:
 ### Required Fields
 
 - **version**: Always use `"experimental"` for the current framework version
-- **environment**: Set to `"remote"` for production or `"local"` for development.
-  Both environments function similarly during this experimental phase.
+- **environment**: Set to `"remote"` for delegated tasks that agents should do in the background with little to non user interactions or `"local"` for pair coding experience, when user is expected to collaborate with agents in real time.
 - **components**: List of components that make up your flow
 - **routers**: Define how components connect to each other
 - **flow**: Specify the entry point component and other options
@@ -154,7 +153,7 @@ The `as` keyword provides these benefits:
 ### Output
 
 Output management handles the automatic production and storage of component results.
-Each component automatically produces outputs that are consumed by other components.
+Each component automatically produces outputs that may be consumed by other components.
 The outputs are automatically available to subsequent components when they are referenced in their `inputs` configuration or used in router conditions.
 Refer to the documentation of every component to check what outputs it produces.
 
@@ -163,11 +162,11 @@ Refer to the documentation of every component to check what outputs it produces.
 UI logs provide visibility into component execution progress and results for end users.
 This system captures and displays component activities in the user interface, enabling real-time feedback about workflow execution.
 
-You need to specify what events to log for every component that provides UI feedback.
-The events you choose determine what information users see about the component's execution in the Duo interface.
-
 Each component defines its own set of available events to be logged and visualized.
 For example, the AgentComponent provides events for tool execution and final responses, allowing users to see exactly what the agent is doing and what results it produces.
+
+You need to specify what events to log for every component that provides UI feedback.
+The events you choose determine what information users see about the component's execution in the Duo interface.
 
 ## Routers
 
@@ -202,8 +201,8 @@ routers:
 ```
 
 This router examines the `final_answer` output from the "decision_maker" component and routes to different components based on the content:
-- If the answer contains "approve", route to the "approval_handler"
-- If the answer contains "reject", route to the "rejection_handler"
+- If the answer equals to "approve", route to the "approval_handler" component
+- If the answer equals to "reject", route to the "rejection_handler" component
 - For any other content, route to the "manual_review" component (default_route)
 
 ### Complex Multi-Path Router
@@ -251,7 +250,7 @@ The agent uses the prompt template from the prompt registry, processes the input
 ### Available Tools
 
 Agents access the following tools in their `toolset` configuration.
-Tools are found in the `duo_workflow_service/tools/` directory and are passed to agents by their function names.
+Complete list of tools classes can be located at `duo_workflow_service/components/tools_registry.py`. To configure an agent with tools, pass `name` attributes from their classes, eg: for `GetIssue` tool class pass `get_issue`
 Each tool is a Python class that the agent calls to perform specific actions.
 
 Here are some examples:
@@ -261,8 +260,6 @@ Here are some examples:
 - **edit_file**: Modify an existing file
 - **list_dir**: List directory contents
 - **find_files**: Search for files matching patterns
-- **mkdir**: Create directories
-- **grep**: Search text patterns in files
 
 ### Prompts
 
@@ -303,7 +300,7 @@ Each AgentComponent automatically produces:
 - **status**: Updated workflow status
 
 These outputs can be used as inputs by other components or referenced in routing logic to control flow execution.
-For example, you might route to different components based on whether the agent's final answer contains specific keywords or patterns.
+For example, you might route to different components based on whether the agent's final answer equals to specific phrase
 
 ### UI Log Events
 
