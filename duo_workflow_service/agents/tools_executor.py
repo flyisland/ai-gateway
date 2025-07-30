@@ -256,7 +256,10 @@ class ToolsExecutor:
         self._track_internal_event(
             event_name=EventEnum.WORKFLOW_TOOL_FAILURE,
             tool_name=tool_name,
-            extra={"error": str(error)},
+            extra={
+                "error": str(error),
+                "error_type": type(error).__name__,
+            },
         )
 
         self._add_tool_ui_chat_log(
@@ -282,7 +285,10 @@ class ToolsExecutor:
         self._track_internal_event(
             event_name=EventEnum.WORKFLOW_TOOL_FAILURE,
             tool_name=tool_name,
-            extra={"error": str(error)},
+            extra={
+                "error": str(error),
+                "error_type": type(error).__name__,
+            },
         )
 
         self._add_tool_ui_chat_log(
@@ -308,7 +314,10 @@ class ToolsExecutor:
         self._track_internal_event(
             event_name=EventEnum.WORKFLOW_TOOL_FAILURE,
             tool_name=tool_name,
-            extra={"error": str(error)},
+            extra={
+                "error": str(error),
+                "error_type": type(error).__name__,
+            },
         )
 
         self._add_tool_ui_chat_log(
@@ -337,6 +346,10 @@ class ToolsExecutor:
             property=tool_name,
             value=self._workflow_id,
             **extra,
+        )
+        self._record_metric(
+            event_name=event_name,
+            additional_properties=additional_properties,
         )
         self._internal_event_client.track_event(
             event_name=event_name.value,
@@ -395,3 +408,18 @@ class ToolsExecutor:
             return StrOutputParser().invoke(last_message)
 
         return None
+
+    def _record_metric(
+        self,
+        event_name: EventEnum,
+        additional_properties: InternalEventAdditionalProperties,
+    ) -> None:
+
+        if event_name == EventEnum.WORKFLOW_TOOL_FAILURE:
+            tool_name = additional_properties.property or "unknown"
+            failure_reason = additional_properties.extra.get("error_type", "unknown")
+            duo_workflow_metrics.count_agent_platform_tool_failure(
+                flow_type=self._workflow_type.value,
+                tool_name=tool_name,
+                failure_reason=failure_reason,
+            )
