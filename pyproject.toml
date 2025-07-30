@@ -61,9 +61,6 @@ grpcio-reflection = "^1.64.1"
 sentry-sdk = "^2.17.0"
 websockets = "^15.0.1"
 langgraph-checkpoint = "2.0.26"
-lxml = "^4.9.0"
-markdown = "^3.5.0"
-lxml-html-clean = "^0.4.2"
 bleach = "^6.2.0"
 
 [[tool.poetry.source]]
@@ -144,15 +141,15 @@ asyncio_default_fixture_loop_scope = "function"
 
 [tool.coverage.run]
 source = [
-  "ai_gateway",
-  "duo_workflow_service",
-  "eval",
-  "lib",
-  "lints",
+    "ai_gateway",
+    "duo_workflow_service",
+    "eval",
+    "lib",
+    "lints",
 ]
 omit = [
-  "tests/*",
-  "*.jinja",
+    "tests/*",
+    "*.jinja",
 ]
 
 [tool.poetry.scripts]
@@ -173,12 +170,12 @@ profile = "black"
 extension-pkg-allow-list = ["dependency_injector"]
 # Exclude protobuf packages because they can't be parsed properly by pylint, leading to `no-name-in-module` errors.
 # See https://github.com/protocolbuffers/protobuf/issues/10372
-ignored-modules=["contract.contract_pb2", "google.protobuf.struct_pb2", "google.rpc.error_details_pb2"]
+ignored-modules = ["contract.contract_pb2", "google.protobuf.struct_pb2", "google.rpc.error_details_pb2"]
 jobs = 0
 load-plugins = [
-  "lints.unsafe_dependency_resolution",
-  "lints.direct_environment_variable_reference",
-  "lints.file_naming_for_tests",
+    "lints.unsafe_dependency_resolution",
+    "lints.direct_environment_variable_reference",
+    "lints.file_naming_for_tests",
 ]
 
 [tool.pylint.format]
@@ -191,29 +188,29 @@ max-statements = 65
 
 [tool.pylint.messages_control]
 disable = [
-  "missing-module-docstring",
-  "missing-function-docstring",
-  "line-too-long",
-  "missing-class-docstring",
-  "too-few-public-methods",
-  "no-member",
-  "fixme",
-  "protected-access",
-  "no-name-in-module",
-  "arguments-differ",
-  "unspecified-encoding",
-  "redefined-builtin",
-  "arguments-renamed",
-  "raise-missing-from",
-  "too-many-ancestors",
-  "abstract-method",
-  "broad-exception-caught",
-  "redefined-outer-name",
-  "duplicate-code",
+    "missing-module-docstring",
+    "missing-function-docstring",
+    "line-too-long",
+    "missing-class-docstring",
+    "too-few-public-methods",
+    "no-member",
+    "fixme",
+    "protected-access",
+    "no-name-in-module",
+    "arguments-differ",
+    "unspecified-encoding",
+    "redefined-builtin",
+    "arguments-renamed",
+    "raise-missing-from",
+    "too-many-ancestors",
+    "abstract-method",
+    "broad-exception-caught",
+    "redefined-outer-name",
+    "duplicate-code",
 ]
 enable = [
-  "unsafe-dependency-resolution",
-  "direct-environment-variable-reference",
+    "unsafe-dependency-resolution",
+    "direct-environment-variable-reference",
 ]
 
 [tool.pylint.reports]

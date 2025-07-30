@@ -1,3 +1,4 @@
+import re
 from typing import Any, Callable
 
 import bleach
@@ -46,8 +47,6 @@ def strip_hidden_html_comments(response: str | dict | list) -> str | dict | list
         # dangerous tags are already encoded as &lt;system&gt; etc.
         # We just need to strip HTML comments using Bleach's robust parsing
         # while preserving everything else exactly as-is
-
-        import re
 
         if "<!--" not in text:
             return text  # No comments to strip, return unchanged
