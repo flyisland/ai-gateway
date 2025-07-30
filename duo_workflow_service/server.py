@@ -45,6 +45,9 @@ from duo_workflow_service.interceptors.language_server_version_interceptor impor
     LanguageServerVersionInterceptor,
     language_server_version,
 )
+from duo_workflow_service.interceptors.model_metadata_interceptor import (
+    ModelMetadataInterceptor,
+)
 from duo_workflow_service.interceptors.monitoring_interceptor import (
     MonitoringInterceptor,
 )
@@ -55,11 +58,8 @@ from duo_workflow_service.structured_logging import set_workflow_id, setup_loggi
 from duo_workflow_service.tracking import MonitoringContext, current_monitoring_context
 from duo_workflow_service.tracking.errors import log_exception
 from duo_workflow_service.tracking.sentry_error_tracking import setup_error_tracking
-from duo_workflow_service.workflows.abstract_workflow import (
-    AbstractWorkflow,
-    TypeWorkflow,
-)
-from duo_workflow_service.workflows.registry import resolve_workflow_class
+from duo_workflow_service.workflows.abstract_workflow import AbstractWorkflow
+from duo_workflow_service.workflows.registry import FlowFactory, resolve_workflow_class
 from duo_workflow_service.workflows.type_definitions import AdditionalContext
 from lib.internal_events import InternalEventsClient
 from lib.internal_events.event_enum import CategoryEnum
@@ -203,7 +203,10 @@ class DuoWorkflowService(contract_pb2_grpc.DuoWorkflowServicer):
             mcp_tools = list(start_workflow_request.startRequest.mcpTools)
 
         workflow_type = string_to_category_enum(workflow_definition)
-        workflow_class: TypeWorkflow = resolve_workflow_class(workflow_definition)
+
+        # for testing purposes stub to
+        # workflow_class: FlowFactory = resolve_workflow_class("prototype/experimental")
+        workflow_class: FlowFactory = resolve_workflow_class(workflow_definition)
 
         invocation_metadata = dict(context.invocation_metadata())
 
@@ -391,6 +394,7 @@ async def serve(port: int) -> None:
                 AuthenticationInterceptor(),
                 FeatureFlagInterceptor(),
                 InternalEventsInterceptor(),
+                ModelMetadataInterceptor(),
                 MonitoringInterceptor(),
                 LanguageServerVersionInterceptor(),
                 GitLabVersionInterceptor(),

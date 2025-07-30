@@ -31,12 +31,14 @@ from duo_workflow_service.agents.prompts import (
     HANDOVER_TOOL_NAME,
 )
 from duo_workflow_service.components import (
-    GoalDisambiguationComponent,
     PlanApprovalComponent,
     ToolsApprovalComponent,
     ToolsRegistry,
 )
 from duo_workflow_service.components.executor.component import ExecutorComponent
+from duo_workflow_service.components.goal_disambiguation import (
+    GoalDisambiguationComponent,
+)
 from duo_workflow_service.components.planner.component import PlannerComponent
 from duo_workflow_service.entities import (
     MessageTypeEnum,
@@ -53,7 +55,7 @@ from lib.feature_flags.context import FeatureFlag, is_feature_enabled
 
 # Constants
 QUEUE_MAX_SIZE = 1
-MAX_TOKENS_TO_SAMPLE = 8192
+MAX_TOKENS_TO_SAMPLE = 16384
 RECURSION_LIMIT = 300
 DEBUG = os.getenv("DEBUG")
 MAX_MESSAGES_TO_DISPLAY = 5
@@ -77,6 +79,7 @@ EXECUTOR_TOOLS = [
     "list_all_merge_request_notes",
     "list_merge_request_diffs",
     "gitlab_issue_search",
+    "gitlab_blob_search",
     "gitlab_merge_request_search",
     "run_command",
     "read_file",
@@ -122,6 +125,7 @@ CONTEXT_BUILDER_TOOLS = [
     "list_all_merge_request_notes",
     "list_merge_request_diffs",
     "gitlab_issue_search",
+    "gitlab_blob_search",
     "gitlab_merge_request_search",
     "read_file",
     "find_files",
@@ -215,10 +219,7 @@ class Workflow(AbstractWorkflow):
         last_node_name = self._add_context_builder_nodes(graph, goal, tools_registry)
         disambiguation_component = GoalDisambiguationComponent(
             goal=goal,
-            model=create_chat_model(
-                max_tokens=MAX_TOKENS_TO_SAMPLE,
-                config=self._model_config,
-            ),
+            model_config=self._model_config,
             http_client=self._http_client,
             workflow_id=self._workflow_id,
             tools_registry=tools_registry,
@@ -235,6 +236,7 @@ class Workflow(AbstractWorkflow):
         graph.add_edge(last_node_name, disambiguation_entry_node)
 
         planner_component = PlannerComponent(
+            user=self._user,
             workflow_id=self._workflow_id,
             workflow_type=self._workflow_type,
             planner_toolset=tools_registry.toolset(PLANNER_TOOLS),

@@ -9,6 +9,7 @@ from langgraph.checkpoint.memory import BaseCheckpointSaver
 from langgraph.graph import END, StateGraph
 from langgraph.types import Command
 
+from ai_gateway.model_metadata import current_model_metadata_context
 from duo_workflow_service.agents.chat_agent import ChatAgent
 from duo_workflow_service.agents.tools_executor import ToolsExecutor
 from duo_workflow_service.checkpointer.gitlab_workflow import WorkflowStatusEventEnum
@@ -25,7 +26,7 @@ from duo_workflow_service.tracking.errors import log_exception
 from duo_workflow_service.workflows.abstract_workflow import AbstractWorkflow
 from lib.feature_flags.context import FeatureFlag, is_feature_enabled
 
-MAX_TOKENS_TO_SAMPLE = 8192
+MAX_TOKENS_TO_SAMPLE = 16384
 DEBUG = os.getenv("DEBUG")
 MAX_MESSAGE_LENGTH = 200
 RECURSION_LIMIT = 500
@@ -52,6 +53,7 @@ CHAT_READ_ONLY_TOOLS = [
     "list_all_merge_request_notes",
     "list_merge_request_diffs",
     "gitlab_issue_search",
+    "gitlab_blob_search",
     "gitlab_merge_request_search",
     "gitlab_documentation_search",
     "read_file",
@@ -213,12 +215,11 @@ class Workflow(AbstractWorkflow):
         tools = self._get_tools()
         agents_toolset = tools_registry.toolset(tools)
 
-        # TODO: Specify model metadata for model switching and custom model support
         self._agent: ChatAgent = self._prompt_registry.get_on_behalf(  # type: ignore[assignment]
             user=self._user,
             prompt_id="chat/agent",
             prompt_version="^1.0.0",
-            model_metadata=None,
+            model_metadata=current_model_metadata_context.get(),
             internal_event_category=__name__,
             tools=agents_toolset.bindable,  # type: ignore[arg-type]
         )
