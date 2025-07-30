@@ -12,7 +12,7 @@ from langgraph.types import Command
 from ai_gateway.model_metadata import current_model_metadata_context
 from duo_workflow_service.agents.chat_agent import ChatAgent
 from duo_workflow_service.agents.history_compactor import HistoryCompactor
-from duo_workflow_service.agents.tools_executor import ToolsExecutor
+from duo_workflow_service.agents.chat_tools_executor import ChatToolsExecutor
 from duo_workflow_service.checkpointer.gitlab_workflow import WorkflowStatusEventEnum
 from duo_workflow_service.components.tools_registry import ToolsRegistry
 from duo_workflow_service.entities.state import (
@@ -30,6 +30,9 @@ from duo_workflow_service.token_counter.approximate_token_counter import (
 from duo_workflow_service.tracking.errors import log_exception
 from duo_workflow_service.workflows.abstract_workflow import AbstractWorkflow
 from lib.feature_flags.context import FeatureFlag, is_feature_enabled
+from lib.internal_events import InternalEventsClient
+from dependency_injector.wiring import Provide, inject
+from ai_gateway.container import ContainerApplication
 
 MAX_TOKENS_TO_SAMPLE = 16384
 DEBUG = os.getenv("DEBUG")
@@ -134,7 +137,7 @@ class Workflow(AbstractWorkflow):
         total_tokens = token_counter.count_tokens(history)
 
         log.info(f"Pre compact token count {total_tokens}")
-
+        log.info(state["conversation_history"])
         if total_tokens > MAX_CONTEXT_TOKENS:
             log.info("COMPACTING HISTORY")
             return Routes.COMPACT_HISTORY
@@ -253,15 +256,19 @@ class Workflow(AbstractWorkflow):
         # Initialize HistoryCompactor
         self._history_compactor = HistoryCompactor(
             agent_name="history_compactor",
+            compacting_from=self._agent.name,
             workflow_id=self._workflow_id,
         )
 
-        tools_runner = ToolsExecutor(
-            tools_agent_name=self._agent.name,
+        chat_tools_executor = ChatToolsExecutor(
+            name=self._agent.name,
+            component_name=self._agent.name,
             toolset=agents_toolset,
-            workflow_id=self._workflow_id,
-            workflow_type=self._workflow_type,
-        ).run
+            flow_id=self._workflow_id,
+            flow_type=self._workflow_type,
+            internal_event_client=self._internal_event_client,
+        )
+        tools_runner = chat_tools_executor.run
 
         graph.add_node("agent", self._agent.run)
         graph.add_node("run_tools", tools_runner)

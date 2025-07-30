@@ -186,8 +186,11 @@ class ChatAgent(Prompt[ChatWorkflowState, BaseMessage]):
             else:
                 status = WorkflowStatusEnum.INPUT_REQUIRED
 
+            # Get the complete conversation history including new messages
+            complete_history = input["conversation_history"][self.name] + new_messages
+            
             result: dict[str, Any] = {
-                "conversation_history": {self.name: [agent_response]},
+                "conversation_history": {self.name: complete_history},
                 "status": status,
             }
 
@@ -223,8 +226,11 @@ class ChatAgent(Prompt[ChatWorkflowState, BaseMessage]):
                 content=f"There was an error processing your request: {error}"
             )
 
+            # Get the complete conversation history including error message
+            complete_history = input["conversation_history"].get(self.name, []) + [error_message]
+            
             return {
-                "conversation_history": {self.name: [error_message]},
+                "conversation_history": {self.name: complete_history},
                 "status": WorkflowStatusEnum.INPUT_REQUIRED,
                 "ui_chat_log": [
                     UiChatLog(

@@ -157,16 +157,7 @@ def _chat_conversation_history_reducer(
     if new is None:
         return current.copy()
 
-    # Create a new dictionary merging current and new
-    reduced = {**current}
-
-    for agent_name, new_messages in new.items():
-        if agent_name in reduced:
-            reduced[agent_name] = reduced[agent_name] + new_messages
-        else:
-            reduced[agent_name] = new_messages
-
-    return reduced
+    return new
 
 
 # reducers can be called multiple times by the LangGraph framework. One MUST assure
