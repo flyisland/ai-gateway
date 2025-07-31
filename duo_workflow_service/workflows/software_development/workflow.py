@@ -109,6 +109,7 @@ EXECUTOR_TOOLS = [
     "get_work_item",
     "list_work_items",
     "get_work_item_notes",
+    "ci_linter",
 ]
 
 CONTEXT_BUILDER_TOOLS = [
@@ -144,6 +145,7 @@ CONTEXT_BUILDER_TOOLS = [
     "get_work_item",
     "list_work_items",
     "get_work_item_notes",
+    "ci_linter",
 ]
 
 PLANNER_TOOLS = [
