@@ -83,23 +83,18 @@ def strip_hidden_html_comments(response: str | dict | list) -> str | dict | list
                 "table": ["border", "cellpadding", "cellspacing"],
             }
         )
+        result = bleach.clean(
+            text,
+            tags=allowed_tags,
+            attributes=allowed_attributes,
+            strip_comments=True,
+            strip=False,
+        )
 
-        try:
-            result = bleach.clean(
-                text,
-                tags=allowed_tags,
-                attributes=allowed_attributes,
-                strip_comments=True,
-                strip=False,
-            )
+        # After Bleach processing, handle any remaining malformed comment patterns
+        # that might have been escaped instead of removed
+        result = re.sub(r"&lt;!--.*?--&gt;", "", result, flags=re.DOTALL)
 
-            # After Bleach processing, handle any remaining malformed comment patterns
-            # that might have been escaped instead of removed
-            result = re.sub(r"&lt;!--.*?--&gt;", "", result, flags=re.DOTALL)
-
-            return result
-        except Exception:
-            # If Bleach fails, fall back to regex (simple but less robust)
-            return re.sub(r"<!--.*?-->", "", text, flags=re.DOTALL)
+        return result
 
     return _apply_recursively(response, _strip_comments)
