@@ -116,15 +116,15 @@ yarl = ">=1.17.0,<2.0"
 speedups = ["Brotli", "aiodns (>=3.2.0)", "brotlicffi"]
 
 [[package]]
-name = "gitmatch"
+name = "gitpatch"
 version = "0.2.1"
 description = "Gitignore-style path matching"
 optional = false
 python-versions = ">=3.8"
 groups = ["main"]
 files = [
-    {file = "gitmatch-0.2.1-py3-none-any.whl", hash = "sha256:c74b370d78356e587c87374ded757ce953c5dd84b458ddea7e65918d7cd11972"},
-    {file = "gitmatch-0.2.1.tar.gz", hash = "sha256:46d2c5e25d579580ebed15632ceaaae696fa437f8b52634fb042d1b4fa432f52"},
+    {file = "gitpatch-0.2.1-py3-none-any.whl", hash = "sha256:c74b370d78356e587c87374ded757ce953c5dd84b458ddea7e65918d7cd11972"},
+    {file = "gitpatch-0.2.1.tar.gz", hash = "sha256:46d2c5e25d579580ebed15632ceaaae696fa437f8b52634fb042d1b4fa432f52"},
 ]
 
 [[package]]
