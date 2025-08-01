@@ -1,6 +1,6 @@
 from typing import Any, Dict, List, Optional
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, Field
 
 __all__ = [
     "BillingEventContext",
@@ -13,9 +13,6 @@ class BillingEventContext(BaseModel):
     See https://gitlab.com/gitlab-org/iglu/-/tree/master/public/schemas/com.gitlab/billable_usage?ref_type=heads
     about the spec of the GitLab billable usage context.
     """
-
-    # Opt out protected namespace "model_" (https://github.com/pydantic/pydantic/issues/6322).
-    model_config = ConfigDict(protected_namespaces=())
 
     event_id: str
     event_type: str

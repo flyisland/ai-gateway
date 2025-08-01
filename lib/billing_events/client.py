@@ -40,10 +40,10 @@ class BillingEventsClient:
     def track_billing_event(
         self,
         event_type: str,
+        category: str,
         unit_of_measure: str = "tokens",
         quantity: float = 1.0,
         metadata: Optional[Dict[str, Any]] = None,
-        category: Optional[str] = "default_category",
     ) -> None:
         """Send billing event to Data Insights Platform.
 
@@ -60,7 +60,7 @@ class BillingEventsClient:
         if not self.enabled:
             return
 
-        if quantity < 0:
+        if quantity <= 0:
             return
 
         internal_context: EventContext = current_event_context.get()
@@ -97,7 +97,7 @@ class BillingEventsClient:
                     self.BILLING_CONTEXT_SCHEMA, billing_context.model_dump()
                 )
             ],
-            category=category,  # type: ignore[arg-type]
+            category=category,
             action=event_type,
         )
 
