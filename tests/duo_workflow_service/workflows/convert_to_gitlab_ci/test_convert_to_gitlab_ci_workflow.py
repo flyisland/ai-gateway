@@ -1,5 +1,6 @@
 import asyncio
 import json
+from typing import Any
 from unittest.mock import AsyncMock, MagicMock, Mock, patch
 
 import pytest
@@ -80,8 +81,40 @@ def mock_agent_response_fixture():
     }
 
 
+@pytest.fixture(name="mock_chat_client")
+def mock_chat_client_fixture():
+    with patch(
+        "duo_workflow_service.workflows.convert_to_gitlab_ci.workflow.create_chat_model"
+    ) as mock:
+        yield mock
+
+
+@pytest.fixture(name="mock_agent")
+def mock_agent_fixture(mock_agent_response: dict[str, Any]):
+    with patch(
+        "duo_workflow_service.workflows.convert_to_gitlab_ci.workflow.Agent"
+    ) as mock:
+        mock.return_value.run.return_value = mock_agent_response
+        yield mock
+
+
+@pytest.fixture(name="mock_run_tool_node_class")
+def mock_run_tool_node_class_fixture():
+    with patch(
+        "duo_workflow_service.workflows.convert_to_gitlab_ci.workflow.RunToolNode"
+    ) as mock:
+        yield mock.__getitem__.return_value
+
+
+@pytest.fixture(name="mock_log_exception")
+def mock_log_exception_fixture():
+    with patch(
+        "duo_workflow_service.workflows.convert_to_gitlab_ci.workflow.log_exception"
+    ) as mock:
+        yield mock
+
+
 @pytest.mark.asyncio
-@patch("duo_workflow_service.workflows.convert_to_gitlab_ci.workflow.create_chat_model")
 async def test_translation_tools(
     tools_registry_with_all_privileges, mock_checkpointer, workflow
 ):
@@ -146,10 +179,8 @@ async def test_workflow_initialization(workflow):
 
 
 @pytest.mark.asyncio
-@patch("duo_workflow_service.workflows.convert_to_gitlab_ci.workflow.create_chat_model")
-@patch("duo_workflow_service.workflows.convert_to_gitlab_ci.workflow.Agent")
 async def test_workflow_compilation(
-    mock_agent, mock_new_chat_client, mock_tools_registry, mock_checkpointer, workflow
+    mock_agent, mock_chat_client, mock_tools_registry, mock_checkpointer, workflow
 ):
     """Test workflow compilation process."""
     # Compile the workflow graph
@@ -165,7 +196,7 @@ async def test_workflow_compilation(
         system_prompt="N/A",
         name="ci_pipelines_manager_agent",
         toolset=mock_tools_registry.toolset.return_value,
-        model=mock_new_chat_client.return_value,
+        model=mock_chat_client.return_value,
         workflow_id="test_id",
         http_client=workflow._http_client,
         workflow_type=CategoryEnum.WORKFLOW_CONVERT_TO_GITLAB_CI.value,
@@ -178,19 +209,15 @@ async def test_workflow_compilation(
 @pytest.mark.usefixtures(
     "mock_tools_registry_cls", "mock_fetch_workflow_and_container_data"
 )
-@patch("duo_workflow_service.workflows.convert_to_gitlab_ci.workflow.Agent")
 @patch("duo_workflow_service.workflows.convert_to_gitlab_ci.workflow.HandoverAgent")
 @patch("duo_workflow_service.workflows.convert_to_gitlab_ci.workflow.ToolsExecutor")
-@patch("duo_workflow_service.workflows.convert_to_gitlab_ci.workflow.RunToolNode")
-@patch("duo_workflow_service.workflows.convert_to_gitlab_ci.workflow.create_chat_model")
 async def test_workflow_run(
-    mock_chat_client,
-    mock_run_tool_node_generic_class,
     mock_tools_executor,
     mock_handover_agent,
+    mock_run_tool_node_class,
+    mock_chat_client,
     mock_agent,
     mock_checkpoint_notifier,
-    mock_agent_response,
     workflow_state,
     mock_git_lab_workflow_instance,
     workflow,
@@ -203,7 +230,6 @@ async def test_workflow_run(
         "conversation_history": {},
     }
 
-    mock_run_tool_node_class = mock_run_tool_node_generic_class.__getitem__.return_value
     mock_run_tool_node_class.return_value.run.side_effect = [
         {
             "file_contents": ["test string"],
@@ -222,8 +248,6 @@ async def test_workflow_run(
         "status": WorkflowStatusEnum.COMPLETED,
         "conversation_history": {},
     }
-
-    mock_agent.return_value.run.return_value = mock_agent_response
 
     await workflow.run("test-file-path")
 
@@ -251,14 +275,10 @@ async def test_workflow_run(
 @pytest.mark.usefixtures(
     "mock_tools_registry_cls", "mock_fetch_workflow_and_container_data"
 )
-@patch("duo_workflow_service.workflows.convert_to_gitlab_ci.workflow.Agent")
-@patch("duo_workflow_service.workflows.convert_to_gitlab_ci.workflow.RunToolNode")
-@patch("duo_workflow_service.workflows.convert_to_gitlab_ci.workflow.create_chat_model")
-@patch("duo_workflow_service.workflows.convert_to_gitlab_ci.workflow.log_exception")
 async def test_workflow_run_with_file_not_found(
     mock_log_exception,
+    mock_run_tool_node_class,
     mock_chat_client,
-    mock_run_tool_node_generic_class,
     mock_agent,
     mock_checkpoint_notifier,
     mock_git_lab_workflow_instance,
@@ -266,7 +286,6 @@ async def test_workflow_run_with_file_not_found(
 ):
     mock_checkpoint_notifier_instance = mock_checkpoint_notifier.return_value
 
-    mock_run_tool_node_class = mock_run_tool_node_generic_class.__getitem__.return_value
     mock_run_tool_node_class.return_value.run = MagicMock(
         side_effect=RuntimeError(
             "Failed to load file contents, ensure that file is present"
@@ -289,12 +308,12 @@ async def test_workflow_run_with_file_not_found(
 
 @pytest.mark.asyncio
 @pytest.mark.usefixtures(
+    "mock_chat_client",
     "mock_tools_registry_cls",
     "mock_fetch_workflow_and_container_data",
     "mock_git_lab_workflow_instance",
 )
-@patch("duo_workflow_service.workflows.convert_to_gitlab_ci.workflow.create_chat_model")
-async def test_workflow_run_with_exception(mock_chat_client, workflow):
+async def test_workflow_run_with_exception(workflow):
 
     class AsyncIterator:
         def __init__(self):
@@ -436,7 +455,6 @@ def test_router_create_file_returns_to_agent():
     assert _router(state) == Routes.AGENT
 
 
-@patch("duo_workflow_service.workflows.convert_to_gitlab_ci.workflow.log_exception")
 def test_router_ci_linter_json_parsing_error(mock_log_exception):
     """Test router handles JSON parsing errors in ci_linter responses."""
     state = WorkflowState(
