@@ -111,3 +111,8 @@ def checkpoint_tuple_fixture():
         metadata={"step": 0},
         parent_config={"configurable": {"thread_id": "123", "checkpoint_id": None}},
     )
+
+
+@pytest.fixture(name="scopes")
+def scopes_fixture():
+    return ["duo_workflow_execute_workflow"]

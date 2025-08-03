@@ -13,6 +13,13 @@ from duo_workflow_service.entities.state import (
 )
 from duo_workflow_service.gitlab.gitlab_api import Project
 from duo_workflow_service.gitlab.http_client import GitlabHttpClient
+from duo_workflow_service.interceptors.gitlab_version_interceptor import gitlab_version
+from lib.feature_flags.context import current_feature_flag_context
+
+
+@pytest.fixture(name="config_values")
+def config_values_fixture():
+    return {"mock_model_responses": True}
 
 
 @pytest.fixture(name="plan_steps")
@@ -72,3 +79,29 @@ def graph_input_fixture() -> WorkflowState:
         goal=None,
         additional_context=None,
     )
+
+
+@pytest.fixture(name="duo_workflow_prompt_registry_enabled")
+def duo_workflow_prompt_registry_enabled_fixture() -> bool:
+    return False
+
+
+@pytest.fixture(autouse=True)
+def stub_feature_flags(duo_workflow_prompt_registry_enabled: bool):
+    if duo_workflow_prompt_registry_enabled:
+        current_feature_flag_context.set({"duo_workflow_prompt_registry"})
+
+    yield
+
+
+@pytest.fixture(name="gl_version")
+def gl_version_fixture() -> str:
+    return "17.5.2"
+
+
+@pytest.fixture(name="mock_gitlab_version")
+def mock_gitlab_version_fixture(gl_version: str):
+    # Set GitLab version in context
+    gitlab_version.set(gl_version)
+    yield
+    gitlab_version.set(None)
