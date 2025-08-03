@@ -4,29 +4,30 @@ from typing import Any
 from unittest.mock import AsyncMock, MagicMock, Mock, patch
 
 import pytest
+from gitlab_cloud_connector import CloudConnectorUser
 from langchain_core.messages import AIMessage, HumanMessage, SystemMessage
+from langchain_core.prompt_values import ChatPromptValue
 
+from ai_gateway.models.mock import FakeModel
 from duo_workflow_service.components.tools_registry import (
     _AGENT_PRIVILEGES,
     ToolsRegistry,
 )
 from duo_workflow_service.entities import (
-    MAX_CONTEXT_TOKENS,
+    MAX_SINGLE_MESSAGE_TOKENS,
     Plan,
     WorkflowState,
     WorkflowStatusEnum,
 )
+from duo_workflow_service.gitlab.gitlab_api import Project
+from duo_workflow_service.gitlab.http_client import GitlabHttpClient
 from duo_workflow_service.workflows.convert_to_gitlab_ci import Workflow
 from duo_workflow_service.workflows.convert_to_gitlab_ci.prompts import (
     CI_PIPELINES_MANAGER_FILE_USER_MESSAGE,
     CI_PIPELINES_MANAGER_SYSTEM_MESSAGE,
     CI_PIPELINES_MANAGER_USER_GUIDELINES,
 )
-from duo_workflow_service.workflows.convert_to_gitlab_ci.workflow import (
-    Routes,
-    _load_file_contents,
-    _router,
-)
+from duo_workflow_service.workflows.convert_to_gitlab_ci.workflow import Routes, _router
 from lib.internal_events.event_enum import CategoryEnum
 
 
@@ -46,12 +47,24 @@ def mock_checkpointer_fixture():
 
 
 @pytest.fixture(name="workflow")
-def workflow_fixture():
-    return Workflow(
-        workflow_id="test_id",
-        workflow_metadata={},
-        workflow_type=CategoryEnum.WORKFLOW_CONVERT_TO_GITLAB_CI,
-    )
+def workflow_fixture(
+    mock_duo_workflow_service_container: Mock,
+    user: CloudConnectorUser,
+    gl_http_client: GitlabHttpClient,
+    project: Project,
+):
+    with patch(
+        "duo_workflow_service.workflows.abstract_workflow.get_http_client",
+        return_value=gl_http_client,
+    ):
+        workflow = Workflow(
+            workflow_id="test_id",
+            workflow_metadata={},
+            workflow_type=CategoryEnum.WORKFLOW_CONVERT_TO_GITLAB_CI,
+            user=user,
+        )
+        workflow._project = project
+        return workflow
 
 
 @pytest.fixture(name="mock_agent_response")
@@ -86,14 +99,34 @@ def mock_chat_client_fixture():
     with patch(
         "duo_workflow_service.workflows.convert_to_gitlab_ci.workflow.create_chat_model"
     ) as mock:
+        mock.return_value = mock
+        mock.bind_tools.return_value = mock
         yield mock
 
 
+@pytest.fixture(name="mock_model_ainvoke")
+def mock_model_ainvoke_fixture(duo_workflow_prompt_registry_enabled, mock_chat_client):
+    end_message = AIMessage("done")
+
+    if duo_workflow_prompt_registry_enabled:
+        with patch.object(FakeModel, "ainvoke") as mock:
+            mock.return_value = end_message
+            yield mock
+    else:
+        mock_chat_client.ainvoke = AsyncMock(return_value=end_message)
+        yield mock_chat_client.ainvoke
+
+
 @pytest.fixture(name="mock_agent")
-def mock_agent_fixture(mock_agent_response: dict[str, Any]):
-    with patch(
-        "duo_workflow_service.workflows.convert_to_gitlab_ci.workflow.Agent"
-    ) as mock:
+def mock_agent_fixture(
+    mock_agent_response: dict[str, Any], duo_workflow_prompt_registry_enabled: bool
+):
+    if duo_workflow_prompt_registry_enabled:
+        factory = "ai_gateway.prompts.registry.LocalPromptRegistry.get_on_behalf"
+    else:
+        factory = "duo_workflow_service.workflows.convert_to_gitlab_ci.workflow.Agent"
+
+    with patch(factory) as mock:
         mock.return_value.run.return_value = mock_agent_response
         yield mock
 
@@ -115,6 +148,7 @@ def mock_log_exception_fixture():
 
 
 @pytest.mark.asyncio
+@pytest.mark.parametrize("duo_workflow_prompt_registry_enabled", [False, True])
 async def test_translation_tools(
     tools_registry_with_all_privileges, mock_checkpointer, workflow
 ):
@@ -148,28 +182,25 @@ async def test_translation_tools(
     "duo_workflow_service.workflows.convert_to_gitlab_ci.workflow.ApproximateTokenCounter"
 )
 @pytest.mark.asyncio
-async def test_file_content_too_large(mock_token_counter, workflow_state):
-    workflow_state["conversation_history"] = {"ci_pipelines_manager_agent": []}
-    mock_token_counter.return_value.count_tokens.return_value = MAX_CONTEXT_TOKENS + 1
-
-    result = _load_file_contents(["large file content"], workflow_state)
-
-    human_prompt = CI_PIPELINES_MANAGER_FILE_USER_MESSAGE.format(
-        file_content="large file content"
+@pytest.mark.parametrize("duo_workflow_prompt_registry_enabled", [False, True])
+async def test_file_content_too_large(mock_token_counter, workflow_state, workflow):
+    mock_token_counter.return_value.count_string_content.return_value = (
+        MAX_SINGLE_MESSAGE_TOKENS + 1
     )
+
+    result = workflow._load_file_contents(["large file content"], workflow_state)
+
     mock_token_counter.assert_called_once_with("ci_pipelines_manager_agent")
-    mock_token_counter.return_value.count_tokens.assert_called_once_with(
-        [
-            SystemMessage(content=CI_PIPELINES_MANAGER_SYSTEM_MESSAGE),
-            HumanMessage(content=CI_PIPELINES_MANAGER_USER_GUIDELINES),
-            HumanMessage(content=human_prompt),
-        ]
+    mock_token_counter.return_value.count_string_content.assert_called_once_with(
+        "large file content"
     )
     assert "File too large" in result["ui_chat_log"][0]["content"]
-    assert result["conversation_history"].get("ci_pipelines_manager_agent") == []
+    assert "conversation_history" not in result
+    assert "additional_context" not in result
 
 
 @pytest.mark.asyncio
+@pytest.mark.parametrize("duo_workflow_prompt_registry_enabled", [False, True])
 async def test_workflow_initialization(workflow):
     """Test workflow initialization and state setup."""
     initial_state = workflow.get_workflow_state("/test/path")
@@ -179,8 +210,14 @@ async def test_workflow_initialization(workflow):
 
 
 @pytest.mark.asyncio
+@pytest.mark.parametrize("duo_workflow_prompt_registry_enabled", [False, True])
 async def test_workflow_compilation(
-    mock_agent, mock_chat_client, mock_tools_registry, mock_checkpointer, workflow
+    mock_agent,
+    mock_chat_client,
+    mock_tools_registry,
+    mock_checkpointer,
+    workflow,
+    duo_workflow_prompt_registry_enabled,
 ):
     """Test workflow compilation process."""
     # Compile the workflow graph
@@ -191,16 +228,26 @@ async def test_workflow_compilation(
     )
 
     assert compiled_graph is not None
-    mock_agent.assert_called_with(
-        goal="N/A",
-        system_prompt="N/A",
-        name="ci_pipelines_manager_agent",
-        toolset=mock_tools_registry.toolset.return_value,
-        model=mock_chat_client.return_value,
-        workflow_id="test_id",
-        http_client=workflow._http_client,
-        workflow_type=CategoryEnum.WORKFLOW_CONVERT_TO_GITLAB_CI.value,
-    )
+    if duo_workflow_prompt_registry_enabled:
+        mock_agent.assert_called_with(
+            workflow._user,
+            "workflow/convert_to_gitlab_ci",
+            "^1.0.0",
+            tools=mock_tools_registry.toolset.return_value.bindable,
+            workflow_id=workflow._workflow_id,
+            http_client=workflow._http_client,
+        )
+    else:
+        mock_agent.assert_called_with(
+            goal="N/A",
+            system_prompt="N/A",
+            name="ci_pipelines_manager_agent",
+            toolset=mock_tools_registry.toolset.return_value,
+            model=mock_chat_client.return_value,
+            workflow_id="test_id",
+            http_client=workflow._http_client,
+            workflow_type=CategoryEnum.WORKFLOW_CONVERT_TO_GITLAB_CI.value,
+        )
     mock_tools_registry.get.assert_called()  # Should call get() for tools
     mock_tools_registry.toolset.assert_called()
 
@@ -211,6 +258,7 @@ async def test_workflow_compilation(
 )
 @patch("duo_workflow_service.workflows.convert_to_gitlab_ci.workflow.HandoverAgent")
 @patch("duo_workflow_service.workflows.convert_to_gitlab_ci.workflow.ToolsExecutor")
+@pytest.mark.parametrize("duo_workflow_prompt_registry_enabled", [False, True])
 async def test_workflow_run(
     mock_tools_executor,
     mock_handover_agent,
@@ -275,6 +323,7 @@ async def test_workflow_run(
 @pytest.mark.usefixtures(
     "mock_tools_registry_cls", "mock_fetch_workflow_and_container_data"
 )
+@pytest.mark.parametrize("duo_workflow_prompt_registry_enabled", [False, True])
 async def test_workflow_run_with_file_not_found(
     mock_log_exception,
     mock_run_tool_node_class,
@@ -313,6 +362,7 @@ async def test_workflow_run_with_file_not_found(
     "mock_fetch_workflow_and_container_data",
     "mock_git_lab_workflow_instance",
 )
+@pytest.mark.parametrize("duo_workflow_prompt_registry_enabled", [False, True])
 async def test_workflow_run_with_exception(workflow):
 
     class AsyncIterator:
@@ -338,6 +388,7 @@ async def test_workflow_run_with_exception(workflow):
     assert workflow.is_done
 
 
+@pytest.mark.parametrize("duo_workflow_prompt_registry_enabled", [False, True])
 def test_router_ci_linter_validation_success():
     """Test router handles successful ci_linter validation."""
     state = WorkflowState(
@@ -366,6 +417,7 @@ def test_router_ci_linter_validation_success():
     assert _router(state) == Routes.COMMIT_CHANGES
 
 
+@pytest.mark.parametrize("duo_workflow_prompt_registry_enabled", [False, True])
 def test_router_ci_linter_validation_failure():
     """Test router handles failed ci_linter validation."""
     state = WorkflowState(
@@ -394,6 +446,7 @@ def test_router_ci_linter_validation_failure():
     assert _router(state) == Routes.AGENT
 
 
+@pytest.mark.parametrize("duo_workflow_prompt_registry_enabled", [False, True])
 def test_router_ci_linter_max_attempts():
     """Test router handles max validation attempts."""
     messages = []
@@ -427,6 +480,7 @@ def test_router_ci_linter_max_attempts():
     assert _router(state) == Routes.COMMIT_CHANGES
 
 
+@pytest.mark.parametrize("duo_workflow_prompt_registry_enabled", [False, True])
 def test_router_create_file_returns_to_agent():
     """Test router returns to agent after file creation for validation."""
     state = WorkflowState(
@@ -455,6 +509,7 @@ def test_router_create_file_returns_to_agent():
     assert _router(state) == Routes.AGENT
 
 
+@pytest.mark.parametrize("duo_workflow_prompt_registry_enabled", [False, True])
 def test_router_ci_linter_json_parsing_error(mock_log_exception):
     """Test router handles JSON parsing errors in ci_linter responses."""
     state = WorkflowState(
@@ -492,6 +547,7 @@ def test_router_ci_linter_json_parsing_error(mock_log_exception):
     assert kwargs["extra"]["error_type"] == "json_parsing_error"
 
 
+@pytest.mark.parametrize("duo_workflow_prompt_registry_enabled", [False, True])
 def test_router_create_file_max_attempts():
     """Test router prevents infinite file creation loops."""
     messages = []
@@ -523,3 +579,41 @@ def test_router_create_file_max_attempts():
     )
 
     assert _router(state) == Routes.COMMIT_CHANGES
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("duo_workflow_prompt_registry_enabled", [False, True])
+@pytest.mark.usefixtures(
+    "mock_gitlab_version",
+    "mock_fetch_workflow_and_container_data",
+    "mock_git_lab_workflow_instance",
+)
+async def test_messages_to_model(
+    mock_model_ainvoke,
+    goal,
+    project,
+    workflow,
+):
+    file_content = "mock file content"
+    mock_tool_response = Mock(response=file_content)
+    with patch(
+        "duo_workflow_service.executor.action._execute_action_and_get_action_response",
+        return_value=mock_tool_response,
+    ):
+        await workflow.run(goal)
+
+    ainvoke_messages = mock_model_ainvoke.call_args.args[0]
+
+    if isinstance(ainvoke_messages, ChatPromptValue):
+        ainvoke_messages = ainvoke_messages.messages
+
+    assert ainvoke_messages == [
+        SystemMessage(content=CI_PIPELINES_MANAGER_SYSTEM_MESSAGE),
+        HumanMessage(
+            content=CI_PIPELINES_MANAGER_USER_GUIDELINES
+            + "\n"
+            + CI_PIPELINES_MANAGER_FILE_USER_MESSAGE.format(file_content=file_content)
+            + "\n"
+            + f"Note: The project_id for ci_linter validation is {project["id"]}."
+        ),
+    ]

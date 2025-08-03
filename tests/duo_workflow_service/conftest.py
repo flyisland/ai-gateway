@@ -1,6 +1,6 @@
 import asyncio
 from datetime import datetime, timezone
-from unittest.mock import AsyncMock, MagicMock
+from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
@@ -79,6 +79,37 @@ def graph_input_fixture() -> WorkflowState:
         goal=None,
         additional_context=None,
     )
+
+
+@pytest.fixture(name="mock_gitlab_workflow")
+def mock_gitlab_workflow_fixture():
+    with patch(
+        "duo_workflow_service.workflows.abstract_workflow.GitLabWorkflow", autospec=True
+    ) as mock:
+        yield mock
+
+
+@pytest.fixture(name="offline_mode")
+def offline_mode_fixture():
+    return False
+
+
+@pytest.fixture(name="mock_git_lab_workflow_instance")
+def mock_git_lab_workflow_instance_fixture(mock_gitlab_workflow, offline_mode):
+    mock = mock_gitlab_workflow.return_value
+    mock.__aenter__.return_value = mock
+    mock.__aexit__.return_value = None
+    mock._offline_mode = offline_mode
+    mock.aget_tuple = AsyncMock(return_value=None)
+    mock.alist = AsyncMock(return_value=[])
+    mock.aput = AsyncMock(
+        return_value={
+            "configurable": {"thread_id": "123", "checkpoint_id": "checkpoint1"}
+        }
+    )
+    mock.get_next_version = MagicMock(return_value=1)
+
+    return mock
 
 
 @pytest.fixture(name="duo_workflow_prompt_registry_enabled")
