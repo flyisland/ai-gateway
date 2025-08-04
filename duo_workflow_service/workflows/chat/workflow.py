@@ -181,7 +181,7 @@ class Workflow(AbstractWorkflow):
             approval=None,
         )
 
-    async def get_graph_input(self, goal: str, status_event: str) -> Any:
+    async def get_graph_input(self, goal: str, status_event: str, current_state: ChatWorkflowState | None = None) -> Any:
         new_chat_message = goal
 
         match status_event:
@@ -200,8 +200,11 @@ class Workflow(AbstractWorkflow):
                             message=new_chat_message
                         )
                     case _:
-                        state_update["conversation_history"] = {
-                            self._agent.name: [
+                        # Reconstruct the full conversation history from current state
+                        if current_state and "conversation_history" in current_state:
+                            # Get existing conversation history and add new message
+                            existing_history = current_state["conversation_history"].get(self._agent.name, [])
+                            reconstructed_history = existing_history + [
                                 HumanMessage(
                                     content=goal,
                                     additional_kwargs={
@@ -209,6 +212,19 @@ class Workflow(AbstractWorkflow):
                                     },
                                 )
                             ]
+                        else:
+                            # Fallback for new conversations
+                            reconstructed_history = [
+                                HumanMessage(
+                                    content=goal,
+                                    additional_kwargs={
+                                        "additional_context": self._additional_context
+                                    },
+                                )
+                            ]
+                        
+                        state_update["conversation_history"] = {
+                            self._agent.name: reconstructed_history
                         }
 
                 if new_chat_message and new_chat_message != "null":
@@ -254,7 +270,12 @@ class Workflow(AbstractWorkflow):
         self._agent.tools_registry = tools_registry
 
         # Initialize HistoryCompactor
-        self._history_compactor = HistoryCompactor(
+        self._history_compactor: HistoryCompactor = self._prompt_registry.get_on_behalf(  # type: ignore[assignment]
+            user=self._user,
+            prompt_id="history_compactor",
+            prompt_version="^1.0.0",
+            model_metadata=current_model_metadata_context.get(),
+            internal_event_category=__name__,
             agent_name="history_compactor",
             compacting_from=self._agent.name,
             workflow_id=self._workflow_id,

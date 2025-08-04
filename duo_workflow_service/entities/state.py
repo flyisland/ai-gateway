@@ -290,41 +290,6 @@ def _ui_chat_log_reducer(
     return current + new
 
 
-def _chat_history_reducer(
-    current: Dict[str, List[BaseMessage]], new: Optional[Dict[str, List[BaseMessage]]]
-) -> Dict[str, List[BaseMessage]]:
-    """
-    Chat-specific history reducer that appends messages unless they come from MessageCompactor.
-    MessageCompactor provides a complete replacement of the conversation history.
-    """
-    if new is None:
-        return current.copy() if current else {}
-
-    reduced = {**current} if current else {}
-
-    for agent_name, new_messages in new.items():
-        if not new_messages:
-            continue
-
-        # Check if messages are from MessageCompactor by looking for a special marker
-        # or by checking if it's a complete conversation replacement
-        is_from_compactor = (
-            len(new_messages) > 1 and 
-            any(isinstance(msg, SystemMessage) for msg in new_messages) and
-            any("compacted" in str(msg.content).lower() for msg in new_messages if hasattr(msg, 'content'))
-        )
-
-        if is_from_compactor:
-            # Replace entire conversation history when coming from MessageCompactor
-            reduced[agent_name] = new_messages
-        else:
-            # Append to existing conversation history for regular updates
-            if agent_name in reduced:
-                reduced[agent_name] = reduced[agent_name] + new_messages
-            else:
-                reduced[agent_name] = new_messages
-
-    return reduced
 
 
 class WorkflowState(TypedDict):
@@ -381,9 +346,7 @@ class ApprovalStateRejection(BaseModel):
 class ChatWorkflowState(TypedDict):
     plan: Plan
     status: WorkflowStatusEnum
-    conversation_history: Annotated[
-        Dict[str, List[BaseMessage]], _chat_history_reducer
-    ]
+    conversation_history: Dict[str, List[BaseMessage]]
     ui_chat_log: Annotated[List[UiChatLog], _ui_chat_log_reducer]
     last_human_input: Union[WorkflowEvent, None]
     project: Project | None

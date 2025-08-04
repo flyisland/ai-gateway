@@ -24,6 +24,7 @@ class ContainerPrompts(containers.DeclarativeContainer):
             "workflow/executor": "duo_workflow_service.agents.AgentV2",
             "workflow/context_builder": "duo_workflow_service.agents.AgentV2",
             "workflow/planner": "duo_workflow_service.agents.AgentV2",
+            "history_compactor": "duo_workflow_service.agents.history_compactor.HistoryCompactor",
         },
         model_factories={
             ModelClassProvider.ANTHROPIC: providers.Factory(

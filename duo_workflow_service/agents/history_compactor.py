@@ -1,13 +1,16 @@
 from datetime import datetime, timezone
-from typing import Any, Dict, List
+from typing import Any, Dict, List, Optional, Union
 
 import structlog
 from dependency_injector.wiring import Provide, inject
 from langchain_core.messages import AIMessage, BaseMessage, HumanMessage, SystemMessage, ToolMessage
 from langchain_core.output_parsers.string import StrOutputParser
+from langchain_core.prompt_values import ChatPromptValue, PromptValue
+from langchain_core.runnables import Runnable, RunnableConfig
 
 from ai_gateway.container import ContainerApplication
-from ai_gateway.prompts import Prompt
+from ai_gateway.prompts import Prompt, jinja2_formatter
+from ai_gateway.prompts.config.base import PromptConfig
 from duo_workflow_service.entities.state import (
     ChatWorkflowState,
     MessageTypeEnum,
@@ -20,27 +23,60 @@ from lib.internal_events import InternalEventsClient
 log = structlog.stdlib.get_logger("history_compactor")
 
 
-class HistoryCompactor:
-    _prompt: Prompt[ChatWorkflowState, BaseMessage]
+class HistoryCompactorPromptTemplate(Runnable[ChatWorkflowState, PromptValue]):
+    def __init__(self, prompt_template: dict[str, str]):
+        self.prompt_template = prompt_template
+
+    def invoke(
+        self,
+        input: ChatWorkflowState,
+        config: Optional[RunnableConfig] = None,  # pylint: disable=unused-argument
+        **_kwargs: Any,
+    ) -> PromptValue:
+        messages: list[BaseMessage] = []
+
+        # Get conversation history to be compacted
+        conversation_history = input.get("conversation_history", [])
+        
+        # Convert messages to string representation for the template
+        history_str = ""
+        for msg in conversation_history:
+            if isinstance(msg, HumanMessage):
+                history_str += f"Human: {msg.content}\n\n"
+            elif isinstance(msg, AIMessage):
+                history_str += f"Assistant: {msg.content}\n\n"
+            elif isinstance(msg, SystemMessage):
+                history_str += f"System: {msg.content}\n\n"
+            elif isinstance(msg, ToolMessage):
+                history_str += f"Tool: {msg.content}\n\n"
+
+        # Add system message with the compactor instructions and conversation history
+        if "system" in self.prompt_template:
+            system_content = jinja2_formatter(
+                self.prompt_template["system"],
+                conversation_history=history_str
+            )
+            messages.append(SystemMessage(content=system_content))
+
+        return ChatPromptValue(messages=messages)
+
+
+class HistoryCompactor(Prompt[ChatWorkflowState, BaseMessage]):
     _agent_name: str
     _compacting_from: str
+    _workflow_id: str
 
-    @inject
-    def __init__(
-        self,
-        agent_name: str,
-        compacting_from: str,
-        workflow_id: str,
-        internal_event_client: InternalEventsClient = Provide[
-            ContainerApplication.internal_event.client
-        ],
-    ) -> None:
-        self._prompt = self.history_compactor_prompt()
-        self._agent_name = agent_name
-        self._compacting_from = compacting_from
-        self._workflow_id = workflow_id
-        self._internal_event_client = internal_event_client
+    def __init__(self, model_factory, config, *args, **kwargs):
+        # Extract our custom parameters from kwargs
+        self._agent_name = kwargs.pop("agent_name", "history_compactor")
+        self._compacting_from = kwargs.pop("compacting_from", "unknown")
+        self._workflow_id = kwargs.pop("workflow_id", "unknown")
         self._logger = structlog.stdlib.get_logger("history_compactor")
+        super().__init__(model_factory, config, *args, **kwargs)
+
+    @classmethod
+    def _build_prompt_template(cls, config: PromptConfig) -> Runnable:
+        return HistoryCompactorPromptTemplate(config.prompt_template)
 
     async def run(self, input: ChatWorkflowState) -> Dict[str, Any]:
         try:
@@ -80,19 +116,20 @@ class HistoryCompactor:
 
             # Create a temporary state with only the messages to be compacted for the prompt
             compact_input = input.copy()
-            compact_input["conversation_history"] = {self._compacting_from: messages_to_compact}
+            compact_input["conversation_history"] = messages_to_compact
             self._logger.info("Invoking agent to summarize conversation history")
 
             # Call the prompt to get the compacted history
-            agent_response = await self._prompt.ainvoke(
-                input=compact_input, agent_name=self._agent_name
+            agent_response = await self.ainvoke(
+                input=compact_input
             )
             compacted_content = StrOutputParser().invoke(agent_response) or ""
             self._logger.info(f"Agent summarization completed, generated {len(compacted_content)} characters")
 
-            # Create a new message with the compacted content
-            compacted_message = HumanMessage(content=compacted_content)
-            self._logger.info("Created compacted message")
+            # Create a new message with the compacted content and add identifier
+            compacted_content_with_id = f"COMPACTED_HISTORY: {compacted_content}"
+            compacted_message = HumanMessage(content=compacted_content_with_id)
+            self._logger.info("Created compacted message with identifier")
 
             # Step 5: Reform the conversation history with system_messages + summarized_message + recent_messages
             final_history = system_messages + [compacted_message] + recent_messages
@@ -126,79 +163,3 @@ class HistoryCompactor:
                     )
                 ],
             }
-
-
-    def history_compactor_prompt(self):
-        return """
-        You are operating as an agentic coding assistant built by GitLab. You are expected to be precise, safe, and helpful.
-
-        <role>
-        Context Extraction and Technical Summarization Assistant
-        </role>
-
-        <primary_objective>
-        Your task is to extract and summarize the most relevant, high-quality information from the conversation history below to preserve essential context for ongoing development. Your output will *replace* the current conversation history, so it must retain all critical information while freeing up space.
-        </primary_objective>
-
-        <objective_information>
-        You are approaching the model's token limit. Your goal is to summarize older parts of the conversation, while preserving the most recent interactions in full. Additionally, you must include full file diffs, code changes, and function definitions whenever they appear, especially in the most recent messages. Avoid duplicating information.
-
-        To aid in this, you will be provided with:
-        - The user's original request
-        - The full conversation history
-
-        You must distill this into a compact, chronologically accurate summary that preserves key context, code, and intentions.
-        </objective_information>
-
-        <required_technique>
-        Follow this strategy exactly:
-
-        1. Summarize older sections, combining duplicated requests, responses, and analysis.
-        2. Include full file diffs and code edits, using real file paths and code block formatting.
-        3. Capture all explicit user requests, including tactical and strategic goals.
-        4. Include reasoning, design decisions, and any learned context about the codebase.
-        5. Do not invent or omit details. Do not summarize code—copy it fully if referenced.
-        6. Include the most recent next steps, in the user's words if possible.
-
-        </required_technique>
-
-        <output_structure>
-        Your output must include:
-
-        1. `<analysis>`: Internal thought process ensuring you've followed the above rules.
-        2. `<summary>`: Structured summary with the following fields:
-
-            a. Primary Request and Intent:
-            [User's explicit goals and motivations]
-
-            b. Key Technical Concepts:
-            - [Relevant tools, APIs, patterns, models]
-
-            c. Files and Code Sections:
-            - [Full path to relevant file]
-                - [Why this file is important]
-                - [Summary of edits or insights]
-                - [Full code snippet or diff if referenced or modified]
-
-            d. Problem Solving:
-            [Resolved bugs, edge cases, challenges]
-
-            e. Pending Tasks:
-            - [Tasks still outstanding or awaiting clarification]
-
-            f. Current Work:
-            [Precise detail of last action taken or being discussed]
-            [Include full message(s) and code if recent]
-
-            g. Optional Next Step:
-            [Only if it directly follows from current task and user request]
-            - "Direct quote from user for confirmation"
-        </output_structure>
-
-        <conversation_history>
-        {{conversation_history}}
-        </conversation_history>
-
-        Now, carefully read the full conversation history, then apply the summarization strategy outlined above. Respond only with the <analysis> and <summary> sections, formatted as instructed.
-
-        """
