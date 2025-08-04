@@ -1,6 +1,7 @@
 from datetime import datetime, timezone
 from typing import Any, List, Union
 
+import structlog
 from anthropic import APIStatusError
 from dependency_injector.wiring import Provide, inject
 from langchain_core.language_models.base import LanguageModelInput
@@ -22,11 +23,7 @@ from duo_workflow_service.entities.state import (
     UiChatLog,
     WorkflowStatusEnum,
 )
-from duo_workflow_service.errors.error_handler import (
-    LLMStopReasonError,
-    ModelError,
-    ModelErrorHandler,
-)
+from duo_workflow_service.errors.error_handler import ModelError, ModelErrorHandler
 from duo_workflow_service.gitlab.events import get_event
 from duo_workflow_service.gitlab.http_client import GitlabHttpClient
 from duo_workflow_service.monitoring import duo_workflow_metrics
@@ -35,9 +32,10 @@ from duo_workflow_service.token_counter.approximate_token_counter import (
     ApproximateTokenCounter,
 )
 from duo_workflow_service.tools import Toolset
-from duo_workflow_service.tracking.errors import log_exception
 from lib.internal_events import InternalEventAdditionalProperties, InternalEventsClient
 from lib.internal_events.event_enum import CategoryEnum, EventEnum, EventPropertyEnum
+
+log = structlog.stdlib.get_logger("agent")
 
 
 class Agent:  # pylint: disable=too-many-instance-attributes
@@ -149,12 +147,8 @@ class Agent:  # pylint: disable=too-many-instance-attributes
                     response = await self._model.ainvoke(messages)
 
                 stop_reason = response.response_metadata.get("stop_reason")
-                if stop_reason not in [
-                    "end_turn",
-                    "stop_sequence",
-                    "tool_use",
-                ]:
-                    log_exception(LLMStopReasonError(stop_reason=stop_reason))
+                if stop_reason in ["max_tokens", "refusal"]:
+                    log.warning(f"LLM stopped abnormally with reason: {stop_reason}")
 
                 self._track_tokens_data(response, approximate_token_count)
                 duo_workflow_metrics.count_llm_response(

@@ -84,29 +84,3 @@ class ModelErrorHandler:
 
         self._retry_count += 1
         await asyncio.sleep(retry_after)
-
-
-class LLMStopReasonError(Exception):
-    """Exception raised when a response encounters abnormal stop reasons.
-
-    Attributes:
-        stop_reason -- the stop reason that triggered the exception
-        message -- explanation of the error
-    """
-
-    def __init__(self, stop_reason, message=None):
-        self.stop_reason = stop_reason
-
-        if message is None:
-            if stop_reason == "max_tokens":
-                message = "Response was truncated due to maximum token limit"
-            elif stop_reason == "refusal":
-                message = "Response was refused due to content policy"
-            else:
-                message = f"Unknown or unexpected stop reason: {stop_reason}"
-
-        self.message = message
-        super().__init__(self.message)
-
-    def __str__(self):
-        return f"LLMStopReasonError({self.stop_reason}): {self.message}"
