@@ -25,8 +25,8 @@ from lib.internal_events import InternalEventAdditionalProperties
 from lib.internal_events.event_enum import CategoryEnum, EventEnum, EventPropertyEnum
 
 
-@pytest.fixture
-def workflow_msg_event():
+@pytest.fixture(name="workflow_msg_event")
+def workflow_msg_event_fixture():
     return {
         "id": "event-id",
         "event_type": "message",
@@ -34,8 +34,8 @@ def workflow_msg_event():
     }
 
 
-@pytest.fixture
-def workflow_resume_event():
+@pytest.fixture(name="workflow_resume_event")
+def workflow_resume_event_fixture():
     return {
         "id": "event-id",
         "event_type": "resume",
@@ -43,8 +43,8 @@ def workflow_resume_event():
     }
 
 
-@pytest.fixture
-def workflow_state(plan: Plan):
+@pytest.fixture(name="workflow_state")
+def workflow_state_fixture(plan: Plan):
     return WorkflowState(
         plan=plan,
         status=WorkflowStatusEnum.NOT_STARTED,
@@ -54,25 +54,26 @@ def workflow_state(plan: Plan):
         ui_chat_log=[],
         project=None,
         goal=None,
+        additional_context=None,
     )
 
 
 # pylint: disable=too-many-public-methods
 class TestAgent:
-    @pytest.fixture
-    def chat_mock(self):
+    @pytest.fixture(name="chat_mock")
+    def chat_mock_fixture(self):
         mock = MagicMock(BaseChatModel)
         mock.bind_tools.return_value = mock
         return mock
 
-    @pytest.fixture
-    def mock_toolset(self):
+    @pytest.fixture(name="mock_toolset")
+    def mock_toolset_fixture(self):
         mock = MagicMock(spec=Toolset)
         mock.bindable = []
         return mock
 
-    @pytest.fixture
-    def planner_agent(
+    @pytest.fixture(name="planner_agent")
+    def planner_agent_fixture(
         self, chat_mock, gl_http_client, mock_toolset, internal_event_client
     ):
         return Agent(
@@ -106,6 +107,7 @@ class TestAgent:
         chat_mock.bind_tools.assert_called_once_with(mock_toolset.bindable)
 
     @pytest.mark.asyncio
+    @pytest.mark.usefixtures("mock_duo_workflow_service_container")
     async def test_run_with_empty_conversation(
         self, chat_mock, planner_agent, workflow_state
     ):
@@ -230,6 +232,7 @@ class TestAgent:
         assert result["ui_chat_log"][0]["content"] == simple_string
 
     @pytest.mark.asyncio
+    @pytest.mark.usefixtures("mock_duo_workflow_service_container")
     async def test_run_with_list_of_strings_content(
         self, chat_mock, planner_agent, workflow_state, workflow_msg_event
     ):
@@ -244,6 +247,7 @@ class TestAgent:
         assert result["ui_chat_log"][0]["content"] == "Line 1\nLine 2\nLine 3"
 
     @pytest.mark.asyncio
+    @pytest.mark.usefixtures("mock_duo_workflow_service_container")
     async def test_run_with_dict_content(
         self, chat_mock, planner_agent, workflow_state, workflow_msg_event
     ):
@@ -261,6 +265,7 @@ class TestAgent:
         assert result["ui_chat_log"][0]["content"] == "Message from dict"
 
     @pytest.mark.asyncio
+    @pytest.mark.usefixtures("mock_duo_workflow_service_container")
     async def test_run_with_invalid_content(
         self, chat_mock, planner_agent, workflow_state, workflow_msg_event
     ):
@@ -288,6 +293,7 @@ class TestAgent:
         assert not "ui_chat_log" in result
 
     @pytest.mark.asyncio
+    @pytest.mark.usefixtures("mock_duo_workflow_service_container")
     async def test_run_with_resume_event(
         self, chat_mock, planner_agent, workflow_state, workflow_resume_event
     ):
@@ -388,6 +394,7 @@ class TestAgent:
         assert mock_error_handler.handle_error.call_count == 3
 
     @pytest.mark.asyncio
+    @pytest.mark.usefixtures("mock_duo_workflow_service_container")
     async def test_run_with_api_error_status_tracking(
         self, chat_mock, planner_agent, workflow_state
     ):
@@ -476,6 +483,7 @@ class TestAgent:
         )
 
     @pytest.mark.asyncio
+    @pytest.mark.usefixtures("mock_duo_workflow_service_container")
     @patch("duo_workflow_service.agents.agent.get_event")
     async def test_run_with_check_events_enabled(
         self,

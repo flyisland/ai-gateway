@@ -5,6 +5,7 @@ from urllib.parse import quote
 from pydantic import BaseModel, Field
 
 from duo_workflow_service.gitlab.url_parser import GitLabUrlParseError, GitLabUrlParser
+from duo_workflow_service.policies.file_exclusion_policy import FileExclusionPolicy
 from duo_workflow_service.tools.duo_base_tool import DuoBaseTool
 from duo_workflow_service.tools.gitlab_resource_input import ProjectResourceInput
 
@@ -113,6 +114,17 @@ class GetRepositoryFile(RepositoryFileBaseTool):
             if file_path is None:
                 return json.dumps({"error": "Missing file_path"})
 
+            # Check file exclusion policy if project is available
+            policy = FileExclusionPolicy(self.project)
+            if file_path and not policy.is_allowed(file_path):
+                return json.dumps(
+                    {
+                        "error": FileExclusionPolicy.format_llm_exclusion_message(
+                            [file_path]
+                        )
+                    }
+                )
+
             encoded_file_path = quote(file_path, safe="")
 
             response = await self.gitlab_client.aget(
@@ -133,6 +145,11 @@ class GetRepositoryFile(RepositoryFileBaseTool):
             return json.dumps({"error": str(e)})
 
     def format_display_message(self, args: RepositoryFileResourceInput) -> str:
+        # Check file exclusion policy for display message if project is available
+        policy = FileExclusionPolicy(self.project)
+        if args.file_path and not policy.is_allowed(args.file_path):
+            return FileExclusionPolicy.format_user_exclusion_message([args.file_path])
+
         if args.url:
             return f"Get repository file content from {args.url}"
         return f"Get repository file {args.file_path} from project {args.project_id} at ref {args.ref}"
@@ -177,3 +194,107 @@ class GetRepositoryFile(RepositoryFileBaseTool):
         except UnicodeError:
             # If we can't encode to UTF-8, it's likely binary
             return True
+
+
+class RepositoryTreeResourceInput(ProjectResourceInput):
+    path: Optional[str] = Field(
+        default=None,
+        description="Path inside repository. Used to get content of subdirectories",
+    )
+    ref: Optional[str] = Field(
+        default=None,
+        description="The name of a repository branch or tag or, if not given, the default branch",
+    )
+    recursive: Optional[bool] = Field(
+        default=False,
+        description="Boolean value for getting a recursive tree",
+    )
+    page: Optional[int] = Field(
+        default=1,
+        description="Page number for pagination (min 1)",
+        ge=1,
+    )
+    per_page: Optional[int] = Field(
+        default=20,
+        description="Results per page for pagination (min 1, max 100)",
+        ge=1,
+        le=100,
+    )
+
+
+class ListRepositoryTree(DuoBaseTool):
+    name: str = "list_repository_tree"
+    description: str = """List files and directories in a GitLab repository.
+
+    To identify a project you must provide either:
+    - project_id parameter, or
+    - A GitLab URL like:
+        - https://gitlab.com/namespace/project
+        - https://gitlab.com/group/subgroup/project
+
+    You can specify a path to get contents of a subdirectory, a specific ref (branch/tag),
+    and whether to get a recursive tree.
+
+    For example:
+    - Given project_id 13, the tool call would be:
+        list_repository_tree(project_id=13)
+    - To list files in a specific subdirectory with a specific branch:
+        list_repository_tree(project_id=13, path="src", ref="main")
+    - To recursively list all files in a project:
+        list_repository_tree(project_id=13, recursive=True)
+    """
+    args_schema: Type[BaseModel] = RepositoryTreeResourceInput  # type: ignore
+
+    async def _arun(self, **kwargs) -> str:
+        url = kwargs.get("url")
+        project_id = kwargs.get("project_id")
+
+        project_id, errors = self._validate_project_url(url, project_id)
+
+        if errors:
+            return json.dumps({"error": "; ".join(errors)})
+
+        params = {}
+        optional_params = ["path", "ref", "page", "per_page"]
+        for param in optional_params:
+            if param in kwargs and kwargs[param] is not None:
+                params[param] = kwargs[param]
+
+        recursive = kwargs.get("recursive", None)
+        if recursive is not None:
+            params["recursive"] = str(recursive).lower()
+
+        try:
+            response = await self.gitlab_client.aget(
+                path=f"/api/v4/projects/{project_id}/repository/tree",
+                params=params,
+            )
+
+            # Filter results based on file exclusion policy
+            policy = FileExclusionPolicy(self.project)
+
+            # Extract file paths from the response objects
+            file_paths: List[str] = [
+                item.get("path", "")
+                for item in response
+                if isinstance(item.get("path"), str)
+            ]
+            allowed_paths = policy.filter_allowed(file_paths)
+
+            # Filter the original response to only include allowed items
+            filtered_response = [
+                item for item in response if item.get("path") in allowed_paths
+            ]
+
+            return json.dumps({"tree": filtered_response})
+        except Exception as e:
+            return json.dumps({"error": str(e)})
+
+    def format_display_message(self, args: RepositoryTreeResourceInput) -> str:
+        path_str = f" in path '{args.path}'" if args.path else ""
+        ref_str = f" at ref '{args.ref}'" if args.ref else ""
+        recursive_str = " recursively" if args.recursive else ""
+
+        if args.url:
+            return f"List repository tree{recursive_str}{path_str}{ref_str} from {args.url}"
+        return f"List repository tree{recursive_str}{path_str}{ref_str} in project {args.project_id}"

@@ -13,15 +13,15 @@ from langchain_core.messages import (
 from pydantic import BaseModel
 
 from duo_workflow_service.entities.event import WorkflowEvent
-from duo_workflow_service.gitlab.gitlab_project import Project
+from duo_workflow_service.gitlab.gitlab_api import Namespace, Project
 from duo_workflow_service.token_counter.approximate_token_counter import (
     ApproximateTokenCounter,
 )
 from duo_workflow_service.workflows.type_definitions import AdditionalContext
 
-# max content tokens is 200K but adding a buffer of 5% just in case
-MAX_CONTEXT_TOKENS = int(200_000 * 0.95)
-MAX_SINGLE_MESSAGE_TOKENS = int(MAX_CONTEXT_TOKENS * 0.75)
+# max content tokens is 200K but adding a buffer of 10% just in case
+MAX_CONTEXT_TOKENS = int(200_000 * 0.90)
+MAX_SINGLE_MESSAGE_TOKENS = int(MAX_CONTEXT_TOKENS * 0.65)
 
 logger = structlog.stdlib.get_logger("workflow")
 
@@ -239,7 +239,7 @@ def _conversation_history_reducer(
                 msg for msg in all_messages if not isinstance(msg, SystemMessage)
             ]
 
-            fallback_messages = system_messages + non_system_messages[-10:]
+            fallback_messages = system_messages + non_system_messages[-5:]
             reduced[agent_name] = _restore_message_consistency(fallback_messages)
 
     return reduced
@@ -301,6 +301,7 @@ class WorkflowState(TypedDict):
     last_human_input: Union[WorkflowEvent, None]
     project: Project | None
     goal: str | None
+    additional_context: list[AdditionalContext] | None
 
 
 class ReplacementRule(BaseModel):
@@ -349,6 +350,7 @@ class ChatWorkflowState(TypedDict):
     ui_chat_log: Annotated[List[UiChatLog], _ui_chat_log_reducer]
     last_human_input: Union[WorkflowEvent, None]
     project: Project | None
+    namespace: Namespace | None
     approval: ApprovalStateRejection | None
 
 

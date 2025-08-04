@@ -25,16 +25,11 @@ MYPY_LINT_TODO_DIR ?= --exclude "ai_gateway/models/litellm.py" \
 	--exclude "ai_gateway/api/v2/code/completions.py" \
 	--exclude "ai_gateway/api/v2/code/model_provider_handlers.py" \
 	--exclude "ai_gateway/api/v3/code/completions.py" \
-	--exclude "ai_gateway/auth/gcp.py" \
 	--exclude "ai_gateway/code_suggestions/completions.py" \
 	--exclude "ai_gateway/code_suggestions/generations.py" \
 	--exclude "ai_gateway/code_suggestions/processing/ops.py" \
-	--exclude "ai_gateway/config.py" \
 	--exclude "ai_gateway/instrumentators/model_requests.py" \
 	--exclude "ai_gateway/integrations/amazon_q/test_chat.py" \
-	--exclude "duo_workflow_service/tools/mcp_tools.py" \
-	--exclude "scripts/generate_dws_change_patterns.py" \
-	--exclude "scripts/generate_graph_docs.py" \
 	--exclude "tests/code_suggestions/test_completions.py" \
 	--exclude "tests/code_suggestions/test_container.py"
 
@@ -118,8 +113,17 @@ gen-proto-node: bin/protoc
 		@(cd clients/node; npm run after_generate)
 
 tmp/protoc-${PROTOC_VERSION}/bin/protoc:
-	wget https://github.com/protocolbuffers/protobuf/releases/download/v$(PROTOC_VERSION)/protoc-$(PROTOC_VERSION)-$(OS)-$(ARCH).zip -O tmp/protoc-$(PROTOC_VERSION)-$(OS)-$(ARCH).zip
-	unzip tmp/protoc-${PROTOC_VERSION}-$(OS)-$(ARCH).zip "bin/protoc" -d tmp/protoc-${PROTOC_VERSION}
+	$(eval URL := https://github.com/protocolbuffers/protobuf/releases/download/v$(PROTOC_VERSION)/protoc-$(PROTOC_VERSION)-$(OS)-$(ARCH).zip)
+	$(eval ZIP := tmp/protoc-$(PROTOC_VERSION)-$(OS)-$(ARCH).zip)
+	@if command -v wget >/dev/null 2>&1; then \
+		wget $(URL) -O $(ZIP); \
+		elif command -v curl >/dev/null 2>&1; then \
+		curl -L $(URL) -o $(ZIP); \
+		else \
+		echo "Error: Neither wget nor curl found"; exit 1; \
+		fi
+
+	unzip $(ZIP) "bin/protoc" -d tmp/protoc-${PROTOC_VERSION}
 
 bin/protoc: tmp/protoc-${PROTOC_VERSION}/bin/protoc
 	cp tmp/protoc-${PROTOC_VERSION}/bin/protoc bin/protoc

@@ -9,8 +9,8 @@ import pytest
 from lints import file_naming_for_tests
 
 
-@pytest.fixture
-def node():
+@pytest.fixture(name="node")
+def node_fixture():
     node = astroid.extract_node("def test():\n  pass")
     node.file = f"{os.getcwd()}/tests/path/to/test_filename.py"
     return node
@@ -60,7 +60,7 @@ class TestFileNamingForTests(pylint.testutils.CheckerTestCase):
     def test_excluded_file(self, mock_is_file, node):
         """Test that excluded files don't trigger the warning."""
 
-        node.file = f"{os.getcwd()}/tests/test_structured_log.py"
+        node.file = f"{os.getcwd()}/tests/code_suggestions/test_engine.py"
 
         with self.assertNoMessages():
             mock_is_file.return_value = False

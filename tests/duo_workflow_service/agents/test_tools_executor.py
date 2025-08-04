@@ -57,12 +57,14 @@ def mock_tool(
 
 
 @pytest.fixture(autouse=True)
-def prepare_container(mock_container):  # pylint: disable=unused-argument
+def prepare_container(
+    mock_duo_workflow_service_container,
+):  # pylint: disable=unused-argument
     pass
 
 
-@pytest.fixture
-def all_tools() -> dict[str, ToolType]:
+@pytest.fixture(name="all_tools")
+def all_tools_fixture() -> dict[str, ToolType]:
     return {
         "set_task_status": SetTaskStatus(),
         "add_new_task": AddNewTask(),
@@ -72,16 +74,16 @@ def all_tools() -> dict[str, ToolType]:
     }
 
 
-@pytest.fixture
-def toolset(all_tools: dict[str, ToolType]) -> Toolset:
+@pytest.fixture(name="toolset")
+def toolset_fixture(all_tools: dict[str, ToolType]) -> Toolset:
     return Toolset(
         pre_approved=set(),
         all_tools=all_tools,
     )
 
 
-@pytest.fixture
-def tools_executor(toolset: Toolset) -> ToolsExecutor:
+@pytest.fixture(name="tools_executor")
+def tools_executor_fixture(toolset: Toolset) -> ToolsExecutor:
     return ToolsExecutor(
         tools_agent_name="planner",
         toolset=toolset,
@@ -90,8 +92,8 @@ def tools_executor(toolset: Toolset) -> ToolsExecutor:
     )
 
 
-@pytest.fixture
-def graph(tools_executor: ToolsExecutor) -> Runnable:
+@pytest.fixture(name="graph")
+def graph_fixture(tools_executor: ToolsExecutor) -> Runnable:
     graph_builder = StateGraph(WorkflowState)
     graph_builder.add_node("exec", tools_executor.run)
     graph_builder.set_entry_point("exec")
@@ -100,13 +102,13 @@ def graph(tools_executor: ToolsExecutor) -> Runnable:
     return graph_builder.compile()
 
 
-@pytest.fixture
-def ui_chat_log():
+@pytest.fixture(name="ui_chat_log")
+def ui_chat_log_fixture():
     return []
 
 
-@pytest.fixture
-def mock_datetime(mock_now: datetime):
+@pytest.fixture(name="mock_datetime")
+def mock_datetime_fixture(mock_now: datetime):
     with patch("duo_workflow_service.agents.tools_executor.datetime") as mock:
         mock.now.return_value = mock_now
         mock.timezone = timezone
@@ -868,7 +870,9 @@ async def test_state_manipulation(
 )
 @pytest.mark.usefixtures("mock_datetime")
 @patch.dict(os.environ, {"DW_INTERNAL_EVENT__ENABLED": "true"})
+@patch("duo_workflow_service.agents.tools_executor.duo_workflow_metrics")
 async def test_run_error_handling(
+    mock_duo_workflow_metrics,
     workflow_state,
     *,
     tool_call,
@@ -911,6 +915,7 @@ async def test_run_error_handling(
                     property=mock_tool().name,
                     value="123",
                     error=str(tool_side_effect),
+                    error_type=type(tool_side_effect).__name__,
                 ),
                 category=workflow_type.value,
             ),
@@ -940,6 +945,13 @@ async def test_run_error_handling(
     assert tool_log["message_type"] == MessageTypeEnum.TOOL
     assert tool_log["content"].startswith(expected_log_prefix)
     assert tool_log["tool_info"] == expected_tool_info
+
+    mock_duo_workflow_metrics.count_agent_platform_tool_failure.assert_called_once_with(
+        flow_type=workflow_type.value,
+        tool_name=mock_tool().name,
+        failure_reason=type(tool_side_effect).__name__,
+    )
+
     tool.ainvoke.assert_called_once()
 
 

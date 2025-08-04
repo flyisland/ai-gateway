@@ -2,13 +2,14 @@
 import os
 from datetime import datetime, timezone
 from enum import StrEnum
-from typing import Any, List
+from typing import Any, List, override
 
 from langchain_core.messages import AIMessage, BaseMessage, HumanMessage
 from langgraph.checkpoint.memory import BaseCheckpointSaver
 from langgraph.graph import END, StateGraph
 from langgraph.types import Command
 
+from ai_gateway.model_metadata import current_model_metadata_context
 from duo_workflow_service.agents.chat_agent import ChatAgent
 from duo_workflow_service.agents.tools_executor import ToolsExecutor
 from duo_workflow_service.checkpointer.gitlab_workflow import WorkflowStatusEventEnum
@@ -25,7 +26,7 @@ from duo_workflow_service.tracking.errors import log_exception
 from duo_workflow_service.workflows.abstract_workflow import AbstractWorkflow
 from lib.feature_flags.context import FeatureFlag, is_feature_enabled
 
-MAX_TOKENS_TO_SAMPLE = 8192
+MAX_TOKENS_TO_SAMPLE = 16384
 DEBUG = os.getenv("DEBUG")
 MAX_MESSAGE_LENGTH = 200
 RECURSION_LIMIT = 500
@@ -52,6 +53,7 @@ CHAT_READ_ONLY_TOOLS = [
     "list_all_merge_request_notes",
     "list_merge_request_diffs",
     "gitlab_issue_search",
+    "gitlab_blob_search",
     "gitlab_merge_request_search",
     "gitlab_documentation_search",
     "read_file",
@@ -59,6 +61,7 @@ CHAT_READ_ONLY_TOOLS = [
     "list_dir",
     "find_files",
     "grep",
+    "list_repository_tree",
     "get_epic",
     "list_epics",
     "scan_directory_tree",
@@ -74,6 +77,7 @@ CHAT_READ_ONLY_TOOLS = [
     "list_instance_audit_events",
     "list_group_audit_events",
     "list_project_audit_events",
+    "get_current_user",
 ]
 
 
@@ -87,6 +91,7 @@ CHAT_GITLAB_MUTATION_TOOLS = [
     "create_epic",
     "update_epic",
     "create_commit",
+    "dismiss_vulnerability",
 ]
 
 
@@ -145,14 +150,17 @@ class Workflow(AbstractWorkflow):
             ui_chat_log=[initial_ui_chat_log],
             last_human_input=None,
             project=self._project,
+            namespace=self._namespace,
             approval=None,
         )
 
     async def get_graph_input(self, goal: str, status_event: str) -> Any:
+        new_chat_message = goal
+
         match status_event:
             case WorkflowStatusEventEnum.START:
                 return self.get_workflow_state(goal)
-            case WorkflowStatusEventEnum.RESUME:
+            case _:
                 state_update: dict[str, Any] = {"status": WorkflowStatusEnum.EXECUTION}
                 next_step = "agent"
 
@@ -160,7 +168,10 @@ class Workflow(AbstractWorkflow):
                     case "approval":
                         next_step = "run_tools"
                     case "rejection":
-                        state_update["approval"] = ApprovalStateRejection(message=self._approval.rejection.message)  # type: ignore
+                        new_chat_message = self._approval.rejection.message  # type: ignore
+                        state_update["approval"] = ApprovalStateRejection(
+                            message=new_chat_message
+                        )
                     case _:
                         state_update["conversation_history"] = {
                             self._agent.name: [
@@ -173,21 +184,20 @@ class Workflow(AbstractWorkflow):
                             ]
                         }
 
-                new_message_chat_log = UiChatLog(
-                    message_type=MessageTypeEnum.USER,
-                    message_sub_type=None,
-                    content=goal,
-                    timestamp=datetime.now(timezone.utc).isoformat(),
-                    status=ToolStatus.SUCCESS,
-                    correlation_id=None,
-                    tool_info=None,
-                    additional_context=self._additional_context,
-                )
-                state_update["ui_chat_log"] = [new_message_chat_log]
+                if new_chat_message and new_chat_message != "null":
+                    new_message_chat_log = UiChatLog(
+                        message_type=MessageTypeEnum.USER,
+                        message_sub_type=None,
+                        content=new_chat_message,
+                        timestamp=datetime.now(timezone.utc).isoformat(),
+                        status=ToolStatus.SUCCESS,
+                        correlation_id=None,
+                        tool_info=None,
+                        additional_context=self._additional_context,
+                    )
+                    state_update["ui_chat_log"] = [new_message_chat_log]
 
                 return Command(goto=next_step, update=state_update)
-            case _:
-                return None
 
     def _compile(
         self,
@@ -206,12 +216,11 @@ class Workflow(AbstractWorkflow):
         tools = self._get_tools()
         agents_toolset = tools_registry.toolset(tools)
 
-        # TODO: Specify model metadata for model switching and custom model support
         self._agent: ChatAgent = self._prompt_registry.get_on_behalf(  # type: ignore[assignment]
             user=self._user,
             prompt_id="chat/agent",
             prompt_version="^1.0.0",
-            model_metadata=None,
+            model_metadata=current_model_metadata_context.get(),
             internal_event_category=__name__,
             tools=agents_toolset.bindable,  # type: ignore[arg-type]
         )
@@ -247,12 +256,13 @@ class Workflow(AbstractWorkflow):
         if is_feature_enabled(FeatureFlag.DUO_WORKFLOW_WEB_CHAT_MUTATION_TOOLS):
             available_tools += CHAT_GITLAB_MUTATION_TOOLS
 
-        if self._workflow_config.get("mcp_enabled", False):
-            available_tools += [tool.name for tool in self._additional_tools]
-
         return available_tools
 
     async def _handle_workflow_failure(
         self, error: BaseException, compiled_graph: Any, graph_config: Any
     ):
         log_exception(error, extra={"workflow_id": self._workflow_id})
+
+    @override
+    def _support_namespace_level_workflow(self) -> bool:
+        return True

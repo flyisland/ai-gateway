@@ -4,13 +4,14 @@ from pydantic import ValidationError
 
 from duo_workflow_service.agent_platform.experimental.state import (
     FlowState,
-    FlowStatusEnum,
     IOKey,
+    IOKeyTemplate,
     create_nested_dict,
     get_vars_from_state,
     merge_nested_dict,
     merge_nested_dict_reducer,
 )
+from duo_workflow_service.entities.state import WorkflowStatusEnum
 
 
 class TestMergeNestedDict:
@@ -161,35 +162,9 @@ class TestCreateNestedDict:
         expected = {"outer": {"inner": {"nested": "object", "list": [1, 2, 3]}}}
         assert result == expected
 
-    def test_create_nested_dict_single_level(self):
-        """Test creating nested dict with just one level."""
-        keys = ["root"]
-        value = [1, 2, 3, 4]
-
-        result = create_nested_dict(keys, value)
-        assert result == {"root": [1, 2, 3, 4]}
-
 
 class TestIOKey:
     """Test IOKey class functionality."""
-
-    def test_iokey_creation_simple_target(self):
-        """Test creating IOKey with simple target."""
-        io_key = IOKey(target="status")
-        assert io_key.target == "status"
-        assert io_key.subkeys is None
-
-    def test_iokey_creation_with_subkeys(self):
-        """Test creating IOKey with subkeys."""
-        io_key = IOKey(target="context", subkeys=["project", "name"])
-        assert io_key.target == "context"
-        assert io_key.subkeys == ["project", "name"]
-
-    def test_iokey_creation_empty_subkeys(self):
-        """Test creating IOKey with empty subkeys list."""
-        io_key = IOKey(target="context", subkeys=[])
-        assert io_key.target == "context"
-        assert len(io_key.subkeys) == 0
 
     def test_iokey_parse_key_simple(self):
         """Test parsing simple key without subkeys."""
@@ -203,17 +178,41 @@ class TestIOKey:
         assert io_key.target == "context"
         assert io_key.subkeys == ["project", "name"]
 
-    def test_iokey_parse_key_single_subkey(self):
-        """Test parsing key with single subkey."""
-        io_key = IOKey.parse_key("context:user")
-        assert io_key.target == "context"
-        assert io_key.subkeys == ["user"]
-
-    def test_iokey_parse_key_deep_nesting(self):
+    def test_iokey_parse_key_advanced_syntax(self):
         """Test parsing key with deep nesting."""
-        io_key = IOKey.parse_key("context:project.config.database.host")
+        io_key = IOKey.parse_key(
+            {"from": "context:project.config.database.host", "as": "db_host"}
+        )
         assert io_key.target == "context"
         assert io_key.subkeys == ["project", "config", "database", "host"]
+        assert io_key.alias == "db_host"
+
+    def test_iokey_parse_key_advanced_syntax_epty_alias(self):
+        """Test parsing key with deep nesting."""
+        io_key = IOKey.parse_key(
+            {"from": "context:project.config.database.host", "as": ""}
+        )
+        assert io_key.target == "context"
+        assert io_key.subkeys == ["project", "config", "database", "host"]
+        assert io_key.alias == ""
+
+    def test_iokey_parse_key_advanced_syntax_none_alias(self):
+        """Test parsing key with deep nesting."""
+        io_key = IOKey.parse_key(
+            {"from": "context:project.config.database.host", "as": None}
+        )
+        assert io_key.target == "context"
+        assert io_key.subkeys == ["project", "config", "database", "host"]
+        assert io_key.alias is None
+
+    def test_iokey_parse_key_advanced_syntax_none_from(self):
+        """Test parsing key with deep nesting."""
+        with pytest.raises(ValidationError) as exc_info:
+            IOKey.parse_key({"as": None})
+
+        assert "_AliasedIOKeyConfig\nfrom\n  Field required [type=missing" in str(
+            exc_info.value
+        )
 
     def test_iokey_parse_keys_multiple(self):
         """Test parsing multiple keys at once."""
@@ -229,26 +228,28 @@ class TestIOKey:
         assert io_keys[2].subkeys is None
 
     @pytest.mark.parametrize(
-        "target,subkeys,state_data,expected_result",
+        "target,subkeys,alias,state_data,expected_result",
         [
             # Simple target without subkeys
             (
                 "status",
                 None,
+                None,
                 {
-                    "status": FlowStatusEnum.PLANNING,
+                    "status": WorkflowStatusEnum.PLANNING,
                     "conversation_history": {},
                     "ui_chat_log": [],
                     "context": {},
                 },
-                {"status": FlowStatusEnum.PLANNING},
+                {"status": WorkflowStatusEnum.PLANNING},
             ),
             # Nested value using subkeys
             (
                 "context",
                 ["project", "name"],
+                None,
                 {
-                    "status": FlowStatusEnum.PLANNING,
+                    "status": WorkflowStatusEnum.PLANNING,
                     "conversation_history": {},
                     "ui_chat_log": [],
                     "context": {
@@ -261,8 +262,9 @@ class TestIOKey:
             (
                 "context",
                 ["project", "config", "database", "host"],
+                None,
                 {
-                    "status": FlowStatusEnum.PLANNING,
+                    "status": WorkflowStatusEnum.PLANNING,
                     "conversation_history": {},
                     "ui_chat_log": [],
                     "context": {
@@ -277,8 +279,9 @@ class TestIOKey:
             (
                 "context",
                 [],
+                None,
                 {
-                    "status": FlowStatusEnum.PLANNING,
+                    "status": WorkflowStatusEnum.PLANNING,
                     "conversation_history": {},
                     "ui_chat_log": [],
                     "context": {"key": "value"},
@@ -289,8 +292,9 @@ class TestIOKey:
             (
                 "context",
                 None,
+                None,
                 {
-                    "status": FlowStatusEnum.PLANNING,
+                    "status": WorkflowStatusEnum.PLANNING,
                     "conversation_history": {},
                     "ui_chat_log": [],
                     "context": {"key": "value"},
@@ -301,8 +305,9 @@ class TestIOKey:
             (
                 "context",
                 ["flow", "metadata", "tags"],
+                None,
                 {
-                    "status": FlowStatusEnum.PLANNING,
+                    "status": WorkflowStatusEnum.PLANNING,
                     "conversation_history": {},
                     "ui_chat_log": [],
                     "context": {
@@ -320,6 +325,32 @@ class TestIOKey:
                 },
                 {"tags": ["important", "urgent"]},
             ),
+            # Target with alias
+            (
+                "status",
+                None,
+                "current_status",
+                {
+                    "status": WorkflowStatusEnum.PLANNING,
+                    "conversation_history": {},
+                    "ui_chat_log": [],
+                    "context": {},
+                },
+                {"current_status": WorkflowStatusEnum.PLANNING},
+            ),
+            # Target with empty string alias
+            (
+                "status",
+                None,
+                "",
+                {
+                    "status": WorkflowStatusEnum.PLANNING,
+                    "conversation_history": {},
+                    "ui_chat_log": [],
+                    "context": {},
+                },
+                {"status": WorkflowStatusEnum.PLANNING},
+            ),
         ],
         ids=[
             "simple_target",
@@ -328,14 +359,16 @@ class TestIOKey:
             "empty_subkeys_list",
             "none_subkeys",
             "complex_nested_object",
+            "advanced_syntax_with_alias",
+            "advanced_syntax_with_empty_string_alias",
         ],
     )
     def test_iokey_template_variable_from_state(
-        self, target, subkeys, state_data, expected_result
+        self, target, subkeys, alias, state_data, expected_result
     ):
         """Test reading values from state using template_variable_from_state method."""
         state: FlowState = state_data
-        io_key = IOKey(target=target, subkeys=subkeys)
+        io_key = IOKey(target=target, subkeys=subkeys, alias=alias)
         result = io_key.template_variable_from_state(state)
 
         assert result == expected_result
@@ -348,7 +381,7 @@ class TestIOKey:
                 "conversation_history",
                 ["main"],
                 {
-                    "status": FlowStatusEnum.PLANNING,
+                    "status": WorkflowStatusEnum.PLANNING,
                     "conversation_history": {
                         "main": [
                             SystemMessage(content="System prompt"),
@@ -388,19 +421,19 @@ class TestIOKey:
                 "status",
                 None,
                 {
-                    "status": FlowStatusEnum.PLANNING,
+                    "status": WorkflowStatusEnum.PLANNING,
                     "conversation_history": {},
                     "ui_chat_log": [],
                     "context": {},
                 },
-                FlowStatusEnum.PLANNING,
+                WorkflowStatusEnum.PLANNING,
             ),
             # Nested value using subkeys
             (
                 "context",
                 ["project", "name"],
                 {
-                    "status": FlowStatusEnum.PLANNING,
+                    "status": WorkflowStatusEnum.PLANNING,
                     "conversation_history": {},
                     "ui_chat_log": [],
                     "context": {
@@ -414,7 +447,7 @@ class TestIOKey:
                 "context",
                 ["project", "config", "database", "host"],
                 {
-                    "status": FlowStatusEnum.PLANNING,
+                    "status": WorkflowStatusEnum.PLANNING,
                     "conversation_history": {},
                     "ui_chat_log": [],
                     "context": {
@@ -430,7 +463,7 @@ class TestIOKey:
                 "context",
                 [],
                 {
-                    "status": FlowStatusEnum.PLANNING,
+                    "status": WorkflowStatusEnum.PLANNING,
                     "conversation_history": {},
                     "ui_chat_log": [],
                     "context": {"key": "value"},
@@ -442,7 +475,7 @@ class TestIOKey:
                 "context",
                 None,
                 {
-                    "status": FlowStatusEnum.PLANNING,
+                    "status": WorkflowStatusEnum.PLANNING,
                     "conversation_history": {},
                     "ui_chat_log": [],
                     "context": {"key": "value"},
@@ -454,7 +487,7 @@ class TestIOKey:
                 "context",
                 ["project", "config", "database", "port"],
                 {
-                    "status": FlowStatusEnum.PLANNING,
+                    "status": WorkflowStatusEnum.PLANNING,
                     "conversation_history": {},
                     "ui_chat_log": [],
                     "context": {
@@ -470,7 +503,7 @@ class TestIOKey:
                 "context",
                 ["project", "config", "debug"],
                 {
-                    "status": FlowStatusEnum.PLANNING,
+                    "status": WorkflowStatusEnum.PLANNING,
                     "conversation_history": {},
                     "ui_chat_log": [],
                     "context": {
@@ -489,7 +522,7 @@ class TestIOKey:
                 "context",
                 ["flow", "metadata"],
                 {
-                    "status": FlowStatusEnum.PLANNING,
+                    "status": WorkflowStatusEnum.PLANNING,
                     "conversation_history": {},
                     "ui_chat_log": [],
                     "context": {
@@ -533,7 +566,7 @@ class TestIOKey:
     def test_get_vars_from_state_multiple_keys(self):
         """Test extracting variables from state using multiple IOKeys."""
         state: FlowState = {
-            "status": FlowStatusEnum.EXECUTION,
+            "status": WorkflowStatusEnum.EXECUTION,
             "conversation_history": {"main": [HumanMessage(content="Hello")]},
             "ui_chat_log": [],
             "context": {"project": {"name": "test-project"}, "user": {"id": 123}},
@@ -547,14 +580,14 @@ class TestIOKey:
 
         variables = get_vars_from_state(io_keys, state)
 
-        assert variables["status"] == FlowStatusEnum.EXECUTION
+        assert variables["status"] == WorkflowStatusEnum.EXECUTION
         assert variables["name"] == "test-project"
         assert variables["id"] == 123
 
     def test_get_vars_from_state_overlapping_keys(self):
         """Test extracting variables with overlapping key names."""
         state: FlowState = {
-            "status": FlowStatusEnum.EXECUTION,
+            "status": WorkflowStatusEnum.EXECUTION,
             "conversation_history": {},
             "ui_chat_log": [],
             "context": {
@@ -577,7 +610,7 @@ class TestIOKey:
         """Test edge cases for IOKey functionality."""
         # Test with special characters in keys
         state: FlowState = {
-            "status": FlowStatusEnum.PLANNING,
+            "status": WorkflowStatusEnum.PLANNING,
             "conversation_history": {},
             "ui_chat_log": [],
             "context": {
@@ -772,6 +805,121 @@ class TestIOKeyModelValidations:
             io_key.subkeys = ["different", "keys"]
 
 
+class TestIOKeyTemplate:
+    """Test IOKeyTemplate class functionality."""
+
+    def test_iokey_template_creation_simple_target(self):
+        """Test creating IOKeyTemplate with simple target."""
+        template = IOKeyTemplate(target="status")
+        assert template.target == "status"
+        assert template.subkeys is None
+
+    def test_iokey_template_creation_with_subkeys(self):
+        """Test creating IOKeyTemplate with subkeys."""
+        template = IOKeyTemplate(target="context", subkeys=["project", "name"])
+        assert template.target == "context"
+        assert template.subkeys == ["project", "name"]
+
+    def test_iokey_template_creation_with_template_placeholder(self):
+        """Test creating IOKeyTemplate with template placeholder in subkeys."""
+        template = IOKeyTemplate(target="context", subkeys=["<name>", "config"])
+        assert template.target == "context"
+        assert template.subkeys == ["<name>", "config"]
+
+    def test_iokey_template_creation_multiple_placeholders(self):
+        """Test creating IOKeyTemplate with multiple template placeholders."""
+        template = IOKeyTemplate(
+            target="context", subkeys=["<name>", "<type>", "value"]
+        )
+        assert template.target == "context"
+        assert template.subkeys == ["<name>", "<type>", "value"]
+
+    def test_to_iokey_simple_replacement(self):
+        """Test converting template to IOKey with simple replacement."""
+        template = IOKeyTemplate(target="context", subkeys=["<name>", "config"])
+        replacements = {"<name>": "component1"}
+
+        io_key = template.to_iokey(replacements)
+
+        assert isinstance(io_key, IOKey)
+        assert io_key.target == "context"
+        assert io_key.subkeys == ["component1", "config"]
+
+    def test_to_iokey_multiple_replacements(self):
+        """Test converting template to IOKey with multiple replacements."""
+        template = IOKeyTemplate(
+            target="context", subkeys=["<name>", "<type>", "value"]
+        )
+        replacements = {"<name>": "component1", "<type>": "database"}
+
+        io_key = template.to_iokey(replacements)
+
+        assert isinstance(io_key, IOKey)
+        assert io_key.target == "context"
+        assert io_key.subkeys == ["component1", "database", "value"]
+
+    def test_to_iokey_no_replacements_needed(self):
+        """Test converting template to IOKey when no replacements are needed."""
+        template = IOKeyTemplate(target="context", subkeys=["project", "config"])
+        replacements = {"<name>": "component1"}
+
+        io_key = template.to_iokey(replacements)
+
+        assert isinstance(io_key, IOKey)
+        assert io_key.target == "context"
+        assert io_key.subkeys == ["project", "config"]
+
+    def test_to_iokey_partial_replacements(self):
+        """Test converting template to IOKey with partial replacements."""
+        template = IOKeyTemplate(
+            target="context", subkeys=["<name>", "config", "<type>"]
+        )
+        replacements = {"<name>": "component1"}  # Missing replacement for <type>
+
+        io_key = template.to_iokey(replacements)
+
+        assert isinstance(io_key, IOKey)
+        assert io_key.target == "context"
+        assert io_key.subkeys == [
+            "component1",
+            "config",
+            "<type>",
+        ]  # <type> remains unreplaced
+
+    def test_to_iokey_empty_replacements(self):
+        """Test converting template to IOKey with empty replacements dict."""
+        template = IOKeyTemplate(target="context", subkeys=["<name>", "config"])
+        replacements = {}
+
+        io_key = template.to_iokey(replacements)
+
+        assert isinstance(io_key, IOKey)
+        assert io_key.target == "context"
+        assert io_key.subkeys == ["<name>", "config"]  # No replacements made
+
+    def test_to_iokey_none_subkeys(self):
+        """Test converting template to IOKey when subkeys is None."""
+        template = IOKeyTemplate(target="status")
+        replacements = {"<name>": "component1"}
+
+        io_key = template.to_iokey(replacements)
+
+        assert isinstance(io_key, IOKey)
+        assert io_key.target == "status"
+        assert io_key.subkeys is None
+
+    def test_to_iokey_extra_replacements(self):
+        """Test converting template to IOKey with extra replacements that aren't used."""
+        template = IOKeyTemplate(target="context", subkeys=["<name>", "config"])
+        replacements = {"<name>": "component1", "<unused>": "value", "<extra>": "data"}
+
+        io_key = template.to_iokey(replacements)
+
+        assert isinstance(io_key, IOKey)
+        assert io_key.target == "context"
+        assert io_key.subkeys == ["component1", "config"]
+
+
 class TestIntegration:
     """Integration tests for the state module."""
 
@@ -779,7 +927,7 @@ class TestIntegration:
         """Test a complete workflow of state manipulation."""
         # Create initial state
         initial_state: FlowState = {
-            "status": FlowStatusEnum.NOT_STARTED,
+            "status": WorkflowStatusEnum.NOT_STARTED,
             "conversation_history": {},
             "ui_chat_log": [],
             "context": {},
@@ -795,7 +943,7 @@ class TestIntegration:
         # Update state
         updated_state = initial_state.copy()
         updated_state["context"] = updated_context
-        updated_state["status"] = FlowStatusEnum.PLANNING
+        updated_state["status"] = WorkflowStatusEnum.PLANNING
 
         # Extract variables
         variables = get_vars_from_state(io_keys, updated_state)
@@ -803,7 +951,7 @@ class TestIntegration:
         # Verify results
         assert variables["step"] == 1
         assert variables["name"] == "initialization"
-        assert updated_state["status"] == FlowStatusEnum.PLANNING
+        assert updated_state["status"] == WorkflowStatusEnum.PLANNING
         assert updated_state["context"]["flow"]["step"] == 1
 
     def test_io_key_parsing_and_variable_extraction(self):

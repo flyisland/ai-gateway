@@ -25,16 +25,16 @@ class TestGetMessageSource:
         mock_ast.body[0].template.value = template_path
         return mock_ast
 
-    @pytest.fixture
-    def mock_system_ast(self):
+    @pytest.fixture(name="mock_system_ast")
+    def mock_system_ast_fixture(self):
         return self.mock_ast("chat/explain_code/system/1.0.0.jinja")
 
-    @pytest.fixture
-    def mock_user_ast(self):
+    @pytest.fixture(name="mock_user_ast")
+    def mock_user_ast_fixture(self):
         return self.mock_ast("chat/explain_code/user/1.0.0.jinja")
 
-    @pytest.fixture
-    def mock_env(self, mock_system_ast, mock_user_ast):
+    @pytest.fixture(name="mock_env")
+    def mock_env_fixture(self, mock_system_ast, mock_user_ast):
         def parse_side_effect(template_str):
             if "system" in template_str:
                 return mock_system_ast
@@ -47,8 +47,8 @@ class TestGetMessageSource:
 
             yield mock_env
 
-    @pytest.fixture
-    def mock_loader(self, mock_env, mock_user_ast):
+    @pytest.fixture(name="mock_loader")
+    def mock_loader_fixture(self, mock_env, mock_user_ast):
         mock_loader = MagicMock()
         mock_env.loader = mock_loader
         mock_env.parse.return_value = mock_user_ast
@@ -237,45 +237,54 @@ class TestGetPromptSource:
 
 
 class TestCreateLangsmithClient:
-    # pylint: disable=direct-environment-variable-reference
-    @patch.dict(os.environ, {}, clear=True)
     def test_create_langsmith_client_missing_api_key(self):
-        with pytest.raises(Exception):
-            create_langsmith_client()
+        # pylint: disable=direct-environment-variable-reference
+        with patch.dict(os.environ, {}, clear=True):
+            with pytest.raises(Exception):
+                create_langsmith_client()
+        # pylint: enable=direct-environment-variable-reference
 
-    @patch.dict(os.environ, {"LANGCHAIN_API_KEY": "test_key"})
     @patch("eval.generate_dataset.Client")
     def test_create_langsmith_client_success(self, mock_client_class):
         mock_client = Mock(spec=Client)
         mock_client_class.return_value = mock_client
 
-        result = create_langsmith_client()
+        # pylint: disable=direct-environment-variable-reference
+        with patch.dict(
+            os.environ,
+            {"LANGCHAIN_API_KEY": "test_key", "LANGCHAIN_TRACING_V2": "true"},
+        ):
+            result = create_langsmith_client()
+        # pylint: enable=direct-environment-variable-reference
 
         assert result == mock_client
         mock_client_class.assert_called_once_with(api_key="test_key")
 
-    @patch.dict(os.environ, {"LANGCHAIN_API_KEY": "test_key"})
     @patch("eval.generate_dataset.Client")
     def test_create_langsmith_client_error(self, mock_client_class):
         mock_client_class.side_effect = Exception("Connection error")
 
-        with pytest.raises(Exception):
-            create_langsmith_client()
-
-    # pylint: enable=direct-environment-variable-reference
+        # pylint: disable=direct-environment-variable-reference
+        with patch.dict(
+            os.environ,
+            {"LANGCHAIN_API_KEY": "test_key", "LANGCHAIN_TRACING_V2": "true"},
+        ):
+            with pytest.raises(Exception):
+                create_langsmith_client()
+        # pylint: enable=direct-environment-variable-reference
 
 
 class TestRun:
-    @pytest.fixture
-    def mock_container_application(self):
+    @pytest.fixture(name="mock_container_application")
+    def mock_container_application_fixture(self):
         with patch(
             "eval.generate_dataset.ContainerApplication"
         ) as mock_container_class:
-            mock_container = Mock()
-            mock_container_class.return_value = mock_container
+            mock_ai_gateway_container = Mock()
+            mock_container_class.return_value = mock_ai_gateway_container
             mock_config = Mock()
-            mock_container.config = mock_config
-            yield mock_container
+            mock_ai_gateway_container.config = mock_config
+            yield mock_ai_gateway_container
 
     @patch("eval.generate_dataset.LangGraphAdapter")
     @patch("eval.generate_dataset.DatasetGenerator")
@@ -405,16 +414,19 @@ class TestRun:
         mock_generator = Mock(spec=DatasetGenerator)
         mock_dataset_generator_class.return_value = mock_generator
 
-        run(
-            prompt_id=prompt_id,
-            prompt_version=prompt_version,
-            dataset_name=dataset_name,
-            output_dir=output_dir,
-            num_examples=5,
-            temperature=0.5,
-            upload=True,
-            description=description,
-        )
+        # pylint: disable=direct-environment-variable-reference
+        with patch.dict(os.environ, {"LANGCHAIN_TRACING_V2": "true"}):
+            run(
+                prompt_id=prompt_id,
+                prompt_version=prompt_version,
+                dataset_name=dataset_name,
+                output_dir=output_dir,
+                num_examples=5,
+                temperature=0.5,
+                upload=True,
+                description=description,
+            )
+        # pylint: enable=direct-environment-variable-reference
 
         mock_create_client.assert_called_once()
         mock_prompt_config_class.from_source.assert_called_once_with(mock_prompt_source)

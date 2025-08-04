@@ -31,12 +31,14 @@ from duo_workflow_service.agents.prompts import (
     HANDOVER_TOOL_NAME,
 )
 from duo_workflow_service.components import (
-    GoalDisambiguationComponent,
     PlanApprovalComponent,
     ToolsApprovalComponent,
     ToolsRegistry,
 )
 from duo_workflow_service.components.executor.component import ExecutorComponent
+from duo_workflow_service.components.goal_disambiguation import (
+    GoalDisambiguationComponent,
+)
 from duo_workflow_service.components.planner.component import PlannerComponent
 from duo_workflow_service.entities import (
     MessageTypeEnum,
@@ -53,7 +55,7 @@ from lib.feature_flags.context import FeatureFlag, is_feature_enabled
 
 # Constants
 QUEUE_MAX_SIZE = 1
-MAX_TOKENS_TO_SAMPLE = 8192
+MAX_TOKENS_TO_SAMPLE = 16384
 RECURSION_LIMIT = 300
 DEBUG = os.getenv("DEBUG")
 MAX_MESSAGES_TO_DISPLAY = 5
@@ -64,6 +66,7 @@ EXECUTOR_TOOLS = [
     "list_issues",
     "get_issue",
     "update_issue",
+    "dismiss_vulnerability",
     "create_issue_note",
     "create_merge_request_note",
     "list_issue_notes",
@@ -77,6 +80,7 @@ EXECUTOR_TOOLS = [
     "list_all_merge_request_notes",
     "list_merge_request_diffs",
     "gitlab_issue_search",
+    "gitlab_blob_search",
     "gitlab_merge_request_search",
     "run_command",
     "read_file",
@@ -122,6 +126,7 @@ CONTEXT_BUILDER_TOOLS = [
     "list_all_merge_request_notes",
     "list_merge_request_diffs",
     "gitlab_issue_search",
+    "gitlab_blob_search",
     "gitlab_merge_request_search",
     "read_file",
     "find_files",
@@ -215,10 +220,7 @@ class Workflow(AbstractWorkflow):
         last_node_name = self._add_context_builder_nodes(graph, goal, tools_registry)
         disambiguation_component = GoalDisambiguationComponent(
             goal=goal,
-            model=create_chat_model(
-                max_tokens=MAX_TOKENS_TO_SAMPLE,
-                config=self._model_config,
-            ),
+            model_config=self._model_config,
             http_client=self._http_client,
             workflow_id=self._workflow_id,
             tools_registry=tools_registry,
@@ -235,6 +237,7 @@ class Workflow(AbstractWorkflow):
         graph.add_edge(last_node_name, disambiguation_entry_node)
 
         planner_component = PlannerComponent(
+            user=self._user,
             workflow_id=self._workflow_id,
             workflow_type=self._workflow_type,
             planner_toolset=tools_registry.toolset(PLANNER_TOOLS),
@@ -242,7 +245,7 @@ class Workflow(AbstractWorkflow):
             tools_registry=tools_registry,
             model_config=self._model_config,
             goal=goal,
-            project=self._project,
+            project=self._project,  # type: ignore[arg-type]
             http_client=self._http_client,
         )
 
@@ -286,9 +289,10 @@ class Workflow(AbstractWorkflow):
             tools_registry=tools_registry,
             model_config=self._model_config,
             goal=goal,
-            project=self._project,
+            project=self._project,  # type: ignore[arg-type]
             http_client=self._http_client,
             additional_context=self._additional_context,
+            user=self._user,
         )
 
         executor_entry_node = executor_component.attach(
@@ -340,6 +344,7 @@ class Workflow(AbstractWorkflow):
             ui_chat_log=[initial_ui_chat_log],
             project=self._project,
             goal=goal,
+            additional_context=self._additional_context,
         )
 
     def _setup_context_builder(
@@ -371,9 +376,9 @@ class Workflow(AbstractWorkflow):
                 name="context_builder",
                 system_prompt=BUILD_CONTEXT_SYSTEM_MESSAGE.format(
                     handover_tool_name=HANDOVER_TOOL_NAME,
-                    project_id=self._project["id"],
-                    project_name=self._project["name"],
-                    project_url=self._project["http_url_to_repo"],
+                    project_id=self._project["id"],  # type: ignore[index]
+                    project_name=self._project["name"],  # type: ignore[index]
+                    project_url=self._project["http_url_to_repo"],  # type: ignore[index]
                 ),
                 toolset=context_builder_toolset,
                 workflow_id=self._workflow_id,

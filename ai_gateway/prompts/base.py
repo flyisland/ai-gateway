@@ -1,5 +1,5 @@
 from abc import ABC, abstractmethod
-from typing import Any, AsyncIterator, List, Mapping, Optional, Tuple, TypeVar, cast
+from typing import Any, AsyncIterator, List, Mapping, Optional, Sequence, TypeVar, cast
 
 from gitlab_cloud_connector import (
     CloudConnectorUser,
@@ -12,7 +12,8 @@ from langchain_core.callbacks import BaseCallbackHandler, get_usage_metadata_cal
 from langchain_core.language_models import BaseChatModel
 from langchain_core.messages.ai import UsageMetadata
 from langchain_core.prompt_values import PromptValue
-from langchain_core.prompts import ChatPromptTemplate, string
+from langchain_core.prompts import ChatPromptTemplate, MessagesPlaceholder, string
+from langchain_core.prompts.chat import MessageLikeRepresentation
 from langchain_core.prompts.string import DEFAULT_FORMATTER_MAPPING
 from langchain_core.runnables import Runnable, RunnableBinding, RunnableConfig
 from langchain_core.tools import BaseTool
@@ -97,6 +98,7 @@ class Prompt(RunnableBinding[Input, Output]):
         model_metadata: Optional[TypeModelMetadata] = None,
         disable_streaming: bool = False,
         tools: Optional[List[BaseTool]] = None,
+        tool_choice: Optional[str] = None,
         **kwargs: Any,
     ):
         model_override = None
@@ -105,8 +107,10 @@ class Prompt(RunnableBinding[Input, Output]):
         model = self._build_model(
             model_factory, config.model, disable_streaming, model_override
         )
+
         if tools and isinstance(model, BaseChatModel):
-            model = model.bind_tools(tools)  # type: ignore[assignment]
+            model = model.bind_tools(tools, tool_choice=tool_choice)  # type: ignore[assignment]
+
         prompt = self._build_prompt_template(config)
         chain = self._build_chain(
             cast(
@@ -175,7 +179,9 @@ class Prompt(RunnableBinding[Input, Output]):
         **kwargs: Optional[Any],
     ) -> Output:
         with (
-            self.instrumentator.watch(stream=False) as watcher,
+            self.instrumentator.watch(
+                stream=False, unit_primitives=self.unit_primitives
+            ) as watcher,
             get_usage_metadata_callback() as cb,
         ):
             result = await super().ainvoke(
@@ -198,7 +204,9 @@ class Prompt(RunnableBinding[Input, Output]):
         # To properly address this pylint issue, the upstream function would need to be altered to ensure proper cleanup.
         # See https://pylint.readthedocs.io/en/latest/user_guide/messages/warning/contextmanager-generator-missing-cleanup.html
         with (
-            self.instrumentator.watch(stream=True) as watcher,
+            self.instrumentator.watch(
+                stream=True, unit_primitives=self.unit_primitives
+            ) as watcher,
             get_usage_metadata_callback() as cb,
         ):
             # The usage metadata callback only totals the usage at the `on_llm_end` event, so we need to be able to
@@ -291,17 +299,19 @@ class Prompt(RunnableBinding[Input, Output]):
     # Assume that the prompt template keys map to roles. Subclasses can
     # override this method to implement more complex logic.
     @staticmethod
-    def _prompt_template_to_messages(tpl: dict[str, str]) -> list[Tuple[str, str]]:
-        return list(tpl.items())
+    def _prompt_template_to_messages(
+        tpl: dict[str, str],
+    ) -> Sequence[MessageLikeRepresentation]:
+        return [
+            MessagesPlaceholder(content) if role == "placeholder" else (role, content)
+            for role, content in tpl.items()
+        ]
 
     @classmethod
     def _build_prompt_template(
         cls, config: PromptConfig
     ) -> Runnable[Input, PromptValue]:
-        messages = []
-
-        for role, template in cls._prompt_template_to_messages(config.prompt_template):
-            messages.append((role, template))
+        messages = cls._prompt_template_to_messages(config.prompt_template)
 
         return cast(
             Runnable[Input, PromptValue],

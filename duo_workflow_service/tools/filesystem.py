@@ -1,11 +1,79 @@
 from enum import IntEnum
 from typing import Type
 
+import gitmatch
+from langchain.tools.base import ToolException
 from pydantic import BaseModel, Field
 
 from contract import contract_pb2
 from duo_workflow_service.executor.action import _execute_action
+from duo_workflow_service.policies.file_exclusion_policy import FileExclusionPolicy
 from duo_workflow_service.tools.duo_base_tool import DuoBaseTool
+
+# Security denylist of sensitive directories and files that should not be accessed
+DEFAULT_CONTEXT_EXCLUSIONS = gitmatch.compile(
+    [
+        ".config/nvim",
+        ".docker",
+        ".emacs.d",
+        ".env.*",
+        ".env",
+        ".git",
+        ".gitlab/duo",
+        ".gitlab/rules",
+        ".gnupg",
+        ".idea",
+        ".metadata",
+        ".settings",
+        ".ssh",
+        ".sublime-project",
+        ".sublime-workspace",
+        ".vim",
+        ".vimrc",
+        ".vscode",
+        "Dockerfile.secrets",
+        "!.env.example",
+    ]
+)
+
+
+def validate_duo_context_exclusions(file_path: str) -> None:
+    """Check if the given file path is in the managed Duo Context Exclusion denylist of sensitive paths or contains path
+    traversal attempts.
+
+    Args:
+        file_path: The file path to check
+
+    Raises:
+        ToolException: If the path is in the denylist or an invalid path.
+    """
+    if not file_path:
+        return
+
+    file_path = file_path.replace("\\", "/")
+    while file_path.startswith("./"):
+        file_path = file_path.replace("./", "", 1)
+    for pattern in ["../", "..\\", "%2e%2e", "%252e%252e", "\u002e\u002e"]:
+        if pattern in file_path:
+            raise ToolException(
+                f"Access denied: Cannot access '{file_path}' as it contains path traversal patterns"
+            )
+
+    try:
+        excluded = DEFAULT_CONTEXT_EXCLUSIONS.match(file_path)
+        if excluded is not None and bool(excluded):
+            raise ToolException(
+                f"Access denied: Cannot access '{file_path}' as it matches Duo Context Exclusion"
+                f" patterns. Path '{excluded.path}' matches excluded pattern: '{excluded.pattern}'."
+            )
+    except gitmatch.InvalidPathError as ex:
+        raise ToolException(
+            f"Access denied: Not accessing invalid path '{file_path}'. {str(ex)}"
+        )
+
+    if file_path != file_path.lower():
+        validate_duo_context_exclusions(file_path.lower())
+        return
 
 
 class ReadFileInput(BaseModel):
@@ -22,15 +90,55 @@ class ReadFile(DuoBaseTool):
 
     """
     args_schema: Type[BaseModel] = ReadFileInput  # type: ignore
+    handle_tool_error: bool = True
 
     async def _arun(self, file_path: str) -> str:
+        # Check file exclusion policy
+        if not FileExclusionPolicy.is_allowed_for_project(self.project, file_path):
+            return FileExclusionPolicy.format_llm_exclusion_message([file_path])
+
+        # Check path security before proceeding
+        validate_duo_context_exclusions(file_path)
+
         return await _execute_action(
             self.metadata,  # type: ignore
             contract_pb2.Action(runReadFile=contract_pb2.ReadFile(filepath=file_path)),
         )
 
     def format_display_message(self, args: ReadFileInput) -> str:
-        return "Read file"
+        msg = "Read file"
+        if not FileExclusionPolicy.is_allowed_for_project(self.project, args.file_path):
+            msg += FileExclusionPolicy.format_user_exclusion_message([args.file_path])
+
+        return msg
+
+
+class ReadFilesInput(BaseModel):
+    file_paths: list[str] = Field(description="List of file paths to read")
+
+
+class ReadFiles(DuoBaseTool):
+    name: str = "read_files"
+    description: str = """Read one or more files in a single operation.
+    """
+    args_schema: Type[BaseModel] = ReadFilesInput  # type: ignore
+    handle_tool_error: bool = True
+
+    async def _arun(self, file_paths: list[str]) -> str:
+        # Check path security for all files before proceeding
+        for file_path in file_paths:
+            validate_duo_context_exclusions(file_path)
+
+        return await _execute_action(
+            self.metadata,  # type: ignore
+            contract_pb2.Action(
+                runReadFiles=contract_pb2.ReadFiles(filepaths=file_paths)
+            ),
+        )
+
+    def format_display_message(self, args: ReadFilesInput) -> str:
+        file_count = len(args.file_paths)
+        return f"Read {file_count} file{'s' if file_count != 1 else ''}"
 
 
 class WriteFileInput(BaseModel):
@@ -46,8 +154,16 @@ class WriteFile(DuoBaseTool):
         "Create and write the given contents to a file. Please specify the `file_path` and the `contents` to write."
     )
     args_schema: Type[BaseModel] = WriteFileInput  # type: ignore
+    handle_tool_error: bool = True
 
     async def _arun(self, file_path: str, contents: str) -> str:
+        # Check file exclusion policy
+        if not FileExclusionPolicy.is_allowed_for_project(self.project, file_path):
+            return FileExclusionPolicy.format_llm_exclusion_message([file_path])
+
+        # Check path security before proceeding
+        validate_duo_context_exclusions(file_path)
+
         return await _execute_action(
             self.metadata,  # type: ignore
             contract_pb2.Action(
@@ -58,7 +174,11 @@ class WriteFile(DuoBaseTool):
         )
 
     def format_display_message(self, args: WriteFileInput) -> str:
-        return "Create file"
+        msg = "Create file"
+        if not FileExclusionPolicy.is_allowed_for_project(self.project, args.file_path):
+            msg += FileExclusionPolicy.format_user_exclusion_message([args.file_path])
+
+        return msg
 
 
 class FilesScopeEnum(IntEnum):
@@ -75,13 +195,30 @@ class FindFilesInput(BaseModel):
 
 class FindFiles(DuoBaseTool):
     name: str = "find_files"
-    description: str = """Find files, recursively, with names matching a specific pattern in the repository.
+    description: str = """Find files by name patterns (equivalent to 'find' command).
 
-It includes all files (tracked and untracked) and respects .gitignore rules.
+    **Primary use cases:**
+    - Find files by filename or extension patterns
+    - Locate specific files across the codebase
+    - Get list of files matching naming conventions
 
-This name_pattern uses the same syntax as `find --name` or `bash` filename expansion and matches are done against the
-full path relative to the project root.
-"""
+    **Replaces these commands:**
+    - find . -name "*.py" → find_files(name_pattern="*.py")
+    - find tests -name "test_*.js" → find_files(name_pattern="tests/test_*.js")
+    - find src -name "*.json" → find_files(name_pattern="src/*.json")
+
+    **Examples:**
+    - All Python files: find_files(name_pattern="*.py")
+    - Test files: find_files(name_pattern="test_*.py")
+    - Config files: find_files(name_pattern="*.json")
+    - Files in directory: find_files(name_pattern="src/*.js")
+
+    **Don't use this for:**
+    - Searching text content within files (use grep instead)
+    - Finding where functions/variables are used (use grep instead)
+
+    Uses bash filename expansion syntax. Searches recursively and respects .gitignore rules.
+    """
     args_schema: Type[BaseModel] = FindFilesInput  # type: ignore
 
     async def _arun(
@@ -97,7 +234,21 @@ full path relative to the project root.
             ),
         )
 
-        return result
+        # Filter results based on file exclusion policy
+        policy = FileExclusionPolicy(self.project)
+        lines = result.strip().split("\n") if result.strip() else []
+        allowed_files = policy.filter_allowed(lines)
+
+        # Build the response
+        response_parts = []
+        if allowed_files:
+            response_parts.append("\n".join(allowed_files))
+
+        return (
+            "\n\n".join(response_parts)
+            if response_parts
+            else _format_no_matches_message(name_pattern)
+        )
 
     def format_display_message(self, args: FindFilesInput) -> str:
         return f"Search files with pattern '{args.name_pattern}'"
@@ -115,6 +266,9 @@ full path relative to the project root.
 #     args_schema: Type[BaseModel] = MkdirInput  # type: ignore
 #
 #     async def _arun(self, directory_path: str) -> str:
+#         # Check path security before proceeding
+#         validate_duo_context_exclusions(directory_path)
+#
 #         if ".." in directory_path:
 #             return "Creating directories above the current directory is not allowed"
 #
@@ -219,8 +373,16 @@ Examples of batched file edits:
         new_str="# Changelog\n\n## 1.1.0\n- Bug fixes\n- Performance improvements\n\n## 1.0.0"
     )"""
     args_schema: Type[BaseModel] = EditFileInput  # type: ignore
+    handle_tool_error: bool = True
 
     async def _arun(self, file_path: str, old_str: str, new_str: str) -> str:
+        # Check file exclusion policy
+        if not FileExclusionPolicy.is_allowed_for_project(self.project, file_path):
+            return FileExclusionPolicy.format_llm_exclusion_message([file_path])
+
+        # Check path security before proceeding
+        validate_duo_context_exclusions(file_path)
+
         return await _execute_action(
             self.metadata,  # type: ignore
             contract_pb2.Action(
@@ -233,7 +395,11 @@ Examples of batched file edits:
         )
 
     def format_display_message(self, args: EditFileInput) -> str:
-        return "Edit file"
+        msg = "Edit file"
+        if not FileExclusionPolicy.is_allowed_for_project(self.project, args.file_path):
+            msg += FileExclusionPolicy.format_user_exclusion_message([args.file_path])
+
+        return msg
 
 
 class ListDirInput(BaseModel):
@@ -242,18 +408,59 @@ class ListDirInput(BaseModel):
 
 class ListDir(DuoBaseTool):
     name: str = "list_dir"
-    description: str = (
-        """Lists files and subdirectories in the given directory relative to the root of the project. Use this tool to check directory contents, verify if a directory exists, or explore the file structure."""
-    )
+    description: str = """List directory contents (equivalent to 'ls -la' command).
+
+    **Primary use cases:**
+    - See all files and subdirectories in a directory
+    - Check if files or directories exist
+    - Explore project structure and organization
+    - Get directory contents before reading specific files
+
+    **Replaces these commands:**
+    - ls -la → list_dir(directory=".")
+    - ls -l → list_dir(directory=".")
+    - ls → list_dir(directory=".")
+    - ls src/ → list_dir(directory="src/")
+    - ls -la tests/ → list_dir(directory="tests/")
+    - dir → list_dir(directory=".") (Windows equivalent)
+
+    **Examples:**
+    - List current directory: list_dir(directory=".")
+    - List source code: list_dir(directory="src/")
+    - Check if directory exists: list_dir(directory="tests/")
+    - Explore subdirectory: list_dir(directory="config/")
+
+    Shows files and subdirectories relative to the repository root.
+    Use this instead of trying to run 'ls' commands.
+    """
     args_schema: Type[BaseModel] = ListDirInput  # type: ignore
 
     async def _arun(self, directory: str) -> str:
-        return await _execute_action(
+        # Check file exclusion policy before executing action
+        if not FileExclusionPolicy.is_allowed_for_project(self.project, directory):
+            return FileExclusionPolicy.format_llm_exclusion_message([directory])
+
+        # Check path security before proceeding
+        validate_duo_context_exclusions(directory)
+
+        result = await _execute_action(
             self.metadata,  # type: ignore
             contract_pb2.Action(
                 listDirectory=contract_pb2.ListDirectory(directory=directory)
             ),
         )
+
+        # Filter results based on file exclusion policy
+        policy = FileExclusionPolicy(self.project)
+        lines = result.strip().split("\n") if result.strip() else []
+        allowed_files = policy.filter_allowed(lines)
+
+        # Build the response
+        response_parts = []
+        if allowed_files:
+            response_parts.append("\n".join(allowed_files))
+
+        return "\n\n".join(response_parts)
 
 
 def _format_no_matches_message(pattern, search_directory=None):

@@ -45,7 +45,14 @@ def test_configure_cache_enabled():
         assert cache is not None
 
 
-def test_run():
+@pytest.mark.parametrize(
+    "custom_models_enabled,should_validate_llm",
+    [
+        ("true", False),
+        ("false", True),
+    ],
+)
+def test_run(custom_models_enabled, should_validate_llm):
     with (
         patch("duo_workflow_service.server.setup_profiling") as mock_setup_profiling,
         patch(
@@ -57,6 +64,7 @@ def test_run():
             "duo_workflow_service.server.validate_llm_access"
         ) as mock_validate_llm_access,
         patch("asyncio.get_event_loop") as mock_get_loop,
+        patch.dict(os.environ, {"AIGW_CUSTOM_MODELS__ENABLED": custom_models_enabled}),
     ):
         mock_loop = MagicMock()
         mock_get_loop.return_value = mock_loop
@@ -66,8 +74,12 @@ def test_run():
         mock_setup_profiling.assert_called_once()
         mock_setup_error_tracking.assert_called_once()
         mock_setup_monitoring.assert_called_once()
-        mock_setup_logging.assert_called_once_with(json_format=True, to_file=None)
-        mock_validate_llm_access.assert_called_once()
+        mock_setup_logging.assert_called_once()
+
+        if should_validate_llm:
+            mock_validate_llm_access.assert_called_once()
+        else:
+            mock_validate_llm_access.assert_not_called()
 
         assert mock_loop.run_until_complete.call_count == 1
         actual_arg = mock_loop.run_until_complete.call_args[0][0]
@@ -184,7 +196,19 @@ async def test_workflow_is_cancelled_on_parent_task_cancellation(
 @pytest.mark.asyncio
 @patch("duo_workflow_service.server.AbstractWorkflow")
 @patch("duo_workflow_service.server.resolve_workflow_class")
-async def test_execute_workflow(mock_resolve_workflow, mock_abstract_workflow_class):
+@pytest.mark.parametrize(
+    ("unidirectional_streaming_enabled", "request_iterator_count"),
+    [
+        ("", 6),
+        ("enabled", 3),
+    ],
+)
+async def test_execute_workflow(
+    mock_resolve_workflow,
+    mock_abstract_workflow_class,
+    unidirectional_streaming_enabled,
+    request_iterator_count,
+):
     mock_workflow_instance = mock_abstract_workflow_class.return_value
     mock_workflow_instance.is_done = False
     mock_workflow_instance.run = AsyncMock()
@@ -209,13 +233,16 @@ async def test_execute_workflow(mock_resolve_workflow, mock_abstract_workflow_cl
     mock_resolve_workflow.return_value = mock_abstract_workflow_class
 
     async def mock_request_iterator() -> AsyncIterable[contract_pb2.ClientEvent]:
-        while True:
+        for _ in range(request_iterator_count):
             yield contract_pb2.ClientEvent(
                 startRequest=contract_pb2.StartWorkflowRequest(goal="test")
             )
 
     current_user.set(CloudConnectorUser(authenticated=True, is_debug=True))
     mock_context = MagicMock(spec=grpc.ServicerContext)
+    mock_context.invocation_metadata.return_value = [
+        ("x-gitlab-unidirectional-streaming", unidirectional_streaming_enabled),
+    ]
     servicer = DuoWorkflowService()
     result = servicer.ExecuteWorkflow(mock_request_iterator(), mock_context)
     assert isinstance(result, AsyncIterable)

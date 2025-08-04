@@ -59,8 +59,8 @@ URL_ERROR_CASES = [
 ]
 
 
-@pytest.fixture
-def merge_request_data():
+@pytest.fixture(name="merge_request_data")
+def merge_request_data_fixture():
     """Fixture for common merge request data."""
     return {
         "id": 1,
@@ -70,8 +70,8 @@ def merge_request_data():
     }
 
 
-@pytest.fixture
-def note_data():
+@pytest.fixture(name="note_data")
+def note_data_fixture():
     return {
         "id": 1,
         "body": "Test note",
@@ -80,13 +80,13 @@ def note_data():
     }
 
 
-@pytest.fixture
-def gitlab_client_mock():
+@pytest.fixture(name="gitlab_client_mock")
+def gitlab_client_mock_fixture():
     return Mock()
 
 
-@pytest.fixture
-def metadata(gitlab_client_mock):
+@pytest.fixture(name="metadata")
+def metadata_fixture(gitlab_client_mock):
     return {
         "gitlab_client": gitlab_client_mock,
         "gitlab_host": "gitlab.com",
@@ -171,8 +171,7 @@ async def test_create_merge_request(gitlab_client_mock, metadata):
     expected_response = json.dumps(
         {
             "status": "success",
-            "data": expected_data,
-            "response": '{"id": 1, "title": "New Feature", "source_branch": "feature", "target_branch": "main"}',
+            "merge_request": '{"id": 1, "title": "New Feature", "source_branch": "feature", "target_branch": "main"}',
         }
     )
 
@@ -231,12 +230,7 @@ async def test_create_merge_request_with_url_success(
     expected_response = json.dumps(
         {
             "status": "success",
-            "data": {
-                "source_branch": "feature",
-                "target_branch": "main",
-                "title": "Test Merge Request",
-            },
-            "response": {
+            "merge_request": {
                 "id": 1,
                 "title": "Test Merge Request",
                 "source_branch": "feature",
@@ -324,10 +318,40 @@ async def test_create_merge_request_minimal_params(gitlab_client_mock, metadata)
     expected_response = json.dumps(
         {
             "status": "success",
-            "data": expected_data,
-            "response": '{"id": 1, "title": "New Feature", "source_branch": "feature", "target_branch": "main"}',
+            "merge_request": '{"id": 1, "title": "New Feature", "source_branch": "feature", "target_branch": "main"}',
         }
     )
+
+    assert response == expected_response
+
+    gitlab_client_mock.apost.assert_called_once_with(
+        path="/api/v4/projects/1/merge_requests", body=json.dumps(expected_data)
+    )
+
+
+@pytest.mark.asyncio
+async def test_create_merge_request_with_server_error(gitlab_client_mock, metadata):
+    gitlab_client_mock.apost = AsyncMock(
+        return_value={"status": 409, "message": "Duplicate request"}
+    )
+
+    tool = CreateMergeRequest(metadata=metadata)
+
+    input_data = {
+        "project_id": 1,
+        "source_branch": "feature",
+        "target_branch": "main",
+        "title": "New Feature",
+    }
+
+    response = await tool.arun(input_data)
+    expected_response = json.dumps({"error": "Failed to create merge request"})
+
+    expected_data = {
+        "source_branch": "feature",
+        "target_branch": "main",
+        "title": "New Feature",
+    }
 
     assert response == expected_response
 

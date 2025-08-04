@@ -35,12 +35,12 @@ class MockWorkflow(AbstractWorkflow):
 
 
 @pytest.fixture(autouse=True)
-def prepare_container(mock_container):
+def prepare_container(mock_duo_workflow_service_container):
     pass
 
 
-@pytest.fixture
-def workflow():
+@pytest.fixture(name="workflow")
+def workflow_fixture():
     workflow_id = "test-workflow-id"
     metadata = {
         "extended_logging": True,
@@ -55,14 +55,24 @@ def workflow():
     )
 
 
-@pytest.fixture
-def mock_project():
+@pytest.fixture(name="mock_project")
+def mock_project_fixture():
     return {
         "id": MagicMock(),
         "description": MagicMock(),
         "name": MagicMock(),
         "http_url_to_repo": MagicMock(),
         "web_url": "https://example.com/project",
+    }
+
+
+@pytest.fixture(name="mock_namespace")
+def mock_namespace_fixture():
+    return {
+        "id": MagicMock(),
+        "description": MagicMock(),
+        "name": MagicMock(),
+        "web_url": "https://example.com/group",
     }
 
 
@@ -89,8 +99,8 @@ async def test_init():
     assert workflow.is_done is False
     assert workflow._outbox.maxsize == 1
     assert workflow._inbox.maxsize == 1
-    assert len(workflow._additional_tools) == 1
-    tool = workflow._additional_tools[0]
+    assert len(workflow._mcp_tools) == 1
+    tool = workflow._mcp_tools[0](metadata={})
     assert tool.name == "get_issue"
     assert tool.description == "Tool to get issue"
     assert workflow._user == user
@@ -144,16 +154,21 @@ async def test_add_to_inbox(workflow):
 
 @pytest.mark.asyncio
 @patch(
-    "duo_workflow_service.workflows.abstract_workflow.fetch_workflow_and_project_data"
+    "duo_workflow_service.workflows.abstract_workflow.fetch_workflow_and_container_data"
+)
+@patch(
+    "duo_workflow_service.workflows.abstract_workflow.convert_mcp_tools_to_langchain_tool_classes"
 )
 @patch("duo_workflow_service.workflows.abstract_workflow.GitLabWorkflow")
 @patch("duo_workflow_service.workflows.abstract_workflow.ToolsRegistry.configure")
+@pytest.mark.parametrize("mcp_enabled", [True, False])
 async def test_compile_and_run_graph(
     mock_tools_registry,
     mock_gitlab_workflow,
-    mock_fetch_project,
-    workflow,
+    mock_convert_mcp_tools,
+    mock_fetch_workflow,
     mock_project,
+    mcp_enabled,
 ):
     # Setup mocks
     mock_tools_registry.return_value = MagicMock()
@@ -161,15 +176,39 @@ async def test_compile_and_run_graph(
     mock_checkpointer.aget_tuple = AsyncMock(return_value=None)
     mock_checkpointer.initial_status_event = "START"
     mock_gitlab_workflow.return_value.__aenter__.return_value = mock_checkpointer
-    mock_fetch_project.return_value = (mock_project, {"project_id": 1})
+    mock_fetch_workflow.return_value = (
+        mock_project,
+        None,
+        {"project_id": 1, "mcp_enabled": mcp_enabled},
+    )
+
+    mcp_tool = MagicMock()
+    mock_convert_mcp_tools.return_value = [mcp_tool]
+
+    workflow = MockWorkflow(
+        "id",
+        {},
+        CategoryEnum.WORKFLOW_SOFTWARE_DEVELOPMENT,
+        {},
+        [mcp_tool],
+    )
 
     # Run the method
     await workflow._compile_and_run_graph("Test goal")
 
     # Assertions
     assert workflow.is_done
-    mock_tools_registry.assert_called_once()
-    mock_fetch_project.assert_called_once()
+    mock_fetch_workflow.assert_called_once()
+    mock_tools_registry.assert_called_once_with(
+        outbox=workflow._outbox,
+        inbox=workflow._inbox,
+        workflow_config=workflow._workflow_config,
+        gl_http_client=workflow._http_client,
+        mcp_tools=[mcp_tool] if mcp_enabled else [],
+        project=mock_project,
+        user=None,
+        language_server_version=None,
+    )
 
 
 @pytest.mark.asyncio
@@ -244,20 +283,20 @@ def test_track_internal_event(workflow, internal_event_client: Mock):
 
 @pytest.mark.asyncio
 @patch(
-    "duo_workflow_service.workflows.abstract_workflow.fetch_workflow_and_project_data"
+    "duo_workflow_service.workflows.abstract_workflow.fetch_workflow_and_container_data"
 )
 @patch("duo_workflow_service.workflows.abstract_workflow.GitLabWorkflow")
 @patch("duo_workflow_service.workflows.abstract_workflow.ToolsRegistry.configure")
 async def test_compile_and_run_graph_with_exception(
     mock_tools_registry,
     mock_gitlab_workflow,
-    mock_fetch_project,
+    mock_fetch_workflow,
     workflow,
     mock_project,
 ):
     # Setup mocks to raise an exception
     mock_tools_registry.side_effect = Exception("Test exception")
-    mock_fetch_project.return_value = (mock_project, {"project_id": 1})
+    mock_fetch_workflow.return_value = (mock_project, None, {"project_id": 1})
     workflow._inbox.get = AsyncMock(
         return_value=MagicMock(actionResponse=MagicMock(requestID="", response=""))
     )
@@ -267,13 +306,16 @@ async def test_compile_and_run_graph_with_exception(
         await workflow._compile_and_run_graph("Test goal")
 
     mock_tools_registry.assert_called_once()
-    mock_fetch_project.assert_called_once()
+    mock_fetch_workflow.assert_called_once()
     assert workflow.is_done
     assert isinstance(exc_info.value.original_exception, Exception)
     assert str(exc_info.value.original_exception) == "Test exception"
 
 
 @pytest.mark.asyncio
+# pylint: disable=direct-environment-variable-reference
+@patch.dict(os.environ, {"LANGCHAIN_TRACING_V2": "true"})
+# pylint: enable=direct-environment-variable-reference
 @patch.object(MockWorkflow, "_compile_and_run_graph")
 async def test_run_passes_correct_metadata_to_langsmith_extra(
     mock_compile_and_run_graph, workflow
@@ -321,3 +363,37 @@ async def test_workflow_get_chat_model_with_vertex():
 
     vertex_model: VertexConfig = workflow._get_model_config()
     assert vertex_model.model_name == "claude-sonnet-4@20250514"
+
+
+@pytest.mark.asyncio
+@patch(
+    "duo_workflow_service.workflows.abstract_workflow.fetch_workflow_and_container_data"
+)
+@patch("duo_workflow_service.workflows.abstract_workflow.GitLabWorkflow")
+@patch("duo_workflow_service.workflows.abstract_workflow.ToolsRegistry.configure")
+async def test_namespace_level_workflow(
+    mock_tools_registry,
+    mock_gitlab_workflow,
+    mock_fetch_workflow,
+    workflow,
+    mock_namespace,
+):
+    # Setup mocks
+    mock_tools_registry.return_value = MagicMock()
+    mock_checkpointer = AsyncMock()
+    mock_checkpointer.aget_tuple = AsyncMock(return_value=None)
+    mock_checkpointer.initial_status_event = "START"
+    mock_gitlab_workflow.return_value.__aenter__.return_value = mock_checkpointer
+    mock_fetch_workflow.return_value = (None, mock_namespace, {"namespace_id": 1})
+
+    # Run the method
+    with pytest.raises(TraceableException) as exc_info:
+        await workflow._compile_and_run_graph("Test goal")
+
+    # Assertions
+    assert workflow.is_done
+    assert isinstance(exc_info.value.original_exception, Exception)
+    assert (
+        str(exc_info.value.original_exception)
+        == "This workflow software_development does not support namespace-level workflow"
+    )

@@ -54,12 +54,12 @@ class MockComponent:
 
 
 @pytest.fixture(autouse=True)
-def prepare_container(mock_container):
+def prepare_container(mock_duo_workflow_service_container):
     pass
 
 
-@pytest.fixture
-def user():
+@pytest.fixture(name="user")
+def user_fixture():
     return CloudConnectorUser(
         authenticated=True,
         claims=UserClaims(
@@ -69,9 +69,11 @@ def user():
     )
 
 
-@pytest.fixture
-def workflow(
-    mock_container: Mock, gl_http_client: GitlabHttpClient, user: CloudConnectorUser
+@pytest.fixture(name="workflow")
+def workflow_fixture(
+    mock_duo_workflow_service_container: Mock,
+    gl_http_client: GitlabHttpClient,
+    user: CloudConnectorUser,
 ):
     """Create a software development workflow instance."""
     workflow = Workflow(
@@ -85,8 +87,8 @@ def workflow(
     return workflow
 
 
-@pytest.fixture
-def workflow_config():
+@pytest.fixture(name="workflow_config")
+def workflow_config_fixture():
     return {
         "first_checkpoint": None,
         "workflow_status": "created",
@@ -97,8 +99,8 @@ def workflow_config():
     }
 
 
-@pytest.fixture
-def checkpoint_tuple():
+@pytest.fixture(name="checkpoint_tuple")
+def checkpoint_tuple_fixture():
     return CheckpointTuple(
         config={"configurable": {"thread_id": "123", "checkpoint_id": str(uuid4())}},
         checkpoint={
@@ -115,16 +117,16 @@ def checkpoint_tuple():
     )
 
 
-@pytest.fixture
-def mock_log_exception():
+@pytest.fixture(name="mock_log_exception")
+def mock_log_exception_fixture():
     with patch(
         "duo_workflow_service.workflows.abstract_workflow.log_exception"
     ) as mock:
         yield mock
 
 
-@pytest.fixture
-def agent_responses() -> list[dict[str, Any]]:
+@pytest.fixture(name="agent_responses")
+def agent_responses_fixture() -> list[dict[str, Any]]:
     status = WorkflowStatusEnum.PLANNING
     agent_name = "context_builder"
 
@@ -185,8 +187,8 @@ def agent_responses() -> list[dict[str, Any]]:
     ]
 
 
-@pytest.fixture
-def duo_workflow_prompt_registry_enabled() -> bool:
+@pytest.fixture(name="duo_workflow_prompt_registry_enabled")
+def duo_workflow_prompt_registry_enabled_fixture() -> bool:
     return False
 
 
@@ -198,8 +200,8 @@ def stub_feature_flags(duo_workflow_prompt_registry_enabled: bool):
     yield
 
 
-@pytest.fixture
-def mock_agent(
+@pytest.fixture(name="mock_agent")
+def mock_agent_fixture(
     agent_responses: list[dict[str, Any]], duo_workflow_prompt_registry_enabled: bool
 ):
     if duo_workflow_prompt_registry_enabled:
@@ -212,8 +214,8 @@ def mock_agent(
         yield mock
 
 
-@pytest.fixture
-def mock_handover_agent():
+@pytest.fixture(name="mock_handover_agent")
+def mock_handover_agent_fixture():
     with patch(
         "duo_workflow_service.workflows.software_development.workflow.HandoverAgent"
     ) as mock:
@@ -225,8 +227,8 @@ def mock_handover_agent():
         yield mock
 
 
-@pytest.fixture
-def mock_plan_supervisor_agent():
+@pytest.fixture(name="mock_plan_supervisor_agent")
+def mock_plan_supervisor_agent_fixture():
     with patch(
         "duo_workflow_service.workflows.software_development.workflow.PlanSupervisorAgent"
     ) as mock:
@@ -238,16 +240,16 @@ def mock_plan_supervisor_agent():
         yield mock
 
 
-@pytest.fixture
-def mock_tools_executor():
+@pytest.fixture(name="mock_tools_executor")
+def mock_tools_executor_fixture():
     with patch(
         "duo_workflow_service.workflows.software_development.workflow.ToolsExecutor"
     ) as mock:
         yield mock
 
 
-@pytest.fixture
-def mock_chat_client():
+@pytest.fixture(name="mock_chat_client")
+def mock_chat_client_fixture():
     with patch(
         "duo_workflow_service.workflows.software_development.workflow.create_chat_model",
         autospec=True,
@@ -255,8 +257,8 @@ def mock_chat_client():
         yield mock
 
 
-@pytest.fixture
-def mock_executor_component():
+@pytest.fixture(name="mock_executor_component")
+def mock_executor_component_fixture():
     with patch(
         "duo_workflow_service.workflows.software_development.workflow.ExecutorComponent",
         autospec=True,
@@ -265,8 +267,8 @@ def mock_executor_component():
         yield mock
 
 
-@pytest.fixture
-def mock_planner_component():
+@pytest.fixture(name="mock_planner_component")
+def mock_planner_component_fixture():
     with patch(
         "duo_workflow_service.workflows.software_development.workflow.PlannerComponent",
         autospec=True,
@@ -275,8 +277,8 @@ def mock_planner_component():
         yield mock
 
 
-@pytest.fixture
-def mock_tools_approval_component():
+@pytest.fixture(name="mock_tools_approval_component")
+def mock_tools_approval_component_fixture():
     with patch(
         "duo_workflow_service.workflows.software_development.workflow.ToolsApprovalComponent",
         autospec=True,
@@ -284,8 +286,8 @@ def mock_tools_approval_component():
         yield mock
 
 
-@pytest.fixture
-def mock_goal_disambiguation_component():
+@pytest.fixture(name="mock_goal_disambiguation_component")
+def mock_goal_disambiguation_component_fixture():
     with patch(
         "duo_workflow_service.workflows.software_development.workflow.GoalDisambiguationComponent",
         autospec=True,
@@ -319,7 +321,7 @@ async def test_workflow_run(
     mock_planner_component,
     mock_executor_component,
     mock_chat_client,
-    mock_fetch_workflow_and_project_data,
+    mock_fetch_workflow_and_container_data,
     mock_tools_executor,
     mock_plan_supervisor_agent,
     mock_handover_agent,
@@ -405,7 +407,7 @@ async def test_workflow_run_with_memory_saver(
     mock_goal_disambiguation_component,
     mock_gitlab_workflow,
     mock_chat_client,
-    mock_fetch_workflow_and_project_data,
+    mock_fetch_workflow_and_container_data,
     mock_tools_executor,
     mock_plan_supervisor_agent,
     mock_handover_agent,
@@ -455,7 +457,7 @@ async def test_workflow_run_when_exception(
     mock_executor_component,
     mock_goal_disambiguation_component,
     mock_chat_client,
-    mock_fetch_workflow_and_project_data,
+    mock_fetch_workflow_and_container_data,
     mock_gitlab_workflow,
     mock_tools_executor,
     mock_plan_supervisor_agent,
@@ -495,6 +497,7 @@ async def test_workflow_run_when_exception(
     autospec=True,
 )
 @pytest.mark.parametrize("duo_workflow_prompt_registry_enabled", [False, True])
+@pytest.mark.usefixtures("mock_chat_client")
 @patch.dict(os.environ, {"DW_INTERNAL_EVENT__ENABLED": "true"})
 async def test_workflow_run_with_error_state(
     mock_status_updater,
@@ -503,8 +506,9 @@ async def test_workflow_run_with_error_state(
     mock_checkpoint_notifier,
     mock_planner_component,
     mock_tools_approval_component,
+    mock_executor_component,
     mock_goal_disambiguation_component,
-    mock_fetch_workflow_and_project_data,
+    mock_fetch_workflow_and_container_data,
     mock_tools_executor,
     mock_agent,
     workflow,
@@ -546,7 +550,7 @@ async def test_workflow_run_with_tools_registry(
     mock_goal_disambiguation_component,
     mock_gitlab_workflow,
     mock_chat_client,
-    mock_fetch_workflow_and_project_data,
+    mock_fetch_workflow_and_container_data,
     mock_tools_executor,
     mock_plan_supervisor_agent,
     mock_handover_agent,
@@ -589,8 +593,8 @@ async def test_workflow_run_with_tools_registry(
     )
 
 
-@pytest.fixture
-def tools_registry(tool_metadata):
+@pytest.fixture(name="tools_registry")
+def tools_registry_fixture(tool_metadata):
     """Create a tools registry with all privileges enabled."""
     return ToolsRegistry(
         enabled_tools=list(_AGENT_PRIVILEGES.keys()),
@@ -617,6 +621,7 @@ def assert_tools_in_tools_registry(tools_registry, tools):
 # The next test check that the tools defined in the agent setup methods in the workflow are actually in
 # the registry and match the list in the test.
 @pytest.mark.parametrize("duo_workflow_prompt_registry_enabled", [False, True])
+@pytest.mark.usefixtures("mock_chat_client")
 def test_context_builder_tools(tools_registry, workflow):
     """Test that all tools used by the context builder agent are available in the tools registry."""
     agent_components = workflow._setup_context_builder("test goal", tools_registry)
@@ -631,7 +636,7 @@ async def test_workflow_run_with_setup_error(
     mock_executor_component,
     mock_planner_component,
     mock_goal_disambiguation_component,
-    mock_fetch_workflow_and_project_data,
+    mock_fetch_workflow_and_container_data,
     mock_gitlab_workflow,
     mock_git_lab_workflow_instance,
     mock_tools_registry_cls,
@@ -654,13 +659,13 @@ async def test_workflow_run_with_setup_error(
 @pytest.mark.parametrize("duo_workflow_prompt_registry_enabled", [False, True])
 @patch.dict(os.environ, {"DW_INTERNAL_EVENT__ENABLED": "true"})
 async def test_workflow_run_with_missing_web_url(
-    mock_fetch_workflow_and_project_data,
+    mock_fetch_workflow_and_container_data,
     mock_gitlab_workflow,
     mock_git_lab_workflow_instance,
     checkpoint_tuple,
     workflow,
 ):
-    mock_fetch_workflow_and_project_data.return_value = (
+    mock_fetch_workflow_and_container_data.return_value = (
         {
             "id": 1,
             "name": "test-project",
@@ -668,6 +673,7 @@ async def test_workflow_run_with_missing_web_url(
             "http_url_to_repo": "https://example.com/project",
             # web_url is missing
         },
+        None,
         {"project_id": 1},
     )
 
@@ -680,20 +686,18 @@ async def test_workflow_run_with_missing_web_url(
 
 @pytest.mark.asyncio
 @pytest.mark.parametrize("duo_workflow_prompt_registry_enabled", [False, True])
-@patch(
-    "duo_workflow_service.workflows.abstract_workflow.GitLabUrlParser", autospec=True
-)
+@patch("duo_workflow_service.gitlab.gitlab_api.GitLabUrlParser", autospec=True)
 @patch.dict(os.environ, {"DW_INTERNAL_EVENT__ENABLED": "true"})
 async def test_workflow_run_with_invalid_web_url(
     mock_gitlab_url_parser,
-    mock_fetch_workflow_and_project_data,
+    mock_fetch_workflow_and_container_data,
     mock_gitlab_workflow,
     mock_git_lab_workflow_instance,
     checkpoint_tuple,
     workflow,
 ):
     # Test case for invalid web_url (cannot extract gitlab_host)
-    mock_fetch_workflow_and_project_data.return_value = (
+    mock_fetch_workflow_and_container_data.return_value = (
         {
             "id": 1,
             "name": "test-project",
@@ -701,6 +705,7 @@ async def test_workflow_run_with_invalid_web_url(
             "http_url_to_repo": "https://example.com/project",
             "web_url": "invalid-url",  # Invalid URL format
         },
+        None,
         {"project_id": 1},
     )
 
@@ -722,7 +727,7 @@ async def test_workflow_run_with_retry(
     mock_planner_component,
     mock_goal_disambiguation_component,
     mock_chat_client,
-    mock_fetch_workflow_and_project_data,
+    mock_fetch_workflow_and_container_data,
     mock_gitlab_workflow,
     mock_git_lab_workflow_instance,
     mock_tools_executor,
@@ -854,7 +859,7 @@ async def test_workflow_run_with_tool_approvals(
     mock_gitlab_workflow,
     mock_git_lab_workflow_instance,
     mock_chat_client,
-    mock_fetch_workflow_and_project_data,
+    mock_fetch_workflow_and_container_data,
     mock_tools_executor,
     mock_planner_component,
     mock_goal_disambiguation_component,
@@ -894,7 +899,7 @@ async def test_workflow_run_without_plan_approval_component(
     mock_tools_approval_component,
     mock_gitlab_workflow,
     mock_chat_client,
-    mock_fetch_workflow_and_project_data,
+    mock_fetch_workflow_and_container_data,
     mock_tools_executor,
     mock_planner_component,
     mock_goal_disambiguation_component,

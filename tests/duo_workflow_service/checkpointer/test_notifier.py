@@ -1,9 +1,9 @@
 import asyncio
+from json import dumps
 from typing import Any, Dict, List, Optional
 from unittest.mock import Mock, patch
 
 import pytest
-from langchain.load.dump import dumps
 from langchain_core.messages import HumanMessage
 
 from duo_workflow_service.checkpointer.gitlab_workflow import (
@@ -11,15 +11,16 @@ from duo_workflow_service.checkpointer.gitlab_workflow import (
 )
 from duo_workflow_service.checkpointer.notifier import UserInterface
 from duo_workflow_service.entities.state import MessageTypeEnum, WorkflowStatusEnum
+from duo_workflow_service.workflows.type_definitions import AdditionalContext
 
 
-@pytest.fixture
-def outbox():
+@pytest.fixture(name="outbox")
+def outbox_fixture():
     return asyncio.Queue()
 
 
-@pytest.fixture
-def checkpoint_notifier(outbox):
+@pytest.fixture(name="checkpoint_notifier")
+def checkpoint_notifier_fixture(outbox):
     return UserInterface(outbox=outbox, goal="test_goal")
 
 
@@ -33,13 +34,23 @@ async def test_send_event_with_non_values_type(checkpoint_notifier):
 
 @pytest.mark.asyncio
 async def test_send_event_with_values_type(checkpoint_notifier):
+    ui_chat_log = [
+        {
+            "content": "message",
+            "role": "user",
+            "status": "success",
+            "additional_context": AdditionalContext(
+                category="file", content="content", id="1"
+            ),
+        }
+    ]
     state = {
         "status": WorkflowStatusEnum.COMPLETED,
-        "ui_chat_log": ["message1", "message2"],
+        "ui_chat_log": ui_chat_log,
         "plan": {"steps": ["step1", "step2"]},
     }
     await checkpoint_notifier.send_event("values", state, False)
-    assert checkpoint_notifier.ui_chat_log == ["message1", "message2"]
+    assert checkpoint_notifier.ui_chat_log == ui_chat_log
     assert checkpoint_notifier.status == WorkflowStatusEnum.COMPLETED
     assert checkpoint_notifier.steps == ["step1", "step2"]
     assert not checkpoint_notifier.outbox.empty()
@@ -49,7 +60,20 @@ async def test_send_event_with_values_type(checkpoint_notifier):
     expected_checkpoint = dumps(
         {
             "channel_values": {
-                "ui_chat_log": ["message1", "message2"],
+                "ui_chat_log": [
+                    {
+                        "content": "message",
+                        "role": "user",
+                        "status": "success",
+                        "additional_context": {
+                            "category": "file",
+                            "id": "1",
+                            "content": "content",
+                            "metadata": None,
+                            "type": "AdditionalContext",
+                        },
+                    }
+                ],
                 "plan": {"steps": ["step1", "step2"]},
             }
         }

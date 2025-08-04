@@ -1,7 +1,7 @@
 import os
 from contextlib import contextmanager
 from pathlib import Path
-from typing import Generator, Iterator, List, Optional, Type
+from typing import Any, Generator, Iterator, List, Optional, Type
 from unittest import mock
 from unittest.mock import Mock, call
 
@@ -9,10 +9,10 @@ import pytest
 from anthropic import APITimeoutError, AsyncAnthropic
 from gitlab_cloud_connector import GitLabUnitPrimitive, WrongUnitPrimitives
 from langchain_community.chat_models import ChatLiteLLM
-from langchain_core.messages import HumanMessage, SystemMessage
+from langchain_core.messages import AIMessage, HumanMessage, SystemMessage
 from langchain_core.messages.ai import InputTokenDetails, UsageMetadata
 from langchain_core.prompt_values import ChatPromptValue
-from langchain_core.prompts import ChatPromptTemplate
+from langchain_core.prompts import ChatPromptTemplate, MessagesPlaceholder
 from langchain_core.runnables import Runnable
 from langchain_core.tools import BaseTool
 from litellm.exceptions import Timeout
@@ -31,12 +31,13 @@ from ai_gateway.model_metadata import (
 from ai_gateway.models.v2.anthropic_claude import ChatAnthropic
 from ai_gateway.prompts import BasePromptRegistry, Prompt
 from ai_gateway.prompts.config.base import PromptConfig, PromptParams
+from ai_gateway.prompts.typing import TypeModelFactory
 from lib.internal_events.context import InternalEventAdditionalProperties
 from tests.conftest import FakeModel
 
 
-@pytest.fixture
-def mock_watch() -> Generator[mock.MagicMock, None, None]:
+@pytest.fixture(name="mock_watch")
+def mock_watch_fixture() -> Generator[mock.MagicMock, None, None]:
     with mock.patch(
         "ai_gateway.prompts.base.ModelRequestInstrumentator.watch"
     ) as mock_watch:
@@ -60,10 +61,17 @@ class TestPrompt:
             contents="Hi, I'm {{name}}",
         )
 
-    @pytest.fixture
-    def prompt_template(self):
+    @pytest.fixture(name="prompt_template")
+    def prompt_template_fixture(self, request: Any):
         # Test inclusion and direct content
-        return {"system": "{% include 'system.jinja' %}", "user": "{{content}}"}
+        tpl = {"system": "{% include 'system.jinja' %}", "user": "{{content}}"}
+
+        if getattr(request, "param", None) and request.param.get(
+            "with_messages_placeholder", None
+        ):
+            tpl["placeholder"] = "messages"
+
+        return tpl
 
     @contextmanager
     def _mock_usage_metadata(
@@ -114,6 +122,21 @@ class TestPrompt:
             template_format="jinja2",
         )
 
+    @pytest.mark.parametrize(
+        "prompt_template", [{"with_messages_placeholder": True}], indirect=True
+    )
+    def test_build_prompt_template_with_placeholder(self, prompt_config: PromptConfig):
+        prompt_template: Runnable = Prompt._build_prompt_template(prompt_config)
+
+        assert prompt_template == ChatPromptTemplate.from_messages(
+            [
+                ("system", "{% include 'system.jinja' %}"),
+                ("user", "{{content}}"),
+                MessagesPlaceholder("messages"),
+            ],
+            template_format="jinja2",
+        )
+
     def test_instrumentator(self, model_engine: str, model_name: str, prompt: Prompt):
         assert prompt.instrumentator.labels == {
             "model_engine": model_engine,
@@ -141,7 +164,46 @@ class TestPrompt:
             prompt="System: Hi, I'm Duo\nHuman: What's up?",
         )
 
-        mock_watch.assert_called_with(stream=False)
+        mock_watch.assert_called_with(
+            stream=False, unit_primitives=prompt.unit_primitives
+        )
+
+    @pytest.mark.asyncio
+    @mock.patch("ai_gateway.prompts.base.get_request_logger")
+    @pytest.mark.parametrize(
+        "prompt_template", [{"with_messages_placeholder": True}], indirect=True
+    )
+    async def test_ainvoke_with_messages_placeholder(
+        self,
+        mock_get_logger: mock.Mock,
+        mock_watch: mock.Mock,
+        prompt: Prompt,
+        model_response: str,
+    ):
+        mock_logger = mock.MagicMock()
+        mock_get_logger.return_value = mock_logger
+
+        response = await prompt.ainvoke(
+            {
+                "name": "Duo",
+                "content": "What's up?",
+                "messages": [
+                    AIMessage(content="Fine, you?"),
+                    HumanMessage(content="Good."),
+                ],
+            }
+        )
+
+        assert response.content == model_response
+
+        mock_logger.info.assert_called_with(
+            "Performing LLM request",
+            prompt="System: Hi, I'm Duo\nHuman: What's up?\nAI: Fine, you?\nHuman: Good.",
+        )
+
+        mock_watch.assert_called_with(
+            stream=False, unit_primitives=prompt.unit_primitives
+        )
 
     @pytest.mark.asyncio
     @mock.patch("ai_gateway.prompts.base.get_request_logger")
@@ -171,7 +233,55 @@ class TestPrompt:
 
         assert response == model_response
 
-        mock_watch.assert_called_with(stream=True)
+        mock_watch.assert_called_with(
+            stream=True, unit_primitives=prompt.unit_primitives
+        )
+
+        mock_watcher.afinish.assert_awaited_once()
+
+    @pytest.mark.asyncio
+    @mock.patch("ai_gateway.prompts.base.get_request_logger")
+    @pytest.mark.parametrize(
+        "prompt_template", [{"with_messages_placeholder": True}], indirect=True
+    )
+    async def test_astream_with_messages_placeholder(
+        self,
+        mock_get_logger: mock.Mock,
+        mock_watch: mock.Mock,
+        prompt: Prompt,
+        model_response: str,
+    ):
+        response = ""
+
+        mock_watcher = mock_watch.return_value.__enter__.return_value
+        mock_logger = mock.MagicMock()
+        mock_get_logger.return_value = mock_logger
+
+        async for c in prompt.astream(
+            {
+                "name": "Duo",
+                "content": "What's up?",
+                "messages": [
+                    AIMessage(content="Fine, you?"),
+                    HumanMessage(content="Good."),
+                ],
+            }
+        ):
+            response += c.content
+
+            # Make sure we don't finish prematurely
+            mock_watcher.afinish.assert_not_awaited()
+
+        mock_logger.info.assert_called_with(
+            "Performing LLM request",
+            prompt="System: Hi, I'm Duo\nHuman: What's up?\nAI: Fine, you?\nHuman: Good.",
+        )
+
+        assert response == model_response
+
+        mock_watch.assert_called_with(
+            stream=True, unit_primitives=prompt.unit_primitives
+        )
 
         mock_watcher.afinish.assert_awaited_once()
 
@@ -531,6 +641,36 @@ class TestPrompt:
         ):
             await anext(prompt.astream({"content": "What's up?"}))
 
+    @pytest.mark.parametrize(
+        "tool_choice",
+        [
+            "auto",
+            None,
+            "any",
+        ],
+    )
+    def test_bind_tools_with_tool_choice(
+        self,
+        prompt_config: PromptConfig,
+        model_factory: TypeModelFactory,
+        model: FakeModel,
+        tool_choice: str | None,
+    ):
+        """Test that tool_choice parameter is correctly passed to bind_tools method."""
+
+        with mock.patch.object(FakeModel, "bind_tools") as mock_bind_tool:
+            mock_bind_tool.return_value = model
+            Prompt(
+                model_factory=model_factory,
+                config=prompt_config,
+                tools=[mock.Mock(spec=BaseTool)],
+                tool_choice=tool_choice,
+            )
+
+        kwargs = mock_bind_tool.call_args.kwargs
+
+        assert kwargs["tool_choice"] == tool_choice
+
 
 def _assert_usage_metadata_handling(
     mock_watcher: mock.Mock,
@@ -564,8 +704,8 @@ def _assert_usage_metadata_handling(
     reason="3rd party requests not enabled",
 )
 class TestPromptTimeout:
-    @pytest.fixture
-    def prompt_params(self):
+    @pytest.fixture(name="prompt_params")
+    def prompt_params_fixture(self):
         return PromptParams(timeout=0.1)
 
     @pytest.mark.asyncio
@@ -602,8 +742,8 @@ class TestPromptTimeout:
             )
 
 
-@pytest.fixture
-def registry(
+@pytest.fixture(name="registry")
+def registry_fixture(
     internal_event_client: Mock, model_limits: ConfigModelLimits, prompt: Prompt
 ):
     class Registry(BasePromptRegistry):

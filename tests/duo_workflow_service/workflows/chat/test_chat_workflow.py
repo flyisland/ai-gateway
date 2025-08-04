@@ -32,18 +32,18 @@ from lib.feature_flags import current_feature_flag_context
 from lib.internal_events.event_enum import CategoryEnum
 
 
-@pytest.fixture
-def prompt_class():
+@pytest.fixture(name="prompt_class")
+def prompt_class_fixture():
     return ChatAgent
 
 
-@pytest.fixture
-def config_values():
+@pytest.fixture(name="config_values")
+def config_values_fixture():
     yield {"mock_model_responses": True}
 
 
-@pytest.fixture
-def user():
+@pytest.fixture(name="user")
+def user_fixture():
     return CloudConnectorUser(
         authenticated=True,
         claims=UserClaims(
@@ -53,9 +53,9 @@ def user():
     )
 
 
-@pytest.fixture
-def workflow_with_project(
-    mock_container: containers.Container,
+@pytest.fixture(name="workflow_with_project")
+def workflow_with_project_fixture(
+    mock_duo_workflow_service_container: containers.Container,
     prompt: ChatAgent,
     user: CloudConnectorUser,
     mock_tools_registry: Mock,
@@ -82,7 +82,10 @@ def workflow_with_project(
         "web_url": "https://example.com/test-project",
         "description": "A test project",
         "languages": [{"name": "Python", "share": 1.0}],
+        "default_branch": "main",
+        "exclusion_rules": None,
     }
+    workflow._namespace = None
     workflow._additional_context = additional_context
     workflow._http_client = MagicMock()
     prompt.tools_registry = mock_tools_registry
@@ -90,23 +93,11 @@ def workflow_with_project(
     return workflow
 
 
-@pytest.fixture
-def workflow_with_approval(workflow_with_project):
+@pytest.fixture(name="workflow_with_approval")
+def workflow_with_approval_fixture(workflow_with_project):
     workflow = workflow_with_project
     workflow._approval = contract_pb2.Approval(
         approval=contract_pb2.Approval.Approved()
-    )
-
-    return workflow
-
-
-@pytest.fixture
-def workflow_with_rejected_approval(workflow_with_project):
-    workflow = workflow_with_project
-    workflow._approval = contract_pb2.Approval(
-        rejection=contract_pb2.Approval.Rejected(
-            message="Rejected the tool usage because it's not safe",
-        )
     )
 
     return workflow
@@ -188,12 +179,12 @@ async def test_execute_agent(workflow_with_project):
 
 
 class TestExecuteAgentWithTools:
-    @pytest.fixture
-    def model_response(self):
+    @pytest.fixture(name="model_response")
+    def model_response_fixture(self):
         return [ToolMessage(content="tool calling", tool_call_id="random_id")]
 
-    @pytest.fixture
-    def model_disable_streaming(self):
+    @pytest.fixture(name="model_disable_streaming")
+    def model_disable_streaming_fixture(self):
         return "tool_calling"
 
     @pytest.mark.asyncio
@@ -244,6 +235,7 @@ def test_are_tools_called_with_various_content(
         "ui_chat_log": [],
         "last_human_input": None,
         "project": None,
+        "namespace": None,
         "approval": None,
     }
     assert workflow._are_tools_called(state) == expected_result
@@ -276,6 +268,7 @@ def test_are_tools_called_with_tool_use(workflow_with_project):
         "ui_chat_log": [],
         "last_human_input": None,
         "project": None,
+        "namespace": None,
         "approval": None,
     }
     assert workflow._are_tools_called(state) == Routes.TOOL_USE
@@ -285,12 +278,17 @@ def test_are_tools_called_with_tool_use(workflow_with_project):
 @pytest.mark.usefixtures(
     "mock_tools_registry_cls",
     "mock_git_lab_workflow_instance",
-    "mock_fetch_workflow_and_project_data",
+    "mock_fetch_workflow_and_container_data",
 )
+@patch("duo_workflow_service.workflows.chat.workflow.current_model_metadata_context")
 async def test_workflow_run(
+    mock_model_metadata_context,
     mock_checkpoint_notifier,
     workflow_with_project,
 ):
+    mock_model_metadata = MagicMock()
+    mock_model_metadata_context.get.return_value = mock_model_metadata
+
     mock_user_interface_instance = mock_checkpoint_notifier.return_value
     state = {"status": "Not Started", "ui_chat_log": []}
 
@@ -318,9 +316,25 @@ async def test_workflow_run(
 
         workflow = workflow_with_project
 
-        await workflow.run("Test chat goal")
+        mock_agent = MagicMock()
+        with patch.object(
+            workflow._prompt_registry, "get_on_behalf", return_value=mock_agent
+        ) as mock_get_on_behalf:
+            await workflow.run("Test chat goal")
 
-        assert workflow.is_done
+            assert workflow.is_done
+
+            mock_get_on_behalf.assert_called_once()
+            call_args = mock_get_on_behalf.call_args
+
+            assert call_args.kwargs["model_metadata"] == mock_model_metadata
+            assert call_args.kwargs["user"] == workflow._user
+            assert call_args.kwargs["prompt_id"] == "chat/agent"
+            assert call_args.kwargs["prompt_version"] == "^1.0.0"
+            assert (
+                call_args.kwargs["internal_event_category"]
+                == "duo_workflow_service.workflows.chat.workflow"
+            )
 
         mock_user_interface_instance.send_event.assert_called_with(
             type="values", state=state, stream=True
@@ -329,8 +343,8 @@ async def test_workflow_run(
 
 
 class TestUnauthorizedChatExecution:
-    @pytest.fixture
-    def user(self):
+    @pytest.fixture(name="user")
+    def user_fixture(self):
         return CloudConnectorUser(
             authenticated=True,
             claims=UserClaims(
@@ -362,14 +376,6 @@ class TestUnauthorizedChatExecution:
             + CHAT_MUTATION_TOOLS
             + RUN_COMMAND_TOOLS
             + CHAT_GITLAB_MUTATION_TOOLS,
-        ),
-        (
-            [],
-            {"mcp_enabled": True},
-            CHAT_READ_ONLY_TOOLS
-            + CHAT_MUTATION_TOOLS
-            + RUN_COMMAND_TOOLS
-            + ["extra_tool"],
         ),
     ],
 )
@@ -416,10 +422,11 @@ async def test_get_graph_input_start(workflow_with_project):
 
 
 @pytest.mark.asyncio
-async def test_get_graph_input_resume(workflow_with_project):
-    result = await workflow_with_project.get_graph_input(
-        "New input", WorkflowStatusEventEnum.RESUME
-    )
+@pytest.mark.parametrize(
+    "status", [WorkflowStatusEventEnum.RETRY, WorkflowStatusEventEnum.RESUME]
+)
+async def test_get_graph_input(workflow_with_project, status):
+    result = await workflow_with_project.get_graph_input("New input", status)
 
     assert result.goto == "agent"
     assert result.update["status"] == WorkflowStatusEnum.EXECUTION
@@ -436,30 +443,44 @@ async def test_get_graph_input_resume(workflow_with_project):
 async def test_get_graph_input_resume_with_approval(workflow_with_approval):
     """Test graph input with approved tool calls."""
     result = await workflow_with_approval.get_graph_input(
-        "New input", WorkflowStatusEventEnum.RESUME
+        "", WorkflowStatusEventEnum.RESUME
     )
 
     assert result.goto == "run_tools"
     assert result.update["status"] == WorkflowStatusEnum.EXECUTION
     assert "conversation_history" not in result.update
+    assert "ui_chat_log" not in result.update
 
 
 @pytest.mark.asyncio
+@pytest.mark.parametrize(
+    "rejection_message", ["", "null", "Rejected the tool usage because it's not safe"]
+)
 async def test_get_graph_input_resume_with_rejected_approval(
-    workflow_with_rejected_approval,
+    rejection_message, workflow_with_project
 ):
     """Test graph input with rejected tool calls."""
+
+    workflow_with_rejected_approval = workflow_with_project
+    workflow_with_rejected_approval._approval = contract_pb2.Approval(
+        rejection=contract_pb2.Approval.Rejected(
+            message=rejection_message,
+        )
+    )
+
     result = await workflow_with_rejected_approval.get_graph_input(
-        "New input", WorkflowStatusEventEnum.RESUME
+        "", WorkflowStatusEventEnum.RESUME
     )
 
     assert result.goto == "agent"
     assert result.update["status"] == WorkflowStatusEnum.EXECUTION
     assert "conversation_history" not in result.update
-    assert (
-        result.update["approval"].message
-        == "Rejected the tool usage because it's not safe"
-    )
+    assert result.update["approval"].message == rejection_message
+
+    if rejection_message and rejection_message != "null":
+        result.update["ui_chat_log"][-1]["content"] == rejection_message
+    else:
+        assert "ui_chat_log" not in result.update
 
 
 @pytest.mark.asyncio
@@ -611,7 +632,7 @@ async def test_chat_workflow_status_flow_integration(
 
 @pytest.mark.asyncio
 @pytest.mark.parametrize("tool_approval_required", [True])
-@pytest.mark.usefixtures("mock_fetch_workflow_and_project_data")
+@pytest.mark.usefixtures("mock_fetch_workflow_and_container_data")
 async def test_agent_run_with_tool_approval_required(workflow_with_project):
     """Test agent run method when tools require approval."""
 

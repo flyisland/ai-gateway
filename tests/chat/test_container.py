@@ -19,19 +19,21 @@ from ai_gateway.models.anthropic import (
 from ai_gateway.models.litellm import KindLiteLlmModel, LiteLlmChatModel
 
 
-@pytest.fixture
-def config_values(custom_models_enabled: bool):
+@pytest.fixture(name="config_values")
+def config_values_fixture(custom_models_enabled: bool):
     return {"custom_models": {"enabled": custom_models_enabled}}
 
 
-@pytest.fixture
-def mock_agent():
+@pytest.fixture(name="mock_agent")
+def mock_agent_fixture():
     return Mock(spec=Runnable)
 
 
 @pytest.mark.parametrize("custom_models_enabled", [False])
-def test_container(mock_container: containers.DeclarativeContainer, mock_agent: Mock):
-    chat = cast(providers.Container, mock_container.chat)
+def test_container(
+    mock_ai_gateway_container: containers.DeclarativeContainer, mock_agent: Mock
+):
+    chat = cast(providers.Container, mock_ai_gateway_container.chat)
 
     assert isinstance(
         chat.anthropic_claude_factory(
@@ -58,10 +60,11 @@ def test_container(mock_container: containers.DeclarativeContainer, mock_agent: 
     [(True, SelfHostedGitlabDocumentation), (False, GitlabDocumentation)],
 )
 def test_container_with_config(
-    mock_container: containers.DeclarativeContainer,
+    mock_ai_gateway_container: containers.DeclarativeContainer,
     expected_tool_type: Type[BaseTool],
+    mock_agent: Runnable,
 ):
-    chat = cast(providers.Container, mock_container.chat)
+    chat = cast(providers.Container, mock_ai_gateway_container.chat)
 
     tool_types = {
         type(tool)

@@ -27,7 +27,9 @@ from contract import contract_pb2, contract_pb2_grpc
 from duo_workflow_service.gitlab.connection_pool import connection_pool
 from duo_workflow_service.interceptors.authentication_interceptor import (
     AuthenticationInterceptor,
-    current_user,
+)
+from duo_workflow_service.interceptors.authentication_interceptor import (
+    current_user as current_user_context_var,
 )
 from duo_workflow_service.interceptors.correlation_id_interceptor import (
     CorrelationIdInterceptor,
@@ -35,12 +37,18 @@ from duo_workflow_service.interceptors.correlation_id_interceptor import (
 from duo_workflow_service.interceptors.feature_flag_interceptor import (
     FeatureFlagInterceptor,
 )
+from duo_workflow_service.interceptors.gitlab_version_interceptor import (
+    GitLabVersionInterceptor,
+)
 from duo_workflow_service.interceptors.internal_events_interceptor import (
     InternalEventsInterceptor,
 )
 from duo_workflow_service.interceptors.language_server_version_interceptor import (
     LanguageServerVersionInterceptor,
     language_server_version,
+)
+from duo_workflow_service.interceptors.model_metadata_interceptor import (
+    ModelMetadataInterceptor,
 )
 from duo_workflow_service.interceptors.monitoring_interceptor import (
     MonitoringInterceptor,
@@ -52,14 +60,13 @@ from duo_workflow_service.structured_logging import set_workflow_id, setup_loggi
 from duo_workflow_service.tracking import MonitoringContext, current_monitoring_context
 from duo_workflow_service.tracking.errors import log_exception
 from duo_workflow_service.tracking.sentry_error_tracking import setup_error_tracking
-from duo_workflow_service.workflows.abstract_workflow import (
-    AbstractWorkflow,
-    TypeWorkflow,
-)
-from duo_workflow_service.workflows.registry import resolve_workflow_class
+from duo_workflow_service.workflows.abstract_workflow import AbstractWorkflow
+from duo_workflow_service.workflows.registry import FlowFactory, resolve_workflow_class
 from duo_workflow_service.workflows.type_definitions import AdditionalContext
 from lib.internal_events import InternalEventsClient
 from lib.internal_events.event_enum import CategoryEnum
+
+CONTAINER_APPLICATION_PACKAGES = ["duo_workflow_service"]
 
 log = structlog.stdlib.get_logger("server")
 
@@ -131,7 +138,7 @@ class DuoWorkflowService(contract_pb2_grpc.DuoWorkflowServicer):
             ContainerApplication.internal_event.client
         ],
     ) -> AsyncIterator[contract_pb2.Action]:
-        user: CloudConnectorUser = current_user.get()
+        user: CloudConnectorUser = current_user_context_var.get()
 
         # Fetch the start workflow call
         start_workflow_request: contract_pb2.ClientEvent = await anext(
@@ -198,7 +205,10 @@ class DuoWorkflowService(contract_pb2_grpc.DuoWorkflowServicer):
             mcp_tools = list(start_workflow_request.startRequest.mcpTools)
 
         workflow_type = string_to_category_enum(workflow_definition)
-        workflow_class: TypeWorkflow = resolve_workflow_class(workflow_definition)
+
+        # for testing purposes stub to
+        # workflow_class: FlowFactory = resolve_workflow_class("prototype/experimental")
+        workflow_class: FlowFactory = resolve_workflow_class(workflow_definition)
 
         invocation_metadata = dict(context.invocation_metadata())
 
@@ -224,7 +234,13 @@ class DuoWorkflowService(contract_pb2_grpc.DuoWorkflowServicer):
                     if isinstance(streaming_action, contract_pb2.Action):
                         yield streaming_action
 
-                        await next_non_heartbeat_event(request_iterator)
+                        if (
+                            invocation_metadata.get(
+                                "x-gitlab-unidirectional-streaming", ""
+                            )
+                            != "enabled"
+                        ):
+                            await next_non_heartbeat_event(request_iterator)
 
                         if workflow.outbox_empty():
                             continue
@@ -288,7 +304,7 @@ class DuoWorkflowService(contract_pb2_grpc.DuoWorkflowServicer):
     async def GenerateToken(
         self, request: contract_pb2.GenerateTokenRequest, context: grpc.ServicerContext
     ) -> contract_pb2.GenerateTokenResponse:
-        user: CloudConnectorUser = current_user.get()
+        user: CloudConnectorUser = current_user_context_var.get()
 
         workflow_definition = request.workflowDefinition
         unit_primitive = choose_unit_primitive(workflow_definition)
@@ -380,8 +396,10 @@ async def serve(port: int) -> None:
                 AuthenticationInterceptor(),
                 FeatureFlagInterceptor(),
                 InternalEventsInterceptor(),
+                ModelMetadataInterceptor(),
                 MonitoringInterceptor(),
                 LanguageServerVersionInterceptor(),
+                GitLabVersionInterceptor(),
             ],
             options=server_options,
         )
@@ -434,19 +452,25 @@ def choose_legacy_unit_primitive(
 
 def setup_container():
     container_application = ContainerApplication()
+    container_application.wire(packages=CONTAINER_APPLICATION_PACKAGES)
     container_application.config.from_dict(Config().model_dump())
 
 
 def run():
+    self_hosted_mode = (
+        os.environ.get("AIGW_CUSTOM_MODELS__ENABLED", "false").lower() == "true"
+    )
+
     load_dotenv()
     setup_container()
     setup_cloud_connector()
     setup_profiling()
     setup_error_tracking()
     setup_monitoring()
-    setup_logging(json_format=True, to_file=None)
+    setup_logging()
     configure_cache()
-    validate_llm_access()
+    if not self_hosted_mode:
+        validate_llm_access()
     port = int(os.environ.get("PORT", "50052"))
     asyncio.get_event_loop().run_until_complete(serve(port))
 

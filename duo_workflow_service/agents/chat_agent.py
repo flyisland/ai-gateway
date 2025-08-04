@@ -26,7 +26,7 @@ from duo_workflow_service.entities.state import (
     UiChatLog,
     WorkflowStatusEnum,
 )
-from duo_workflow_service.gitlab.gitlab_project import Project
+from duo_workflow_service.gitlab.gitlab_api import Namespace, Project
 from duo_workflow_service.slash_commands.goal_parser import parse as slash_command_parse
 from duo_workflow_service.structured_logging import _workflow_id
 from lib.internal_events import InternalEventAdditionalProperties
@@ -48,6 +48,7 @@ class ChatAgentPromptTemplate(Runnable[ChatWorkflowState, PromptValue]):
         messages: list[BaseMessage] = []
         agent_name = _kwargs["agent_name"]
         project: Project | None = input.get("project")
+        namespace: Namespace | None = input.get("namespace")
 
         # Handle system messages with static and dynamic parts
         # Create separate system messages for static and dynamic parts
@@ -76,6 +77,7 @@ class ChatAgentPromptTemplate(Runnable[ChatWorkflowState, PromptValue]):
                 current_time=datetime.now().strftime("%H:%M:%S"),
                 current_timezone=datetime.now().astimezone().tzname(),
                 project=project,
+                namespace=namespace,
             )
             messages.append(SystemMessage(content=dynamic_content))
 
@@ -228,7 +230,8 @@ class ChatAgent(Prompt[ChatWorkflowState, BaseMessage]):
                     UiChatLog(
                         message_type=MessageTypeEnum.AGENT,
                         message_sub_type=None,
-                        content="There was an error processing your request. Please try again or contact support if the issue persists.",
+                        content="There was an error processing your request. Please try again or contact support if "
+                        "the issue persists.",
                         timestamp=datetime.now(timezone.utc).isoformat(),
                         status=ToolStatus.FAILURE,
                         correlation_id=None,

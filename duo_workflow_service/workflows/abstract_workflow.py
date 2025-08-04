@@ -2,7 +2,7 @@
 import asyncio
 import os
 from abc import ABC, abstractmethod
-from typing import Any, Dict, Optional, Type, TypedDict, Union
+from typing import Any, Dict, Optional, TypedDict, Union
 
 import structlog
 from dependency_injector.wiring import Provide, inject
@@ -31,18 +31,18 @@ from duo_workflow_service.checkpointer.notifier import UserInterface
 from duo_workflow_service.components import ToolsRegistry
 from duo_workflow_service.entities import DuoWorkflowStateType
 from duo_workflow_service.gitlab.events import get_event
-from duo_workflow_service.gitlab.gitlab_project import (
+from duo_workflow_service.gitlab.gitlab_api import (
+    Namespace,
     Project,
     WorkflowConfig,
     empty_workflow_config,
-    fetch_workflow_and_project_data,
+    fetch_workflow_and_container_data,
 )
 from duo_workflow_service.gitlab.http_client import GitlabHttpClient
 from duo_workflow_service.gitlab.http_client_factory import get_http_client
-from duo_workflow_service.gitlab.url_parser import GitLabUrlParser
 from duo_workflow_service.llm_factory import AnthropicConfig, VertexConfig
 from duo_workflow_service.monitoring import duo_workflow_metrics
-from duo_workflow_service.tools import convert_mcp_tools_to_langchain_tools
+from duo_workflow_service.tools import convert_mcp_tools_to_langchain_tool_classes
 from duo_workflow_service.tracking import log_exception
 from duo_workflow_service.workflows.type_definitions import AdditionalContext
 from lib.internal_events import InternalEventAdditionalProperties, InternalEventsClient
@@ -50,6 +50,7 @@ from lib.internal_events.event_enum import CategoryEnum, EventEnum
 
 # Constants
 QUEUE_MAX_SIZE = 1
+STREAMING_QUEUE_MAX_SIZE = 10
 MAX_TOKENS_TO_SAMPLE = 8192
 RECURSION_LIMIT = 300
 DEBUG = os.getenv("DEBUG")
@@ -73,7 +74,8 @@ class AbstractWorkflow(ABC):
     _inbox: asyncio.Queue
     _streaming_outbox: asyncio.Queue
     _workflow_id: str
-    _project: Project
+    _project: Project | None
+    _namespace: Namespace | None
     _workflow_config: WorkflowConfig
     _http_client: GitlabHttpClient
     _workflow_metadata: dict[str, Any]
@@ -81,7 +83,7 @@ class AbstractWorkflow(ABC):
     _workflow_type: CategoryEnum
     _stream: bool = False
     _additional_context: list[AdditionalContext] | None
-    _additional_tools: list[Type[BaseTool]]
+    _mcp_tools: list[type[BaseTool]]
     _approval: Optional[contract_pb2.Approval]
     _prompt_registry: LocalPromptRegistry
     _language_server_version: Optional[LanguageServerVersion]
@@ -110,7 +112,7 @@ class AbstractWorkflow(ABC):
     ):
         self._outbox = asyncio.Queue(maxsize=QUEUE_MAX_SIZE)
         self._inbox = asyncio.Queue(maxsize=QUEUE_MAX_SIZE)
-        self._streaming_outbox = asyncio.Queue(maxsize=QUEUE_MAX_SIZE)
+        self._streaming_outbox = asyncio.Queue(maxsize=STREAMING_QUEUE_MAX_SIZE)
         self._workflow_id = workflow_id
         self._workflow_metadata = workflow_metadata
         self._user = user
@@ -123,7 +125,9 @@ class AbstractWorkflow(ABC):
         )
         self._workflow_type = workflow_type
         self._additional_context = additional_context
-        self._additional_tools = self._build_additional_tools(mcp_tools)
+        self._mcp_tools = convert_mcp_tools_to_langchain_tool_classes(
+            mcp_tools=mcp_tools
+        )
         self._model_config = self._get_model_config()
         self._approval = approval
         self._prompt_registry = prompt_registry
@@ -199,25 +203,16 @@ class AbstractWorkflow(ABC):
         }
         compiled_graph = None
         try:
-            self._project, self._workflow_config = (
-                await fetch_workflow_and_project_data(
+            self._project, self._namespace, self._workflow_config = (
+                await fetch_workflow_and_container_data(
                     client=self._http_client,
                     workflow_id=self._workflow_id,
                 )
             )
 
-            if "web_url" not in self._project:
-                raise RuntimeError(
-                    f"Failed to get web_url from project for workflow {self._workflow_id}"
-                )
-
-            gitlab_host = GitLabUrlParser.extract_host_from_url(
-                self._project["web_url"]
-            )
-
-            if not gitlab_host:
-                raise RuntimeError(
-                    f"Failed to extract gitlab host from web_url for workflow {self._workflow_id}"
+            if self._namespace and self._support_namespace_level_workflow() is False:
+                raise NotImplementedError(
+                    f"This workflow {self._workflow_type.value} does not support namespace-level workflow"
                 )
 
             user_for_registry = (
@@ -231,8 +226,12 @@ class AbstractWorkflow(ABC):
                 inbox=self._inbox,
                 workflow_config=self._workflow_config,
                 gl_http_client=self._http_client,
-                gitlab_host=gitlab_host,
-                additional_tools=self._additional_tools,
+                project=self._project,
+                mcp_tools=(
+                    self._mcp_tools
+                    if self._workflow_config.get("mcp_enabled", False)
+                    else []
+                ),
                 user=user_for_registry,
                 language_server_version=self._language_server_version,
             )
@@ -355,15 +354,6 @@ class AbstractWorkflow(ABC):
             category=category.value if category else self.__class__.__name__,
         )
 
-    def _build_additional_tools(
-        self,
-        mcp_tools: list[contract_pb2.McpTool],
-    ):
-        metadata = {"inbox": self._inbox, "outbox": self._outbox}
-        return convert_mcp_tools_to_langchain_tools(
-            metadata=metadata, mcp_tools=mcp_tools
-        )
-
     def _get_model_config(self) -> Union[AnthropicConfig, VertexConfig]:
         """Determine the appropriate model configuration based on deployment environment.
 
@@ -392,6 +382,15 @@ class AbstractWorkflow(ABC):
             )
 
         return AnthropicConfig(model_name=KindAnthropicModel.CLAUDE_SONNET_4.value)
+
+    def _support_namespace_level_workflow(self) -> bool:
+        """Indicate if a workflow class supports namespace-level workflows.
+
+        To support namespace-level workflows, make sure that the subclass of AbstractWorkflow
+        handle both self._project and self._namespace fields properly, then override this method to return `True`.
+        By default, namespace support is disabled in workflow classes.
+        """
+        return False
 
 
 TypeWorkflow = type[AbstractWorkflow]

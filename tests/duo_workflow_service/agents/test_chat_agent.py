@@ -1,11 +1,16 @@
 from datetime import datetime, timezone
+from typing import Any
 from unittest.mock import ANY, Mock, call, patch
 
 import pytest
+from dependency_injector.wiring import Provide, inject
+from gitlab_cloud_connector import CloudConnectorUser
 from langchain_core.messages import AIMessage, HumanMessage, SystemMessage
 from langchain_core.messages.ai import UsageMetadata
 from langchain_core.prompt_values import ChatPromptValue
 
+from ai_gateway.container import ContainerApplication
+from ai_gateway.prompts.registry import LocalPromptRegistry
 from duo_workflow_service.agents.chat_agent import ChatAgent, ChatAgentPromptTemplate
 from duo_workflow_service.entities import WorkflowStatusEnum
 from duo_workflow_service.entities.state import (
@@ -14,30 +19,50 @@ from duo_workflow_service.entities.state import (
     ToolStatus,
     UiChatLog,
 )
+from duo_workflow_service.gitlab.gitlab_api import Namespace, Project
 from lib.internal_events import InternalEventAdditionalProperties
 from lib.internal_events.event_enum import CategoryEnum, EventEnum, EventPropertyEnum
 
 
-@pytest.fixture
-def mock_datetime(mock_now: datetime):
+@pytest.fixture(name="mock_datetime")
+def mock_datetime_fixture(mock_now: datetime):
     with patch("duo_workflow_service.agents.chat_agent.datetime") as mock:
         mock.now.return_value = mock_now
         mock.timezone = timezone
         yield mock
 
 
-@pytest.fixture
-def prompt_name():
+@pytest.fixture(name="config_values")
+def config_values_fixture():
+    return {"mock_model_responses": True}
+
+
+@pytest.fixture(name="user_is_debug")
+def user_is_debug_fixture():
+    return True
+
+
+@pytest.fixture(name="prompt_name")
+def prompt_name_fixture():
     return "Chat Agent"
 
 
-@pytest.fixture
-def chat_agent(model_factory, prompt_config):
+@pytest.fixture(name="chat_agent")
+def chat_agent_fixture(model_factory, prompt_config):
     yield ChatAgent(model_factory=model_factory, config=prompt_config)
 
 
-@pytest.fixture
-def input():
+@pytest.fixture(autouse=True)
+def prepare_container(
+    mock_duo_workflow_service_container,
+):  # pylint: disable=unused-argument
+    mock_duo_workflow_service_container.wire(
+        modules=["tests.duo_workflow_service.agents.test_chat_agent"]
+    )
+
+
+@pytest.fixture(name="input")
+def input_fixture():
     return {
         "conversation_history": {"Chat Agent": [HumanMessage(content="hi")]},
         "plan": {"steps": []},
@@ -45,6 +70,7 @@ def input():
         "ui_chat_log": [],
         "last_human_input": None,
         "project": None,
+        "namespace": None,
         "approval": None,
     }
 
@@ -71,13 +97,94 @@ async def test_run(chat_agent, input):
     assert result["status"] == WorkflowStatusEnum.INPUT_REQUIRED
 
 
+@pytest.mark.asyncio
+@inject
+async def test_template_with_project(
+    input,
+    user: CloudConnectorUser,
+    prompt_registry: LocalPromptRegistry = Provide[
+        ContainerApplication.pkg_prompts.prompt_registry
+    ],
+):
+    input["project"] = Project(
+        id=1,
+        name="gitlab project",
+        web_url="https://gitlab.com/gitlab-org/gitlab",
+        description="awesome project",
+        http_url_to_repo="",
+        default_branch=None,
+        languages=[],
+        exclusion_rules=None,
+    )
+
+    chat_agent: ChatAgent = prompt_registry.get_on_behalf(  # type: ignore[assignment]
+        user=user,
+        prompt_id="chat/agent",
+        prompt_version="^1.0.0",
+        model_metadata=None,
+        internal_event_category=__name__,
+        tools=None,
+    )
+
+    result: Any = await chat_agent.prompt_tpl.ainvoke(input, agent_name=chat_agent.name)
+
+    assert isinstance(result.messages[1], SystemMessage)
+    assert "<project_id>1</project_id>" in result.messages[1].content
+    assert "<project_name>gitlab project</project_name>" in result.messages[1].content
+    assert (
+        "<project_url>https://gitlab.com/gitlab-org/gitlab</project_url>"
+        in result.messages[1].content
+    )
+    assert "<namespace>" not in result.messages[1].content
+
+
+@pytest.mark.asyncio
+@inject
+async def test_template_with_namespace(
+    input,
+    user: CloudConnectorUser,
+    prompt_registry: LocalPromptRegistry = Provide[
+        ContainerApplication.pkg_prompts.prompt_registry
+    ],
+):
+    input["namespace"] = Namespace(
+        id=1,
+        name="gitlab-org",
+        web_url="https://gitlab.com/gitlab-org",
+        description="awesome organization",
+    )
+    chat_agent: ChatAgent = prompt_registry.get_on_behalf(  # type: ignore[assignment]
+        user=user,
+        prompt_id="chat/agent",
+        prompt_version="^1.0.0",
+        model_metadata=None,
+        internal_event_category=__name__,
+        tools=None,
+    )
+
+    result: Any = await chat_agent.prompt_tpl.ainvoke(input, agent_name=chat_agent.name)
+
+    assert isinstance(result.messages[1], SystemMessage)
+    assert "<project>" not in result.messages[1].content
+    assert "<namespace_id>1</namespace_id>" in result.messages[1].content
+    assert (
+        "<namespace_description>awesome organization</namespace_description>"
+        in result.messages[1].content
+    )
+    assert "<namespace_name>gitlab-org</namespace_name>" in result.messages[1].content
+    assert (
+        "<namespace_url>https://gitlab.com/gitlab-org</namespace_url>"
+        in result.messages[1].content
+    )
+
+
 class TestChatAgentTrackTokensData:
-    @pytest.fixture
-    def unit_primitives(self):
+    @pytest.fixture(name="unit_primitives")
+    def unit_primitives_fixture(self):
         return ["duo_chat"]
 
-    @pytest.fixture
-    def usage_metadata(self):
+    @pytest.fixture(name="usage_metadata")
+    def usage_metadata_fixture(self):
         return UsageMetadata(input_tokens=1, output_tokens=2, total_tokens=3)
 
     @pytest.mark.asyncio
@@ -115,17 +222,32 @@ class TestChatAgentTrackTokensData:
 
 
 class TestChatAgentPromptTemplate:
-    @pytest.fixture
-    def prompt_template_with_split_system(self):
+    @pytest.fixture(name="prompt_template_with_split_system")
+    def prompt_template_with_split_system_fixture(self):
         """Prompt template with both system_static and system_dynamic parts."""
         return {
-            "system_static": "You are GitLab Duo Chat, an AI coding assistant.\n\n<core_mission>\nYour primary role is collaborative programming.\n</core_mission>",
-            "system_dynamic": "<context>\nThe current date is {{ current_date }}. The current time is {{ current_time }}. The user's timezone is {{ current_timezone }}.\n{%- if project %}\nHere is the project information for the current GitLab project the USER is working on:\n<project>\n<project_id>{{ project.id }}</project_id>\n<project_name>{{ project.name }}</project_name>\n<project_url>{{ project.web_url }}</project_url>\n</project>\n{%- endif %}\n</context>",
+            "system_static": """You are GitLab Duo Chat, an AI coding assistant.
+
+<core_mission>
+Your primary role is collaborative programming.
+</core_mission>""",
+            "system_dynamic": """<context>
+The current date is {{ current_date }}. The current time is {{ current_time }}. The user's timezone is
+{{ current_timezone }}.
+{%- if project %}
+Here is the project information for the current GitLab project the USER is working on:
+<project>
+<project_id>{{ project.id }}</project_id>
+<project_name>{{ project.name }}</project_name>
+<project_url>{{ project.web_url }}</project_url>
+</project>
+{%- endif %}
+</context>""",
             "user": "{{ message.content }}",
         }
 
-    @pytest.fixture
-    def chat_workflow_state(self):
+    @pytest.fixture(name="chat_workflow_state")
+    def chat_workflow_state_fixture(self):
         """Sample chat workflow state for testing."""
         return ChatWorkflowState(
             plan={"steps": []},

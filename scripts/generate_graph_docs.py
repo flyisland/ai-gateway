@@ -11,6 +11,7 @@ from langgraph.checkpoint.memory import MemorySaver
 from ai_gateway.config import Config
 from ai_gateway.container import ContainerApplication
 from duo_workflow_service.components import ToolsRegistry
+from duo_workflow_service.server import CONTAINER_APPLICATION_PACKAGES
 from lib.internal_events.event_enum import CategoryEnum
 
 HEADER_TEXT = """
@@ -35,6 +36,7 @@ def main():
 
     container_application = ContainerApplication()
     container_application.config.from_dict(Config().model_dump())
+    container_application.wire(packages=CONTAINER_APPLICATION_PACKAGES)
 
     output_file_path = sys.argv[1]
     with open(output_file_path, "w") as output_file:
@@ -51,9 +53,18 @@ def main():
 
             tools_reg = MagicMock(spec=ToolsRegistry)
             wrk = Workflow(
-                "", {}, workflow_type="", user=CloudConnectorUser(True, is_debug=True)
+                "",
+                {"git_branch": "test-branch"},
+                workflow_type="",
+                user=CloudConnectorUser(True, is_debug=True),
             )
-            wrk._project = {"id": "", "name": "", "http_url_to_repo": "", "web_url": ""}
+            wrk._project = {
+                "id": "",
+                "name": "",
+                "http_url_to_repo": "",
+                "web_url": "",
+                "default_branch": "main",
+            }
             graph = wrk._compile("", tools_reg, MemorySaver())
 
             diagram = graph.get_graph().draw_mermaid()

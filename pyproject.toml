@@ -11,6 +11,17 @@ description = "A service that gives access to GitLab AI features"
 authors = [{ name = "GitLab Engineering", email = "engineering@gitlab.com" }]
 readme = "README.md"
 
+[project.scripts]
+ai_gateway = "ai_gateway.main:run_app"
+ai-gateway = "ai_gateway.main:run_app"
+validate-model-selection-config = "ai_gateway.model_selection:validate_model_selection_config"
+eval = "eval.main:main"
+generate-dataset = "eval.generate_dataset:main"
+index_docs = "ai_gateway.scripts.index_docs_as_sqlite:build_indexed_docs"
+troubleshoot = "ai_gateway.scripts.troubleshoot_selfhosted_installation:troubleshoot"
+compute-tps = "ai_gateway.scripts.tps_test:compute_tps"
+duo-workflow-service = "duo_workflow_service.server:run"
+
 [tool.poetry.dependencies]
 fastapi = "^0.115.2"
 dependency-injector = "^4.41.0"
@@ -47,7 +58,6 @@ langchainhub = "^0.1.20"
 langchain-community = "^0.3.5"
 boto3 = "^1.35.37"
 python-gitlab = "^6.0.0"
-gitpython = "^3.1.43"
 unique-names-generator = "^1.0.2"
 langchain-google-vertexai = "^2.0.8"
 gitlab-cloud-connector = { version = "^3.0.0", source = "gitlab_cloud_connector" }
@@ -61,6 +71,7 @@ grpcio-reflection = "^1.64.1"
 sentry-sdk = "^2.17.0"
 websockets = "^15.0.1"
 langgraph-checkpoint = "2.0.26"
+gitmatch = "^0.2.1"
 bleach = "^6.2.0"
 
 [[tool.poetry.source]]
@@ -152,17 +163,6 @@ omit = [
     "*.jinja",
 ]
 
-[tool.poetry.scripts]
-ai_gateway = "ai_gateway.main:run_app"
-ai-gateway = "ai_gateway.main:run_app"
-validate-model-selection-config = "ai_gateway.model_selection:validate_model_selection_config"
-eval = "eval.main:main"
-generate-dataset = "eval.generate_dataset:main"
-index_docs = "ai_gateway.scripts.index_docs_as_sqlite:build_indexed_docs"
-troubleshoot = "ai_gateway.scripts.troubleshoot_selfhosted_installation:troubleshoot"
-compute-tps = "ai_gateway.scripts.tps_test:compute_tps"
-duo-workflow-service = "duo_workflow_service.server:run"
-
 [tool.isort]
 profile = "black"
 
@@ -188,25 +188,23 @@ max-statements = 65
 
 [tool.pylint.messages_control]
 disable = [
-    "missing-module-docstring",
-    "missing-function-docstring",
-    "line-too-long",
-    "missing-class-docstring",
-    "too-few-public-methods",
-    "no-member",
-    "fixme",
-    "protected-access",
-    "no-name-in-module",
-    "arguments-differ",
-    "unspecified-encoding",
-    "redefined-builtin",
-    "arguments-renamed",
-    "raise-missing-from",
-    "too-many-ancestors",
-    "abstract-method",
-    "broad-exception-caught",
-    "redefined-outer-name",
-    "duplicate-code",
+  "missing-module-docstring",
+  "missing-function-docstring",
+  "missing-class-docstring",
+  "too-few-public-methods",
+  "no-member",
+  "fixme",
+  "protected-access",
+  "no-name-in-module",
+  "arguments-differ",
+  "unspecified-encoding",
+  "redefined-builtin",
+  "arguments-renamed",
+  "raise-missing-from",
+  "too-many-ancestors",
+  "abstract-method",
+  "broad-exception-caught",
+  "duplicate-code",
 ]
 enable = [
     "unsafe-dependency-resolution",

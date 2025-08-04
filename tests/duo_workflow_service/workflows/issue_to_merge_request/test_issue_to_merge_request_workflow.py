@@ -12,11 +12,10 @@ from duo_workflow_service.components import ToolsRegistry
 from duo_workflow_service.entities import Plan, WorkflowStatusEnum
 from duo_workflow_service.workflows.issue_to_merge_request.workflow import Workflow
 from lib.internal_events.event_enum import CategoryEnum
-from tests.duo_workflow_service.components.conftest import graph_input
 
 
-@pytest.fixture
-def checkpoint_tuple():
+@pytest.fixture(name="checkpoint_tuple")
+def checkpoint_tuple_fixture():
     return CheckpointTuple(
         config={"configurable": {"thread_id": "123", "checkpoint_id": str(uuid4())}},
         checkpoint={
@@ -40,7 +39,7 @@ def checkpoint_tuple():
 @patch("duo_workflow_service.workflows.issue_to_merge_request.workflow.ToolsExecutor")
 @patch("duo_workflow_service.workflows.issue_to_merge_request.workflow.RunToolNode")
 @patch(
-    "duo_workflow_service.workflows.abstract_workflow.fetch_workflow_and_project_data"
+    "duo_workflow_service.workflows.abstract_workflow.fetch_workflow_and_container_data"
 )
 @patch(
     "duo_workflow_service.workflows.issue_to_merge_request.workflow.create_chat_model"
@@ -67,7 +66,7 @@ async def test_workflow_run(
     mock_executor_component,
     mock_gitlab_workflow,
     mock_chat_client,
-    mock_fetch_workflow_and_project_data,
+    mock_fetch_workflow_and_container_data,
     mock_run_tool_node_generic_class,
     mock_tools_executor,
     mock_handover_agent,
@@ -80,14 +79,16 @@ async def test_workflow_run(
     mock_tools_registry = MagicMock(spec=ToolsRegistry)
     mock_tools_registry_cls.configure = AsyncMock(return_value=mock_tools_registry)
     mock_tools_registry.approval_required.return_value = False
-    mock_fetch_workflow_and_project_data.return_value = (
+    mock_fetch_workflow_and_container_data.return_value = (
         {
             "id": 1,
             "name": "test-project",
             "description": "This is a test project",
             "http_url_to_repo": "https://example.com/project",
             "web_url": "https://example.com/project",
+            "default_branch": "main",
         },
+        None,
         {"id": 1, "project_id": 1},
     )
 
@@ -167,7 +168,7 @@ async def test_workflow_run(
     workflow = Workflow(
         "123",
         workflow_type=CategoryEnum.WORKFLOW_ISSUE_TO_MERGE_REQUEST,
-        workflow_metadata={},
+        workflow_metadata={"git_branch": "test-branch"},
     )
     await workflow.run("https://example.com/project/-/issues/1")
 
@@ -191,8 +192,8 @@ async def test_workflow_run(
     assert mock_tools_executor.call_count == 1
     assert mock_tools_executor.return_value.run.call_count >= 1
 
-    assert mock_handover_agent.call_count == 3
-    assert mock_handover_agent.return_value.run.call_count == 3
+    assert mock_handover_agent.call_count == 2
+    assert mock_handover_agent.return_value.run.call_count == 2
 
     assert mock_git_lab_workflow_instance.aput.call_count == 0
     assert mock_git_lab_workflow_instance.aget_tuple.call_count == 0
@@ -214,7 +215,7 @@ async def test_workflow_run(
 @patch("duo_workflow_service.workflows.issue_to_merge_request.workflow.ToolsExecutor")
 @patch("duo_workflow_service.workflows.issue_to_merge_request.workflow.RunToolNode")
 @patch(
-    "duo_workflow_service.workflows.abstract_workflow.fetch_workflow_and_project_data"
+    "duo_workflow_service.workflows.abstract_workflow.fetch_workflow_and_container_data"
 )
 @patch(
     "duo_workflow_service.workflows.issue_to_merge_request.workflow.create_chat_model"
@@ -234,7 +235,7 @@ async def test_workflow_run_when_exception(
     mock_executor_component,
     mock_gitlab_workflow,
     mock_chat_client,
-    mock_fetch_workflow_and_project_data,
+    mock_fetch_workflow_and_container_data,
     mock_run_tool_node_generic_class,
     mock_tools_executor,
     mock_handover_agent,
@@ -244,7 +245,7 @@ async def test_workflow_run_when_exception(
     mock_tools_registry.configure = AsyncMock(
         return_value=MagicMock(spec=ToolsRegistry)
     )
-    mock_fetch_workflow_and_project_data.return_value = (
+    mock_fetch_workflow_and_container_data.return_value = (
         {
             "id": 1,
             "name": "test-project",
@@ -252,6 +253,7 @@ async def test_workflow_run_when_exception(
             "http_url_to_repo": "https://example.com/project",
             "web_url": "https://example.com/project",
         },
+        None,
         {"id": 1, "project_id": 1},
     )
 

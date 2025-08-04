@@ -1,10 +1,8 @@
-import base64
 import json
 from typing import Any, Optional, Sequence, TypedDict
 from unittest.mock import AsyncMock, Mock, call, patch
 
 import pytest
-from dependency_injector import containers
 from langchain_core.messages import SystemMessage
 from langchain_core.runnables import RunnableConfig
 from langgraph.checkpoint.base import (
@@ -37,8 +35,8 @@ class CustomRunnableConfig(TypedDict):
     configurable: Optional[dict]
 
 
-@pytest.fixture
-def http_client_for_retry(http_client, workflow_id):
+@pytest.fixture(name="http_client_for_retry")
+def http_client_for_retry_fixture(http_client, workflow_id):
     async def mock_aget(path, **kwargs):
         if (
             path
@@ -66,33 +64,33 @@ def http_client_for_retry(http_client, workflow_id):
     return http_client
 
 
-@pytest.fixture
-def config() -> CustomRunnableConfig:
+@pytest.fixture(name="config")
+def config_fixture() -> CustomRunnableConfig:
     return {"configurable": {"thread_id": "1234", "checkpoint_id": "5678"}}
 
 
-@pytest.fixture
-def http_client():
+@pytest.fixture(name="http_client")
+def http_client_fixture():
     return AsyncMock()
 
 
-@pytest.fixture
-def workflow_id():
+@pytest.fixture(name="workflow_id")
+def workflow_id_fixture():
     return "1234"
 
 
-@pytest.fixture
-def workflow_type():
+@pytest.fixture(name="workflow_type")
+def workflow_type_fixture():
     return CategoryEnum.WORKFLOW_SOFTWARE_DEVELOPMENT
 
 
 @pytest.fixture(autouse=True)
-def prepare_container(mock_container):
+def prepare_container(mock_duo_workflow_service_container):
     pass
 
 
-@pytest.fixture
-def workflow_config():
+@pytest.fixture(name="workflow_config")
+def workflow_config_fixture():
     return {
         "first_checkpoint": None,
         "workflow_status": "created",
@@ -103,8 +101,8 @@ def workflow_config():
     }
 
 
-@pytest.fixture
-def gitlab_workflow(
+@pytest.fixture(name="gitlab_workflow")
+def gitlab_workflow_fixture(
     http_client,
     workflow_id,
     workflow_type,
@@ -118,8 +116,8 @@ def gitlab_workflow(
     )
 
 
-@pytest.fixture
-def checkpoint_data():
+@pytest.fixture(name="checkpoint_data")
+def checkpoint_data_fixture():
     return [
         {
             "thread_ts": "5678",
@@ -139,15 +137,17 @@ def checkpoint_data():
     ]
 
 
-@pytest.fixture
-def checkpoint_metadata():
+@pytest.fixture(name="checkpoint_metadata")
+def checkpoint_metadata_fixture():
     metadata = CheckpointMetadata()
     metadata["writes"] = {"some_node": {"status": "Created", "last_human_input": {}}}
     return metadata
 
 
 @pytest.mark.asyncio
+@patch("duo_workflow_service.checkpointer.gitlab_workflow.duo_workflow_metrics")
 async def test_workflow_event_tracking_for_cancelled_workflow(
+    mock_duo_workflow_metrics,
     gitlab_workflow,
     http_client,
     workflow_id,
@@ -198,6 +198,10 @@ async def test_workflow_event_tracking_for_cancelled_workflow(
         use_http_response=True,
     )
 
+    mock_duo_workflow_metrics.count_agent_platform_session_start.assert_called_once_with(
+        flow_type=workflow_type.value,
+    )
+
     assert internal_event_client.track_event.call_count == 2
     internal_event_client.track_event.assert_has_calls(
         [
@@ -222,9 +226,15 @@ async def test_workflow_event_tracking_for_cancelled_workflow(
         ]
     )
 
+    mock_duo_workflow_metrics.count_agent_platform_session_success.assert_called_once_with(
+        flow_type=workflow_type.value,
+    )
+
 
 @pytest.mark.asyncio
+@patch("duo_workflow_service.checkpointer.gitlab_workflow.duo_workflow_metrics")
 async def test_workflow_context_manager_success(
+    mock_duo_workflow_metrics,
     gitlab_workflow,
     http_client,
     workflow_id,
@@ -275,6 +285,10 @@ async def test_workflow_context_manager_success(
         use_http_response=True,
     )
 
+    mock_duo_workflow_metrics.count_agent_platform_session_start.assert_called_once_with(
+        flow_type=workflow_type.value,
+    )
+
     assert internal_event_client.track_event.call_count == 2
 
     internal_event_client.track_event.assert_has_calls(
@@ -300,11 +314,17 @@ async def test_workflow_context_manager_success(
         ]
     )
 
+    mock_duo_workflow_metrics.count_agent_platform_session_success.assert_called_once_with(
+        flow_type=workflow_type.value,
+    )
+
 
 @pytest.mark.asyncio
+@patch("duo_workflow_service.checkpointer.gitlab_workflow.duo_workflow_metrics")
 @patch("duo_workflow_service.checkpointer.gitlab_workflow.log_exception")
 async def test_workflow_context_manager_startup_error(
     mock_log_exception,
+    mock_duo_workflow_metrics,
     http_client,
     workflow_id,
     workflow_type,
@@ -367,6 +387,7 @@ async def test_workflow_context_manager_startup_error(
             label=EventLabelEnum.WORKFLOW_FINISH_LABEL.value,
             property="ValueError('Startup error simulated')",
             value=workflow_id,
+            error_type="ValueError",
         ),
         category=workflow_type,
     )
@@ -374,11 +395,19 @@ async def test_workflow_context_manager_startup_error(
     # The log_exception for status update shouldn't be called since the second status update succeeded
     mock_log_exception.assert_not_called()
 
+    # Verify the failure metric was called
+    mock_duo_workflow_metrics.count_agent_platform_session_failure.assert_called_once_with(
+        flow_type=workflow_type.value,
+        failure_reason="ValueError",
+    )
+
 
 @pytest.mark.asyncio
+@patch("duo_workflow_service.checkpointer.gitlab_workflow.duo_workflow_metrics")
 @patch("duo_workflow_service.checkpointer.gitlab_workflow.log_exception")
 async def test_workflow_context_manager_startup_error_with_status_update_failure(
     mock_log_exception,
+    mock_duo_workflow_metrics,
     http_client,
     workflow_id,
     workflow_type,
@@ -453,6 +482,7 @@ async def test_workflow_context_manager_startup_error_with_status_update_failure
             label=EventLabelEnum.WORKFLOW_FINISH_LABEL.value,
             property="ValueError('Startup error simulated')",
             value=workflow_id,
+            error_type="ValueError",
         ),
         category=workflow_type,
     )
@@ -464,6 +494,12 @@ async def test_workflow_context_manager_startup_error_with_status_update_failure
             "workflow_id": workflow_id,
             "context": "Failed to update workflow status during startup error",
         },
+    )
+
+    # Verify the failure metric was called
+    mock_duo_workflow_metrics.count_agent_platform_session_failure.assert_called_once_with(
+        flow_type=workflow_type.value,
+        failure_reason="ValueError",
     )
 
 
@@ -568,7 +604,9 @@ async def test_workflow_context_manager_resume_interrupted_approval(
 
 
 @pytest.mark.asyncio
+@patch("duo_workflow_service.checkpointer.gitlab_workflow.duo_workflow_metrics")
 async def test_workflow_context_manager_retry_success(
+    mock_duo_workflow_metrics,
     gitlab_workflow,
     http_client_for_retry,
     workflow_id,
@@ -628,9 +666,15 @@ async def test_workflow_context_manager_retry_success(
         ]
     )
 
+    mock_duo_workflow_metrics.count_agent_platform_session_success.assert_called_once_with(
+        flow_type=workflow_type.value,
+    )
+
 
 @pytest.mark.asyncio
+@patch("duo_workflow_service.checkpointer.gitlab_workflow.duo_workflow_metrics")
 async def test_workflow_context_manager_error(
+    mock_duo_workflow_metrics,
     gitlab_workflow,
     http_client,
     workflow_id,
@@ -676,6 +720,10 @@ async def test_workflow_context_manager_error(
         use_http_response=True,
     )
 
+    mock_duo_workflow_metrics.count_agent_platform_session_start.assert_called_once_with(
+        flow_type=workflow_type.value,
+    )
+
     assert internal_event_client.track_event.call_count == 2
 
     internal_event_client.track_event.assert_has_calls(
@@ -695,10 +743,17 @@ async def test_workflow_context_manager_error(
                     label=EventLabelEnum.WORKFLOW_FINISH_LABEL.value,
                     property="ValueError('Test error')",
                     value="1234",
+                    error_type="ValueError",
                 ),
                 category=workflow_type,
             ),
         ]
+    )
+
+    # Verify the failure metric was called
+    mock_duo_workflow_metrics.count_agent_platform_session_failure.assert_called_once_with(
+        flow_type=workflow_type.value,
+        failure_reason="ValueError",
     )
 
 
@@ -831,6 +886,7 @@ async def test_aput(
             },
             cls=CustomEncoder,
         ),
+        use_http_response=True,
     )
 
     http_client.apatch.assert_called_once_with(

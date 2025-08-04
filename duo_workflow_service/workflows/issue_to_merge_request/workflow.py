@@ -1,4 +1,3 @@
-import shlex
 from datetime import datetime, timezone
 from enum import StrEnum
 from typing import Annotated, Any
@@ -41,7 +40,34 @@ from duo_workflow_service.workflows.issue_to_merge_request.prompts import (
 CONTEXT_BUILDER_TOOLS = [
     "list_issues",
     "get_issue",
+    "list_issue_notes",
+    "get_issue_note",
+    "get_job_logs",
+    "get_merge_request",
+    "get_project",
+    "get_pipeline_errors",
+    "list_all_merge_request_notes",
+    "list_merge_request_diffs",
+    "gitlab_issue_search",
+    "gitlab_merge_request_search",
+    "read_file",
+    "find_files",
+    "list_dir",
+    "grep",
     "handover_tool",
+    "get_epic",
+    "list_epics",
+    "get_repository_file",
+    "list_epic_notes",
+    "get_epic_note",
+    "get_commit",
+    "list_commits",
+    "get_commit_comments",
+    "get_commit_diff",
+    "get_work_item",
+    "list_work_items",
+    "get_work_item_notes",
+    "create_merge_request",
 ]
 
 PLANNER_TOOLS = [
@@ -178,6 +204,7 @@ class Workflow(AbstractWorkflow):
         )
 
         planner_component = PlannerComponent(
+            user=self._user,
             workflow_id=self._workflow_id,
             workflow_type=self._workflow_type,
             planner_toolset=tools_registry.toolset(PLANNER_TOOLS),
@@ -185,7 +212,7 @@ class Workflow(AbstractWorkflow):
             tools_registry=tools_registry,
             model_config=self._model_config,
             goal=goal,
-            project=self._project,
+            project=self._project,  # type: ignore[arg-type]
             http_client=self._http_client,
         )
 
@@ -224,8 +251,9 @@ class Workflow(AbstractWorkflow):
             tools_registry=tools_registry,
             model_config=self._model_config,
             goal=goal,
-            project=self._project,
+            project=self._project,  # type: ignore[arg-type]
             http_client=self._http_client,
+            user=self._user,
         )
 
         executor_entry_node = executor_component.attach(
@@ -237,8 +265,6 @@ class Workflow(AbstractWorkflow):
         graph.add_edge("set_status_to_execution", executor_entry_node)
 
         issue_iid = self._fetch_issue_iid(goal)
-        merge_request_title = f"Draft: Resolve #{issue_iid}"
-
         # deterministic git actions
         graph.add_node(
             "git_actions",
@@ -246,32 +272,24 @@ class Workflow(AbstractWorkflow):
                 tool=tools_registry.get("run_git_command"),  # type: ignore
                 input_parser=lambda _: [
                     {
-                        "repository_url": self._project["http_url_to_repo"],
+                        "repository_url": self._project["http_url_to_repo"],  # type: ignore[index]
                         "command": "add",
                         "args": "-A",
                     },
                     {
-                        "repository_url": self._project["http_url_to_repo"],
+                        "repository_url": self._project["http_url_to_repo"],  # type: ignore[index]
                         "command": "commit",
                         "args": f"-m 'Duo Workflow: Resolve issue #{issue_iid}'",
                     },
                     {
-                        "repository_url": self._project["http_url_to_repo"],
+                        "repository_url": self._project["http_url_to_repo"],  # type: ignore[index]
                         "command": "push",
-                        "args": f"-o merge_request.create -o merge_request.title={shlex.quote(merge_request_title)}",
                     },
                 ],
                 output_parser=_git_output,  # type: ignore
             ).run,
         )
-        graph.add_node(
-            "complete",
-            HandoverAgent(
-                new_status=WorkflowStatusEnum.COMPLETED, handover_from="executor"
-            ).run,
-        )
-        graph.add_edge("git_actions", "complete")
-        graph.add_edge("complete", END)
+        graph.add_edge("git_actions", END)
         return graph
 
     def _add_context_builder_nodes(
@@ -323,6 +341,9 @@ class Workflow(AbstractWorkflow):
             system_prompt=BUILD_CONTEXT_SYSTEM_MESSAGE.format(
                 handover_tool_name=HANDOVER_TOOL_NAME,
                 issue_url=goal,
+                current_branch=self._workflow_metadata["git_branch"],
+                default_branch=self._project["default_branch"],  # type: ignore[index]
+                project_id=self._project["id"],  # type: ignore[index]
             ),
             toolset=context_builder_toolset,
             workflow_id=self._workflow_id,
@@ -356,12 +377,13 @@ class Workflow(AbstractWorkflow):
             last_human_input=None,
             project=self._project,
             goal=goal,
+            additional_context=None,
         )
 
     def _fetch_issue_iid(self, issue_url: str):
         try:
             gitlab_host = GitLabUrlParser.extract_host_from_url(
-                self._project["web_url"]
+                self._project["web_url"]  # type: ignore[index]
             )
             _, issue_iid = GitLabUrlParser.parse_issue_url(issue_url, gitlab_host)
             return issue_iid

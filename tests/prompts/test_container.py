@@ -14,8 +14,8 @@ from duo_workflow_service import agents as workflow
 from duo_workflow_service.gitlab.http_client import GitlabHttpClient
 
 
-@pytest.fixture
-def config_values(assets_dir):
+@pytest.fixture(name="config_values")
+def config_values_fixture(assets_dir):
     return {
         "custom_models": {"enabled": True, "disable_streaming": True},
         "self_signed_jwt": {
@@ -47,8 +47,8 @@ def _kwargs_for_class(klass):
     return {}
 
 
-def test_container(mock_container: containers.DeclarativeContainer):
-    prompts = cast(providers.Container, mock_container.pkg_prompts)
+def test_container(mock_ai_gateway_container: containers.DeclarativeContainer):
+    prompts = cast(providers.Container, mock_ai_gateway_container.pkg_prompts)
     registry = cast(LocalPromptRegistry, prompts.prompt_registry())
 
     assert registry.model_limits == ConfigModelLimits(
@@ -85,7 +85,11 @@ def test_container(mock_container: containers.DeclarativeContainer):
             provider="",
         )
 
-        klass = registry.prompts_registered[str(prompt_id_with_model_name)].klass
+        # Load the prompt definition to get the class
+        prompt_registered = registry._load_prompt_definition(
+            str(prompt_id_with_model_name)
+        )
+        klass = prompt_registered.klass
         kwargs = _kwargs_for_class(klass)
 
         for version in versions:

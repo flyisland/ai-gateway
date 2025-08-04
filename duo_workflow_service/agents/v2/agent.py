@@ -1,7 +1,7 @@
 from datetime import datetime, timezone
-from typing import Any, cast
+from typing import Any, Sequence, cast
 
-from langchain_core.messages import AIMessage, BaseMessage, HumanMessage
+from langchain_core.messages import AIMessage, BaseMessage
 from langchain_core.prompt_values import PromptValue
 from langchain_core.prompts import ChatPromptTemplate
 from langchain_core.prompts.chat import MessageLikeRepresentation
@@ -22,73 +22,53 @@ from duo_workflow_service.monitoring import duo_workflow_metrics
 from duo_workflow_service.tools.handover import HandoverTool
 
 
-class AgentPromptTemplate(Runnable[DuoWorkflowStateType, PromptValue]):
+class AgentPromptTemplate(Runnable[dict, PromptValue]):
     messages: list[BaseMessage]
 
-    def __init__(self, agent_name: str, prompt_template: dict[str, str]):
+    def __init__(
+        self, agent_name: str, preamble_messages: Sequence[MessageLikeRepresentation]
+    ):
         self.agent_name = agent_name
-        self.prompt_template = prompt_template
+        self.preamble_messages = preamble_messages
 
     def invoke(
         self,
-        input: DuoWorkflowStateType,
+        input: dict,
         config: RunnableConfig | None = None,
         **kwargs: Any,
     ) -> PromptValue:
-        messages: list[MessageLikeRepresentation] = []
-
         if self.agent_name in input["conversation_history"]:
-            messages = cast(
-                list[MessageLikeRepresentation],
-                input["conversation_history"][self.agent_name],
-            )
+            messages = input["conversation_history"][self.agent_name]
         else:
-            messages = self._conversation_preamble(input, self.prompt_template)
+            if "handover" in input:
+                # Transform handover into an agent-readable representation
+                input["handover"] = "\n".join(
+                    map(lambda x: x.pretty_repr(), input["handover"])
+                )
 
-        inputs = cast(dict, input)
-        inputs["handover_tool_name"] = HandoverTool.tool_title
+            messages = self.preamble_messages
 
         prompt_value = ChatPromptTemplate.from_messages(
             messages, template_format="jinja2"
-        ).invoke(inputs, config, **kwargs)
+        ).invoke(input, config, **kwargs)
         self.messages = prompt_value.to_messages()
 
         return prompt_value
 
-    def _conversation_preamble(
-        self, state: DuoWorkflowStateType, prompt_template: dict[str, str]
-    ) -> list[MessageLikeRepresentation]:
-        conversation_preamble: list[MessageLikeRepresentation] = []
 
-        if "system" in prompt_template:
-            conversation_preamble.append(("system", prompt_template["system"]))
-
-        if state.get("handover"):  # type: ignore
-            conversation_preamble.extend(
-                [
-                    HumanMessage(
-                        content="The steps towards goal accomplished so far are as follow:"
-                    ),
-                    *state.get("handover"),  # type: ignore
-                ]
-            )
-
-        if "user" in prompt_template:
-            conversation_preamble.append(("user", prompt_template["user"]))
-
-        return conversation_preamble
-
-
-class Agent(Prompt[DuoWorkflowStateType, BaseMessage]):
+class Agent(Prompt):
     check_events: bool = True
     workflow_id: str
     http_client: GitlabHttpClient
+    prompt_template_inputs: dict = {}
 
     @classmethod
     def _build_prompt_template(
         cls, config: PromptConfig
-    ) -> Runnable[DuoWorkflowStateType, PromptValue]:
-        return AgentPromptTemplate(config.name, config.prompt_template)
+    ) -> Runnable[dict, PromptValue]:
+        messages = cls._prompt_template_to_messages(config.prompt_template)
+
+        return AgentPromptTemplate(agent_name=config.name, preamble_messages=messages)
 
     async def run(self, state: DuoWorkflowStateType) -> dict[str, Any]:
         with duo_workflow_metrics.time_compute(
@@ -106,7 +86,8 @@ class Agent(Prompt[DuoWorkflowStateType, BaseMessage]):
                 if event and event["event_type"] == WorkflowEventType.STOP:
                     return {"status": WorkflowStatusEnum.CANCELLED}
 
-            model_completion = await super().ainvoke(state)
+            input = self._prepare_input(state)
+            model_completion = await super().ainvoke(input)
 
             if self.name in state["conversation_history"]:
                 updates["conversation_history"] = {self.name: [model_completion]}
@@ -120,6 +101,14 @@ class Agent(Prompt[DuoWorkflowStateType, BaseMessage]):
                 **updates,
                 **self._respond_to_human(state, model_completion),
             }
+
+    def _prepare_input(self, state: DuoWorkflowStateType) -> dict:
+        inputs = cast(dict, state)
+        inputs["handover_tool_name"] = HandoverTool.tool_title
+        inputs["get_plan_tool_name"] = "get_plan"
+        inputs["set_task_status_tool_name"] = "set_task_status"
+
+        return {**inputs, **self.prompt_template_inputs}
 
     def _respond_to_human(self, state, model_completion) -> dict[str, Any]:
         if not isinstance(model_completion, AIMessage):
