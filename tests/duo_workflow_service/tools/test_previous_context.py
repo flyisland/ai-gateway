@@ -29,6 +29,21 @@ class TestGetWorkflowContext:
 
         assert result == "Get context for workflow 123"
 
+    def test_tool_description_includes_agent_session_reference(self, get_last_checkpoint_tool):
+        """Test that the tool description explicitly mentions agent session references"""
+        description = get_last_checkpoint_tool.description
+        
+        # Verify key phrases are present to help LLM understand when to use this tool
+        assert "Based on agent session" in description
+        assert "previous sessions" in description
+        assert "Follow-up sessions" in description
+        assert "agent session" in description.lower()
+        assert "continuing work" in description.lower()
+        
+    def test_tool_name_matches_expected(self, get_last_checkpoint_tool):
+        """Test that the tool name is correct for referencing in workflows"""
+        assert get_last_checkpoint_tool.name == "get_previous_workflow_context"
+
     @pytest.mark.asyncio
     async def test_arun_success(self, get_last_checkpoint_tool, gitlab_client):
         mock_checkpoint = {
