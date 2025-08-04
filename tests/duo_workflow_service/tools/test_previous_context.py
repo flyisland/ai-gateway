@@ -4,8 +4,8 @@ from unittest.mock import AsyncMock
 import pytest
 
 from duo_workflow_service.tools.previous_context import (
-    GetWorkflowContext,
-    GetWorkflowContextInput,
+    GetSessionContext,
+    GetSessionContextInput,
 )
 
 
@@ -17,14 +17,14 @@ def gitlab_client_fixture():
 
 @pytest.fixture(name="get_last_checkpoint_tool")
 def get_last_checkpoint_tool_fixture(gitlab_client):
-    return GetWorkflowContext(
+    return GetSessionContext(
         metadata={"gitlab_client": gitlab_client, "gitlab_host": "gitlab.example.com"}
     )
 
 
-class TestGetWorkflowContext:
+class TestGetSessionContext:
     def test_format_display_message(self, get_last_checkpoint_tool):
-        args = GetWorkflowContextInput(previous_workflow_id=123)
+        args = GetSessionContextInput(previous_session_id=123)
         result = get_last_checkpoint_tool.format_display_message(args)
 
         assert result == "Get context for workflow 123"
@@ -57,7 +57,7 @@ class TestGetWorkflowContext:
         }
         gitlab_client.aget.return_value = [mock_checkpoint]
 
-        result = await get_last_checkpoint_tool._arun(previous_workflow_id=123)
+        result = await get_last_checkpoint_tool._arun(previous_session_id=123)
 
         gitlab_client.aget.assert_called_once_with(
             path="/api/v4/ai/duo_workflows/workflows/123/checkpoints?per_page=1",
@@ -82,7 +82,7 @@ class TestGetWorkflowContext:
     async def test_arun_empty_response(self, get_last_checkpoint_tool, gitlab_client):
         gitlab_client.aget.return_value = []
 
-        result = await get_last_checkpoint_tool._arun(previous_workflow_id=123)
+        result = await get_last_checkpoint_tool._arun(previous_session_id=123)
 
         # Verify the error message
         parsed_result = json.loads(result)
@@ -96,7 +96,7 @@ class TestGetWorkflowContext:
             "status": 404,
         }
 
-        result = await get_last_checkpoint_tool._arun(previous_workflow_id=123)
+        result = await get_last_checkpoint_tool._arun(previous_session_id=123)
 
         # Verify the error message
         parsed_result = json.loads(result)

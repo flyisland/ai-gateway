@@ -317,7 +317,7 @@ def test_registry_initialization_initialises_tools_with_correct_attributes(
         "get_repository_file": tools.GetRepositoryFile(metadata=tool_metadata),
         "list_repository_tree": tools.ListRepositoryTree(metadata=tool_metadata),
         "list_epic_notes": tools.ListEpicNotes(metadata=tool_metadata),
-        "get_previous_workflow_context": tools.GetWorkflowContext(
+        "get_previous_workflow_context": tools.GetSessionContext(
             metadata=tool_metadata
         ),
         "list_vulnerabilities": tools.ListVulnerabilities(metadata=tool_metadata),
