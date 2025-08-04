@@ -84,3 +84,17 @@ class ModelErrorHandler:
 
         self._retry_count += 1
         await asyncio.sleep(retry_after)
+
+
+class ActionException(Exception):
+    def __init__(
+        self,
+        status_code: int,
+        message: str,
+    ):
+        self.status_code = status_code
+        self.message = message
+        super().__init__(message)
+
+    def __str__(self) -> str:
+        return f"Got error from action execution: {self.message} (Status: {self.status_code})"

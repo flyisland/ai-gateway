@@ -7,7 +7,7 @@ from urllib.parse import urlencode
 from contract import contract_pb2
 from duo_workflow_service.executor.action import (
     _execute_action,
-    _execute_action_and_get_action_response,
+    _execute_action_and_get_http_response,
 )
 from duo_workflow_service.gitlab.http_client import GitlabHttpClient, GitLabHttpResponse
 
@@ -36,7 +36,7 @@ class ExecutorGitLabHttpClient(GitlabHttpClient):
             path = f"{path}?{query_string}"
 
         if use_http_response:
-            action_response = await _execute_action_and_get_action_response(
+            http_response = await _execute_action_and_get_http_response(
                 {"outbox": self.outbox, "inbox": self.inbox},
                 contract_pb2.Action(
                     runHTTPRequest=contract_pb2.RunHTTPRequest(
@@ -46,15 +46,15 @@ class ExecutorGitLabHttpClient(GitlabHttpClient):
             )
 
             body = self._parse_response(
-                action_response.httpResponse.body,
+                http_response.body,
                 parse_json=parse_json,
                 object_hook=object_hook,
             )
 
             return GitLabHttpResponse(
-                status_code=action_response.httpResponse.statusCode,
+                status_code=http_response.statusCode,
                 body=body,
-                headers=action_response.httpResponse.headers,
+                headers=http_response.headers,
             )
 
         # The following code will be removed once all tools use the new http response
