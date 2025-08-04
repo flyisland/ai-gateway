@@ -128,7 +128,7 @@ class Workflow(AbstractWorkflow):
         history: List[BaseMessage] = state["conversation_history"][self._agent.name]
 
         import structlog
-        log = structlog.stdlib.get_logger("history_compactor")
+        log = structlog.stdlib.get_logger("WORKFLOW")
 
         log.info("JEFF"*50)
 

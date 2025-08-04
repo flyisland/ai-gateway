@@ -38,6 +38,10 @@ class ChatToolsExecutor:
         self._logger = structlog.stdlib.get_logger("chat_workflow")
 
     async def run(self, state: ChatWorkflowState) -> dict:
+        import structlog
+        log = structlog.stdlib.get_logger("chat_agent")
+        log.info("IN CHAT TOOL EXECUTOR")
+
         conversation_history = state["conversation_history"].get(
             self._component_name, []
         )

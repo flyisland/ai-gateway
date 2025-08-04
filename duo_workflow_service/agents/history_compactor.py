@@ -44,59 +44,35 @@ class HistoryCompactor:
 
     async def run(self, input: ChatWorkflowState) -> Dict[str, Any]:
         try:
-            # Get the conversation history for this agent
+            self._logger.info("Starting history compaction process")
+
+            # Step 1: Take the conversation history from the input
             history: List[BaseMessage] = input["conversation_history"].get(self._compacting_from, [])
+            self._logger.info(f"Retrieved {len(history)} messages from conversation history")
 
             if not history:
+                self._logger.info("No history found, returning empty history")
                 return {
                     "conversation_history": {self._compacting_from: []},
                     "status": WorkflowStatusEnum.INPUT_REQUIRED,
                 }
 
-            # Check if we've recently compacted (look for our compacted message marker)
-            has_recent_compaction = any(
-                isinstance(msg, HumanMessage) and
-                msg.content and
-                ("<analysis>" in msg.content or "Generated with [Claude Code]" in msg.content)
-                for msg in history[-5:]  # Check last 5 messages
-            )
-
-            if has_recent_compaction:
-                log.info("Recent compaction detected - skipping to avoid loop")
-                return {
-                    "conversation_history": {self._compacting_from: history},
-                    "status": WorkflowStatusEnum.INPUT_REQUIRED,
-                }
-
-            # Separate system messages (keep at the beginning)
+            # Step 2: Parse out the system messages at the beginning of the history
             system_messages = [msg for msg in history if isinstance(msg, SystemMessage)]
             non_system_messages = [msg for msg in history if not isinstance(msg, SystemMessage)]
+            self._logger.info(f"Found {len(system_messages)} system messages and {len(non_system_messages)} non-system messages")
 
-            # If we have very few messages, don't compact
-            if len(non_system_messages) <= 8:
-                return {
-                    "conversation_history": {self._compacting_from: history},
-                    "status": WorkflowStatusEnum.INPUT_REQUIRED,
-                }
+            # Step 3: Extract up to 3 most recent messages if they exist, otherwise extract whatever is available
+            recent_count = min(3, len(non_system_messages))
+            recent_messages = non_system_messages[-recent_count:] if recent_count > 0 else []
+            self._logger.info(f"Extracted {len(recent_messages)} recent messages (up to 3)")
 
-            # Extract recent messages (5-6 messages, ensuring tool use/result pairs stay together)
-            recent_messages = self._extract_recent_messages_with_tool_pairs(non_system_messages)
-
-            # Get middle messages to be compacted (everything except system and recent)
-            messages_to_compact = non_system_messages[:-len(recent_messages)] if recent_messages else non_system_messages
+            # Step 4: Compact any remaining messages (only if there are messages to compact)
+            messages_to_compact = non_system_messages[:-recent_count] if recent_count < len(non_system_messages) else []
+            self._logger.info(f"Found {len(messages_to_compact)} messages to compact")
 
             if not messages_to_compact:
-                # Nothing to compact
-                return {
-                    "conversation_history": {self._compacting_from: history},
-                    "status": WorkflowStatusEnum.INPUT_REQUIRED,
-                }
-
-            # Ensure messages_to_compact doesn't have orphaned tool_use blocks
-            messages_to_compact = self._ensure_complete_tool_pairs(messages_to_compact)
-
-            if not messages_to_compact:
-                # No safe messages to compact after tool pair validation
+                self._logger.info("No messages to compact (fewer than 3 total messages), returning original history")
                 return {
                     "conversation_history": {self._compacting_from: history},
                     "status": WorkflowStatusEnum.INPUT_REQUIRED,
@@ -105,28 +81,22 @@ class HistoryCompactor:
             # Create a temporary state with only the messages to be compacted for the prompt
             compact_input = input.copy()
             compact_input["conversation_history"] = {self._compacting_from: messages_to_compact}
+            self._logger.info("Invoking agent to summarize conversation history")
 
             # Call the prompt to get the compacted history
             agent_response = await self._prompt.ainvoke(
                 input=compact_input, agent_name=self._agent_name
             )
             compacted_content = StrOutputParser().invoke(agent_response) or ""
+            self._logger.info(f"Agent summarization completed, generated {len(compacted_content)} characters")
 
             # Create a new message with the compacted content
             compacted_message = HumanMessage(content=compacted_content)
+            self._logger.info("Created compacted message")
 
-            from duo_workflow_service.token_counter.approximate_token_counter import (
-                ApproximateTokenCounter,
-            )
-            token_counter = ApproximateTokenCounter(self._agent_name)
-            total_tokens = token_counter.count_tokens(compacted_message)
-
-            log.info("PARK" * 50)
-            log.info(compacted_message)
-            log.info(f"Post compact token count {total_tokens}")
-
-            # Reassemble: system messages + compacted message + recent messages
+            # Step 5: Reform the conversation history with system_messages + summarized_message + recent_messages
             final_history = system_messages + [compacted_message] + recent_messages
+            self._logger.info(f"Reassembled final history with {len(final_history)} messages total")
 
             return {
                 "conversation_history": {self._compacting_from: final_history},
@@ -157,136 +127,6 @@ class HistoryCompactor:
                 ],
             }
 
-    def _extract_recent_messages_with_tool_pairs(self, messages: List[BaseMessage]) -> List[BaseMessage]:
-        """
-        Extract the 5-6 most recent messages, ensuring tool use and tool result messages
-        are kept together as pairs.
-        """
-        if not messages:
-            return []
-
-        # Simple approach: take the last 6 messages but ensure tool pairs stay together
-        target_count = 6
-
-        if len(messages) <= target_count:
-            return messages
-
-        # Start with the last target_count messages
-        candidate_messages = messages[-target_count:]
-
-        # Check if the first message in our candidate set breaks a tool pair
-        first_msg = candidate_messages[0]
-
-        # If the first message is a ToolMessage, we need to include its corresponding AIMessage
-        if isinstance(first_msg, ToolMessage):
-            tool_call_id = getattr(first_msg, "tool_call_id", None)
-            if tool_call_id:
-                # Look backwards in the full message list to find the AIMessage with this tool_call_id
-                start_index = len(messages) - target_count
-                ai_msg_index = self._find_ai_message_with_tool_call(messages, tool_call_id, start_index - 1)
-                if ai_msg_index is not None:
-                    # Include messages from the AIMessage onwards
-                    return messages[ai_msg_index:]
-
-        # Check if we have any AIMessages with tool_calls that don't have all their ToolMessages
-        for i, msg in enumerate(candidate_messages):
-            if isinstance(msg, AIMessage) and hasattr(msg, "tool_calls") and msg.tool_calls:
-                tool_call_ids = [tc.get("id") for tc in msg.tool_calls if tc.get("id")]
-                if tool_call_ids:
-                    # Check if all tool_call_ids have corresponding ToolMessages in the remaining messages
-                    remaining_messages = candidate_messages[i+1:]
-                    found_tool_ids = set()
-                    for remaining_msg in remaining_messages:
-                        if isinstance(remaining_msg, ToolMessage):
-                            tool_call_id = getattr(remaining_msg, "tool_call_id", None)
-                            if tool_call_id in tool_call_ids:
-                                found_tool_ids.add(tool_call_id)
-
-                    # If not all tool calls have results, we need to extend to include them
-                    missing_tool_ids = set(tool_call_ids) - found_tool_ids
-                    if missing_tool_ids:
-                        # Look for the missing tool results after our candidate messages
-                        extended_end = len(messages) - target_count + len(candidate_messages)
-                        for j in range(extended_end, len(messages)):
-                            if isinstance(messages[j], ToolMessage):
-                                tool_call_id = getattr(messages[j], "tool_call_id", None)
-                                if tool_call_id in missing_tool_ids:
-                                    # Extend to include this message
-                                    candidate_messages = messages[len(messages) - target_count:j+1]
-                                    missing_tool_ids.discard(tool_call_id)
-                                    if not missing_tool_ids:
-                                        break
-
-        return candidate_messages
-
-    def _ensure_complete_tool_pairs(self, messages: List[BaseMessage]) -> List[BaseMessage]:
-        """
-        Ensure that the messages list doesn't contain AIMessages with tool_calls
-        that don't have corresponding ToolMessages. Remove incomplete tool pairs.
-        """
-        if not messages:
-            return messages
-
-        # Work backwards to find the last safe message to compact
-        safe_messages = []
-        pending_tool_calls = set()
-
-        for i in range(len(messages) - 1, -1, -1):
-            msg = messages[i]
-
-            if isinstance(msg, ToolMessage):
-                # This tool result resolves a tool call
-                tool_call_id = getattr(msg, "tool_call_id", None)
-                if tool_call_id:
-                    pending_tool_calls.discard(tool_call_id)
-                safe_messages.insert(0, msg)
-
-            elif isinstance(msg, AIMessage) and hasattr(msg, "tool_calls") and msg.tool_calls:
-                # This AI message has tool calls
-                tool_call_ids = [tc.get("id") for tc in msg.tool_calls if tc.get("id")]
-
-                # If any of these tool calls are still pending (not resolved),
-                # we can't include this message or any before it
-                has_unresolved_calls = any(tc_id in pending_tool_calls for tc_id in tool_call_ids)
-
-                if has_unresolved_calls:
-                    # Stop here - can't safely include this message or earlier ones
-                    break
-                else:
-                    # Mark these tool calls as pending (they need results after this message)
-                    pending_tool_calls.update(tool_call_ids)
-                    safe_messages.insert(0, msg)
-            else:
-                # Regular message (HumanMessage, etc.) - always safe
-                safe_messages.insert(0, msg)
-
-        # If we have pending tool calls at the end, we can't use any of these messages
-        if pending_tool_calls:
-            log.info(f"Skipping compaction due to {len(pending_tool_calls)} unresolved tool calls")
-            return []
-
-        return safe_messages
-
-    def _find_ai_message_with_tool_call(self, messages: List[BaseMessage], tool_call_id: str, max_index: int) -> int | None:
-        """Find the AIMessage that contains the given tool_call_id, searching backwards from max_index."""
-        for i in range(max_index, -1, -1):
-            msg = messages[i]
-            if isinstance(msg, AIMessage) and hasattr(msg, "tool_calls") and msg.tool_calls:
-                for tool_call in msg.tool_calls:
-                    if tool_call.get("id") == tool_call_id:
-                        return i
-        return None
-
-    def _find_last_tool_message(self, messages: List[BaseMessage], tool_call_ids: List[str], start_index: int) -> int | None:
-        """Find the last ToolMessage that corresponds to any of the given tool_call_ids."""
-        last_index = None
-        for i in range(start_index + 1, len(messages)):
-            msg = messages[i]
-            if isinstance(msg, ToolMessage):
-                tool_call_id = getattr(msg, "tool_call_id", None)
-                if tool_call_id in tool_call_ids:
-                    last_index = i
-        return last_index
 
     def history_compactor_prompt(self):
         return """

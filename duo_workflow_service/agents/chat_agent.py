@@ -50,6 +50,8 @@ class ChatAgentPromptTemplate(Runnable[ChatWorkflowState, PromptValue]):
         project: Project | None = input.get("project")
         namespace: Namespace | None = input.get("namespace")
 
+        old_messages = input["conversation_history"].get(agent_name, [])
+
         # Handle system messages with static and dynamic parts
         # Create separate system messages for static and dynamic parts
         if "system_static" in self.prompt_template:
@@ -104,7 +106,8 @@ class ChatAgentPromptTemplate(Runnable[ChatWorkflowState, PromptValue]):
             else:
                 messages.append(m)  # AIMessage or ToolMessage
 
-        return ChatPromptValue(messages=messages)
+        final_messages = old_messages + messages
+        return ChatPromptValue(messages=final_messages)
 
 
 class ChatAgent(Prompt[ChatWorkflowState, BaseMessage]):
@@ -188,7 +191,7 @@ class ChatAgent(Prompt[ChatWorkflowState, BaseMessage]):
 
             # Get the complete conversation history including new messages
             complete_history = input["conversation_history"][self.name] + new_messages
-            
+
             result: dict[str, Any] = {
                 "conversation_history": {self.name: complete_history},
                 "status": status,
@@ -218,6 +221,8 @@ class ChatAgent(Prompt[ChatWorkflowState, BaseMessage]):
                 result["status"] = WorkflowStatusEnum.TOOL_CALL_APPROVAL_REQUIRED
                 result["ui_chat_log"] = approval_messages
 
+            log.info("CHATAGENT"*50)
+            log.info(result["conversation_history"])
             return result
         except Exception as error:
             log.warning(f"Error processing chat agent: {error}")
@@ -228,7 +233,7 @@ class ChatAgent(Prompt[ChatWorkflowState, BaseMessage]):
 
             # Get the complete conversation history including error message
             complete_history = input["conversation_history"].get(self.name, []) + [error_message]
-            
+
             return {
                 "conversation_history": {self.name: complete_history},
                 "status": WorkflowStatusEnum.INPUT_REQUIRED,
