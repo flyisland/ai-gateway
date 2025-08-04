@@ -26,6 +26,7 @@ from duo_workflow_service.entities.state import (
 from duo_workflow_service.errors.error_handler import ModelError, ModelErrorHandler
 from duo_workflow_service.gitlab.events import get_event
 from duo_workflow_service.gitlab.http_client import GitlabHttpClient
+from duo_workflow_service.llm_factory import AnthropicStopReason
 from duo_workflow_service.monitoring import duo_workflow_metrics
 from duo_workflow_service.structured_logging import _workflow_id
 from duo_workflow_service.token_counter.approximate_token_counter import (
@@ -147,7 +148,7 @@ class Agent:  # pylint: disable=too-many-instance-attributes
                     response = await self._model.ainvoke(messages)
 
                 stop_reason = response.response_metadata.get("stop_reason")
-                if stop_reason in ["max_tokens", "refusal"]:
+                if stop_reason in AnthropicStopReason.abnormal_values():
                     log.warning(f"LLM stopped abnormally with reason: {stop_reason}")
 
                 self._track_tokens_data(response, approximate_token_count)

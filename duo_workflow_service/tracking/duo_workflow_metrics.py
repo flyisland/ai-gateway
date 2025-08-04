@@ -3,6 +3,8 @@ import time
 import structlog
 from prometheus_client import REGISTRY, Counter, Histogram
 
+from duo_workflow_service.llm_factory import AnthropicStopReason
+
 log = structlog.stdlib.get_logger("monitoring")
 
 WORKFLOW_TIME_SCALE_BUCKETS = [
@@ -24,13 +26,7 @@ WORKFLOW_TIME_SCALE_BUCKETS = [
 ]
 LLM_TIME_SCALE_BUCKETS = [0.25, 0.5, 1, 2, 4, 7, 10, 20, 30, 60]
 
-ANTHROPIC_STOP_REASONS = [
-    "end_turn",
-    "max_tokens",
-    "stop_sequence",
-    "tool_use",
-    "unknown",
-]
+ANTHROPIC_STOP_REASONS = AnthropicStopReason.values()
 
 
 class DuoWorkflowMetrics:  # pylint: disable=too-many-instance-attributes
@@ -260,4 +256,5 @@ class DuoWorkflowMetrics:  # pylint: disable=too-many-instance-attributes
                 self.callback(duration)
             else:
                 log.warning("Timer was not started")
+                self.callback(0.0)
                 self.callback(0.0)

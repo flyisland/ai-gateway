@@ -1,6 +1,7 @@
 # pylint: disable=direct-environment-variable-reference
 
 import os
+from enum import Enum
 from typing import Literal, Optional, Union
 
 import structlog
@@ -12,6 +13,27 @@ from pydantic import BaseModel, Field, field_validator
 
 from ai_gateway.models import KindAnthropicModel
 from duo_workflow_service.tracking.errors import log_exception
+
+
+class AnthropicStopReason(str, Enum):
+    END_TURN = "end_turn"
+    MAX_TOKENS = "max_tokens"
+    STOP_SEQUENCE = "stop_sequence"
+    TOOL_USE = "tool_use"
+    PAUSE_TURN = "pause_turn"
+    REFUSAL = "refusal"
+
+    _ABNORMAL = ["max_tokens", "refusal"]
+
+    @classmethod
+    def values(cls):
+        """Return all enum values as a list."""
+        return [e.value for e in cls]
+
+    @classmethod
+    def abnormal_values(cls):
+        """Return abnormal stop reason values as a list."""
+        return [e.value for e in cls if e.value in cls._ABNORMAL]
 
 
 class ModelConfig(BaseModel):
@@ -120,4 +142,5 @@ def validate_llm_access(config: Optional[Union[AnthropicConfig, VertexConfig]] =
     content = anthropic_response.content
     # feature flags are not yet loaded, so logging the model name here could be misleading if the model name depends on
     # feature flags.
+    log.info(str(content))
     log.info(str(content))
