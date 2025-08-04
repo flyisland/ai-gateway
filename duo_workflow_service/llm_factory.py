@@ -23,7 +23,7 @@ class AnthropicStopReason(str, Enum):
     PAUSE_TURN = "pause_turn"
     REFUSAL = "refusal"
 
-    _ABNORMAL = ["max_tokens", "refusal"]
+    _ABNORMAL = [MAX_TOKENS.value, REFUSAL.value]
 
     @classmethod
     def values(cls):
