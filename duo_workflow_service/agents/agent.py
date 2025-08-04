@@ -3,6 +3,7 @@ from typing import Any, List, Union
 
 from anthropic import APIStatusError
 from dependency_injector.wiring import Provide, inject
+from langchain_core.language_models.base import LanguageModelInput
 from langchain_core.language_models.chat_models import BaseChatModel
 from langchain_core.messages import (
     AIMessage,
@@ -21,7 +22,11 @@ from duo_workflow_service.entities.state import (
     UiChatLog,
     WorkflowStatusEnum,
 )
-from duo_workflow_service.errors.error_handler import ModelError, ModelErrorHandler
+from duo_workflow_service.errors.error_handler import (
+    LLMStopReasonError,
+    ModelError,
+    ModelErrorHandler,
+)
 from duo_workflow_service.gitlab.events import get_event
 from duo_workflow_service.gitlab.http_client import GitlabHttpClient
 from duo_workflow_service.monitoring import duo_workflow_metrics
@@ -30,6 +35,7 @@ from duo_workflow_service.token_counter.approximate_token_counter import (
     ApproximateTokenCounter,
 )
 from duo_workflow_service.tools import Toolset
+from duo_workflow_service.tracking.errors import log_exception
 from lib.internal_events import InternalEventAdditionalProperties, InternalEventsClient
 from lib.internal_events.event_enum import CategoryEnum, EventEnum, EventPropertyEnum
 
@@ -37,7 +43,7 @@ from lib.internal_events.event_enum import CategoryEnum, EventEnum, EventPropert
 class Agent:  # pylint: disable=too-many-instance-attributes
     name: str
 
-    _model: Runnable
+    _model: Runnable[LanguageModelInput, BaseMessage]
     _goal: str
     _system_prompt: str
     _workflow_id: str
@@ -142,15 +148,19 @@ class Agent:  # pylint: disable=too-many-instance-attributes
                 ):
                     response = await self._model.ainvoke(messages)
 
+                stop_reason = response.response_metadata.get("stop_reason")
+                if stop_reason not in [
+                    "end_turn",
+                    "stop_sequence",
+                    "tool_use",
+                ]:
+                    log_exception(LLMStopReasonError(stop_reason=stop_reason))
+
                 self._track_tokens_data(response, approximate_token_count)
                 duo_workflow_metrics.count_llm_response(
                     model=model_name,
                     request_type=request_type,
-                    stop_reason=(
-                        response.response_metadata.get("stop_reason")
-                        if response.response_metadata
-                        else None
-                    ),
+                    stop_reason=stop_reason,
                 )
                 return [response]
             except APIStatusError as e:
