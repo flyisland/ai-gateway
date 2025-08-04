@@ -15,10 +15,21 @@ class GetWorkflowContextInput(BaseModel):
 
 class GetWorkflowContext(DuoBaseTool):
     name: str = "get_previous_workflow_context"
-    description: str = """Get context from a previously run workflow.
+    description: str = """Get context from a previously run workflow or agent session.
 
     This tool retrieves context from a previously run specified workflow.
-    Only use it when prompted by the user to reference a previously executed workflow.
+    
+    **Use this tool when:**
+    - The user prompt starts with "Based on agent session #[ID]" or similar references to previous sessions
+    - The user explicitly asks to reference a previously executed workflow
+    - The user mentions continuing work from a previous workflow or session
+    - The user references a specific workflow ID that was previously executed
+    
+    **Key use cases:**
+    - Follow-up sessions that reference previous agent sessions
+    - Continuing work from completed workflows
+    - Retrieving context to understand what was done previously
+    
     Do not provide context for any other workflow unless explicitly asked.
 
     Args:
