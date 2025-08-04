@@ -257,4 +257,3 @@ class DuoWorkflowMetrics:  # pylint: disable=too-many-instance-attributes
             else:
                 log.warning("Timer was not started")
                 self.callback(0.0)
-                self.callback(0.0)

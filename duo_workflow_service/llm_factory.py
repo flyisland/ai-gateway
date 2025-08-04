@@ -143,4 +143,3 @@ def validate_llm_access(config: Optional[Union[AnthropicConfig, VertexConfig]] =
     # feature flags are not yet loaded, so logging the model name here could be misleading if the model name depends on
     # feature flags.
     log.info(str(content))
-    log.info(str(content))
