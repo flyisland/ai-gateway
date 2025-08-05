@@ -87,7 +87,7 @@ class TestGetSessionContext:
         # Verify the error message
         parsed_result = json.loads(result)
         assert "error" in parsed_result
-        assert parsed_result["error"] == "Unable to find checkpoint for this workflow"
+        assert parsed_result["error"] == "Unable to find checkpoint for this session"
 
     @pytest.mark.asyncio
     async def test_arun_api_error(self, get_last_checkpoint_tool, gitlab_client):
@@ -173,7 +173,7 @@ class TestGetSessionContext:
 
         with pytest.raises(
             ValueError,
-            match="Unable to parse context from last checkpoint for this workflow",
+            match="Unable to parse context from last checkpoint for this session",
         ):
             get_last_checkpoint_tool._format_checkpoint_context(bad_checkpoint)
 

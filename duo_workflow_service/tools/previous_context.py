@@ -45,7 +45,7 @@ class GetSessionContext(DuoBaseTool):
 
             if not response or len(response) == 0:
                 return json.dumps(
-                    {"error": "Unable to find checkpoint for this workflow"}
+                    {"error": "Unable to find checkpoint for this session"}
                 )
 
             return json.dumps({"context": self._format_checkpoint_context(response[0])})
@@ -59,7 +59,7 @@ class GetSessionContext(DuoBaseTool):
         workflow_id = checkpoint.get("metadata", {}).get("thread_id", None)
 
         if not workflow_id:
-            raise ValueError("Invalid checkpoint format. Valid workflow ID is required")
+            raise ValueError("Invalid checkpoint format. Valid session ID is required")
 
         if not checkpoint.get("checkpoint") or not checkpoint.get("checkpoint", {}).get(
             "channel_values"
@@ -84,7 +84,7 @@ class GetSessionContext(DuoBaseTool):
         handover_messages = channel_values.get("handover", [])
         if not isinstance(handover_messages, list):
             raise ValueError(
-                "Unable to parse context from last checkpoint for this workflow"
+                "Unable to parse context from last checkpoint for this session"
             )
 
         if (
