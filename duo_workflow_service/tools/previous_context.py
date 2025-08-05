@@ -14,7 +14,7 @@ class GetSessionContextInput(BaseModel):
 
 
 class GetSessionContext(DuoBaseTool):
-    name: str = "get_previous_workflow_context"
+    name: str = "get_previous_session_context"
     description: str = """Get context from a previously run session.
 
     This tool retrieves context from a previously run specified session.
@@ -53,7 +53,7 @@ class GetSessionContext(DuoBaseTool):
             return json.dumps({"error": str(e)})
 
     def format_display_message(self, args: GetSessionContextInput) -> Optional[str]:
-        return f"Get context for workflow {args.previous_session_id}"
+        return f"Get context for session {args.previous_session_id}"
 
     def _format_checkpoint_context(self, checkpoint: dict) -> str:
         workflow_id = checkpoint.get("metadata", {}).get("thread_id", None)

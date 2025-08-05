@@ -27,7 +27,7 @@ class TestGetSessionContext:
         args = GetSessionContextInput(previous_session_id=123)
         result = get_last_checkpoint_tool.format_display_message(args)
 
-        assert result == "Get context for workflow 123"
+        assert result == "Get context for session 123"
 
     @pytest.mark.asyncio
     async def test_arun_success(self, get_last_checkpoint_tool, gitlab_client):
