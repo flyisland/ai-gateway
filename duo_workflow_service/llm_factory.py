@@ -23,8 +23,6 @@ class AnthropicStopReason(str, Enum):
     PAUSE_TURN = "pause_turn"
     REFUSAL = "refusal"
 
-    _ABNORMAL = [MAX_TOKENS.value, REFUSAL.value]
-
     @classmethod
     def values(cls):
         """Return all enum values as a list."""
@@ -33,7 +31,8 @@ class AnthropicStopReason(str, Enum):
     @classmethod
     def abnormal_values(cls):
         """Return abnormal stop reason values as a list."""
-        return [e.value for e in cls if e.value in cls._ABNORMAL]
+        abnormal = [cls.MAX_TOKENS, cls.REFUSAL]
+        return [e.value for e in abnormal]
 
 
 class ModelConfig(BaseModel):
