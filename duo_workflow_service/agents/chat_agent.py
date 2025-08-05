@@ -1,5 +1,5 @@
 from datetime import datetime, timezone
-from typing import Any, Dict, Optional, Union
+from typing import Any, Dict, Optional, Union, List
 
 import structlog
 from langchain_core.messages import (
@@ -187,8 +187,6 @@ class ChatAgent(Prompt[ChatWorkflowState, BaseMessage]):
                 for tool_call in getattr(last_message, "tool_calls", [])
             ]
             new_messages.extend(messages)
-            # update history
-            input["conversation_history"][self.name].extend(messages)
 
         try:
             with GitLabServiceContext(
@@ -221,8 +219,9 @@ class ChatAgent(Prompt[ChatWorkflowState, BaseMessage]):
             else:
                 status = WorkflowStatusEnum.INPUT_REQUIRED
 
+            complete_history = input["conversation_history"][self.name] + new_messages
             result: dict[str, Any] = {
-                "conversation_history": {self.name: [agent_response]},
+                "conversation_history": {self.name: complete_history},
                 "status": status,
             }
 
@@ -262,8 +261,9 @@ class ChatAgent(Prompt[ChatWorkflowState, BaseMessage]):
                 content=f"There was an error processing your request: {error}"
             )
 
+            complete_history = input["conversation_history"].get(self.name, []) + [error_message]
             return {
-                "conversation_history": {self.name: [error_message]},
+                "conversation_history": {self.name: complete_history},
                 "status": WorkflowStatusEnum.INPUT_REQUIRED,
                 "ui_chat_log": [
                     UiChatLog(
