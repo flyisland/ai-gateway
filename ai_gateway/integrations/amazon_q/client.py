@@ -35,19 +35,24 @@ class AmazonQClientFactory:
         self.endpoint_url = endpoint_url
         self.region = region
 
-    def get_client(self, current_user: StarletteUser, role_arn: str):
-        token = self._get_glgo_token(current_user)
+    def get_client(self, current_user: StarletteUser, auth_header: str, role_arn: str):
+        # Extract the original JWT token for validation by Amazon Q
+        _, _, original_jwt_token = auth_header.partition(" ")
+
+        token = self._get_glgo_token(current_user, auth_header)
         credentials = self._get_aws_credentials(current_user, token, role_arn)
 
         return AmazonQClient(
             url=self.endpoint_url,
             region=self.region,
             credentials=credentials,
+            original_jwt_token=original_jwt_token,
         )
 
     def _get_glgo_token(
         self,
         current_user: StarletteUser,
+        auth_header: str,
     ):
         user_id = current_user.global_user_id
         if not user_id:
@@ -56,9 +61,10 @@ class AmazonQClientFactory:
             )
 
         try:
+            _, _, cloud_connector_token = auth_header.partition(" ")
             token = self.glgo_authority.token(
                 user_id=user_id,
-                cloud_connector_token=current_user.cloud_connector_token,
+                cloud_connector_token=cloud_connector_token,
             )
             request_log.info("Obtained Glgo token", source=__name__, user_id=user_id)
             return token
@@ -93,7 +99,13 @@ class AmazonQClientFactory:
 
 
 class AmazonQClient:
-    def __init__(self, url: str, region: str, credentials: dict):
+    def __init__(
+        self,
+        url: str,
+        region: str,
+        credentials: dict,
+        original_jwt_token: str | None = None,
+    ):
         self.client = q_boto3.client(
             "q",
             region_name=region,
@@ -102,6 +114,15 @@ class AmazonQClient:
             aws_secret_access_key=credentials["SecretAccessKey"],
             aws_session_token=credentials["SessionToken"],
         )
+
+        # Add GitLab token header to all requests for validation by Amazon Q
+        if original_jwt_token:
+            self.client.meta.events.register(
+                "before-call.q.*",
+                lambda model, params, **kwargs: params.setdefault("headers", {}).update(
+                    {"X-GitLab-Token": original_jwt_token}
+                ),
+            )
 
     @raise_aws_errors
     def create_or_update_auth_application(self, application_request):

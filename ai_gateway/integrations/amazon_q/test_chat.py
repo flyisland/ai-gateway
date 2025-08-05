@@ -403,7 +403,9 @@ class TestChatAmazonQ:
 
         assert result.content == "Streamed response"
         mock_q_client_factory.get_client.assert_called_once_with(
-            current_user=mock_user, role_arn=role_arn
+            current_user=mock_user,
+            auth_header=f"Bearer {mock_user.cloud_connector_token}",
+            role_arn=role_arn,
         )
         mock_q_client.send_message.assert_called_once_with(
             message={
@@ -431,7 +433,9 @@ class TestChatAmazonQ:
         assert isinstance(chunk, ChatGenerationChunk)
         assert chunk.message.content == "Streamed response"
         mock_q_client_factory.get_client.assert_called_once_with(
-            current_user=mock_user, role_arn=role_arn
+            current_user=mock_user,
+            auth_header=f"Bearer {mock_user.cloud_connector_token}",
+            role_arn=role_arn,
         )
         mock_q_client.send_message.assert_called_once_with(
             message={"content": "system message user message"},
@@ -454,7 +458,9 @@ class TestChatAmazonQ:
         assert isinstance(chunk, ChatGenerationChunk)
         assert chunk.message.content == "Streamed response"
         mock_q_client_factory.get_client.assert_called_once_with(
-            current_user=mock_user, role_arn=role_arn
+            current_user=mock_user,
+            auth_header=f"Bearer {mock_user.cloud_connector_token}",
+            role_arn=role_arn,
         )
         mock_q_client.send_message.assert_called_once_with(
             message={

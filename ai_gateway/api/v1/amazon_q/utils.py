@@ -32,6 +32,7 @@ def authorized_q_client(
     try:
         yield amazon_q_client_factory.get_client(
             current_user=current_user,
+            auth_header=f"Bearer {current_user.cloud_connector_token}",
             role_arn=role_arn,
         )
     except AWSException as e:
