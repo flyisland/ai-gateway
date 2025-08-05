@@ -9,7 +9,7 @@ from duo_workflow_service.tools.duo_base_tool import DuoBaseTool
 
 class GetSessionContextInput(BaseModel):
     previous_session_id: int = Field(
-        description="The ID of a previously-run workflow to get context for"
+        description="The ID of a previously-run session to get context for"
     )
 
 
