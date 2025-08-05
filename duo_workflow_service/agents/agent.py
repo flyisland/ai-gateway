@@ -20,10 +20,11 @@ from duo_workflow_service.entities.event import WorkflowEvent, WorkflowEventType
 from duo_workflow_service.entities.state import (
     DuoWorkflowStateType,
     MessageTypeEnum,
+    ToolStatus,
     UiChatLog,
     WorkflowStatusEnum,
 )
-from duo_workflow_service.errors.error_handler import ModelError, ModelErrorHandler
+from duo_workflow_service.errors.error_handler import ModelErrorHandler
 from duo_workflow_service.gitlab.events import get_event
 from duo_workflow_service.gitlab.http_client import GitlabHttpClient
 from duo_workflow_service.llm_factory import AnthropicStopReason
@@ -37,6 +38,13 @@ from lib.internal_events import InternalEventAdditionalProperties, InternalEvent
 from lib.internal_events.event_enum import CategoryEnum, EventEnum, EventPropertyEnum
 
 log = structlog.stdlib.get_logger("agent")
+
+
+class AgentProcessingError(Exception):
+    def __init__(self, message: str, original_exception: Exception):
+        self.message = message
+        self.original_exception = original_exception
+        super().__init__(message)
 
 
 class Agent:  # pylint: disable=too-many-instance-attributes
@@ -84,35 +92,62 @@ class Agent:  # pylint: disable=too-many-instance-attributes
         with duo_workflow_metrics.time_compute(
             operation_type=f"{self.name}_processing"
         ):
-            updates: dict[str, Any] = {
-                "handover": [],
-            }
-            model_completion: list[MessageLikeRepresentation]
-
-            if self._check_events:
-                event: Union[WorkflowEvent, None] = await get_event(
-                    self._http_client, self._workflow_id, False
-                )
-
-                if event and event["event_type"] == WorkflowEventType.STOP:
-                    return {"status": WorkflowStatusEnum.CANCELLED}
-
-            if self.name in state["conversation_history"]:
-                model_completion = await self._model_completion(
-                    state["conversation_history"][self.name]
-                )
-                updates["conversation_history"] = {self.name: model_completion}
-            else:
-                messages = self._conversation_preamble(state)
-                model_completion = await self._model_completion(messages)
-                updates["conversation_history"] = {
-                    self.name: [*messages, *model_completion]
+            try:
+                updates: dict[str, Any] = {
+                    "handover": [],
                 }
+                model_completion: list[MessageLikeRepresentation]
 
-            return {
-                **updates,
-                **self._respond_to_human(state, model_completion),
-            }
+                if self._check_events:
+                    event: Union[WorkflowEvent, None] = await get_event(
+                        self._http_client, self._workflow_id, False
+                    )
+
+                    if event and event["event_type"] == WorkflowEventType.STOP:
+                        return {"status": WorkflowStatusEnum.CANCELLED}
+
+                if self.name in state["conversation_history"]:
+                    model_completion = await self._model_completion(
+                        state["conversation_history"][self.name]
+                    )
+                    updates["conversation_history"] = {self.name: model_completion}
+                else:
+                    messages = self._conversation_preamble(state)
+                    model_completion = await self._model_completion(messages)
+                    updates["conversation_history"] = {
+                        self.name: [*messages, *model_completion]
+                    }
+
+                return {
+                    **updates,
+                    **self._respond_to_human(state, model_completion),
+                }
+            except AgentProcessingError as e:
+                log.warning(f"Error processing agent: {e}")
+
+                return {
+                    "conversation_history": {
+                        self.name: [
+                            HumanMessage(
+                                content=f"There was an error processing your request: {e.original_exception}"
+                            )
+                        ]
+                    },
+                    "status": WorkflowStatusEnum.ERROR,
+                    "ui_chat_log": [
+                        UiChatLog(
+                            message_type=MessageTypeEnum.AGENT,
+                            message_sub_type=None,
+                            content="There was an error processing your request. "
+                            "Please try again or contact support if the issue persists.",
+                            timestamp=datetime.now(timezone.utc).isoformat(),
+                            status=ToolStatus.FAILURE,
+                            correlation_id=None,
+                            tool_info=None,
+                            additional_context=None,
+                        )
+                    ],
+                }
 
     def _respond_to_human(self, state, model_completion) -> dict[str, Any]:
         if not isinstance(model_completion[0], AIMessage):
@@ -140,7 +175,15 @@ class Agent:  # pylint: disable=too-many-instance-attributes
                     self.name
                 ).count_tokens(messages)
 
-                model_name = getattr(self._model, "model_name", "unknown")
+                model_name_attrs = {
+                    "ChatAnthropicVertex": "model_name",
+                    "ChatAnthropic": "model",
+                }
+                model_name = getattr(
+                    self._model,
+                    model_name_attrs.get(self._model.get_name()) or "missing_attr",
+                    "unknown",
+                )
                 request_type = f"{self.name}_completion"
                 with duo_workflow_metrics.time_llm_request(
                     model=model_name, request_type=request_type
@@ -161,11 +204,6 @@ class Agent:  # pylint: disable=too-many-instance-attributes
             except APIStatusError as e:
                 error_message = str(e)
                 status_code = e.response.status_code
-                model_error = ModelError(
-                    error_type=self._error_handler.get_error_type(status_code),
-                    status_code=status_code,
-                    message=error_message,
-                )
                 model_class = getattr(self._model, "bound", None)
                 duo_workflow_metrics.count_model_completion_errors(
                     model=getattr(self._model, "model_name", "unknown"),
@@ -174,7 +212,9 @@ class Agent:  # pylint: disable=too-many-instance-attributes
                     error_type=self._error_handler.get_error_type(status_code),
                 )
 
-                await self._error_handler.handle_error(model_error)
+                raise AgentProcessingError(
+                    f"Model completion failed: {error_message}", e
+                )
 
     def _track_tokens_data(self, message, estimated):
         usage_metadata = message.usage_metadata if message.usage_metadata else {}
