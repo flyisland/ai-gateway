@@ -33,7 +33,7 @@ tests:performance:
       artifacts: true
   trigger:
     project: gitlab-org/quality/component-performance-testing
-    branch: jmd/test-integrate-reporting
+    branch: vp-check-for-default-branch
     strategy: depend
     forward:
       pipeline_variables: true
