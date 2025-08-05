@@ -6,10 +6,9 @@ from unittest.mock import Mock
 import pytest
 from dependency_injector import containers, providers
 from dependency_injector.providers import Factory
-from pydantic import AnyUrl
 
 from ai_gateway.config import ConfigModelLimits
-from ai_gateway.model_metadata import create_model_metadata
+from ai_gateway.model_metadata import ModelMetadata, create_model_metadata
 from ai_gateway.model_selection.model_selection_config import ModelSelectionConfig
 from ai_gateway.prompts.config import ChatOpenAIParams, ModelClassProvider
 from ai_gateway.prompts.registry import (
@@ -100,12 +99,9 @@ def test_container(mock_ai_gateway_container: containers.DeclarativeContainer):
             # The base model is requested when no model metadata is passed
             model_metadata = None
         else:
-            model_metadata = create_model_metadata(
-                {
-                    "name": str(model_name),
-                    "endpoint": AnyUrl("http://localhost:4000"),
-                    "provider": "gitlab",
-                }
+            # Create a model metadata object that requires this file
+            model_metadata = ModelMetadata(
+                name="test", provider="gitlab", family=[model_name]
             )
 
         # Load the prompt definition to get the class

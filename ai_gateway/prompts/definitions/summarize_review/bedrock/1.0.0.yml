@@ -1,0 +1,13 @@
+---
+name: Claude 3.7 Summarize Review
+model:
+  params:
+    model_class_provider: litellm
+unit_primitives:
+  - summarize_review
+prompt_template:
+  system: |
+    {% include 'summarize_review/system/1.0.0.jinja' %}
+  user: |
+    {% include 'summarize_review/user/1.0.0.jinja' %}
+params:
