@@ -243,7 +243,7 @@ class FindFiles(DuoBaseTool):
         # Filter results based on file exclusion policy
         policy = FileExclusionPolicy(self.project)
         lines = result.strip().split("\n") if result.strip() else []
-        allowed_files = policy.filter_allowed(lines)
+        allowed_files, _excluded_files = policy.filter_allowed(lines)
 
         # Build the response
         response_parts = []
@@ -461,7 +461,7 @@ class ListDir(DuoBaseTool):
         # Filter results based on file exclusion policy
         policy = FileExclusionPolicy(self.project)
         lines = result.strip().split("\n") if result.strip() else []
-        allowed_files = policy.filter_allowed(lines)
+        allowed_files, _excluded_files = policy.filter_allowed(lines)
 
         # Build the response
         response_parts = []

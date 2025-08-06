@@ -36,17 +36,22 @@ class FileExclusionPolicy:
     def filter_allowed(self, filenames: List[str]):
         """Filter a list of filenames, returning only those allowed by the policy."""
         if not is_feature_enabled(FeatureFlag.USE_DUO_CONTEXT_EXCLUSION):
-            return filenames
+            return filenames, []
 
         if not self._matcher:
-            return filenames
+            return filenames, []
 
         allowed_files = []
+        excluded_files = []
+
         for filename in filenames:
             filename = filename.strip()
             if filename and self.is_allowed(filename):
                 allowed_files.append(filename)
-        return allowed_files
+            elif filename:
+                excluded_files.append(filename)
+
+        return allowed_files, excluded_files
 
     @staticmethod
     def format_user_exclusion_message(blocked_files: List[str]) -> str:
