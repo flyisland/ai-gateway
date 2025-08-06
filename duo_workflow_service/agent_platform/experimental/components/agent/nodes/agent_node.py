@@ -24,7 +24,7 @@ from lib.internal_events.event_enum import CategoryEnum, EventEnum, EventPropert
 
 __all__ = ["AgentNode", "AgentFinalOutput"]
 
-log = structlog.stdlib.get_logger("agent")
+log = structlog.stdlib.get_logger("agent_node")
 
 
 class AgentFinalOutput(BaseModel):
