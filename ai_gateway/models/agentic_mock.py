@@ -26,7 +26,7 @@ Usage examples:
 import asyncio
 import json
 import re
-from typing import Any, List, NamedTuple, Optional
+from typing import Any, NamedTuple, Optional
 
 from langchain_core.callbacks import AsyncCallbackManagerForLLMRun
 from langchain_core.language_models.chat_models import BaseChatModel
@@ -37,21 +37,21 @@ from langchain_core.outputs import ChatGeneration, ChatResult
 
 class Response(NamedTuple):
     content: str
-    tool_calls: List[ToolCall]
+    tool_calls: list[ToolCall]
     latency_ms: int
 
 
 class ResponseHandler:
     """Handles parsing and state management for scripted responses."""
 
-    def __init__(self, messages: List[BaseMessage]):
+    def __init__(self, messages: list[BaseMessage]):
         self.content = self._get_user_message_with_tags(messages)
-        self.responses: List[Response] = (
+        self.responses: list[Response] = (
             self._parse_all_responses() if self.content else []
         )
         self.current_index = 0
 
-    def _get_user_message_with_tags(self, messages: List[BaseMessage]) -> Optional[str]:
+    def _get_user_message_with_tags(self, messages: list[BaseMessage]) -> Optional[str]:
         """Extract the user input that contains response/tool_calls tags."""
         if not messages:
             return None
@@ -71,7 +71,7 @@ class ResponseHandler:
 
         return None
 
-    def _parse_all_responses(self) -> List[Response]:
+    def _parse_all_responses(self) -> list[Response]:
         """Parse all defined responses from the user input content return as a list."""
         assert self.content is not None
 
@@ -103,8 +103,8 @@ class ResponseHandler:
 
     def _extract_tools_from_response(
         self, response_text: str
-    ) -> tuple[str, List[ToolCall]]:
-        tool_calls: List[ToolCall] = []
+    ) -> tuple[str, list[ToolCall]]:
+        tool_calls: list[ToolCall] = []
 
         tool_pattern = r"<tool_calls>(.*?)</tool_calls>"
         tool_matches = re.findall(
@@ -198,6 +198,10 @@ class AgenticFakeModel(BaseChatModel):
         self._response_handler: Optional[ResponseHandler] = None
 
     @property
+    def _is_agentic_mock_model(self) -> bool:
+        return True
+
+    @property
     def _llm_type(self) -> str:
         return "agentic-fake-provider"
 
@@ -205,7 +209,7 @@ class AgenticFakeModel(BaseChatModel):
     def _identifying_params(self) -> dict[str, Any]:
         return {"model": "agentic-fake-model"}
 
-    async def _generate_with_latency(self, messages: List[BaseMessage]) -> ChatResult:
+    async def _generate_with_latency(self, messages: list[BaseMessage]) -> ChatResult:
         if self._response_handler is None:
             self._response_handler = ResponseHandler(messages)
 
@@ -223,8 +227,8 @@ class AgenticFakeModel(BaseChatModel):
 
     def _generate(
         self,
-        messages: List[BaseMessage],
-        stop: Optional[List[str]] = None,
+        messages: list[BaseMessage],
+        stop: Optional[list[str]] = None,
         run_manager: Optional[Any] = None,
         **kwargs,
     ) -> ChatResult:

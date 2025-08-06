@@ -220,7 +220,7 @@ class ChatAgent(Prompt[ChatWorkflowState, BaseMessage]):
             if (
                 len(agent_response.tool_calls) > 0
                 and tools_need_approval
-                and self.model_name != "agentic-fake-model"
+                and not getattr(self.model, "_is_agentic_mock_model", False)
             ):
                 result["status"] = WorkflowStatusEnum.TOOL_CALL_APPROVAL_REQUIRED
                 result["ui_chat_log"] = approval_messages
