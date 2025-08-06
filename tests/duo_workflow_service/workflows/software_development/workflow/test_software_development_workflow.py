@@ -2,7 +2,6 @@ import asyncio
 import os
 from typing import Any
 from unittest.mock import ANY, AsyncMock, MagicMock, Mock, call, patch
-from uuid import uuid4
 
 import pytest
 from gitlab_cloud_connector import CloudConnectorUser, UserClaims
@@ -97,24 +96,6 @@ def workflow_config_fixture():
         "mcp_enabled": True,
         "allow_agent_to_request_user": True,
     }
-
-
-@pytest.fixture(name="checkpoint_tuple")
-def checkpoint_tuple_fixture():
-    return CheckpointTuple(
-        config={"configurable": {"thread_id": "123", "checkpoint_id": str(uuid4())}},
-        checkpoint={
-            "channel_values": {"status": WorkflowStatusEnum.NOT_STARTED},
-            "id": str(uuid4()),
-            "channel_versions": {},
-            "pending_sends": [],
-            "versions_seen": {},
-            "ts": "",
-            "v": 0,
-        },
-        metadata={"step": 0},
-        parent_config={"configurable": {"thread_id": "123", "checkpoint_id": None}},
-    )
 
 
 @pytest.fixture(name="mock_log_exception")
@@ -1019,3 +1000,28 @@ def test_software_development_workflow_model_config(
 
         assert isinstance(config, expected_config_type)
         assert config.model_name == expected_model
+
+
+@pytest.mark.parametrize("duo_workflow_prompt_registry_enabled", [True])
+@patch(
+    "duo_workflow_service.workflows.software_development.workflow.current_model_metadata_context"
+)
+def test_context_builder_uses_model_metadata_when_prompt_registry_enabled(
+    mock_model_metadata_context,
+    tools_registry,
+    workflow,
+):
+    """Test that model_metadata is passed to context builder when prompt registry is enabled."""
+    mock_model_metadata = MagicMock()
+    mock_model_metadata_context.get.return_value = mock_model_metadata
+
+    mock_agent = MagicMock()
+    with patch.object(
+        workflow._prompt_registry, "get_on_behalf", return_value=mock_agent
+    ) as mock_get_on_behalf:
+        workflow._setup_context_builder("test goal", tools_registry)
+
+        mock_get_on_behalf.assert_called_once()
+        call_args = mock_get_on_behalf.call_args
+
+        assert call_args.kwargs["model_metadata"] == mock_model_metadata
