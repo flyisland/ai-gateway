@@ -42,6 +42,8 @@ class ModelMetadata(BaseModelMetadata):
     endpoint: Optional[Annotated[AnyUrl, UrlConstraints(max_length=255)]] = None
     api_key: Optional[Annotated[str, StringConstraints(max_length=2000)]] = None
     identifier: Optional[Annotated[str, StringConstraints(max_length=1000)]] = None
+    provider_keys: Optional[Dict[str, Any]] = None
+    model_endpoints: Optional[Dict[str, Any]] = None
 
     def to_params(self) -> Dict[str, Any]:
         """Retrieve model parameters for a given identifier.
@@ -49,7 +51,33 @@ class ModelMetadata(BaseModelMetadata):
         This function also allows setting custom provider details based on the identifier, like fetching endpoints based
         on AIGW location.
         """
-        params: Dict[str, str] = {}
+        params: Dict[str, Any] = {}
+
+        if self.provider == "fireworks_ai":
+            provider_keys = self.provider_keys or {}
+            model_endpoints = self.model_endpoints or {}
+
+            region_config = model_endpoints.get("fireworks_current_region_endpoint", {})
+            model_config = region_config.get(self.name, {})
+
+            model_identifier = model_config.get("identifier")
+
+            if not model_identifier:
+                raise ValueError(
+                    f"Fireworks model identifier is missing for model {model_identifier}."
+                )
+
+            api_base = model_config.get("endpoint")
+
+            params = {
+                "model": model_identifier,
+                "api_key": provider_keys.get("fireworks_api_key"),
+            }
+
+            if api_base:
+                params["api_base"] = api_base
+
+            return params
 
         if self.endpoint:
             params["api_base"] = str(self.endpoint).removesuffix("/")

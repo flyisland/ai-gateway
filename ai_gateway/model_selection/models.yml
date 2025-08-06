@@ -224,6 +224,27 @@ models:
       temperature: 0.0
       max_tokens: 4_096
 
+  - name: Codestral 2501
+    gitlab_identifier: codestral-2501
+    family:
+      - codestral-2501
+    params:
+      custom_llm_provider: fireworks_ai
+      model: codestral-2501
+      temperature: 0.0
+      max_tokens: 4_096
+      max_retries: 1
+
+  - name: Qwen2.5-Coder-7B
+    gitlab_identifier: qwen2p5-coder-7b
+    family:
+      - qwen2p5-coder-7b
+    params:
+      custom_llm_provider: fireworks_ai
+      temperature: 0.0
+      max_tokens: 4_096
+      max_retries: 1
+
   - name: Llama3
     gitlab_identifier: llama3
     family:

@@ -40,6 +40,8 @@ async def test_parses_model_params_into_context_var(middleware_test_client):
         "endpoint": "http://test_model.com/",
         "api_key": "test_api_key",
         "identifier": "test_model_identifier",
+        "provider_keys": None,
+        "model_endpoints": None,
     }
 
     response = middleware_test_client.post(
@@ -89,6 +91,8 @@ async def test_handles_large_request_body_with_model_metadata(middleware_test_cl
         "endpoint": "http://bedrockselfhostedmodel.com/",
         "api_key": "",
         "identifier": "bedrock/us.anthropic.claude-3-5-sonnet-20241022-v2:0",
+        "provider_keys": None,
+        "model_endpoints": None,
     }
 
     # Create a large payload to simulate chunked request
@@ -116,6 +120,8 @@ async def test_handles_very_large_request_body(middleware_test_client):
         "endpoint": "http://test_model.com/",
         "api_key": "test_key",
         "identifier": "test_identifier",
+        "provider_keys": None,
+        "model_endpoints": None,
     }
 
     # Create a very large payload (>1MB)
@@ -155,6 +161,8 @@ async def test_handles_unicode_in_large_body(middleware_test_client):
         "endpoint": "http://test_model.com/",
         "api_key": "test_key",
         "identifier": "test_identifier",
+        "provider_keys": None,
+        "model_endpoints": None,
     }
 
     # Create payload with unicode characters
@@ -175,6 +183,8 @@ async def test_model_metadata_at_end_of_large_body(middleware_test_client):
         "endpoint": "http://test_model.com/",
         "api_key": "test_key",
         "identifier": "test_identifier",
+        "provider_keys": None,
+        "model_endpoints": None,
     }
 
     # Put model_metadata at the end of a large payload
@@ -231,6 +241,8 @@ async def test_multiple_model_metadata_fields_in_large_body(middleware_test_clie
         "endpoint": "http://model1.com/",
         "api_key": "key_1",
         "identifier": "id_1",
+        "provider_keys": None,
+        "model_endpoints": None,
     }
 
     model_params_2 = {
@@ -239,6 +251,8 @@ async def test_multiple_model_metadata_fields_in_large_body(middleware_test_clie
         "endpoint": "http://model2.com/",
         "api_key": "key_2",
         "identifier": "id_2",
+        "provider_keys": None,
+        "model_endpoints": None,
     }
 
     large_content = "x" * 3000
