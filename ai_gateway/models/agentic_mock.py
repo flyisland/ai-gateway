@@ -45,14 +45,13 @@ class ResponseHandler:
     """Handles parsing and state management for scripted responses."""
 
     def __init__(self, messages: list[BaseMessage]):
-        self.content = self._get_user_message_with_tags(messages)
+        self.content = self._get_user_input(messages)
         self.responses: list[Response] = (
             self._parse_all_responses() if self.content else []
         )
         self.current_index = 0
 
-    def _get_user_message_with_tags(self, messages: list[BaseMessage]) -> Optional[str]:
-        """Extract the user input that contains response/tool_calls tags."""
+    def _get_user_input(self, messages: list[BaseMessage]) -> Optional[str]:
         if not messages:
             return None
 
@@ -63,13 +62,7 @@ class ResponseHandler:
         if not user_message or not user_message.content:
             return None
 
-        content = user_message.content
-        if isinstance(content, str) and any(
-            tag in content.lower() for tag in ["<response", "<tool_calls"]
-        ):
-            return content
-
-        return None
+        return user_message.text()
 
     def _parse_all_responses(self) -> list[Response]:
         """Parse all defined responses from the user input content return as a list."""
@@ -171,7 +164,7 @@ class ResponseHandler:
         """Get the next response in sequence, returning empty response when exhausted."""
         if not self.content:
             return Response(
-                "mock response (no HumanMessage with response/tool_calls tags found)",
+                "mock response (no response tag specified)",
                 [],
                 0,
             )

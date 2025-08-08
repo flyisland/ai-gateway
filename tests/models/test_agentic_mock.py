@@ -196,26 +196,21 @@ class TestResponseHandler:
         response = handler.get_next_response()
         assert response.latency_ms == 0
 
-    def test_response_handler_no_human_message(self):
-        messages = [AIMessage(content="<response>AI message</response>")]
-        handler = ResponseHandler(messages)
-        assert handler.content is None
-        response = handler.get_next_response()
-        assert "no HumanMessage with response/tool_calls tags found" in response.content
-
     @pytest.mark.parametrize(
         "messages",
         [
             [],
+            ["not a HumanMessage"],
             [HumanMessage(content="")],
-            [HumanMessage(content="Regular message without tags")],
             [HumanMessage(content="Just regular text without tags")],
+            [HumanMessage(content="Invalid <response tag")],
+            [HumanMessage(content=["not", "a", "string"])],
+            [AIMessage(content="<response>AIMessage is not user input</response>")],
         ],
     )
-    def test_response_handler_no_response_tags(self, messages):
+    def test_response_handler_no_response_tags_in_user_input(self, messages):
         handler = ResponseHandler(messages)
-        assert handler.content is None
 
         response = handler.get_next_response()
-        assert "no HumanMessage with response/tool_calls tags found" in response.content
+        assert response.content == "mock response (no response tag specified)"
         assert not response.tool_calls
