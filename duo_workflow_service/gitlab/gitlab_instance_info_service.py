@@ -137,8 +137,8 @@ class GitLabInstanceInfoService:
                 return f"{parsed.scheme}://{parsed.netloc}"
             else:
                 return "Unknown"
-        except Exception as e:
-            log.warning("Failed to parse web URL '%s': %s", web_url, e)
+        except Exception:
+            log.warning("Failed to parse web URL")
             return "Unknown"
 
     def _get_gitlab_version(self) -> str:
