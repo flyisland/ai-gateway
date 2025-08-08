@@ -151,7 +151,7 @@ class GitLabInstanceInfoService:
             version = gitlab_version.get()
             return version if version else "Unknown"
         except Exception as e:
-            log.warning(f"Failed to get GitLab version: {e}")
+            log.warning("Failed to get GitLab version: %s", e)
             return "Unknown"
 
     def _create_fallback_info(self) -> GitLabInstanceInfo:
