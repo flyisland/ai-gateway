@@ -5,7 +5,6 @@ import pytest
 
 from duo_workflow_service.gitlab.gitlab_api import Namespace, Project
 from duo_workflow_service.gitlab.gitlab_instance_info_service import (
-    GitLabInstanceInfo,
     GitLabInstanceInfoService,
 )
 
@@ -250,6 +249,24 @@ class TestGitLabInstanceInfoService:
             ("http://192.168.1.100:8080/test", "Self-Managed"),
             ("", "Unknown"),
             ("Unknown", "Unknown"),
+            # Edge case: project name contains "dedicated-" but it's on gitlab.com
+            ("https://gitlab.com/dedicated-project/smoke-tests", "GitLab.com (SaaS)"),
+            ("https://gitlab.com/org/dedicated-something", "GitLab.com (SaaS)"),
+            ("https://gitlab.com/dedicated-team/dedicated-repo", "GitLab.com (SaaS)"),
+            # Additional edge cases for the regex
+            ("https://gitlab.com/user/project-dedicated-name", "GitLab.com (SaaS)"),
+            (
+                "https://gitlab.com/dedicated-",
+                "GitLab.com (SaaS)",
+            ),  # Edge case with trailing dash
+            (
+                "https://dedicated.gitlab.com/test",
+                "GitLab.com (SaaS)",
+            ),  # Missing dash after dedicated
+            (
+                "https://not-dedicated-example.gitlab.com/test",
+                "GitLab.com (SaaS)",
+            ),  # Doesn't start with dedicated-
         ],
     )
     def test_determine_instance_type_from_url(self, web_url, expected_type):

@@ -1,3 +1,4 @@
+import re
 from typing import Optional
 from urllib.parse import urlparse
 
@@ -107,9 +108,9 @@ class GitLabInstanceInfoService:
 
         web_url_lower = web_url.lower()
 
-        # GitLab Dedicated typically uses dedicated-*.gitlab.com domains
-        # Check this first before checking for gitlab.com
-        if "dedicated-" in web_url_lower and "gitlab.com" in web_url_lower:
+        # GitLab Dedicated uses dedicated-*.gitlab.com domains
+        # Use regex to match the hostname pattern specifically
+        if re.search(r"://dedicated-[^/]*\.gitlab\.com", web_url_lower):
             return "GitLab Dedicated"
 
         # GitLab.com (SaaS)
