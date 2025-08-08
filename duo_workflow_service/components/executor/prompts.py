@@ -60,6 +60,14 @@ Here is the project information for the current GitLab project:
 
 OS_INFORMATION_COMPONENT = """
 Here is the information about the operating system where you are executing these tasks:
+<os_information>
+  <platform>{platform}</platform>
+  <architecture>{architecture}</architecture>
+</os_information>
+"""
+
+DEPRECATED_OS_INFORMATION_COMPONENT = """
+Here is the information about the operating system where you are executing these tasks:
 <os_information>{os_information}</os_information>
 """
 # editorconfig-checker-enable

@@ -18,15 +18,18 @@ from duo_workflow_service.entities.state import (
     WorkflowState,
     WorkflowStatusEnum,
 )
-from duo_workflow_service.errors.error_handler import ModelErrorHandler
-from duo_workflow_service.gitlab.http_client import GitlabHttpClient
+from duo_workflow_service.errors.error_handler import (
+    ModelError,
+    ModelErrorHandler,
+    ModelErrorType,
+)
 from duo_workflow_service.tools import Toolset
 from lib.internal_events import InternalEventAdditionalProperties
 from lib.internal_events.event_enum import CategoryEnum, EventEnum, EventPropertyEnum
 
 
-@pytest.fixture
-def workflow_msg_event():
+@pytest.fixture(name="workflow_msg_event")
+def workflow_msg_event_fixture():
     return {
         "id": "event-id",
         "event_type": "message",
@@ -34,8 +37,8 @@ def workflow_msg_event():
     }
 
 
-@pytest.fixture
-def workflow_resume_event():
+@pytest.fixture(name="workflow_resume_event")
+def workflow_resume_event_fixture():
     return {
         "id": "event-id",
         "event_type": "resume",
@@ -43,8 +46,8 @@ def workflow_resume_event():
     }
 
 
-@pytest.fixture
-def workflow_state(plan: Plan):
+@pytest.fixture(name="workflow_state")
+def workflow_state_fixture(plan: Plan):
     return WorkflowState(
         plan=plan,
         status=WorkflowStatusEnum.NOT_STARTED,
@@ -60,20 +63,20 @@ def workflow_state(plan: Plan):
 
 # pylint: disable=too-many-public-methods
 class TestAgent:
-    @pytest.fixture
-    def chat_mock(self):
+    @pytest.fixture(name="chat_mock")
+    def chat_mock_fixture(self):
         mock = MagicMock(BaseChatModel)
         mock.bind_tools.return_value = mock
         return mock
 
-    @pytest.fixture
-    def mock_toolset(self):
+    @pytest.fixture(name="mock_toolset")
+    def mock_toolset_fixture(self):
         mock = MagicMock(spec=Toolset)
         mock.bindable = []
         return mock
 
-    @pytest.fixture
-    def planner_agent(
+    @pytest.fixture(name="planner_agent")
+    def planner_agent_fixture(
         self, chat_mock, gl_http_client, mock_toolset, internal_event_client
     ):
         return Agent(
@@ -344,100 +347,62 @@ class TestAgent:
         )
 
     @pytest.mark.asyncio
-    async def test_run_with_api_error_retry(
-        self, chat_mock, planner_agent, workflow_state
-    ):
-        # Configure chat_mock.ainvoke to fail with APIStatusError first, then succeed
-        error_response = APIStatusError(
-            message="Temporary server error",
-            response=MagicMock(status_code=500),
-            body={"error": {"message": "Service temporarily unavailable"}},
-        )
-
-        success_response = AIMessage(content="Success after retry!")
-        chat_mock.ainvoke = AsyncMock(side_effect=[error_response, success_response])
-
-        result = await planner_agent.run(workflow_state)
-
-        # Verify that ainvoke was called twice - first failing, then succeeding
-        assert chat_mock.ainvoke.call_count == 2
-        # Verify the successful response was returned
-        assert (
-            result["conversation_history"]["test agent"][-1].content
-            == "Success after retry!"
-        )
-
-    @pytest.mark.asyncio
     async def test_run_with_persistent_api_error(
         self, chat_mock, planner_agent, workflow_state
     ):
-        # Configure the error handler class to return mock instance
         mock_error_handler = AsyncMock(spec=ModelErrorHandler)
         mock_error_handler.handle_error.return_value = AsyncMock()
         planner_agent._error_handler = mock_error_handler
 
-        # Configure chat_mock.ainvoke to consistently fail with APIStatusError
         error_response = APIStatusError(
             message="Persistent server error",
             response=MagicMock(status_code=500),
             body={"error": {"message": "Internal server error"}},
         )
-        # Mock to return error response for all retries (3 attempts)
-        chat_mock.ainvoke = AsyncMock(side_effect=[error_response] * 3)
-
-        with pytest.raises(StopAsyncIteration):
-            await planner_agent.run(workflow_state)
-
-        # Verify that ainvoke was called the maximum number of retries + 1 (4 times)
-        assert chat_mock.ainvoke.call_count == 4
-        # Verify that error handler was called the maximum number of retries (3 times)
-        assert mock_error_handler.handle_error.call_count == 3
-
-    @pytest.mark.asyncio
-    @pytest.mark.usefixtures("mock_duo_workflow_service_container")
-    async def test_run_with_api_error_status_tracking(
-        self, chat_mock, planner_agent, workflow_state
-    ):
-        # Create different API errors with various status codes
-        error_429 = APIStatusError(
-            message="Rate limit exceeded",
-            response=MagicMock(status_code=429),
-            body={"error": {"message": "Rate limit reached"}},
-        )
-        error_500 = APIStatusError(
-            message="Server error",
-            response=MagicMock(status_code=500),
-            body={"error": {"message": "Internal server error"}},
-        )
-        error_529 = APIStatusError(
-            message="Service unavailable",
-            response=MagicMock(status_code=529),
-            body={"error": {"message": "Too many requests"}},
-        )
-
-        # Configure the mock to fail with different errors then succeed
-        success_response = AIMessage(content="Finally succeeded!")
-        chat_mock.ainvoke = AsyncMock(
-            side_effect=[error_429, error_500, error_529, success_response]
-        )
-
-        # Configure the error handler class to return mock instance
-        mock_error_handler = AsyncMock(spec=ModelErrorHandler)
-        mock_error_handler.handle_error.return_value = AsyncMock()
-        planner_agent._error_handler = mock_error_handler
+        chat_mock.ainvoke = AsyncMock(side_effect=error_response)
 
         result = await planner_agent.run(workflow_state)
 
-        # Verify all retries were attempted
-        assert chat_mock.ainvoke.call_count == 4
+        assert result["status"] == WorkflowStatusEnum.ERROR
+        assert "conversation_history" in result
+        assert result["conversation_history"]["test agent"][0].content.startswith(
+            "There was an error processing your request:"
+        )
+        assert len(result["ui_chat_log"]) == 1
+        assert result["ui_chat_log"][0]["status"].value == "failure"
 
-        # Verify that error handler was called the maximum number of retries (3 times)
-        assert mock_error_handler.handle_error.call_count == 3
+    @pytest.mark.asyncio
+    async def test_agent_processing_error_properties(
+        self, chat_mock, planner_agent, workflow_state
+    ):
+        mock_error_handler = AsyncMock(spec=ModelErrorHandler)
+        exhausted_error = ModelError(
+            error_type=ModelErrorType.API_ERROR,
+            status_code=500,
+            message="Test error message",
+        )
+        mock_error_handler.handle_error.side_effect = exhausted_error
+        planner_agent._error_handler = mock_error_handler
 
-        # Verify final success
+        # Configure chat_mock.ainvoke to fail with APIStatusError
+        original_error = APIStatusError(
+            message="Test error message",
+            response=MagicMock(status_code=500),
+            body={"error": {"message": "Test error"}},
+        )
+        chat_mock.ainvoke = AsyncMock(side_effect=original_error)
+
+        result = await planner_agent.run(workflow_state)
+
+        # Verify that the error information is properly preserved
+        assert result["status"] == WorkflowStatusEnum.ERROR
         assert (
-            result["conversation_history"]["test agent"][-1].content
-            == "Finally succeeded!"
+            "Test error message"
+            in result["conversation_history"]["test agent"][0].content
+        )
+        assert (
+            result["ui_chat_log"][0]["content"]
+            == "There was an error processing your request. Please try again or contact support if the issue persists."
         )
 
     # pylint: disable=too-many-positional-arguments

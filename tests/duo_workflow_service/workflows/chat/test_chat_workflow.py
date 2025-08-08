@@ -32,18 +32,18 @@ from lib.feature_flags import current_feature_flag_context
 from lib.internal_events.event_enum import CategoryEnum
 
 
-@pytest.fixture
-def prompt_class():
+@pytest.fixture(name="prompt_class")
+def prompt_class_fixture():
     return ChatAgent
 
 
-@pytest.fixture
-def config_values():
+@pytest.fixture(name="config_values")
+def config_values_fixture():
     yield {"mock_model_responses": True}
 
 
-@pytest.fixture
-def user():
+@pytest.fixture(name="user")
+def user_fixture():
     return CloudConnectorUser(
         authenticated=True,
         claims=UserClaims(
@@ -53,8 +53,8 @@ def user():
     )
 
 
-@pytest.fixture
-def workflow_with_project(
+@pytest.fixture(name="workflow_with_project")
+def workflow_with_project_fixture(
     mock_duo_workflow_service_container: containers.Container,
     prompt: ChatAgent,
     user: CloudConnectorUser,
@@ -83,6 +83,7 @@ def workflow_with_project(
         "description": "A test project",
         "languages": [{"name": "Python", "share": 1.0}],
         "default_branch": "main",
+        "exclusion_rules": None,
     }
     workflow._namespace = None
     workflow._additional_context = additional_context
@@ -92,8 +93,8 @@ def workflow_with_project(
     return workflow
 
 
-@pytest.fixture
-def workflow_with_approval(workflow_with_project):
+@pytest.fixture(name="workflow_with_approval")
+def workflow_with_approval_fixture(workflow_with_project):
     workflow = workflow_with_project
     workflow._approval = contract_pb2.Approval(
         approval=contract_pb2.Approval.Approved()
@@ -178,12 +179,12 @@ async def test_execute_agent(workflow_with_project):
 
 
 class TestExecuteAgentWithTools:
-    @pytest.fixture
-    def model_response(self):
+    @pytest.fixture(name="model_response")
+    def model_response_fixture(self):
         return [ToolMessage(content="tool calling", tool_call_id="random_id")]
 
-    @pytest.fixture
-    def model_disable_streaming(self):
+    @pytest.fixture(name="model_disable_streaming")
+    def model_disable_streaming_fixture(self):
         return "tool_calling"
 
     @pytest.mark.asyncio
@@ -342,8 +343,8 @@ async def test_workflow_run(
 
 
 class TestUnauthorizedChatExecution:
-    @pytest.fixture
-    def user(self):
+    @pytest.fixture(name="user")
+    def user_fixture(self):
         return CloudConnectorUser(
             authenticated=True,
             claims=UserClaims(

@@ -7,7 +7,7 @@ from pydantic import BaseModel
 
 from ai_gateway.code_suggestions.language_server import LanguageServerVersion
 from duo_workflow_service import tools
-from duo_workflow_service.gitlab.gitlab_api import WorkflowConfig
+from duo_workflow_service.gitlab.gitlab_api import Project, WorkflowConfig
 from duo_workflow_service.gitlab.http_client import GitlabHttpClient
 from duo_workflow_service.tools import Toolset, ToolType
 from duo_workflow_service.tools.duo_base_tool import DuoBaseTool
@@ -19,6 +19,7 @@ class ToolMetadata(TypedDict):
     inbox: asyncio.Queue
     gitlab_client: GitlabHttpClient
     gitlab_host: str
+    project: Optional[Project]
 
 
 # This tools agent uses to interact with its internal state, they are required for
@@ -73,7 +74,7 @@ _READ_ONLY_GITLAB_TOOLS: list[Type[BaseTool]] = [
     tools.ListCommits,
     tools.GetCommitDiff,
     tools.GetCommitComments,
-    tools.GetWorkflowContext,
+    tools.GetSessionContext,
     tools.ListVulnerabilities,
     tools.CiLinter,
     tools.GetWorkItem,
@@ -111,6 +112,8 @@ _AGENT_PRIVILEGES: dict[str, list[Type[BaseTool]]] = {
         tools.CreateEpic,
         tools.UpdateEpic,
         tools.CreateCommit,
+        tools.DismissVulnerability,
+        tools.CreateWorkItem,
         *_READ_ONLY_GITLAB_TOOLS,
     ],
     "read_only_gitlab": _READ_ONLY_GITLAB_TOOLS,
@@ -134,6 +137,7 @@ class ToolsRegistry:
         gl_http_client: GitlabHttpClient,
         outbox: asyncio.Queue,
         inbox: asyncio.Queue,
+        project: Optional[Project],
         mcp_tools: Optional[list[type[BaseTool]]] = None,
         user: Optional[CloudConnectorUser] = None,
         language_server_version: Optional[LanguageServerVersion] = None,
@@ -155,6 +159,7 @@ class ToolsRegistry:
             inbox=inbox,
             gitlab_client=gl_http_client,
             gitlab_host=workflow_config.get("gitlab_host", ""),
+            project=project,
         )
 
         return cls(

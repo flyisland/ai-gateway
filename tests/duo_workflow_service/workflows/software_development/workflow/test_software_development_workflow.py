@@ -2,7 +2,6 @@ import asyncio
 import os
 from typing import Any
 from unittest.mock import ANY, AsyncMock, MagicMock, Mock, call, patch
-from uuid import uuid4
 
 import pytest
 from gitlab_cloud_connector import CloudConnectorUser, UserClaims
@@ -58,8 +57,8 @@ def prepare_container(mock_duo_workflow_service_container):
     pass
 
 
-@pytest.fixture
-def user():
+@pytest.fixture(name="user")
+def user_fixture():
     return CloudConnectorUser(
         authenticated=True,
         claims=UserClaims(
@@ -69,8 +68,8 @@ def user():
     )
 
 
-@pytest.fixture
-def workflow(
+@pytest.fixture(name="workflow")
+def workflow_fixture(
     mock_duo_workflow_service_container: Mock,
     gl_http_client: GitlabHttpClient,
     user: CloudConnectorUser,
@@ -87,8 +86,8 @@ def workflow(
     return workflow
 
 
-@pytest.fixture
-def workflow_config():
+@pytest.fixture(name="workflow_config")
+def workflow_config_fixture():
     return {
         "first_checkpoint": None,
         "workflow_status": "created",
@@ -99,34 +98,16 @@ def workflow_config():
     }
 
 
-@pytest.fixture
-def checkpoint_tuple():
-    return CheckpointTuple(
-        config={"configurable": {"thread_id": "123", "checkpoint_id": str(uuid4())}},
-        checkpoint={
-            "channel_values": {"status": WorkflowStatusEnum.NOT_STARTED},
-            "id": str(uuid4()),
-            "channel_versions": {},
-            "pending_sends": [],
-            "versions_seen": {},
-            "ts": "",
-            "v": 0,
-        },
-        metadata={"step": 0},
-        parent_config={"configurable": {"thread_id": "123", "checkpoint_id": None}},
-    )
-
-
-@pytest.fixture
-def mock_log_exception():
+@pytest.fixture(name="mock_log_exception")
+def mock_log_exception_fixture():
     with patch(
         "duo_workflow_service.workflows.abstract_workflow.log_exception"
     ) as mock:
         yield mock
 
 
-@pytest.fixture
-def agent_responses() -> list[dict[str, Any]]:
+@pytest.fixture(name="agent_responses")
+def agent_responses_fixture() -> list[dict[str, Any]]:
     status = WorkflowStatusEnum.PLANNING
     agent_name = "context_builder"
 
@@ -187,8 +168,8 @@ def agent_responses() -> list[dict[str, Any]]:
     ]
 
 
-@pytest.fixture
-def duo_workflow_prompt_registry_enabled() -> bool:
+@pytest.fixture(name="duo_workflow_prompt_registry_enabled")
+def duo_workflow_prompt_registry_enabled_fixture() -> bool:
     return False
 
 
@@ -200,8 +181,8 @@ def stub_feature_flags(duo_workflow_prompt_registry_enabled: bool):
     yield
 
 
-@pytest.fixture
-def mock_agent(
+@pytest.fixture(name="mock_agent")
+def mock_agent_fixture(
     agent_responses: list[dict[str, Any]], duo_workflow_prompt_registry_enabled: bool
 ):
     if duo_workflow_prompt_registry_enabled:
@@ -214,8 +195,8 @@ def mock_agent(
         yield mock
 
 
-@pytest.fixture
-def mock_handover_agent():
+@pytest.fixture(name="mock_handover_agent")
+def mock_handover_agent_fixture():
     with patch(
         "duo_workflow_service.workflows.software_development.workflow.HandoverAgent"
     ) as mock:
@@ -227,8 +208,8 @@ def mock_handover_agent():
         yield mock
 
 
-@pytest.fixture
-def mock_plan_supervisor_agent():
+@pytest.fixture(name="mock_plan_supervisor_agent")
+def mock_plan_supervisor_agent_fixture():
     with patch(
         "duo_workflow_service.workflows.software_development.workflow.PlanSupervisorAgent"
     ) as mock:
@@ -240,16 +221,16 @@ def mock_plan_supervisor_agent():
         yield mock
 
 
-@pytest.fixture
-def mock_tools_executor():
+@pytest.fixture(name="mock_tools_executor")
+def mock_tools_executor_fixture():
     with patch(
         "duo_workflow_service.workflows.software_development.workflow.ToolsExecutor"
     ) as mock:
         yield mock
 
 
-@pytest.fixture
-def mock_chat_client():
+@pytest.fixture(name="mock_chat_client")
+def mock_chat_client_fixture():
     with patch(
         "duo_workflow_service.workflows.software_development.workflow.create_chat_model",
         autospec=True,
@@ -257,8 +238,8 @@ def mock_chat_client():
         yield mock
 
 
-@pytest.fixture
-def mock_executor_component():
+@pytest.fixture(name="mock_executor_component")
+def mock_executor_component_fixture():
     with patch(
         "duo_workflow_service.workflows.software_development.workflow.ExecutorComponent",
         autospec=True,
@@ -267,8 +248,8 @@ def mock_executor_component():
         yield mock
 
 
-@pytest.fixture
-def mock_planner_component():
+@pytest.fixture(name="mock_planner_component")
+def mock_planner_component_fixture():
     with patch(
         "duo_workflow_service.workflows.software_development.workflow.PlannerComponent",
         autospec=True,
@@ -277,8 +258,8 @@ def mock_planner_component():
         yield mock
 
 
-@pytest.fixture
-def mock_tools_approval_component():
+@pytest.fixture(name="mock_tools_approval_component")
+def mock_tools_approval_component_fixture():
     with patch(
         "duo_workflow_service.workflows.software_development.workflow.ToolsApprovalComponent",
         autospec=True,
@@ -286,8 +267,8 @@ def mock_tools_approval_component():
         yield mock
 
 
-@pytest.fixture
-def mock_goal_disambiguation_component():
+@pytest.fixture(name="mock_goal_disambiguation_component")
+def mock_goal_disambiguation_component_fixture():
     with patch(
         "duo_workflow_service.workflows.software_development.workflow.GoalDisambiguationComponent",
         autospec=True,
@@ -593,8 +574,8 @@ async def test_workflow_run_with_tools_registry(
     )
 
 
-@pytest.fixture
-def tools_registry(tool_metadata):
+@pytest.fixture(name="tools_registry")
+def tools_registry_fixture(tool_metadata):
     """Create a tools registry with all privileges enabled."""
     return ToolsRegistry(
         enabled_tools=list(_AGENT_PRIVILEGES.keys()),
@@ -1019,3 +1000,28 @@ def test_software_development_workflow_model_config(
 
         assert isinstance(config, expected_config_type)
         assert config.model_name == expected_model
+
+
+@pytest.mark.parametrize("duo_workflow_prompt_registry_enabled", [True])
+@patch(
+    "duo_workflow_service.workflows.software_development.workflow.current_model_metadata_context"
+)
+def test_context_builder_uses_model_metadata_when_prompt_registry_enabled(
+    mock_model_metadata_context,
+    tools_registry,
+    workflow,
+):
+    """Test that model_metadata is passed to context builder when prompt registry is enabled."""
+    mock_model_metadata = MagicMock()
+    mock_model_metadata_context.get.return_value = mock_model_metadata
+
+    mock_agent = MagicMock()
+    with patch.object(
+        workflow._prompt_registry, "get_on_behalf", return_value=mock_agent
+    ) as mock_get_on_behalf:
+        workflow._setup_context_builder("test goal", tools_registry)
+
+        mock_get_on_behalf.assert_called_once()
+        call_args = mock_get_on_behalf.call_args
+
+        assert call_args.kwargs["model_metadata"] == mock_model_metadata

@@ -23,11 +23,7 @@ from duo_workflow_service.entities.state import (
     WorkflowState,
     WorkflowStatusEnum,
 )
-from duo_workflow_service.tools import (
-    PipelineMergeRequestNotFoundError,
-    RunCommand,
-    Toolset,
-)
+from duo_workflow_service.tools import RunCommand, Toolset
 from duo_workflow_service.tools.planner import (
     AddNewTask,
     AddNewTaskInput,
@@ -63,8 +59,8 @@ def prepare_container(
     pass
 
 
-@pytest.fixture
-def all_tools() -> dict[str, ToolType]:
+@pytest.fixture(name="all_tools")
+def all_tools_fixture() -> dict[str, ToolType]:
     return {
         "set_task_status": SetTaskStatus(),
         "add_new_task": AddNewTask(),
@@ -74,16 +70,16 @@ def all_tools() -> dict[str, ToolType]:
     }
 
 
-@pytest.fixture
-def toolset(all_tools: dict[str, ToolType]) -> Toolset:
+@pytest.fixture(name="toolset")
+def toolset_fixture(all_tools: dict[str, ToolType]) -> Toolset:
     return Toolset(
         pre_approved=set(),
         all_tools=all_tools,
     )
 
 
-@pytest.fixture
-def tools_executor(toolset: Toolset) -> ToolsExecutor:
+@pytest.fixture(name="tools_executor")
+def tools_executor_fixture(toolset: Toolset) -> ToolsExecutor:
     return ToolsExecutor(
         tools_agent_name="planner",
         toolset=toolset,
@@ -92,8 +88,8 @@ def tools_executor(toolset: Toolset) -> ToolsExecutor:
     )
 
 
-@pytest.fixture
-def graph(tools_executor: ToolsExecutor) -> Runnable:
+@pytest.fixture(name="graph")
+def graph_fixture(tools_executor: ToolsExecutor) -> Runnable:
     graph_builder = StateGraph(WorkflowState)
     graph_builder.add_node("exec", tools_executor.run)
     graph_builder.set_entry_point("exec")
@@ -102,13 +98,13 @@ def graph(tools_executor: ToolsExecutor) -> Runnable:
     return graph_builder.compile()
 
 
-@pytest.fixture
-def ui_chat_log():
+@pytest.fixture(name="ui_chat_log")
+def ui_chat_log_fixture():
     return []
 
 
-@pytest.fixture
-def mock_datetime(mock_now: datetime):
+@pytest.fixture(name="mock_datetime")
+def mock_datetime_fixture(mock_now: datetime):
     with patch("duo_workflow_service.agents.tools_executor.datetime") as mock:
         mock.now.return_value = mock_now
         mock.timezone = timezone
@@ -857,15 +853,6 @@ async def test_state_manipulation(
             "Failed: Using test_tool: invalid=data - Validation error",
             ToolInfo(name="test_tool", args={"invalid": "data"}),
         ),
-        (
-            {"id": "3", "name": "test_tool", "args": {}},
-            PipelineMergeRequestNotFoundError("Merge request not found"),
-            None,
-            "Pipeline exception",
-            True,
-            "Failed: Using test_tool:  - Pipeline error: Merge request not found",
-            ToolInfo(name="test_tool", args={}),
-        ),
     ],
 )
 @pytest.mark.usefixtures("mock_datetime")
@@ -971,7 +958,9 @@ class MockGetIssue(BaseTool):
     def _run(self) -> str:
         return ""
 
-    def format_display_message(self, args: MockGetIssueInput) -> str:
+    def format_display_message(
+        self, args: MockGetIssueInput, _tool_response: Any = None
+    ) -> str:
         return f"Read issue #{args.issue_id} in project {args.project_id}"
 
 

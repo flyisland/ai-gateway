@@ -18,6 +18,7 @@ from langgraph.graph import (  # pylint: disable=no-langgraph-langchain-imports
     StateGraph,
 )
 
+from ai_gateway.model_metadata import current_model_metadata_context
 from duo_workflow_service.agents import (
     Agent,
     AgentV2,
@@ -66,6 +67,7 @@ EXECUTOR_TOOLS = [
     "list_issues",
     "get_issue",
     "update_issue",
+    "dismiss_vulnerability",
     "create_issue_note",
     "create_merge_request_note",
     "list_issue_notes",
@@ -108,10 +110,11 @@ EXECUTOR_TOOLS = [
     "get_work_item",
     "list_work_items",
     "get_work_item_notes",
+    "create_work_item",
 ]
 
 CONTEXT_BUILDER_TOOLS = [
-    "get_previous_workflow_context",
+    "get_previous_session_context",
     "list_issues",
     "get_issue",
     "list_issue_notes",
@@ -143,10 +146,11 @@ CONTEXT_BUILDER_TOOLS = [
     "get_work_item",
     "list_work_items",
     "get_work_item_notes",
+    "create_work_item",
 ]
 
 PLANNER_TOOLS = [
-    "get_previous_workflow_context",
+    "get_previous_session_context",
     "get_plan",
     "add_new_task",
     "remove_task",
@@ -363,6 +367,7 @@ class Workflow(AbstractWorkflow):
                     tools=context_builder_toolset.bindable,  # type: ignore[arg-type]
                     workflow_id=self._workflow_id,
                     http_client=self._http_client,
+                    model_metadata=current_model_metadata_context.get(),
                 ),
             )
         else:

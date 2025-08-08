@@ -1,8 +1,9 @@
 from datetime import datetime, timezone
 from typing import Any
-from unittest.mock import ANY, Mock, call, patch
+from unittest.mock import ANY, AsyncMock, Mock, call, patch
 
 import pytest
+from anthropic import APIStatusError
 from dependency_injector.wiring import Provide, inject
 from gitlab_cloud_connector import CloudConnectorUser
 from langchain_core.messages import AIMessage, HumanMessage, SystemMessage
@@ -24,31 +25,31 @@ from lib.internal_events import InternalEventAdditionalProperties
 from lib.internal_events.event_enum import CategoryEnum, EventEnum, EventPropertyEnum
 
 
-@pytest.fixture
-def mock_datetime(mock_now: datetime):
+@pytest.fixture(name="mock_datetime")
+def mock_datetime_fixture(mock_now: datetime):
     with patch("duo_workflow_service.agents.chat_agent.datetime") as mock:
         mock.now.return_value = mock_now
         mock.timezone = timezone
         yield mock
 
 
-@pytest.fixture
-def config_values():
+@pytest.fixture(name="config_values")
+def config_values_fixture():
     return {"mock_model_responses": True}
 
 
-@pytest.fixture
-def user_is_debug():
+@pytest.fixture(name="user_is_debug")
+def user_is_debug_fixture():
     return True
 
 
-@pytest.fixture
-def prompt_name():
+@pytest.fixture(name="prompt_name")
+def prompt_name_fixture():
     return "Chat Agent"
 
 
-@pytest.fixture
-def chat_agent(model_factory, prompt_config):
+@pytest.fixture(name="chat_agent")
+def chat_agent_fixture(model_factory, prompt_config):
     yield ChatAgent(model_factory=model_factory, config=prompt_config)
 
 
@@ -61,8 +62,8 @@ def prepare_container(
     )
 
 
-@pytest.fixture
-def input():
+@pytest.fixture(name="input")
+def input_fixture():
     return {
         "conversation_history": {"Chat Agent": [HumanMessage(content="hi")]},
         "plan": {"steps": []},
@@ -114,6 +115,7 @@ async def test_template_with_project(
         http_url_to_repo="",
         default_branch=None,
         languages=[],
+        exclusion_rules=None,
     )
 
     chat_agent: ChatAgent = prompt_registry.get_on_behalf(  # type: ignore[assignment]
@@ -178,12 +180,12 @@ async def test_template_with_namespace(
 
 
 class TestChatAgentTrackTokensData:
-    @pytest.fixture
-    def unit_primitives(self):
+    @pytest.fixture(name="unit_primitives")
+    def unit_primitives_fixture(self):
         return ["duo_chat"]
 
-    @pytest.fixture
-    def usage_metadata(self):
+    @pytest.fixture(name="usage_metadata")
+    def usage_metadata_fixture(self):
         return UsageMetadata(input_tokens=1, output_tokens=2, total_tokens=3)
 
     @pytest.mark.asyncio
@@ -221,17 +223,32 @@ class TestChatAgentTrackTokensData:
 
 
 class TestChatAgentPromptTemplate:
-    @pytest.fixture
-    def prompt_template_with_split_system(self):
+    @pytest.fixture(name="prompt_template_with_split_system")
+    def prompt_template_with_split_system_fixture(self):
         """Prompt template with both system_static and system_dynamic parts."""
         return {
-            "system_static": "You are GitLab Duo Chat, an AI coding assistant.\n\n<core_mission>\nYour primary role is collaborative programming.\n</core_mission>",
-            "system_dynamic": "<context>\nThe current date is {{ current_date }}. The current time is {{ current_time }}. The user's timezone is {{ current_timezone }}.\n{%- if project %}\nHere is the project information for the current GitLab project the USER is working on:\n<project>\n<project_id>{{ project.id }}</project_id>\n<project_name>{{ project.name }}</project_name>\n<project_url>{{ project.web_url }}</project_url>\n</project>\n{%- endif %}\n</context>",
+            "system_static": """You are GitLab Duo Chat, an AI coding assistant.
+
+<core_mission>
+Your primary role is collaborative programming.
+</core_mission>""",
+            "system_dynamic": """<context>
+The current date is {{ current_date }}. The current time is {{ current_time }}. The user's timezone is
+{{ current_timezone }}.
+{%- if project %}
+Here is the project information for the current GitLab project the USER is working on:
+<project>
+<project_id>{{ project.id }}</project_id>
+<project_name>{{ project.name }}</project_name>
+<project_url>{{ project.web_url }}</project_url>
+</project>
+{%- endif %}
+</context>""",
             "user": "{{ message.content }}",
         }
 
-    @pytest.fixture
-    def chat_workflow_state(self):
+    @pytest.fixture(name="chat_workflow_state")
+    def chat_workflow_state_fixture(self):
         """Sample chat workflow state for testing."""
         return ChatWorkflowState(
             plan={"steps": []},
@@ -497,3 +514,33 @@ class TestChatAgentPromptTemplate:
         # Verify it's the dynamic content by checking for date
         expected_date = mock_datetime.now().strftime("%Y-%m-%d")
         assert expected_date in dynamic_system_message.content
+
+
+@pytest.mark.asyncio
+async def test_chat_agent_api_error_handling(chat_agent, input):
+    """Test that ChatAgent properly handles APIStatusError exceptions."""
+    # Mock the superclass ainvoke method to raise an APIStatusError
+    with patch.object(
+        chat_agent.__class__.__bases__[0], "ainvoke", new_callable=AsyncMock
+    ) as mock_ainvoke:
+        mock_ainvoke.side_effect = APIStatusError(
+            message="Test API error",
+            response=Mock(status_code=500),
+            body={"error": {"message": "Internal server error"}},
+        )
+
+        result = await chat_agent.run(input)
+
+        # Verify error response structure
+        assert result["status"] == WorkflowStatusEnum.INPUT_REQUIRED
+        assert "conversation_history" in result
+        assert result["conversation_history"]["Chat Agent"][0].content.startswith(
+            "There was an error processing your request:"
+        )
+        assert len(result["ui_chat_log"]) == 1
+        assert result["ui_chat_log"][0]["message_type"] == MessageTypeEnum.AGENT
+        assert result["ui_chat_log"][0]["status"] == ToolStatus.FAILURE
+        assert (
+            result["ui_chat_log"][0]["content"]
+            == "There was an error processing your request. Please try again or contact support if the issue persists."
+        )

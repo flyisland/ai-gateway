@@ -4,6 +4,7 @@ from typing import Any, Optional, cast
 from langchain_core.messages import AIMessage
 from langgraph.graph import StateGraph
 
+from ai_gateway.model_metadata import current_model_metadata_context
 from duo_workflow_service.agents import (
     Agent,
     AgentV2,
@@ -11,10 +12,10 @@ from duo_workflow_service.agents import (
     PlanSupervisorAgent,
     ToolsExecutor,
 )
+from duo_workflow_service.components.base import BaseComponent
 from duo_workflow_service.components.human_approval.plan_approval import (
     PlanApprovalComponent,
 )
-from duo_workflow_service.components.planner.base import BaseComponent
 from duo_workflow_service.components.planner.prompt import (
     HANDOVER_TOOL_NAME,
     PLANNER_GOAL,
@@ -83,6 +84,7 @@ class PlannerComponent(BaseComponent):
                     tools=planner_toolset.bindable,  # type: ignore[arg-type]
                     workflow_id=self.workflow_id,
                     http_client=self.http_client,
+                    model_metadata=current_model_metadata_context.get(),
                     prompt_template_inputs={
                         "executor_agent_tools": "\n".join(
                             [
@@ -94,7 +96,9 @@ class PlannerComponent(BaseComponent):
                         "get_plan_tool_name": self.tools_registry.get("get_plan").name,  # type: ignore
                         "add_new_task_tool_name": self.tools_registry.get("add_new_task").name,  # type: ignore
                         "remove_task_tool_name": self.tools_registry.get("remove_task").name,  # type: ignore
-                        "update_task_description_tool_name": self.tools_registry.get("update_task_description").name,  # type: ignore
+                        "update_task_description_tool_name": self.tools_registry.get(
+                            "update_task_description"
+                        ).name,  # type: ignore
                     },
                 ),
             )
@@ -117,7 +121,9 @@ class PlannerComponent(BaseComponent):
                 get_plan_tool_name=self.tools_registry.get("get_plan").name,  # type: ignore
                 add_new_task_tool_name=self.tools_registry.get("add_new_task").name,  # type: ignore
                 remove_task_tool_name=self.tools_registry.get("remove_task").name,  # type: ignore
-                update_task_description_tool_name=self.tools_registry.get("update_task_description").name,  # type: ignore
+                update_task_description_tool_name=self.tools_registry.get(
+                    "update_task_description"
+                ).name,  # type: ignore
                 planner_instructions=self.planner_instructions(self.tools_registry),
             )
             planner = Agent(

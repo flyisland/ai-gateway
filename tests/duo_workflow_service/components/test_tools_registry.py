@@ -28,13 +28,13 @@ from duo_workflow_service.tools.work_item import (
 from lib.feature_flags import current_feature_flag_context
 
 
-@pytest.fixture
-def gl_http_client():
+@pytest.fixture(name="gl_http_client")
+def gl_http_client_fixture():
     return AsyncMock(spec=GitlabHttpClient)
 
 
-@pytest.fixture
-def mcp_tools():
+@pytest.fixture(name="mcp_tools")
+def mcp_tools_fixture():
     mcp_tool_mock = MagicMock()
     mcp_tool_mock.name = "extra_tool"
     mcp_tool_mock.description = "extra tool description"
@@ -115,7 +115,7 @@ _outbox = MagicMock(spec=asyncio.Queue)
                 "get_repository_file",
                 "list_repository_tree",
                 "list_epic_notes",
-                "get_previous_workflow_context",
+                "get_previous_session_context",
                 "list_vulnerabilities",
                 "get_commit",
                 "list_commits",
@@ -172,7 +172,7 @@ _outbox = MagicMock(spec=asyncio.Queue)
                 "get_repository_file",
                 "list_repository_tree",
                 "list_epic_notes",
-                "get_previous_workflow_context",
+                "get_previous_session_context",
                 "list_vulnerabilities",
                 "get_commit",
                 "list_commits",
@@ -182,7 +182,9 @@ _outbox = MagicMock(spec=asyncio.Queue)
                 "list_group_audit_events",
                 "list_project_audit_events",
                 "create_commit",
+                "dismiss_vulnerability",
                 "get_current_user",
+                "create_work_item",
             },
         ),
         (
@@ -317,15 +319,14 @@ def test_registry_initialization_initialises_tools_with_correct_attributes(
         "get_repository_file": tools.GetRepositoryFile(metadata=tool_metadata),
         "list_repository_tree": tools.ListRepositoryTree(metadata=tool_metadata),
         "list_epic_notes": tools.ListEpicNotes(metadata=tool_metadata),
-        "get_previous_workflow_context": tools.GetWorkflowContext(
-            metadata=tool_metadata
-        ),
+        "get_previous_session_context": tools.GetSessionContext(metadata=tool_metadata),
         "list_vulnerabilities": tools.ListVulnerabilities(metadata=tool_metadata),
         "get_commit": tools.GetCommit(metadata=tool_metadata),
         "list_commits": tools.ListCommits(metadata=tool_metadata),
         "get_commit_diff": tools.GetCommitDiff(metadata=tool_metadata),
         "get_commit_comments": tools.GetCommitComments(metadata=tool_metadata),
         "create_commit": tools.CreateCommit(metadata=tool_metadata),
+        "dismiss_vulnerability": tools.DismissVulnerability(metadata=tool_metadata),
         "list_instance_audit_events": tools.ListInstanceAuditEvents(
             metadata=tool_metadata
         ),
@@ -334,13 +335,14 @@ def test_registry_initialization_initialises_tools_with_correct_attributes(
             metadata=tool_metadata
         ),
         "get_current_user": tools.GetCurrentUser(metadata=tool_metadata),
+        "create_work_item": tools.CreateWorkItem(metadata=tool_metadata),
     }
 
     assert registry._enabled_tools == expected_tools
 
 
 @pytest.mark.asyncio
-async def test_registry_configuration(gl_http_client, mcp_tools):
+async def test_registry_configuration(gl_http_client, mcp_tools, project_mock):
     workflow_config = {
         "id": "test_workflow",
         "agent_privileges_names": ["run_commands", "run_git_command", "run_mcp_tools"],
@@ -352,6 +354,7 @@ async def test_registry_configuration(gl_http_client, mcp_tools):
         gl_http_client=gl_http_client,
         outbox=_outbox,
         inbox=_inbox,
+        project=project_mock,
         mcp_tools=mcp_tools,
     )
 
@@ -509,7 +512,9 @@ def test_approval_required(tool_metadata):
 
 
 @pytest.mark.asyncio
-async def test_registry_configuration_with_preapproved_tools(gl_http_client):
+async def test_registry_configuration_with_preapproved_tools(
+    gl_http_client, project_mock
+):
     workflow_config = {
         "id": "test_workflow",
         "agent_privileges_names": ["read_write_files", "run_commands"],
@@ -522,6 +527,7 @@ async def test_registry_configuration_with_preapproved_tools(gl_http_client):
         gl_http_client=gl_http_client,
         outbox=_outbox,
         inbox=_inbox,
+        project=project_mock,
     )
 
     always_enabled_tools = set([tool_cls.tool_title for tool_cls in NO_OP_TOOLS])  # type: ignore
@@ -552,13 +558,16 @@ async def test_registry_configuration_with_preapproved_tools(gl_http_client):
     [(None), ({"id": 123})],
     ids=["no_workflow", "no_agent_privileges_in_workflow"],
 )
-async def test_registry_configuration_error(gl_http_client, workflow_config):
+async def test_registry_configuration_error(
+    gl_http_client, workflow_config, project_mock
+):
     with pytest.raises(RuntimeError, match="Failed to find tools configuration"):
         await ToolsRegistry.configure(
             workflow_config=workflow_config,
             gl_http_client=gl_http_client,
             outbox=_outbox,
             inbox=_inbox,
+            project=project_mock,
         )
 
 
@@ -722,7 +731,7 @@ def test_work_item_tools_feature_flag(
     ],
 )
 async def test_registry_configuration_with_restricted_language_server_client(
-    gl_http_client, lsp_version, feature_flags, ff_disabled_tools
+    gl_http_client, lsp_version, feature_flags, ff_disabled_tools, project_mock
 ):
     current_feature_flag_context.set(feature_flags)
     workflow_config = {
@@ -736,6 +745,7 @@ async def test_registry_configuration_with_restricted_language_server_client(
         gl_http_client=gl_http_client,
         outbox=_outbox,
         inbox=_inbox,
+        project=project_mock,
         language_server_version=LanguageServerVersion.from_string(lsp_version),
     )
 
@@ -774,7 +784,7 @@ async def test_registry_configuration_with_restricted_language_server_client(
     ],
 )
 async def test_registry_configuration_with_unrestricted_language_server_client(
-    gl_http_client, lsp_version, feature_flags, ff_disabled_tools
+    gl_http_client, lsp_version, feature_flags, ff_disabled_tools, project_mock
 ):
     current_feature_flag_context.set(feature_flags)
     workflow_config = {
@@ -788,6 +798,7 @@ async def test_registry_configuration_with_unrestricted_language_server_client(
         gl_http_client=gl_http_client,
         outbox=_outbox,
         inbox=_inbox,
+        project=project_mock,
         language_server_version=(
             LanguageServerVersion.from_string(lsp_version) if lsp_version else None
         ),

@@ -1,8 +1,9 @@
 # pylint: disable=unused-import,unused-variable
 
-from unittest.mock import ANY, Mock, patch
+from unittest.mock import ANY, AsyncMock, Mock, patch
 
 import pytest
+from anthropic import APIStatusError
 from langchain_core.messages import AIMessage, HumanMessage, SystemMessage
 
 from ai_gateway.model_metadata import TypeModelMetadata
@@ -14,27 +15,28 @@ from duo_workflow_service.entities.event import WorkflowEvent
 from duo_workflow_service.entities.state import (
     DuoWorkflowStateType,
     MessageTypeEnum,
+    ToolStatus,
     WorkflowState,
     WorkflowStatusEnum,
 )
 from duo_workflow_service.gitlab.http_client import GitlabHttpClient
 
 
-@pytest.fixture
-def prompt_template() -> dict[str, str]:
+@pytest.fixture(name="prompt_template")
+def prompt_template_fixture() -> dict[str, str]:
     return {
         "system": "You are AGI entity capable of anything",
         "user": "{% if handover %}Handover: {{handover}}.\n{% endif %}Your goal is: {{ goal }}",
     }
 
 
-@pytest.fixture
-def check_events() -> bool:
+@pytest.fixture(name="check_events")
+def check_events_fixture() -> bool:
     return True
 
 
-@pytest.fixture
-def agent(
+@pytest.fixture(name="agent")
+def agent_fixture(
     gl_http_client: GitlabHttpClient,
     model_factory: TypeModelFactory,
     prompt_config: PromptConfig,
@@ -214,3 +216,36 @@ Human message"""
             assert result["status"] == expected_status
         else:
             assert "status" not in result
+
+    @pytest.mark.asyncio
+    async def test_run_with_api_error(
+        self,
+        agent: Agent,
+        workflow_state: DuoWorkflowStateType,
+        prompt_name: str,
+    ):
+        # Mock the superclass ainvoke method to raise an APIStatusError
+        with patch.object(
+            agent.__class__.__bases__[0], "ainvoke", new_callable=AsyncMock
+        ) as mock_ainvoke:
+            mock_ainvoke.side_effect = APIStatusError(
+                message="Test API error",
+                response=Mock(status_code=500),
+                body={"error": {"message": "Internal server error"}},
+            )
+
+            result = await agent.run(workflow_state)
+
+            # Verify error response structure
+            assert result["status"] == WorkflowStatusEnum.ERROR
+            assert "conversation_history" in result
+            assert result["conversation_history"][prompt_name][0].content.startswith(
+                "There was an error processing your request:"
+            )
+            assert len(result["ui_chat_log"]) == 1
+            assert result["ui_chat_log"][0]["message_type"] == MessageTypeEnum.AGENT
+            assert result["ui_chat_log"][0]["status"] == ToolStatus.FAILURE
+            assert (
+                result["ui_chat_log"][0]["content"]
+                == "There was an error processing your request. Please try again or contact support if the issue persists."
+            )

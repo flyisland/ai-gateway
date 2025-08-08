@@ -25,16 +25,11 @@ MYPY_LINT_TODO_DIR ?= --exclude "ai_gateway/models/litellm.py" \
 	--exclude "ai_gateway/api/v2/code/completions.py" \
 	--exclude "ai_gateway/api/v2/code/model_provider_handlers.py" \
 	--exclude "ai_gateway/api/v3/code/completions.py" \
-	--exclude "ai_gateway/auth/gcp.py" \
 	--exclude "ai_gateway/code_suggestions/completions.py" \
 	--exclude "ai_gateway/code_suggestions/generations.py" \
 	--exclude "ai_gateway/code_suggestions/processing/ops.py" \
-	--exclude "ai_gateway/config.py" \
 	--exclude "ai_gateway/instrumentators/model_requests.py" \
 	--exclude "ai_gateway/integrations/amazon_q/test_chat.py" \
-	--exclude "duo_workflow_service/tools/mcp_tools.py" \
-	--exclude "scripts/generate_dws_change_patterns.py" \
-	--exclude "scripts/generate_graph_docs.py" \
 	--exclude "tests/code_suggestions/test_completions.py" \
 	--exclude "tests/code_suggestions/test_container.py"
 

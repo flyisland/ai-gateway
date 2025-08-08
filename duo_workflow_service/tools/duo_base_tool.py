@@ -4,6 +4,7 @@ from gitlab_cloud_connector import GitLabUnitPrimitive
 from langchain.tools import BaseTool
 from pydantic import BaseModel
 
+from duo_workflow_service.gitlab.gitlab_api import Project
 from duo_workflow_service.gitlab.http_client import GitlabHttpClient
 from duo_workflow_service.gitlab.url_parser import GitLabUrlParseError, GitLabUrlParser
 
@@ -19,7 +20,9 @@ class MergeRequestValidationResult(NamedTuple):
     errors: List[str]
 
 
-def format_tool_display_message(tool: BaseTool, args: Any) -> Optional[str]:
+def format_tool_display_message(
+    tool: BaseTool, args: Any, tool_response: Any = None
+) -> Optional[str]:
     if not hasattr(tool, "format_display_message"):
         return None
 
@@ -29,12 +32,12 @@ def format_tool_display_message(tool: BaseTool, args: Any) -> Optional[str]:
         if isinstance(schema, type) and issubclass(schema, BaseModel):
             # type: ignore[arg-type]
             parsed = schema(**args)
-            return tool.format_display_message(parsed)
+            return tool.format_display_message(parsed, tool_response)
 
     except Exception:
-        return DuoBaseTool.format_display_message(tool, args)  # type: ignore[arg-type]
+        return DuoBaseTool.format_display_message(tool, args, tool_response)  # type: ignore[arg-type]
 
-    return tool.format_display_message(args)
+    return tool.format_display_message(args, tool_response)
 
 
 class DuoBaseTool(BaseTool):
@@ -53,6 +56,10 @@ class DuoBaseTool(BaseTool):
         if not host:
             raise RuntimeError("gitlab_host is not set")
         return host
+
+    @property
+    def project(self) -> Project:
+        return self.metadata and self.metadata.get("project")  # type: ignore
 
     def _run(self, *args: Any, **kwargs: Any) -> Any:
         raise NotImplementedError("This tool can only be run asynchronously")
@@ -158,7 +165,9 @@ class DuoBaseTool(BaseTool):
                 errors,
             )
 
-    def format_display_message(self, args: Any) -> Optional[str]:
+    def format_display_message(
+        self, args: Any, _tool_response: Any = None
+    ) -> Optional[str]:
         # Handle both dictionary and Pydantic model arguments
         if isinstance(args, dict):
             args_str = ", ".join(f"{k}={v}" for k, v in args.items())

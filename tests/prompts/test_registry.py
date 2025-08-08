@@ -48,8 +48,8 @@ def clear_prompt_cache():
 
 
 # editorconfig-checker-disable
-@pytest.fixture
-def mock_fs(fs: FakeFilesystem):
+@pytest.fixture(name="mock_fs")
+def mock_fs_fixture(fs: FakeFilesystem):
     prompts_definitions_dir = (
         Path(__file__).parent.parent.parent / "ai_gateway" / "prompts" / "definitions"
     )
@@ -209,8 +209,8 @@ params:
 # editorconfig-checker-enable
 
 
-@pytest.fixture
-def model_factories():
+@pytest.fixture(name="model_factories")
+def model_factories_fixture():
     return {
         # type: ignore[call-arg]
         ModelClassProvider.ANTHROPIC: lambda model, **kwargs: ChatAnthropic(
@@ -227,23 +227,23 @@ def model_factories():
     }
 
 
-@pytest.fixture
-def default_prompts():
+@pytest.fixture(name="default_prompts")
+def default_prompts_fixture():
     return {}
 
 
-@pytest.fixture
-def custom_models_enabled():
+@pytest.fixture(name="custom_models_enabled")
+def custom_models_enabled_fixture():
     return True
 
 
-@pytest.fixture
-def disable_streaming():
+@pytest.fixture(name="disable_streaming")
+def disable_streaming_fixture():
     return True
 
 
-@pytest.fixture
-def registry(
+@pytest.fixture(name="registry")
+def registry_fixture(
     model_factories: dict[ModelClassProvider, TypeModelFactory],
     default_prompts: dict[str, str],
     internal_event_client: Mock,
@@ -504,6 +504,51 @@ prompt_template:
 
             call_dict = mock_log.info.call_args[1]
             assert call_dict["model_identifier"] == expected_identifier
+
+    @pytest.mark.usefixtures("mock_fs")
+    def test_logging_with_feature_enabled_by_namespace_ids(
+        self,
+        registry: LocalPromptRegistry,
+    ):
+        """Test that feature_enabled_by_namespace_ids is correctly logged."""
+        with (
+            patch("ai_gateway.prompts.registry.log") as mock_log,
+            patch("ai_gateway.prompts.registry.current_event_context") as mock_context,
+        ):
+
+            mock_event_context = Mock()
+            mock_event_context.feature_enabled_by_namespace_ids = [123, 456]
+            mock_context.get.return_value = mock_event_context
+
+            registry.get(
+                "chat/react",
+                "^1.0.0",
+            )
+
+            call_dict = mock_log.info.call_args[1]
+            assert call_dict["gitlab_feature_enabled_by_namespace_ids"] == [123, 456]
+
+    @pytest.mark.usefixtures("mock_fs")
+    def test_logging_with_missing_feature_enabled_by_namespace_ids(
+        self,
+        registry: LocalPromptRegistry,
+    ):
+        """Test that logging works when feature_enabled_by_namespace_ids is missing from context."""
+        with (
+            patch("ai_gateway.prompts.registry.log") as mock_log,
+            patch("ai_gateway.prompts.registry.current_event_context") as mock_context,
+        ):
+
+            mock_event_context = Mock(spec=[])
+            mock_context.get.return_value = mock_event_context
+
+            registry.get(
+                "chat/react",
+                "^1.0.0",
+            )
+
+            call_dict = mock_log.info.call_args[1]
+            assert call_dict["gitlab_feature_enabled_by_namespace_ids"] is None
 
     @pytest.mark.usefixtures("mock_fs")
     @pytest.mark.parametrize(
@@ -822,5 +867,6 @@ prompt_template:
 
         assert (
             str(exc_info.value)
-            == "Failed to load prompt definition for 'empty_prompt/base': No version YAML files found for prompt id: empty_prompt/base"
+            == "Failed to load prompt definition for 'empty_prompt/base': No version YAML files found for prompt id: "
+            "empty_prompt/base"
         )

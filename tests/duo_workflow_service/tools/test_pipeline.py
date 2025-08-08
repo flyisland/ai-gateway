@@ -6,18 +6,16 @@ import pytest
 from duo_workflow_service.tools.pipeline import (
     GetPipelineErrorsForMergeRequest,
     GetPipelineErrorsInput,
-    PipelineMergeRequestNotFoundError,
-    PipelinesNotFoundError,
 )
 
 
-@pytest.fixture
-def gitlab_client_mock():
+@pytest.fixture(name="gitlab_client_mock")
+def gitlab_client_mock_fixture():
     return Mock()
 
 
-@pytest.fixture
-def metadata(gitlab_client_mock):
+@pytest.fixture(name="metadata")
+def metadata_fixture(gitlab_client_mock):
     return {
         "gitlab_client": gitlab_client_mock,
         "gitlab_host": "gitlab.com",
@@ -66,8 +64,11 @@ async def test_get_pipeline_errors_merge_request_not_found(
 
     tool = GetPipelineErrorsForMergeRequest(metadata=metadata)
 
-    with pytest.raises(PipelineMergeRequestNotFoundError):
-        await tool.arun({"project_id": "1", "merge_request_iid": "1"})
+    response = await tool.arun({"project_id": "1", "merge_request_iid": "1"})
+    response_json = json.loads(response)
+
+    assert "error" in response_json
+    assert "Merge request with iid 1 not found" in response_json["error"]
 
     gitlab_client_mock.aget.assert_called_once_with(
         path="/api/v4/projects/1/merge_requests/1"
@@ -79,14 +80,17 @@ async def test_get_pipeline_errors_pipelines_not_found(gitlab_client_mock, metad
     gitlab_client_mock.aget = AsyncMock(
         side_effect=[
             {"id": 1, "title": "Merge Request 1"},
-            {"status": 404},
+            [],
         ]
     )
 
     tool = GetPipelineErrorsForMergeRequest(metadata=metadata)
 
-    with pytest.raises(PipelinesNotFoundError):
-        await tool.arun({"project_id": "1", "merge_request_iid": "1"})
+    response = await tool.arun({"project_id": "1", "merge_request_iid": "1"})
+    response_json = json.loads(response)
+
+    assert "error" in response_json
+    assert "No pipelines found for merge request iid 1" in response_json["error"]
 
     assert gitlab_client_mock.aget.call_args_list == [
         call(path="/api/v4/projects/1/merge_requests/1"),
@@ -262,6 +266,34 @@ async def test_validate_merge_request_url_missing_params(
 
 
 @pytest.mark.asyncio
+async def test_get_pipeline_errors_jobs_error(gitlab_client_mock, metadata):
+    merge_request_response = {"id": 1, "title": "Merge Request 1"}
+    pipelines_response = [{"id": 10, "status": "success"}]
+    jobs_error_response = {"status": 404, "message": "Jobs not found"}
+
+    gitlab_client_mock.aget = AsyncMock()
+    gitlab_client_mock.aget.side_effect = [
+        merge_request_response,
+        pipelines_response,
+        jobs_error_response,
+    ]
+
+    tool = GetPipelineErrorsForMergeRequest(metadata=metadata)
+
+    response = await tool.arun({"project_id": "1", "merge_request_iid": "1"})
+    response_json = json.loads(response)
+
+    assert "error" in response_json
+    assert "Failed to fetch jobs for pipeline 10" in response_json["error"]
+
+    assert gitlab_client_mock.aget.call_args_list == [
+        call(path="/api/v4/projects/1/merge_requests/1"),
+        call(path="/api/v4/projects/1/merge_requests/1/pipelines"),
+        call(path="/api/v4/projects/1/pipelines/10/jobs"),
+    ]
+
+
+@pytest.mark.asyncio
 async def test_get_pipeline_errors_trace_exception(gitlab_client_mock, metadata):
     # Set up mock responses
     merge_request_response = {"id": 1, "title": "Merge Request 1"}
@@ -297,3 +329,23 @@ async def test_get_pipeline_errors_trace_exception(gitlab_client_mock, metadata)
         call(path="/api/v4/projects/1/pipelines/10/jobs"),
         call(path="/api/v4/projects/1/jobs/102/trace", parse_json=False),
     ]
+
+
+@pytest.mark.asyncio
+async def test_get_pipeline_errors_network_exception(gitlab_client_mock, metadata):
+    # Test that network/client exceptions are properly caught and returned as JSON
+    gitlab_client_mock.aget = AsyncMock(
+        side_effect=Exception("Network connection error")
+    )
+
+    tool = GetPipelineErrorsForMergeRequest(metadata=metadata)
+
+    response = await tool.arun({"project_id": "1", "merge_request_iid": "1"})
+    response_json = json.loads(response)
+
+    assert "error" in response_json
+    assert "Network connection error" in response_json["error"]
+
+    gitlab_client_mock.aget.assert_called_once_with(
+        path="/api/v4/projects/1/merge_requests/1"
+    )

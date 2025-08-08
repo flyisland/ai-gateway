@@ -5,11 +5,13 @@ from langchain_core.messages import AIMessage, HumanMessage, SystemMessage
 from langchain_core.prompt_values import ChatPromptValue
 from langgraph.constants import END
 from langgraph.graph import StateGraph
+from langsmith.evaluation.evaluator import Category
 
 from ai_gateway.models.mock import FakeModel
 from duo_workflow_service.components import ToolsApprovalComponent, ToolsRegistry
 from duo_workflow_service.components.executor.component import ExecutorComponent, Routes
 from duo_workflow_service.components.executor.prompts import (
+    DEPRECATED_OS_INFORMATION_COMPONENT,
     EXECUTOR_SYSTEM_MESSAGE,
     GET_PLAN_TOOL_NAME,
     HANDOVER_TOOL_NAME,
@@ -18,12 +20,15 @@ from duo_workflow_service.components.executor.prompts import (
 )
 from duo_workflow_service.entities import Plan, WorkflowState, WorkflowStatusEnum
 from duo_workflow_service.tools import DuoBaseTool
-from duo_workflow_service.workflows.type_definitions import AdditionalContext
+from duo_workflow_service.workflows.type_definitions import (
+    AdditionalContext,
+    OsInformationContext,
+)
 from lib.feature_flags.context import current_feature_flag_context
 
 
-@pytest.fixture
-def approval_component(mock_toolset):
+@pytest.fixture(name="approval_component")
+def approval_component_fixture(mock_toolset):
     mock = MagicMock(
         spec=ToolsApprovalComponent,
         toolset=mock_toolset,
@@ -33,8 +38,8 @@ def approval_component(mock_toolset):
     return mock
 
 
-@pytest.fixture
-def compiled_graph(executor_component, approval_component):
+@pytest.fixture(name="compiled_graph")
+def compiled_graph_fixture(executor_component, approval_component):
     graph = StateGraph(WorkflowState)
 
     entry_point = executor_component.attach(
@@ -48,31 +53,31 @@ def compiled_graph(executor_component, approval_component):
     return graph.compile()
 
 
-@pytest.fixture
-def mock_tool():
+@pytest.fixture(name="mock_tool")
+def mock_tool_fixture():
     mock = MagicMock(DuoBaseTool)
     mock.args_schema = None
     return mock
 
 
-@pytest.fixture
-def mock_toolset(mock_tool):
+@pytest.fixture(name="mock_toolset")
+def mock_toolset_fixture(mock_tool):
     mock = MagicMock()
     mock.__getitem__.return_value = mock_tool
     mock.approved.return_value = True
     return mock
 
 
-@pytest.fixture
-def mock_tool_registry():
+@pytest.fixture(name="mock_tool_registry")
+def mock_tool_registry_fixture():
     """Create a mock tool registry."""
     registry = MagicMock(ToolsRegistry)
     registry.get.return_value = MagicMock(name="test_tool")
     return registry
 
 
-@pytest.fixture
-def mock_create_model():
+@pytest.fixture(name="mock_create_model")
+def mock_create_model_fixture():
     with patch(
         "duo_workflow_service.components.executor.component.create_chat_model"
     ) as mock:
@@ -81,8 +86,8 @@ def mock_create_model():
         yield mock
 
 
-@pytest.fixture
-def mock_model_ainvoke(
+@pytest.fixture(name="mock_model_ainvoke")
+def mock_model_ainvoke_fixture(
     duo_workflow_prompt_registry_enabled, mock_create_model, end_message
 ):
     if duo_workflow_prompt_registry_enabled:
@@ -94,8 +99,8 @@ def mock_model_ainvoke(
         yield mock_create_model.ainvoke
 
 
-@pytest.fixture
-def duo_workflow_prompt_registry_enabled() -> bool:
+@pytest.fixture(name="duo_workflow_prompt_registry_enabled")
+def duo_workflow_prompt_registry_enabled_fixture() -> bool:
     return False
 
 
@@ -107,8 +112,8 @@ def stub_feature_flags(duo_workflow_prompt_registry_enabled: bool):
     yield
 
 
-@pytest.fixture
-def mock_agent(duo_workflow_prompt_registry_enabled: bool):
+@pytest.fixture(name="mock_agent")
+def mock_agent_fixture(duo_workflow_prompt_registry_enabled: bool):
     if duo_workflow_prompt_registry_enabled:
         factory = "ai_gateway.prompts.registry.LocalPromptRegistry.get_on_behalf"
     else:
@@ -118,24 +123,24 @@ def mock_agent(duo_workflow_prompt_registry_enabled: bool):
         yield mock
 
 
-@pytest.fixture
-def mock_tools_executor():
+@pytest.fixture(name="mock_tools_executor")
+def mock_tools_executor_fixture():
     with patch(
         "duo_workflow_service.components.executor.component.ToolsExecutor"
     ) as mock:
         yield mock
 
 
-@pytest.fixture
-def mock_supervisor_agent():
+@pytest.fixture(name="mock_supervisor_agent")
+def mock_supervisor_agent_fixture():
     with patch(
         "duo_workflow_service.components.executor.component.PlanSupervisorAgent"
     ) as mock:
         yield mock
 
 
-@pytest.fixture
-def mock_handover_agent():
+@pytest.fixture(name="mock_handover_agent")
+def mock_handover_agent_fixture():
     with patch(
         "duo_workflow_service.components.executor.component.HandoverAgent"
     ) as mock:
@@ -149,12 +154,12 @@ def mock_handover_agent():
 @pytest.mark.usefixtures("mock_container")
 @pytest.mark.parametrize("duo_workflow_prompt_registry_enabled", [False, True])
 class TestExecutorComponent:
-    @pytest.fixture
-    def goal(self) -> str:
+    @pytest.fixture(name="goal")
+    def goal_fixture(self) -> str:
         return "Test goal"
 
-    @pytest.fixture
-    def mock_dependencies(
+    @pytest.fixture(name="mock_dependencies")
+    def mock_dependencies_fixture(
         self,
         mock_toolset,
         mock_tool_registry,
@@ -178,8 +183,8 @@ class TestExecutorComponent:
             "user": user,
         }
 
-    @pytest.fixture
-    def executor_component(
+    @pytest.fixture(name="executor_component")
+    def executor_component_fixture(
         self, mock_dependencies, mock_duo_workflow_service_container
     ):
         return ExecutorComponent(**mock_dependencies)
@@ -245,8 +250,12 @@ class TestExecutorComponent:
         # Verify return value
         assert entry_node == "execution"
 
+    @patch(
+        "duo_workflow_service.components.executor.component.current_model_metadata_context"
+    )
     def test_attach_creates_agent_with_correct_parameters(
         self,
+        mock_model_metadata_context,
         mock_agent,
         mock_create_model,
         executor_component,
@@ -255,6 +264,10 @@ class TestExecutorComponent:
     ):
         """Test that Agent is created with correct parameters."""
         mock_graph = Mock(spec=StateGraph)
+
+        mock_model_metadata = MagicMock()
+        mock_model_metadata_context.get.return_value = mock_model_metadata
+
         executor_component.attach(mock_graph, "exit_node", "next_node", None)
 
         # Verify Agent was called with correct parameters
@@ -264,10 +277,11 @@ class TestExecutorComponent:
             mock_agent.assert_called_once_with(
                 executor_component.user,
                 "workflow/executor",
-                "^1.0.0",
+                "^2.0.0",
                 tools=executor_component.executor_toolset.bindable,
                 workflow_id="test-workflow-123",
                 http_client=executor_component.http_client,
+                model_metadata=mock_model_metadata,
             )
         else:
             call_args = mock_agent.call_args
@@ -506,65 +520,129 @@ class TestExecutorComponent:
         assert len(response["handover"]) == 0
         assert len(response["conversation_history"]["executor"]) == 4
 
-    @pytest.mark.asyncio
     @pytest.mark.parametrize(
-        "additional_context,expected_os_info",
+        "agent_user_environment,additional_context,expected_substrings",
         [
-            (None, ""),
-            ([AdditionalContext(category="os_information", content="")], ""),
+            # Happy case
             (
-                [AdditionalContext(category="os_information", content="Ubuntu 22.04")],
-                "Ubuntu 22.04",
+                {
+                    "os_information_context": OsInformationContext(
+                        platform="foo", architecture="bar"
+                    )
+                },
+                None,
+                (
+                    "<os_information>",
+                    "<platform>foo</platform>",
+                    "<architecture>bar</architecture>",
+                    "</os_information>",
+                ),
             ),
+            # We only use the old template if the new one is missing
             (
+                {
+                    "os_information_context": OsInformationContext(
+                        platform="foo", architecture="bar"
+                    )
+                },
                 [
-                    AdditionalContext(category="other_info", content="some data"),
-                    AdditionalContext(category="os_information", content="Windows 11"),
-                    AdditionalContext(category="more_info", content="more data"),
+                    AdditionalContext(
+                        category="os_information_context", content="old context format"
+                    )
                 ],
-                "Windows 11",
+                (
+                    "<os_information>",
+                    "<platform>foo</platform>",
+                    "<architecture>bar</architecture>",
+                    "</os_information>",
+                ),
             ),
-            ([], ""),
+            # We only use the old template if the new one is missing
             (
-                [AdditionalContext(category="other_category", content="some content")],
-                "",
+                {},
+                [
+                    AdditionalContext(
+                        category="os_information", content="old context format"
+                    )
+                ],
+                (
+                    "<os_information>",
+                    "old context format" "</os_information>",
+                ),
+            ),
+            # Assert no failure if there's no context
+            ({}, None, ()),
+        ],
+    )
+    def test_format_system_prompt(
+        self,
+        agent_user_environment,
+        additional_context,
+        expected_substrings,
+        executor_component,
+    ):
+        executor_component.agent_user_environment = agent_user_environment
+        executor_component.additional_context = additional_context
+        try:
+            prompt = executor_component._format_system_prompt()
+        except Exception:
+            assert False
+        for (
+            substring
+        ) in (
+            expected_substrings
+        ):  # use substrings to avoid formatting related flakiness
+            assert substring in prompt
+
+    @pytest.mark.parametrize(
+        "agent_user_environment,existing_prompt_template_inputs,want",
+        [
+            (
+                {"os_information_context": "some_context"},
+                {},
+                {"agent_user_environment": {"os_information_context": "some_context"}},
+            ),
+            (
+                {},
+                {},
+                {"agent_user_environment": {}},
+            ),
+            (
+                {"os_information_context": "some_context"},
+                {"agent_user_environment": {"shell_context": "some_other_context"}},
+                {
+                    "agent_user_environment": {
+                        "os_information_context": "some_context",
+                        "shell_context": "some_other_context",
+                    }
+                },
             ),
         ],
     )
-    async def test_messages_to_model(
+    @patch(
+        "duo_workflow_service.components.executor.component.current_model_metadata_context"
+    )
+    def test_agentV2_prompt_template_inputs(
         self,
-        expected_os_info,
-        mock_model_ainvoke,
-        compiled_graph,
-        workflow_state,
-        graph_config,
-        project,
-        goal,
+        mock_model_metadata_context,
+        agent_user_environment,
+        existing_prompt_template_inputs,
+        want,
+        mock_agent,
+        executor_component,
+        duo_workflow_prompt_registry_enabled,
     ):
-        await compiled_graph.ainvoke(input=workflow_state, config=graph_config)
+        mock_graph = Mock(spec=StateGraph)
+        mock_agent.return_value.prompt_template_inputs = existing_prompt_template_inputs
 
-        os_information = (
-            OS_INFORMATION_COMPONENT.format(os_information=expected_os_info)
-            if expected_os_info
-            else ""
-        )
+        mock_model_metadata = MagicMock()
+        mock_model_metadata_context.get.return_value = mock_model_metadata
 
-        expected_message = EXECUTOR_SYSTEM_MESSAGE.format(
-            set_task_status_tool_name=SET_TASK_STATUS_TOOL_NAME,
-            handover_tool_name=HANDOVER_TOOL_NAME,
-            get_plan_tool_name=GET_PLAN_TOOL_NAME,
-            project_id=project["id"],
-            project_name=project["name"],
-            project_url=project["http_url_to_repo"],
-            os_information=os_information,
-        )
+        if duo_workflow_prompt_registry_enabled:
+            executor_component.agent_user_environment = agent_user_environment
+            executor_component.attach(mock_graph, "exit_node", "next_node", None)
+            assert mock_agent.return_value.prompt_template_inputs == want
 
-        ainvoke_messages = mock_model_ainvoke.call_args.args[0]
-
-        if isinstance(ainvoke_messages, ChatPromptValue):
-            ainvoke_messages = ainvoke_messages.messages
-
-        assert ainvoke_messages == [
-            SystemMessage(content=expected_message),
-            HumanMessage(content=f"Your goal is: {goal}"),
-        ]
+            mock_agent.assert_called_once()
+            call_args = mock_agent.call_args
+            assert call_args.kwargs["model_metadata"] == mock_model_metadata

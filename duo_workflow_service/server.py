@@ -27,7 +27,9 @@ from contract import contract_pb2, contract_pb2_grpc
 from duo_workflow_service.gitlab.connection_pool import connection_pool
 from duo_workflow_service.interceptors.authentication_interceptor import (
     AuthenticationInterceptor,
-    current_user,
+)
+from duo_workflow_service.interceptors.authentication_interceptor import (
+    current_user as current_user_context_var,
 )
 from duo_workflow_service.interceptors.correlation_id_interceptor import (
     CorrelationIdInterceptor,
@@ -136,7 +138,7 @@ class DuoWorkflowService(contract_pb2_grpc.DuoWorkflowServicer):
             ContainerApplication.internal_event.client
         ],
     ) -> AsyncIterator[contract_pb2.Action]:
-        user: CloudConnectorUser = current_user.get()
+        user: CloudConnectorUser = current_user_context_var.get()
 
         # Fetch the start workflow call
         start_workflow_request: contract_pb2.ClientEvent = await anext(
@@ -302,7 +304,7 @@ class DuoWorkflowService(contract_pb2_grpc.DuoWorkflowServicer):
     async def GenerateToken(
         self, request: contract_pb2.GenerateTokenRequest, context: grpc.ServicerContext
     ) -> contract_pb2.GenerateTokenResponse:
-        user: CloudConnectorUser = current_user.get()
+        user: CloudConnectorUser = current_user_context_var.get()
 
         workflow_definition = request.workflowDefinition
         unit_primitive = choose_unit_primitive(workflow_definition)
@@ -455,6 +457,10 @@ def setup_container():
 
 
 def run():
+    self_hosted_mode = (
+        os.environ.get("AIGW_CUSTOM_MODELS__ENABLED", "false").lower() == "true"
+    )
+
     load_dotenv()
     setup_container()
     setup_cloud_connector()
@@ -463,7 +469,8 @@ def run():
     setup_monitoring()
     setup_logging()
     configure_cache()
-    validate_llm_access()
+    if not self_hosted_mode:
+        validate_llm_access()
     port = int(os.environ.get("PORT", "50052"))
     asyncio.get_event_loop().run_until_complete(serve(port))
 
