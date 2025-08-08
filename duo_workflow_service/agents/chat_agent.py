@@ -27,6 +27,9 @@ from duo_workflow_service.entities.state import (
     WorkflowStatusEnum,
 )
 from duo_workflow_service.gitlab.gitlab_api import Namespace, Project
+from duo_workflow_service.gitlab.gitlab_instance_info_service import (
+    GitLabInstanceInfoService,
+)
 from duo_workflow_service.llm_factory import AnthropicStopReason
 from duo_workflow_service.slash_commands.goal_parser import parse as slash_command_parse
 from duo_workflow_service.structured_logging import _workflow_id
@@ -51,11 +54,34 @@ class ChatAgentPromptTemplate(Runnable[ChatWorkflowState, PromptValue]):
         project: Project | None = input.get("project")
         namespace: Namespace | None = input.get("namespace")
 
+        # Get GitLab instance info if available
+        gitlab_instance_info = None
+        if hasattr(_kwargs.get("chat_agent"), "gitlab_instance_info_service"):
+            service = _kwargs["chat_agent"].gitlab_instance_info_service
+            gitlab_instance_info = service.create_from_project_and_namespace(
+                project, namespace
+            )
+
         # Handle system messages with static and dynamic parts
         # Create separate system messages for static and dynamic parts
         if "system_static" in self.prompt_template:
             static_content_text = jinja2_formatter(
-                self.prompt_template["system_static"]
+                self.prompt_template["system_static"],
+                gitlab_instance_type=(
+                    gitlab_instance_info.instance_type
+                    if gitlab_instance_info
+                    else "Unknown"
+                ),
+                gitlab_instance_url=(
+                    gitlab_instance_info.instance_url
+                    if gitlab_instance_info
+                    else "Unknown"
+                ),
+                gitlab_instance_version=(
+                    gitlab_instance_info.instance_version
+                    if gitlab_instance_info
+                    else "Unknown"
+                ),
             )
             # Always cache static system prompt for Anthropic models
             is_anthropic = _kwargs.get("is_anthropic_model", False)
@@ -110,6 +136,11 @@ class ChatAgentPromptTemplate(Runnable[ChatWorkflowState, PromptValue]):
 
 class ChatAgent(Prompt[ChatWorkflowState, BaseMessage]):
     tools_registry: Optional[ToolsRegistry] = None
+    gitlab_instance_info_service: Optional[GitLabInstanceInfoService] = None
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.gitlab_instance_info_service = GitLabInstanceInfoService()
 
     @classmethod
     def _build_prompt_template(cls, config: PromptConfig) -> Runnable:
@@ -172,7 +203,10 @@ class ChatAgent(Prompt[ChatWorkflowState, BaseMessage]):
             # Check if this is an Anthropic model for prompt caching
             is_anthropic_model = self.model_provider == ModelClassProvider.ANTHROPIC
             agent_response = await super().ainvoke(
-                input=input, agent_name=self.name, is_anthropic_model=is_anthropic_model
+                input=input,
+                agent_name=self.name,
+                is_anthropic_model=is_anthropic_model,
+                chat_agent=self,
             )
 
             stop_reason = agent_response.response_metadata.get("stop_reason")

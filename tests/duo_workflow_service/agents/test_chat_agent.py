@@ -277,8 +277,15 @@ Here is the project information for the current GitLab project the USER is worki
         """Test that system_static and system_dynamic create separate system messages."""
         template = ChatAgentPromptTemplate(prompt_template_with_split_system)
 
+        # Mock chat agent without gitlab_instance_info_service to test fallback behavior
+        mock_chat_agent = Mock()
+        del mock_chat_agent.gitlab_instance_info_service  # Remove the attribute
+
         result = template.invoke(
-            chat_workflow_state, agent_name="test_agent", is_anthropic_model=False
+            chat_workflow_state,
+            agent_name="test_agent",
+            is_anthropic_model=False,
+            chat_agent=mock_chat_agent,
         )
 
         assert isinstance(result, ChatPromptValue)
@@ -294,7 +301,6 @@ Here is the project information for the current GitLab project the USER is worki
         assert "<core_mission>" in static_system_message.content
 
         # Second message should be dynamic system message
-
         expected_date = mock_datetime.now().strftime("%Y-%m-%d")
         expected_time = mock_datetime.now().strftime("%H:%M:%S")
         expected_timezone = mock_datetime.now().astimezone().tzname()
@@ -545,6 +551,153 @@ async def test_chat_agent_api_error_handling(chat_agent, input):
         assert (
             result["ui_chat_log"][0]["content"]
             == "There was an error processing your request. Please try again or contact support if the issue persists."
+        )
+
+
+class TestChatAgentGitLabInstanceInfo:
+    """Test GitLab instance info integration with ChatAgent static prompt."""
+
+    @pytest.fixture(name="prompt_template_with_gitlab_info")
+    def prompt_template_with_gitlab_info_fixture(self):
+        """Prompt template that includes GitLab instance info in static system prompt."""
+        return {
+            "system_static": """You are GitLab Duo Chat, an AI coding assistant.
+
+<gitlab_instance_info>
+<gitlab_instance_type>{{ gitlab_instance_type }}</gitlab_instance_type>
+<gitlab_instance_url>{{ gitlab_instance_url }}</gitlab_instance_url>
+<gitlab_instance_version>{{ gitlab_instance_version }}</gitlab_instance_version>
+</gitlab_instance_info>
+
+<core_mission>
+Your primary role is collaborative programming.
+</core_mission>""",
+            "system_dynamic": """<context>
+The current date is {{ current_date }}.
+{%- if project %}
+<project>
+<project_id>{{ project.id }}</project_id>
+<project_name>{{ project.name }}</project_name>
+<project_url>{{ project.web_url }}</project_url>
+</project>
+{%- endif %}
+{%- if namespace %}
+<namespace>
+<namespace_id>{{ namespace.id }}</namespace_id>
+<namespace_name>{{ namespace.name }}</namespace_name>
+<namespace_url>{{ namespace.web_url }}</namespace_url>
+</namespace>
+{%- endif %}
+</context>""",
+            "user": "{{ message.content }}",
+        }
+
+    @pytest.fixture(name="input_with_project")
+    def input_with_project_fixture(self):
+        """Input with project data."""
+        return ChatWorkflowState(
+            plan={"steps": []},
+            status="execution",
+            conversation_history={"test_agent": [HumanMessage(content="Hello")]},
+            ui_chat_log=[],
+            last_human_input=None,
+            project=Project(
+                id=123,
+                name="test-project",
+                description="Test project",
+                http_url_to_repo="https://gitlab.com/test/project.git",
+                web_url="https://gitlab.com/test/project",
+                default_branch="main",
+                languages=[],
+                exclusion_rules=[],
+            ),
+            namespace=None,
+            approval=None,
+        )
+
+    def test_static_prompt_contains_gitlab_instance_info(
+        self, prompt_template_with_gitlab_info, input_with_project
+    ):
+        """Test static prompt contains correct GitLab instance info."""
+        template = ChatAgentPromptTemplate(prompt_template_with_gitlab_info)
+
+        # Mock the GitLab instance info service
+        mock_chat_agent = Mock()
+        mock_gitlab_service = Mock()
+        mock_gitlab_info = Mock()
+        mock_gitlab_info.instance_type = "GitLab.com (SaaS)"
+        mock_gitlab_info.instance_url = "https://gitlab.com"
+        mock_gitlab_info.instance_version = "16.5.0-ee"
+        mock_gitlab_service.create_from_project_and_namespace.return_value = (
+            mock_gitlab_info
+        )
+        mock_chat_agent.gitlab_instance_info_service = mock_gitlab_service
+
+        result = template.invoke(
+            input_with_project,
+            agent_name="test_agent",
+            is_anthropic_model=False,
+            chat_agent=mock_chat_agent,
+        )
+
+        messages = result.messages
+        assert len(messages) == 3  # static system, dynamic system, user
+
+        # Check static system message contains GitLab instance info
+        static_system_message = messages[0]
+        assert isinstance(static_system_message, SystemMessage)
+        assert (
+            "<gitlab_instance_type>GitLab.com (SaaS)</gitlab_instance_type>"
+            in static_system_message.content
+        )
+        assert (
+            "<gitlab_instance_url>https://gitlab.com</gitlab_instance_url>"
+            in static_system_message.content
+        )
+        assert (
+            "<gitlab_instance_version>16.5.0-ee</gitlab_instance_version>"
+            in static_system_message.content
+        )
+
+        # Verify service was called with correct parameters
+        mock_gitlab_service.create_from_project_and_namespace.assert_called_once_with(
+            input_with_project["project"], input_with_project["namespace"]
+        )
+
+    def test_static_prompt_without_gitlab_instance_info_service(
+        self, prompt_template_with_gitlab_info, input_with_project
+    ):
+        """Test static prompt handles missing GitLabInstanceInfoService gracefully."""
+        template = ChatAgentPromptTemplate(prompt_template_with_gitlab_info)
+
+        # Mock chat agent without gitlab_instance_info_service attribute
+        mock_chat_agent = Mock()
+        del mock_chat_agent.gitlab_instance_info_service  # Remove the attribute
+
+        result = template.invoke(
+            input_with_project,
+            agent_name="test_agent",
+            is_anthropic_model=False,
+            chat_agent=mock_chat_agent,
+        )
+
+        messages = result.messages
+        assert len(messages) == 3  # static system, dynamic system, user
+
+        # Check static system message contains fallback "Unknown" values
+        static_system_message = messages[0]
+        assert isinstance(static_system_message, SystemMessage)
+        assert (
+            "<gitlab_instance_type>Unknown</gitlab_instance_type>"
+            in static_system_message.content
+        )
+        assert (
+            "<gitlab_instance_url>Unknown</gitlab_instance_url>"
+            in static_system_message.content
+        )
+        assert (
+            "<gitlab_instance_version>Unknown</gitlab_instance_version>"
+            in static_system_message.content
         )
 
 
