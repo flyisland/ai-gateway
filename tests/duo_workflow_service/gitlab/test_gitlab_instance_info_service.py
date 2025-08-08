@@ -74,167 +74,230 @@ class TestGitLabInstanceInfoService:
             web_url="https://gitlab.example.com/test-namespace",
         )
 
-    def test_create_from_project_gitlab_com(self, project_gitlab_com):
-        """Test creating GitLab instance info from GitLab.com project."""
-        with patch(
-            "duo_workflow_service.gitlab.gitlab_instance_info_service.gitlab_version"
-        ) as mock_version:
-            mock_version.get.return_value = "16.5.0-ee"
-
-            service = GitLabInstanceInfoService()
-            result = service.create_from_project(project_gitlab_com)
-
-            assert result.instance_type == "GitLab.com (SaaS)"
-            assert result.instance_url == "https://gitlab.com"
-            assert result.instance_version == "16.5.0-ee"
-
-    def test_create_from_project_self_managed(self, project_self_managed):
-        """Test creating GitLab instance info from self-managed project."""
-        with patch(
-            "duo_workflow_service.gitlab.gitlab_instance_info_service.gitlab_version"
-        ) as mock_version:
-            mock_version.get.return_value = "15.0.0-ee"
-
-            service = GitLabInstanceInfoService()
-            result = service.create_from_project(project_self_managed)
-
-            assert result.instance_type == "Self-Managed"
-            assert result.instance_url == "https://gitlab.example.com"
-            assert result.instance_version == "15.0.0-ee"
-
-    def test_create_from_project_dedicated(self, project_dedicated):
-        """Test creating GitLab instance info from GitLab Dedicated project."""
-        with patch(
-            "duo_workflow_service.gitlab.gitlab_instance_info_service.gitlab_version"
-        ) as mock_version:
-            mock_version.get.return_value = "16.0.0-ee"
-
-            service = GitLabInstanceInfoService()
-            result = service.create_from_project(project_dedicated)
-
-            assert result.instance_type == "GitLab Dedicated"
-            assert result.instance_url == "https://dedicated-example.gitlab.com"
-            assert result.instance_version == "16.0.0-ee"
-
-    def test_create_from_namespace_gitlab_com(self, namespace_gitlab_com):
-        """Test creating GitLab instance info from GitLab.com namespace."""
-        with patch(
-            "duo_workflow_service.gitlab.gitlab_instance_info_service.gitlab_version"
-        ) as mock_version:
-            mock_version.get.return_value = "16.5.0-ee"
-
-            service = GitLabInstanceInfoService()
-            result = service.create_from_namespace(namespace_gitlab_com)
-
-            assert result.instance_type == "GitLab.com (SaaS)"
-            assert result.instance_url == "https://gitlab.com"
-            assert result.instance_version == "16.5.0-ee"
-
-    def test_create_from_namespace_self_managed(self, namespace_self_managed):
-        """Test creating GitLab instance info from self-managed namespace."""
-        with patch(
-            "duo_workflow_service.gitlab.gitlab_instance_info_service.gitlab_version"
-        ) as mock_version:
-            mock_version.get.return_value = "15.0.0-ee"
-
-            service = GitLabInstanceInfoService()
-            result = service.create_from_namespace(namespace_self_managed)
-
-            assert result.instance_type == "Self-Managed"
-            assert result.instance_url == "https://gitlab.example.com"
-            assert result.instance_version == "15.0.0-ee"
-
-    def test_create_from_project_with_version_fallback(self, project_gitlab_com):
-        """Test creating GitLab instance info when version is not available."""
-        with patch(
-            "duo_workflow_service.gitlab.gitlab_instance_info_service.gitlab_version"
-        ) as mock_version:
-            mock_version.get.return_value = None
-
-            service = GitLabInstanceInfoService()
-            result = service.create_from_project(project_gitlab_com)
-
-            assert result.instance_type == "GitLab.com (SaaS)"
-            assert result.instance_url == "https://gitlab.com"
-            assert result.instance_version == "Unknown"
-
-    def test_create_from_project_with_version_exception(self, project_gitlab_com):
-        """Test creating GitLab instance info when version retrieval raises exception."""
-        with patch(
-            "duo_workflow_service.gitlab.gitlab_instance_info_service.gitlab_version"
-        ) as mock_version:
-            mock_version.get.side_effect = Exception("Version not available")
-
-            service = GitLabInstanceInfoService()
-            result = service.create_from_project(project_gitlab_com)
-
-            assert result.instance_type == "GitLab.com (SaaS)"
-            assert result.instance_url == "https://gitlab.com"
-            assert result.instance_version == "Unknown"
-
-    def test_create_from_project_none(self):
-        """Test creating GitLab instance info when project is None."""
-        service = GitLabInstanceInfoService()
-        result = service.create_from_project(None)
-
-        assert result.instance_type == "Unknown"
-        assert result.instance_url == "Unknown"
-        assert result.instance_version == "Unknown"
-
-    def test_create_from_namespace_none(self):
-        """Test creating GitLab instance info when namespace is None."""
-        service = GitLabInstanceInfoService()
-        result = service.create_from_namespace(None)
-
-        assert result.instance_type == "Unknown"
-        assert result.instance_url == "Unknown"
-        assert result.instance_version == "Unknown"
-
-    def test_create_from_project_and_namespace_project_priority(
-        self, project_gitlab_com, namespace_self_managed
+    @pytest.mark.parametrize(
+        "project_fixture,mock_version,expected_type,expected_url,expected_version",
+        [
+            (
+                "project_gitlab_com",
+                "16.5.0-ee",
+                "GitLab.com (SaaS)",
+                "https://gitlab.com",
+                "16.5.0-ee",
+            ),
+            (
+                "project_self_managed",
+                "15.0.0-ee",
+                "Self-Managed",
+                "https://gitlab.example.com",
+                "15.0.0-ee",
+            ),
+            (
+                "project_dedicated",
+                "16.0.0-ee",
+                "GitLab Dedicated",
+                "https://dedicated-example.gitlab.com",
+                "16.0.0-ee",
+            ),
+        ],
+    )
+    def test_create_from_project(
+        self,
+        request,
+        project_fixture,
+        mock_version,
+        expected_type,
+        expected_url,
+        expected_version,
     ):
-        """Test that project takes priority over namespace when both are provided."""
+        """Test creating GitLab instance info from different project types."""
+        project = request.getfixturevalue(project_fixture)
+
         with patch(
             "duo_workflow_service.gitlab.gitlab_instance_info_service.gitlab_version"
-        ) as mock_version:
-            mock_version.get.return_value = "16.5.0-ee"
+        ) as mock_gitlab_version:
+            mock_gitlab_version.get.return_value = mock_version
 
             service = GitLabInstanceInfoService()
-            result = service.create_from_project_and_namespace(
-                project_gitlab_com, namespace_self_managed
-            )
+            result = service.create_from_project(project)
 
-            # Should use project info, not namespace
-            assert result.instance_type == "GitLab.com (SaaS)"
-            assert result.instance_url == "https://gitlab.com"
-            assert result.instance_version == "16.5.0-ee"
+            assert result.instance_type == expected_type
+            assert result.instance_url == expected_url
+            assert result.instance_version == expected_version
 
-    def test_create_from_project_and_namespace_fallback_to_namespace(
-        self, namespace_self_managed
+    @pytest.mark.parametrize(
+        "namespace_fixture,mock_version,expected_type,expected_url,expected_version",
+        [
+            (
+                "namespace_gitlab_com",
+                "16.5.0-ee",
+                "GitLab.com (SaaS)",
+                "https://gitlab.com",
+                "16.5.0-ee",
+            ),
+            (
+                "namespace_self_managed",
+                "15.0.0-ee",
+                "Self-Managed",
+                "https://gitlab.example.com",
+                "15.0.0-ee",
+            ),
+        ],
+    )
+    def test_create_from_namespace(
+        self,
+        request,
+        namespace_fixture,
+        mock_version,
+        expected_type,
+        expected_url,
+        expected_version,
     ):
-        """Test that namespace is used when project is None."""
+        """Test creating GitLab instance info from different namespace types."""
+        namespace = request.getfixturevalue(namespace_fixture)
+
+        with patch(
+            "duo_workflow_service.gitlab.gitlab_instance_info_service.gitlab_version"
+        ) as mock_gitlab_version:
+            mock_gitlab_version.get.return_value = mock_version
+
+            service = GitLabInstanceInfoService()
+            result = service.create_from_namespace(namespace)
+
+            assert result.instance_type == expected_type
+            assert result.instance_url == expected_url
+            assert result.instance_version == expected_version
+
+    @pytest.mark.parametrize(
+        "project_fixture,mock_version_return,mock_version_side_effect,expected_type,expected_url,expected_version",
+        [
+            # Version fallback - test with one instance type since logic is the same
+            (
+                "project_gitlab_com",
+                None,
+                None,
+                "GitLab.com (SaaS)",
+                "https://gitlab.com",
+                "Unknown",
+            ),
+            # Version exception - test with one instance type since logic is the same
+            (
+                "project_gitlab_com",
+                None,
+                Exception("Version not available"),
+                "GitLab.com (SaaS)",
+                "https://gitlab.com",
+                "Unknown",
+            ),
+        ],
+    )
+    def test_create_from_project_version_edge_cases(
+        self,
+        request,
+        project_fixture,
+        mock_version_return,
+        mock_version_side_effect,
+        expected_type,
+        expected_url,
+        expected_version,
+    ):
+        """Test creating GitLab instance info with version fallback and exception scenarios."""
+        project = request.getfixturevalue(project_fixture)
+
         with patch(
             "duo_workflow_service.gitlab.gitlab_instance_info_service.gitlab_version"
         ) as mock_version:
-            mock_version.get.return_value = "15.0.0-ee"
+            if mock_version_side_effect:
+                mock_version.get.side_effect = mock_version_side_effect
+            else:
+                mock_version.get.return_value = mock_version_return
 
             service = GitLabInstanceInfoService()
-            result = service.create_from_project_and_namespace(
-                None, namespace_self_managed
-            )
+            result = service.create_from_project(project)
 
-            assert result.instance_type == "Self-Managed"
-            assert result.instance_url == "https://gitlab.example.com"
-            assert result.instance_version == "15.0.0-ee"
+            assert result.instance_type == expected_type
+            assert result.instance_url == expected_url
+            assert result.instance_version == expected_version
 
-    def test_create_from_project_and_namespace_both_none(self):
-        """Test that fallback values are used when both project and namespace are None."""
+    @pytest.mark.parametrize(
+        "input_fixture,method_name,expected_type,expected_url,expected_version",
+        [
+            # None project scenarios
+            (None, "create_from_project", "Unknown", "Unknown", "Unknown"),
+            # None namespace scenarios
+            (None, "create_from_namespace", "Unknown", "Unknown", "Unknown"),
+        ],
+    )
+    def test_create_from_none_inputs(
+        self, input_fixture, method_name, expected_type, expected_url, expected_version
+    ):
+        """Test creating GitLab instance info when project or namespace is None."""
         service = GitLabInstanceInfoService()
-        result = service.create_from_project_and_namespace(None, None)
+        method = getattr(service, method_name)
+        result = method(input_fixture)
 
-        assert result.instance_type == "Unknown"
-        assert result.instance_url == "Unknown"
-        assert result.instance_version == "Unknown"
+        assert result.instance_type == expected_type
+        assert result.instance_url == expected_url
+        assert result.instance_version == expected_version
+
+    @pytest.mark.parametrize(
+        "project_fixture,namespace_fixture,mock_version,expected_type,expected_url,expected_version",
+        [
+            # Project priority over namespace - if this is even a possible scenario
+            (
+                "project_gitlab_com",
+                "namespace_self_managed",
+                "16.5.0-ee",
+                "GitLab.com (SaaS)",
+                "https://gitlab.com",
+                "16.5.0-ee",
+            ),
+            # Fallback to namespace when no project
+            (
+                None,
+                "namespace_self_managed",
+                "15.0.0-ee",
+                "Self-Managed",
+                "https://gitlab.example.com",
+                "15.0.0-ee",
+            ),
+            # Both None scenario
+            (
+                None,
+                None,
+                "16.5.0-ee",
+                "Unknown",
+                "Unknown",
+                "Unknown",
+            ),
+        ],
+    )
+    def test_create_from_project_and_namespace(
+        self,
+        request,
+        project_fixture,
+        namespace_fixture,
+        mock_version,
+        expected_type,
+        expected_url,
+        expected_version,
+    ):
+        """Test creating GitLab instance info from project and namespace combinations."""
+        project = request.getfixturevalue(project_fixture) if project_fixture else None
+        namespace = (
+            request.getfixturevalue(namespace_fixture) if namespace_fixture else None
+        )
+
+        with patch(
+            "duo_workflow_service.gitlab.gitlab_instance_info_service.gitlab_version"
+        ) as mock_gitlab_version:
+            mock_gitlab_version.get.return_value = mock_version
+
+            service = GitLabInstanceInfoService()
+            result = service.create_from_project_and_namespace(project, namespace)
+
+            assert result.instance_type == expected_type
+            assert result.instance_url == expected_url
+            assert result.instance_version == expected_version
 
     @pytest.mark.parametrize(
         "web_url,expected_type",
