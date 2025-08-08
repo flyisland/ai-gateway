@@ -57,7 +57,11 @@ class ChatAgentPromptTemplate(Runnable[ChatWorkflowState, PromptValue]):
         # Get GitLab instance info if available
         gitlab_instance_info = None
         chat_agent = _kwargs.get("chat_agent")
-        if chat_agent and hasattr(chat_agent, "gitlab_instance_info_service") and chat_agent.gitlab_instance_info_service:
+        if (
+            chat_agent
+            and hasattr(chat_agent, "gitlab_instance_info_service")
+            and chat_agent.gitlab_instance_info_service
+        ):
             service = _kwargs["chat_agent"].gitlab_instance_info_service
             gitlab_instance_info = service.create_from_project_and_namespace(
                 project, namespace
