@@ -22,7 +22,7 @@ def mock_prompt_security_fixture():
     with patch(
         "duo_workflow_service.agent_platform.experimental.components.agent.nodes.tool_node.PromptSecurity"
     ) as mock_security:
-        mock_security.apply_security_to_tool_response_to_tool_response.return_value = (
+        mock_security.apply_security_to_tool_response.return_value = (
             "Sanitized response"
         )
         yield mock_security
@@ -221,7 +221,7 @@ class TestToolNode:
 
         # Verify error message in result
         secutiry_harness_args = (
-            mock_prompt_security.apply_security_to_tool_response_to_tool_response.call_args
+            mock_prompt_security.apply_security_to_tool_response.call_args
         )
         assert secutiry_harness_args[1]["tool_name"] == mock_tool.name
         assert (
@@ -475,14 +475,14 @@ class TestToolNodeSecurity:
         with patch(
             "duo_workflow_service.agent_platform.experimental.components.agent.nodes.tool_node.PromptSecurity"
         ) as mock_security:
-            mock_security.apply_security_to_tool_response_to_tool_response.return_value = (
+            mock_security.apply_security_to_tool_response.return_value = (
                 "Sanitized safe response"
             )
 
             result = await tool_node.run(flow_state_with_tool_calls)
 
             # Verify sanitization was called
-            mock_security.apply_security_to_tool_response_to_tool_response.assert_called_once_with(
+            mock_security.apply_security_to_tool_response.assert_called_once_with(
                 response="Tool execution result", tool_name=mock_tool.name
             )
 
