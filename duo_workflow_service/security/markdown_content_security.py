@@ -43,13 +43,27 @@ def strip_hidden_html_comments(response: str | dict | list) -> str | dict | list
         if not text or not isinstance(text, str):
             return text
 
-        # Since encode_dangerous_tags runs first, by the time we get here,
-        # dangerous tags are already encoded as &lt;system&gt; etc.
-        # We just need to strip HTML comments using Bleach's robust parsing
-        # while preserving everything else exactly as-is
+        # Dangerous tags are already encoded as &lt;system&gt; etc. by encode_dangerous_tags
+        # This function focuses solely on removing HTML comments while preserving all other content
 
-        if "<!--" not in text:
-            return text  # No comments to strip, return unchanged
+        # Early exit if no HTML comments are present in any format
+        has_regular_comments = "<!--" in text
+        has_escaped_comments = (
+            "\\u003c!--" in text  # JSON unicode escape (lowercase)
+            or "\\u003C!--" in text  # JSON unicode escape (uppercase)
+            or "\\<!--" in text  # Backslash escape
+        )
+
+        if not has_regular_comments and not has_escaped_comments:
+            return text
+
+        # Remove JSON-escaped HTML comments (e.g., from json.dumps serialization)
+        # Handles patterns like \\u003c!-- ... --\\u003e and \\\\u003c!-- ... --\\\\u003e
+        text = re.sub(r"\\+u003[cC]!--.*?--\\+u003[eE]", "", text, flags=re.DOTALL)
+
+        # Remove backslash-escaped HTML comments
+        # Handles patterns like \\<!-- ... --\\>
+        text = re.sub(r"\\+<!--.*?--\\+>", "", text, flags=re.DOTALL)
 
         # Use Bleach to strip comments while preserving common HTML tags
         # Extend Bleach's default allowed tags with commonly used HTML elements
