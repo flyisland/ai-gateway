@@ -16,6 +16,14 @@ from duo_workflow_service import agents as workflow
 from duo_workflow_service.gitlab.http_client import GitlabHttpClient
 
 
+@pytest.fixture(autouse=True, scope="module")
+def patch_env():
+    mp = pytest.MonkeyPatch()
+    mp.setenv("OPENAI_API_KEY", "test-key")
+    yield
+    mp.undo()
+
+
 @pytest.fixture(name="config_values")
 def config_values_fixture(assets_dir):
     return {
@@ -127,7 +135,6 @@ def test_container_openai_model_factory_exists(
     )
     model: ChatOpenAI = factory(
         model="gpt-4",
-        api_key="mocked",
         **params.model_dump(exclude_none=True, exclude={"model_class_provider"}),
     )
 
