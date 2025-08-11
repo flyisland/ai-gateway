@@ -23,6 +23,8 @@ from duo_workflow_service.entities.state import (
     UiChatLog,
 )
 from duo_workflow_service.gitlab.gitlab_api import Namespace, Project
+from duo_workflow_service.gitlab.gitlab_instance_info_service import GitLabInstanceInfo
+from duo_workflow_service.gitlab.gitlab_service_context import GitLabServiceContext
 from lib.internal_events import InternalEventAdditionalProperties
 from lib.internal_events.event_enum import CategoryEnum, EventEnum, EventPropertyEnum
 
@@ -277,15 +279,11 @@ Here is the project information for the current GitLab project the USER is worki
         """Test that system_static and system_dynamic create separate system messages."""
         template = ChatAgentPromptTemplate(prompt_template_with_split_system)
 
-        # Mock chat agent without gitlab_instance_info_service to test fallback behavior
-        mock_chat_agent = Mock()
-        del mock_chat_agent.gitlab_instance_info_service  # Remove the attribute
-
+        # Test without GitLab context (should use fallback values)
         result = template.invoke(
             chat_workflow_state,
             agent_name="test_agent",
             is_anthropic_model=False,
-            chat_agent=mock_chat_agent,
         )
 
         assert isinstance(result, ChatPromptValue)
@@ -618,27 +616,31 @@ The current date is {{ current_date }}.
     def test_static_prompt_contains_gitlab_instance_info(
         self, prompt_template_with_gitlab_info, input_with_project
     ):
-        """Test static prompt contains correct GitLab instance info."""
+        """Test static prompt contains correct GitLab instance info from context."""
         template = ChatAgentPromptTemplate(prompt_template_with_gitlab_info)
 
         # Mock the GitLab instance info service
-        mock_chat_agent = Mock()
         mock_gitlab_service = Mock()
-        mock_gitlab_info = Mock()
-        mock_gitlab_info.instance_type = "GitLab.com (SaaS)"
-        mock_gitlab_info.instance_url = "https://gitlab.com"
-        mock_gitlab_info.instance_version = "16.5.0-ee"
+        mock_gitlab_info = GitLabInstanceInfo(
+            instance_type="GitLab.com (SaaS)",
+            instance_url="https://gitlab.com",
+            instance_version="16.5.0-ee",
+        )
         mock_gitlab_service.create_from_project_and_namespace.return_value = (
             mock_gitlab_info
         )
-        mock_chat_agent.gitlab_instance_info_service = mock_gitlab_service
 
-        result = template.invoke(
-            input_with_project,
-            agent_name="test_agent",
-            is_anthropic_model=False,
-            chat_agent=mock_chat_agent,
-        )
+        # Use the context manager to provide GitLab info
+        with GitLabServiceContext(
+            mock_gitlab_service,
+            project=input_with_project["project"],
+            namespace=input_with_project["namespace"],
+        ):
+            result = template.invoke(
+                input_with_project,
+                agent_name="test_agent",
+                is_anthropic_model=False,
+            )
 
         messages = result.messages
         assert len(messages) == 3  # static system, dynamic system, user
@@ -664,21 +666,17 @@ The current date is {{ current_date }}.
             input_with_project["project"], input_with_project["namespace"]
         )
 
-    def test_static_prompt_without_gitlab_instance_info_service(
+    def test_static_prompt_without_gitlab_context(
         self, prompt_template_with_gitlab_info, input_with_project
     ):
-        """Test static prompt handles missing GitLabInstanceInfoService gracefully."""
+        """Test static prompt handles missing GitLab context gracefully."""
         template = ChatAgentPromptTemplate(prompt_template_with_gitlab_info)
 
-        # Mock chat agent without gitlab_instance_info_service attribute
-        mock_chat_agent = Mock()
-        del mock_chat_agent.gitlab_instance_info_service  # Remove the attribute
-
+        # Call template without GitLab context
         result = template.invoke(
             input_with_project,
             agent_name="test_agent",
             is_anthropic_model=False,
-            chat_agent=mock_chat_agent,
         )
 
         messages = result.messages
