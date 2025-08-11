@@ -1,5 +1,5 @@
 from enum import IntEnum
-from typing import Any, Type
+from typing import Any, List, Type
 
 import gitmatch
 from langchain.tools.base import ToolException
@@ -91,6 +91,10 @@ class ReadFile(DuoBaseTool):
     """
     args_schema: Type[BaseModel] = ReadFileInput  # type: ignore
     handle_tool_error: bool = True
+    eval_prompts: List[str] = [
+        "I need to read the content of the `readme.md`",
+        "Let me check if class `DuoBaseTool` exists in `./tools/base.py`",
+    ]
 
     async def _arun(self, file_path: str) -> str:
         # Check file exclusion policy
@@ -442,6 +446,10 @@ class ListDir(DuoBaseTool):
     Use this instead of trying to run 'ls' commands.
     """
     args_schema: Type[BaseModel] = ListDirInput  # type: ignore
+    eval_prompts: List[str] = [
+        "I need to list files in the current directory",
+        "Let me check if file `generate_dataset.py` exists in `./src`",
+    ]
 
     async def _arun(self, directory: str) -> str:
         # Check file exclusion policy before executing action
