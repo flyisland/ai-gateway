@@ -11,7 +11,9 @@ from langgraph.checkpoint.memory import MemorySaver
 from ai_gateway.config import Config
 from ai_gateway.container import ContainerApplication
 from duo_workflow_service.components import ToolsRegistry
+from duo_workflow_service.components.tools_registry import ToolMetadata
 from duo_workflow_service.server import CONTAINER_APPLICATION_PACKAGES
+from duo_workflow_service.workflows.registry import FlowFactory, resolve_workflow_class
 from lib.internal_events.event_enum import CategoryEnum
 
 HEADER_TEXT = """
@@ -20,6 +22,8 @@ HEADER_TEXT = """
 These diagrams show the LangGraph structure of each Workflow in the duo_workflow_service. Do not manually edit
 this file, instead update it by running `make duo-workflow-docs`.
 """
+
+FLOW_REGISTRY_CONFIG_DIR = "duo_workflow_service/agent_platform/experimental/flows/configs/"
 
 
 def main():
@@ -76,6 +80,31 @@ def main():
             diagram = diagram.replace("\t", "    ")
 
             output_file.write(f"\n## Graph: `{graph_name}`\n\n")
+            output_file.write("```mermaid\n" + diagram + "```\n")
+
+        flow_registry_names = [file for file in os.listdir(FLOW_REGISTRY_CONFIG_DIR) if file.endswith(".yml")]
+        for flow in flow_registry_names:
+            # Get the name:
+            flow_name = "test/experimental"
+
+            workflow_class: FlowFactory = resolve_workflow_class(flow_name)
+            workflow: AbstractWorkflow = workflow_class(
+                workflow_id="1",
+                workflow_metadata={},
+                workflow_type="software_development",
+            )
+
+            registry = ToolsRegistry(
+                enabled_tools=[],
+                preapproved_tools=[],
+                tool_metadata=MagicMock(spec=ToolMetadata),
+            )
+            graph = workflow._compile("", registry, MemorySaver())
+
+            diagram = graph.get_graph().draw_mermaid()
+            diagram = diagram.replace("\t", "    ")
+
+            output_file.write(f"\n## Graph: `{flow_name}` (Flow Registry)\n\n")
             output_file.write("```mermaid\n" + diagram + "```\n")
 
 
