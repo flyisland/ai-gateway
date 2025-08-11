@@ -41,6 +41,7 @@ CHAT_READ_ONLY_TOOLS = [
     "get_issue_note",
     "get_job_logs",
     "get_merge_request",
+    "list_merge_request",
     "get_pipeline_errors",
     "get_project",
     "run_read_only_git_command",

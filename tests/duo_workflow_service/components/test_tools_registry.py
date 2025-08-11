@@ -91,6 +91,7 @@ _outbox = MagicMock(spec=asyncio.Queue)
                 "get_issue",
                 "get_job_logs",
                 "get_merge_request",
+                "list_merge_request",
                 "list_merge_request_diffs",
                 "list_all_merge_request_notes",
                 "get_pipeline_errors",
@@ -142,6 +143,7 @@ _outbox = MagicMock(spec=asyncio.Queue)
                 "update_issue",
                 "get_job_logs",
                 "get_merge_request",
+                "list_merge_request",
                 "list_merge_request_diffs",
                 "create_merge_request_note",
                 "list_all_merge_request_notes",
@@ -273,6 +275,7 @@ def test_registry_initialization_initialises_tools_with_correct_attributes(
         "update_issue": tools.UpdateIssue(metadata=tool_metadata),
         "get_job_logs": tools.GetLogsFromJob(metadata=tool_metadata),
         "get_merge_request": tools.GetMergeRequest(metadata=tool_metadata),
+        "list_merge_request": tools.ListMergeRequest(metadata=tool_metadata),
         "list_merge_request_diffs": tools.ListMergeRequestDiffs(metadata=tool_metadata),
         "create_merge_request_note": tools.CreateMergeRequestNote(
             metadata=tool_metadata
