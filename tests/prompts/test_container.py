@@ -127,6 +127,7 @@ def test_container_openai_model_factory_exists(
     )
     model: ChatOpenAI = factory(
         model="gpt-4",
+        api_key="mocked",
         **params.model_dump(exclude_none=True, exclude={"model_class_provider"}),
     )
 
