@@ -34,6 +34,11 @@ from duo_workflow_service.tools.queries.work_items import (
 # Supported work item types in GitLab
 GROUP_ONLY_TYPES = {"Epic", "Objective", "Key Result"}
 ALL_TYPES = {"Issue", "Task", *GROUP_ONLY_TYPES}
+STATE_EVENT_MAPPING = {
+    "closed": "CLOSE",
+    "opened": "REOPEN",
+}
+
 
 PARENT_IDENTIFICATION_DESCRIPTION = """To identify the parent (group or project) you must provide either:
 - group_id parameter, or
@@ -937,7 +942,7 @@ class UpdateWorkItem(WorkItemBaseTool):
     {WORK_ITEM_IDENTIFICATION_DESCRIPTION}
 
     For example:
-    - update_work_item(group_id='namespace/group', work_item_iid=42, title="Updated title")
+    - update_work_item(group_id='parent/child', work_item_iid=42, title="Updated title")
     - update_work_item(project_id='namespace/project', work_item_iid=42, title="Updated title")
     - update_work_item(url="https://gitlab.com/groups/namespace/group/-/work_items/42", title="Updated title")
     - update_work_item(url="https://gitlab.com/namespace/project/-/work_items/42", title="Updated title")
@@ -965,10 +970,8 @@ class UpdateWorkItem(WorkItemBaseTool):
         input_fields, warnings = self._build_work_item_input_fields(kwargs)
 
         state = kwargs.get("state")
-        if state == "closed":
-            input_fields["stateEvent"] = "CLOSE"
-        elif state == "opened":
-            input_fields["stateEvent"] = "REOPEN"
+        if state in STATE_EVENT_MAPPING:
+            input_fields["stateEvent"] = STATE_EVENT_MAPPING[state]
 
         variables = {
             "input": {
