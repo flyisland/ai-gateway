@@ -228,8 +228,7 @@ class Workflow(AbstractWorkflow):
             # temporary approach: model selection doesn't support feature flags
             model_metadata = ModelSelectionMetadata(
                 name="gpt_5"
-            )  # it loads the chat/agent/gpt_5 prompt
-            prompt_version = "^1.0.0"
+            )  # it will force the prompt registry load the chat/agent/gpt_5 prompt
 
         self._agent: ChatAgent = self._prompt_registry.get_on_behalf(  # type: ignore[assignment]
             user=self._user,
