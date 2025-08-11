@@ -1,6 +1,6 @@
 # Using the agentic mock model
 
-The [agentic mock model](../../ai_gateway/models/agentic_mock.py) lets you to simulate multi-step workflows by specifying mock responses in your input.
+The [agentic mock model](../../ai_gateway/models/agentic_mock.py) lets you simulate multi-step workflows by specifying mock responses in your input.
 
 Enable the agentic mock by setting both environment variables:
 
