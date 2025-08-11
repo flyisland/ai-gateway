@@ -7,6 +7,7 @@ from unittest.mock import MagicMock
 import structlog
 from gitlab_cloud_connector import CloudConnectorUser
 from langgraph.checkpoint.memory import MemorySaver
+import yaml
 
 from ai_gateway.config import Config
 from ai_gateway.container import ContainerApplication
@@ -84,8 +85,10 @@ def main():
 
         flow_registry_names = [file for file in os.listdir(FLOW_REGISTRY_CONFIG_DIR) if file.endswith(".yml")]
         for flow in flow_registry_names:
-            # Get the name:
-            flow_name = "test/experimental"
+            with open(FLOW_REGISTRY_CONFIG_DIR + flow) as yml_contents:
+                data = yaml.safe_load(yml_contents)
+                version = data['version']
+                flow_name = flow.removesuffix(".yml") + "/" + version
 
             workflow_class: FlowFactory = resolve_workflow_class(flow_name)
             workflow: AbstractWorkflow = workflow_class(
