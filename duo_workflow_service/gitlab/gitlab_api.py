@@ -126,11 +126,16 @@ FALLBACK_VERSION = version_18_2
 
 
 def fetch_workflow_and_container_query():
-    try:
-        gl_version = Version(gitlab_version.get())  # type: ignore[arg-type]
-    except (InvalidVersion, TypeError) as ex:
-        log_exception(ex)
+    version_str = gitlab_version.get()
+
+    if version_str is None:
         gl_version = FALLBACK_VERSION
+    else:
+        try:
+            gl_version = Version(version_str)
+        except InvalidVersion as ex:
+            log_exception(ex)
+            gl_version = FALLBACK_VERSION
 
     if version_18_3 <= gl_version:
         return GITLAB_18_3_OR_ABOVE_QUERY

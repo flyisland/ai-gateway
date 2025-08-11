@@ -3,9 +3,40 @@ from unittest.mock import AsyncMock, patch
 import pytest
 
 from duo_workflow_service.gitlab.gitlab_api import (
+    GITLAB_18_2_QUERY,
+    GITLAB_18_3_OR_ABOVE_QUERY,
     extract_id_from_global_id,
     fetch_workflow_and_container_data,
+    fetch_workflow_and_container_query,
 )
+
+
+@pytest.mark.asyncio
+async def test_fetch_workflow_and_container_query_with_none_version():
+
+    with patch("duo_workflow_service.gitlab.gitlab_api.gitlab_version") as mock_version:
+        mock_version.get.return_value = None
+        query = fetch_workflow_and_container_query()
+        assert query == GITLAB_18_2_QUERY
+        mock_version.get.assert_called_once()
+
+
+@pytest.mark.asyncio
+async def test_fetch_workflow_and_container_query_with_invalid_version():
+
+    with patch("duo_workflow_service.gitlab.gitlab_api.gitlab_version") as mock_version:
+        mock_version.get.return_value = "not-a-valid-version"
+        query = fetch_workflow_and_container_query()
+        assert query == GITLAB_18_2_QUERY
+
+
+@pytest.mark.asyncio
+async def test_fetch_workflow_and_container_query_with_valid_version():
+
+    with patch("duo_workflow_service.gitlab.gitlab_api.gitlab_version") as mock_version:
+        mock_version.get.return_value = "18.3.0"
+        query = fetch_workflow_and_container_query()
+        assert query == GITLAB_18_3_OR_ABOVE_QUERY
 
 
 @pytest.fixture(name="workflow_and_project_data")
