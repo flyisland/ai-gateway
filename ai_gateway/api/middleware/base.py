@@ -7,7 +7,7 @@ from typing import Optional
 import structlog
 from asgi_correlation_id.context import correlation_id
 from fastapi import status
-from starlette.datastructures import CommaSeparatedStrings, MutableHeaders
+from starlette.datastructures import MutableHeaders
 from starlette.middleware.base import Request
 from starlette_context import context as starlette_context
 from uvicorn.protocols.utils import get_path_with_query_string
@@ -190,8 +190,4 @@ class InternalEventMiddleware:
         # Langsmith::RunHelpers of GitLab-Rails/Sidekiq.
         # See https://docs.gitlab.com/ee/development/ai_features/duo_chat.html#tracing-with-langsmith
         # and https://docs.smith.langchain.com/how_to_guides/tracing/distributed_tracing
-        with tracing_context(
-            parent=request.headers.get("langsmith-trace"),
-            enabled=self.environment == "development",
-        ):
-            await self.app(scope, receive, send)
+        await self.app(scope, receive, send)
