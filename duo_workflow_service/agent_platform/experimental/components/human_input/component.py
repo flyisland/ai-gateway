@@ -15,8 +15,9 @@ from duo_workflow_service.agent_platform.experimental.components.human_input.nod
     RequestNode,
 )
 from duo_workflow_service.agent_platform.experimental.components.human_input.ui_log import (
+    AgentLogWriter,
     UILogEventsHumanInput,
-    UILogWriterHumanInput,
+    UserLogWriter,
 )
 from duo_workflow_service.agent_platform.experimental.components.registry import (
     register_component,
@@ -105,8 +106,14 @@ class HumanInputComponent(BaseComponent):
         ui_history = None
         if self.ui_log_events:
             ui_history = UIHistory(
-                events=self.ui_log_events, writer_class=UILogWriterHumanInput
+                events=self.ui_log_events, writer_class=AgentLogWriter
             )
+
+        # Create UI history for user responses using UserLogWriter
+        user_response_ui_history = UIHistory(
+            events=self.ui_log_events,
+            writer_class=UserLogWriter,
+        )
 
         # Create request node
         request_node = RequestNode(
@@ -123,6 +130,7 @@ class HumanInputComponent(BaseComponent):
             component_name=self.name,
             responds_to=self.responds_to,
             output=self._approval_output,
+            ui_history=user_response_ui_history,
         )
 
         # Add nodes to graph

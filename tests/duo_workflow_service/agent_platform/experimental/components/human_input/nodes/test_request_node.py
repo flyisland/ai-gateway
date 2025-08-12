@@ -9,8 +9,8 @@ from duo_workflow_service.agent_platform.experimental.components.human_input.nod
     RequestNode,
 )
 from duo_workflow_service.agent_platform.experimental.components.human_input.ui_log import (
+    AgentLogWriter,
     UILogEventsHumanInput,
-    UILogWriterHumanInput,
 )
 from duo_workflow_service.agent_platform.experimental.state import FlowStateKeys, IOKey
 from duo_workflow_service.agent_platform.experimental.ui_log import UIHistory
@@ -44,7 +44,7 @@ class TestRequestNode:
             inputs=[IOKey(target="context", subkeys=["test_key"])],
             ui_history=UIHistory(
                 events=[UILogEventsHumanInput.ON_USER_INPUT_PROMPT],
-                writer_class=UILogWriterHumanInput,
+                writer_class=AgentLogWriter,
             ),
         )
 
@@ -137,7 +137,7 @@ class TestRequestNode:
             inputs=[],
             ui_history=UIHistory(
                 events=[],  # No ON_USER_INPUT_PROMPT event - but should still log
-                writer_class=UILogWriterHumanInput,
+                writer_class=AgentLogWriter,
             ),
         )
 
@@ -176,7 +176,7 @@ class TestRequestNode:
                 inputs=[],
                 ui_history=UIHistory(
                     events=[UILogEventsHumanInput.ON_USER_INPUT_PROMPT],
-                    writer_class=UILogWriterHumanInput,
+                    writer_class=AgentLogWriter,
                 ),
             )
 
@@ -202,7 +202,7 @@ class TestRequestNode:
                 inputs=[],
                 ui_history=UIHistory(
                     events=[UILogEventsHumanInput.ON_USER_INPUT_PROMPT],
-                    writer_class=UILogWriterHumanInput,
+                    writer_class=AgentLogWriter,
                 ),
             )
         except ValueError:

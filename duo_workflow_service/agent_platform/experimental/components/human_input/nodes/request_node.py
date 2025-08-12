@@ -5,8 +5,8 @@ from pydantic import BaseModel, model_validator
 
 from ai_gateway.prompts import Prompt
 from duo_workflow_service.agent_platform.experimental.components.human_input.ui_log import (
+    AgentLogWriter,
     UILogEventsHumanInput,
-    UILogWriterHumanInput,
 )
 from duo_workflow_service.agent_platform.experimental.state import (
     FlowState,
@@ -27,7 +27,7 @@ class RequestNode(BaseModel):
     component_name: str
     prompt: Optional[Prompt]
     inputs: list[IOKey]
-    ui_history: Optional[UIHistory[UILogWriterHumanInput, UILogEventsHumanInput]] = None
+    ui_history: Optional[UIHistory[AgentLogWriter, UILogEventsHumanInput]] = None
 
     @model_validator(mode="after")
     def validate_prompt_with_ui_history(self):

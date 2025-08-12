@@ -1,4 +1,4 @@
-from unittest.mock import Mock, patch
+from unittest.mock import Mock, call, patch
 
 import pytest
 from langchain_core.prompts import PromptTemplate
@@ -9,9 +9,12 @@ from duo_workflow_service.agent_platform.experimental.components.human_input.com
     HumanInputComponent,
 )
 from duo_workflow_service.agent_platform.experimental.components.human_input.ui_log import (
+    AgentLogWriter,
     UILogEventsHumanInput,
+    UserLogWriter,
 )
 from duo_workflow_service.agent_platform.experimental.state import FlowState, IOKey
+from duo_workflow_service.agent_platform.experimental.ui_log.base import UIHistory
 from lib.internal_events.event_enum import CategoryEnum
 
 
@@ -38,7 +41,10 @@ class TestHumanInputComponent:
             prompt_id="test_prompt",
             prompt_version="v1.0",
             prompt_registry=mock_prompt_registry,
-            ui_log_events=[UILogEventsHumanInput.ON_USER_INPUT_PROMPT],
+            ui_log_events=[
+                UILogEventsHumanInput.ON_USER_INPUT_PROMPT,
+                UILogEventsHumanInput.ON_USER_RESPONSE,
+            ],
         )
 
     def test_iokey_template_replacement(self, human_input_component):
@@ -107,6 +113,7 @@ class TestHumanInputComponent:
                 component_name="test_human_input",
                 responds_to="awesome_agent",
                 output=human_input_component._approval_output,
+                ui_history=mock_fetch_node.call_args[1]["ui_history"],
             )
 
             # Verify graph received calls to add_node, add_edge and add_conditional_edges with correct arguments
@@ -207,7 +214,11 @@ class TestHumanInputComponent:
             patch(
                 "duo_workflow_service.agent_platform.experimental.components.human_input.component.FetchNode"
             ) as mock_fetch_node,
+            patch(
+                "duo_workflow_service.agent_platform.experimental.components.human_input.component.UIHistory"
+            ) as mock_ui_history,
         ):
+            mock_ui_history.return_value = Mock(spec=UIHistory)
 
             # Mock node instances
             request_instance = Mock()
@@ -220,8 +231,27 @@ class TestHumanInputComponent:
 
             human_input_component.attach(graph, router)
 
-            # Verify request node was created with ui_history containing events
-            call_args = mock_request_node.call_args
-            ui_history = call_args[1]["ui_history"]
-            assert ui_history is not None
-            assert UILogEventsHumanInput.ON_USER_INPUT_PROMPT in ui_history.events
+            mock_ui_history.assert_has_calls(
+                [
+                    call(
+                        events=[
+                            UILogEventsHumanInput.ON_USER_INPUT_PROMPT,
+                            UILogEventsHumanInput.ON_USER_RESPONSE,
+                        ],
+                        writer_class=AgentLogWriter,
+                    ),
+                    call(
+                        events=[
+                            UILogEventsHumanInput.ON_USER_INPUT_PROMPT,
+                            UILogEventsHumanInput.ON_USER_RESPONSE,
+                        ],
+                        writer_class=UserLogWriter,
+                    ),
+                ]
+            )
+
+            request_node_ui_history = mock_request_node.call_args[1]["ui_history"]
+            assert request_node_ui_history == mock_ui_history.return_value
+
+            fetch_node_ui_history = mock_fetch_node.call_args[1]["ui_history"]
+            assert fetch_node_ui_history == mock_ui_history.return_value

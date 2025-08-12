@@ -4,6 +4,9 @@ from langchain_core.messages import HumanMessage
 from langgraph.types import interrupt
 from pydantic import BaseModel
 
+from duo_workflow_service.agent_platform.experimental.components.human_input.ui_log import (
+    UILogEventsHumanInput,
+)
 from duo_workflow_service.agent_platform.experimental.state import (
     FlowEvent,
     FlowEventType,
@@ -11,6 +14,7 @@ from duo_workflow_service.agent_platform.experimental.state import (
     FlowStateKeys,
     IOKey,
 )
+from duo_workflow_service.agent_platform.experimental.ui_log import UIHistory
 from duo_workflow_service.entities.state import WorkflowStatusEnum
 
 __all__ = ["FetchNode"]
@@ -23,6 +27,7 @@ class FetchNode(BaseModel):
     component_name: str
     responds_to: str
     output: IOKey
+    ui_history: UIHistory
 
     async def run(
         self, state: FlowState  # pylint: disable=unused-argument
@@ -43,10 +48,18 @@ class FetchNode(BaseModel):
 
             # For REJECT events, also add HumanMessage to conversation history
             if event["event_type"] == FlowEventType.REJECT and "message" in event:
+                # Log user response
+                self.ui_history.log.success(
+                    content=event["message"],
+                    event=UILogEventsHumanInput.ON_USER_RESPONSE,
+                )
+
                 human_message = HumanMessage(content=event["message"])
                 result[FlowStateKeys.CONVERSATION_HISTORY] = {
                     self.responds_to: [human_message]
                 }
+
+            result.update(self.ui_history.pop_state_updates())
 
             return result
 
@@ -54,11 +67,17 @@ class FetchNode(BaseModel):
             # Extract user message from event
             user_message = event["message"]
 
+            # Log user response
+            self.ui_history.log.success(
+                content=user_message,
+                event=UILogEventsHumanInput.ON_USER_RESPONSE,
+            )
+
             # Create HumanMessage for conversation history
             human_message = HumanMessage(content=user_message)
 
-            # Return the message targeted to the responds_to component
             return {
+                **self.ui_history.pop_state_updates(),
                 FlowStateKeys.STATUS: WorkflowStatusEnum.EXECUTION.value,
                 FlowStateKeys.CONVERSATION_HISTORY: {self.responds_to: [human_message]},
             }
