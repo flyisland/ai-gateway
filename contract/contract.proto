@@ -13,6 +13,7 @@ message ClientEvent {
         StartWorkflowRequest startRequest = 1;
         ActionResponse actionResponse = 2;
         HeartbeatRequest heartbeat = 3;
+        StopWorkflowRequest stopRequest = 4;
     }
 }
 
@@ -28,6 +29,8 @@ message StartWorkflowRequest {
     repeated AdditionalContext additional_context = 9;
     optional Approval approval = 10;
 }
+
+message StopWorkflowRequest {}
 
 message ActionResponse {
     string requestID = 1;
