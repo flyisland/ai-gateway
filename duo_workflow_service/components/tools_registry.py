@@ -57,7 +57,6 @@ _READ_ONLY_GITLAB_TOOLS: list[Type[BaseTool]] = [
     tools.DocumentationSearch,
     tools.GroupProjectSearch,
     tools.IssueSearch,
-    tools.MergeRequestSearch,
     tools.MilestoneSearch,
     tools.UserSearch,
     tools.BlobSearch,

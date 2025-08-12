@@ -470,24 +470,27 @@ class ListMergeRequestInput(ProjectResourceInput):
 
 
 class ListMergeRequest(DuoBaseTool):
-    name: str = "list_merge_request"
+    name: str = "gitlab_merge_request_search"
     description: str = f"""List merge requests in a GitLab project.
     This tool supports filtering by author, assignee, reviewer, state, milestone, labels, and more.
-    Use this tool when you need to filter merge requests by author or other specific criteria.
+    This tool also supports searching for merge requests against their title and description.
+    Use this tool when you need to filter or search for merge requests by author or other specific criteria.
 
     {PROJECT_IDENTIFICATION_DESCRIPTION}
 
     For example:
     - List merge requests by author username:
-        list_merge_request(project_id=13, author_username="janedoe1337")
+        gitlab_merge_request_search(project_id=13, author_username="janedoe1337")
     - List merge requests assigned to a specific user:
-        list_merge_request(project_id=13, assignee_username="janedoe1337")
+        gitlab_merge_request_search(project_id=13, assignee_username="janedoe1337")
     - List all open merge requests:
-        list_merge_request(project_id=13, state="opened")
+        gitlab_merge_request_search(project_id=13, state="opened")
     - List merge requests with specific labels:
-        list_merge_request(project_id=13, labels="bug,urgent")
+        gitlab_merge_request_search(project_id=13, labels="bug,urgent")
     - Given the URL https://gitlab.com/namespace/project and author filter:
-        list_merge_request(url="https://gitlab.com/namespace/project", author_username="janedoe1337")
+        gitlab_merge_request_search(url="https://gitlab.com/namespace/project", author_username="janedoe1337")
+    - Search merge requests against their title and description
+        gitlab_merge_request_search(project_id=13, search="bug fix")
     """
     args_schema: Type[BaseModel] = ListMergeRequestInput
 
