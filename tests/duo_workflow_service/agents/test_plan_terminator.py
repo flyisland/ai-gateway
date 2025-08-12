@@ -135,14 +135,8 @@ class TestPlanTerminatorAgent:
                 assert resulting["description"] == original["description"]
                 assert resulting["id"] == original["id"]
 
-            assert "ui_chat_log" in result
-            assert len(result["ui_chat_log"]) == 1
-            chat_message = result["ui_chat_log"][0]
-            assert chat_message["message_type"] == MessageTypeEnum.WORKFLOW_END
-            assert chat_message["content"] == (
-                "Your request was valid but Workflow failed to complete it. Please try again."
-            )
-            assert chat_message["timestamp"] == "2025-01-01T12:00:00+00:00"
+            # No workflow_end messages are generated as per issue #1373
+            assert "ui_chat_log" not in result
 
     @pytest.mark.parametrize(
         "input_state,description",
