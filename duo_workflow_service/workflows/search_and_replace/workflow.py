@@ -496,6 +496,7 @@ class Workflow(AbstractWorkflow):
                 new_status=WorkflowStatusEnum.COMPLETED,
                 handover_from=AGENT_NAME,
                 include_conversation_history=True,
+                workflow_type=self._workflow_type,
             ).run,
         )
         graph.add_edge("complete", END)

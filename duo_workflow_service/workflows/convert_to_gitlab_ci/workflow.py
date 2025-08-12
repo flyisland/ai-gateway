@@ -329,7 +329,9 @@ class Workflow(AbstractWorkflow):
         graph.add_node(
             "complete",
             HandoverAgent(
-                new_status=WorkflowStatusEnum.COMPLETED, handover_from=AGENT_NAME
+                new_status=WorkflowStatusEnum.COMPLETED, 
+                handover_from=AGENT_NAME,
+                workflow_type=self._workflow_type,
             ).run,
         )
 

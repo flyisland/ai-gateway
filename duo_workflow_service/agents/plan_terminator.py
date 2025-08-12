@@ -1,5 +1,5 @@
 from datetime import datetime, timezone
-from typing import Any, Dict, Union
+from typing import Any, Dict, Optional, Union
 
 import structlog
 from langgraph.types import StateSnapshot
@@ -11,15 +11,18 @@ from duo_workflow_service.entities.state import (
     UiChatLog,
     WorkflowState,
 )
+from lib.internal_events.event_enum import CategoryEnum
 
 FINISHED_STATUSES = [TaskStatus.COMPLETED, TaskStatus.CANCELLED]
 
 
 class PlanTerminatorAgent:
     _workflow_id: str
+    _workflow_type: Optional[str]
 
-    def __init__(self, workflow_id: str):
+    def __init__(self, workflow_id: str, workflow_type: Optional[str] = None):
         self._workflow_id = workflow_id
+        self._workflow_type = workflow_type
         self.log = structlog.stdlib.get_logger("workflow").bind(workflow_id=workflow_id)
 
     async def run(self, state: Union[StateSnapshot, WorkflowState]) -> Dict[str, Any]:
@@ -47,9 +50,11 @@ class PlanTerminatorAgent:
 
         self.log.info(f"PlanTerminator: {message}")
 
-        return {
-            "plan": {"steps": updated_steps},
-            "ui_chat_log": [
+        result = {"plan": {"steps": updated_steps}}
+        
+        # Don't add workflow_end message for issue-to-MR workflows
+        if self._workflow_type != CategoryEnum.WORKFLOW_ISSUE_TO_MERGE_REQUEST:
+            result["ui_chat_log"] = [
                 UiChatLog(
                     message_type=MessageTypeEnum.WORKFLOW_END,
                     message_sub_type=None,
@@ -60,5 +65,6 @@ class PlanTerminatorAgent:
                     tool_info=None,
                     additional_context=None,
                 )
-            ],
-        }
+            ]
+
+        return result

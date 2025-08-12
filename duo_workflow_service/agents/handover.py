@@ -12,6 +12,7 @@ from duo_workflow_service.entities.state import (
     WorkflowStatusEnum,
 )
 from lib.feature_flags.context import FeatureFlag, is_feature_enabled
+from lib.internal_events.event_enum import CategoryEnum
 
 __all__ = ["HandoverAgent"]
 
@@ -20,6 +21,7 @@ class HandoverAgent:
     _new_status: WorkflowStatusEnum
     _handover_from: str
     _include_conversation_history: bool
+    _workflow_type: Optional[str]
 
     def __init__(
         self,
@@ -29,10 +31,12 @@ class HandoverAgent:
             bool,
             "Pass complete conversation history including summary from last message handover_tool call",
         ] = False,
+        workflow_type: Optional[str] = None,
     ):
         self._handover_from = handover_from
         self._new_status = new_status
         self._include_conversation_history = include_conversation_history
+        self._workflow_type = workflow_type
 
     async def run(self, state: DuoWorkflowStateType):
         handover_messages: List[BaseMessage] = []
@@ -58,7 +62,8 @@ class HandoverAgent:
                     ),
                 ]
 
-        if self._new_status == WorkflowStatusEnum.COMPLETED:
+        # Don't add workflow_end message for issue-to-MR workflows
+        if self._new_status == WorkflowStatusEnum.COMPLETED and self._workflow_type != CategoryEnum.WORKFLOW_ISSUE_TO_MERGE_REQUEST:
             ui_chat_logs.append(
                 UiChatLog(
                     message_type=MessageTypeEnum.WORKFLOW_END,

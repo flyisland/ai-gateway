@@ -14,6 +14,7 @@ from duo_workflow_service.entities.state import (
     WorkflowStatusEnum,
 )
 from lib.feature_flags import current_feature_flag_context
+from lib.internal_events.event_enum import CategoryEnum
 
 
 class TestHandoverAgent:
@@ -330,3 +331,56 @@ class TestHandoverAgent:
         }
 
     # pylint: enable=too-many-positional-arguments
+
+    @pytest.mark.asyncio
+    @patch("duo_workflow_service.agents.handover.datetime")
+    async def test_run_no_workflow_end_for_issue_to_mr(self, mock_datetime, workflow_state):
+        mock_datetime.now.return_value = datetime(
+            2025, 1, 1, 12, 0, tzinfo=timezone.utc
+        )
+        mock_datetime.timezone = timezone
+
+        # Test that workflow_end message is not added for issue-to-MR workflows
+        result = await HandoverAgent(
+            new_status=WorkflowStatusEnum.COMPLETED, 
+            handover_from="test_agent",
+            workflow_type=CategoryEnum.WORKFLOW_ISSUE_TO_MERGE_REQUEST
+        ).run(workflow_state)
+
+        assert result == {
+            "status": WorkflowStatusEnum.COMPLETED,
+            "handover": [],
+            "ui_chat_log": [],  # No workflow_end message should be added
+        }
+
+    @pytest.mark.asyncio
+    @patch("duo_workflow_service.agents.handover.datetime")
+    async def test_run_workflow_end_for_other_workflows(self, mock_datetime, workflow_state):
+        mock_datetime.now.return_value = datetime(
+            2025, 1, 1, 12, 0, tzinfo=timezone.utc
+        )
+        mock_datetime.timezone = timezone
+
+        # Test that workflow_end message is added for other workflow types
+        result = await HandoverAgent(
+            new_status=WorkflowStatusEnum.COMPLETED, 
+            handover_from="test_agent",
+            workflow_type=CategoryEnum.WORKFLOW_SOFTWARE_DEVELOPMENT
+        ).run(workflow_state)
+
+        assert result == {
+            "status": WorkflowStatusEnum.COMPLETED,
+            "handover": [],
+            "ui_chat_log": [
+                {
+                    "content": "Workflow completed successfully",
+                    "correlation_id": None,
+                    "message_type": MessageTypeEnum.WORKFLOW_END,
+                    "message_sub_type": None,
+                    "status": ToolStatus.SUCCESS,
+                    "timestamp": "2025-01-01T12:00:00+00:00",
+                    "tool_info": None,
+                    "additional_context": None,
+                },
+            ],
+        }

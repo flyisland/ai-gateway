@@ -16,6 +16,7 @@ from duo_workflow_service.entities.state import (
     WorkflowState,
     WorkflowStatusEnum,
 )
+from lib.internal_events.event_enum import CategoryEnum
 
 
 class TestPlanTerminatorAgent:
@@ -174,3 +175,63 @@ class TestPlanTerminatorAgent:
             result == expected
         ), f"Expected plan with empty steps for case: {description}"
         assert "ui_chat_log" not in result
+
+    @pytest.mark.asyncio
+    @patch("duo_workflow_service.agents.plan_terminator.datetime")
+    async def test_run_no_workflow_end_for_issue_to_mr(
+        self, mock_datetime, mock_now: datetime, base_workflow_state: WorkflowState
+    ):
+        mock_datetime.now.return_value = mock_now
+        mock_datetime.timezone = timezone
+
+        workflow_state = base_workflow_state.copy()
+        workflow_state["plan"] = Plan(steps=[
+            {
+                "id": "1",
+                "description": "Task 1",
+                "status": TaskStatus.IN_PROGRESS,
+            }
+        ])
+
+        # Test that no workflow_end message is added for issue-to-MR workflows
+        plan_terminator = PlanTerminatorAgent(
+            workflow_id="123", 
+            workflow_type=CategoryEnum.WORKFLOW_ISSUE_TO_MERGE_REQUEST
+        )
+        result = await plan_terminator.run(workflow_state)
+
+        assert result["plan"]["steps"][0]["status"] == TaskStatus.CANCELLED
+        assert "ui_chat_log" not in result  # No workflow_end message should be added
+
+    @pytest.mark.asyncio
+    @patch("duo_workflow_service.agents.plan_terminator.datetime")
+    async def test_run_workflow_end_for_other_workflows(
+        self, mock_datetime, mock_now: datetime, base_workflow_state: WorkflowState
+    ):
+        mock_datetime.now.return_value = mock_now
+        mock_datetime.timezone = timezone
+
+        workflow_state = base_workflow_state.copy()
+        workflow_state["plan"] = Plan(steps=[
+            {
+                "id": "1",
+                "description": "Task 1",
+                "status": TaskStatus.IN_PROGRESS,
+            }
+        ])
+
+        # Test that workflow_end message is added for other workflow types
+        plan_terminator = PlanTerminatorAgent(
+            workflow_id="123", 
+            workflow_type=CategoryEnum.WORKFLOW_SOFTWARE_DEVELOPMENT
+        )
+        result = await plan_terminator.run(workflow_state)
+
+        assert result["plan"]["steps"][0]["status"] == TaskStatus.CANCELLED
+        assert "ui_chat_log" in result
+        assert len(result["ui_chat_log"]) == 1
+        chat_message = result["ui_chat_log"][0]
+        assert chat_message["message_type"] == MessageTypeEnum.WORKFLOW_END
+        assert chat_message["content"] == (
+            "Your request was valid but Workflow failed to complete it. Please try again."
+        )
