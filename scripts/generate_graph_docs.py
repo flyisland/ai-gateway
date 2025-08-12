@@ -5,9 +5,9 @@ import sys
 from unittest.mock import MagicMock
 
 import structlog
+import yaml
 from gitlab_cloud_connector import CloudConnectorUser
 from langgraph.checkpoint.memory import MemorySaver
-import yaml
 
 from ai_gateway.config import Config
 from ai_gateway.container import ContainerApplication
