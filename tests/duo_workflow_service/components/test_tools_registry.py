@@ -187,12 +187,9 @@ _outbox = MagicMock(spec=asyncio.Queue)
                 "create_commit",
                 "dismiss_vulnerability",
                 "get_current_user",
-<<<<<<< HEAD
                 "create_work_item",
                 "link_vulnerability_to_issue",
-=======
                 "get_vulnerability_details",
->>>>>>> 742f1bd0 (feat: add get_vulnerability_details tool)
             },
         ),
         (
