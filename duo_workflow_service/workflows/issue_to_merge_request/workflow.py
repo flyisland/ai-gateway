@@ -226,7 +226,7 @@ class Workflow(AbstractWorkflow):
 
         graph.add_edge(build_context_handover_node, planner_entry_node)
 
-        plan_terminator = PlanTerminatorAgent(workflow_id=self._workflow_id)
+        plan_terminator = PlanTerminatorAgent(workflow_id=self._workflow_id, workflow_type=self._workflow_type)
         graph.add_node("plan_terminator", plan_terminator.run)
         graph.add_edge("plan_terminator", END)
 
@@ -235,6 +235,7 @@ class Workflow(AbstractWorkflow):
             HandoverAgent(
                 new_status=WorkflowStatusEnum.EXECUTION,
                 handover_from="planner",
+                workflow_type=self._workflow_type,
             ).run,
         )
 
@@ -360,6 +361,7 @@ class Workflow(AbstractWorkflow):
                 new_status=WorkflowStatusEnum.PLANNING,
                 handover_from=context_builder.name,
                 include_conversation_history=True,
+                workflow_type=self._workflow_type,
             ),
             "tools_executor": ToolsExecutor(
                 tools_agent_name=context_builder.name,

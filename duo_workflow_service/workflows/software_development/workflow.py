@@ -268,7 +268,7 @@ class Workflow(AbstractWorkflow):
             approval_component=plan_approval_component,
         )
         # graph.add_edge(disambiguation_exit_node, "planning")
-        plan_terminator = PlanTerminatorAgent(workflow_id=self._workflow_id)
+        plan_terminator = PlanTerminatorAgent(workflow_id=self._workflow_id, workflow_type=self._workflow_type)
         graph.add_node("plan_terminator", plan_terminator.run)
 
         graph.add_node(
@@ -276,6 +276,7 @@ class Workflow(AbstractWorkflow):
             HandoverAgent(
                 new_status=WorkflowStatusEnum.EXECUTION,
                 handover_from="planner",
+                workflow_type=self._workflow_type,
             ).run,
         )
 
@@ -398,6 +399,7 @@ class Workflow(AbstractWorkflow):
                 new_status=WorkflowStatusEnum.PLANNING,
                 handover_from=context_builder.name,
                 include_conversation_history=True,
+                workflow_type=self._workflow_type,
             ),
             "supervisor": PlanSupervisorAgent(supervised_agent_name="context_builder"),
             "tools_executor": ToolsExecutor(
