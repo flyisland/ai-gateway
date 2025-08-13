@@ -29,7 +29,7 @@ class TestFetchNode:
         return FetchNode(
             name="test_component#fetch",
             component_name="test_component",
-            responds_to="target_agent",
+            sends_response_to="target_agent",
             output=IOKey(target="context", subkeys=["test_component", "approval"]),
             ui_history=ui_history,
         )

@@ -357,7 +357,7 @@ The HumanInputComponent consists of two internal nodes:
 
 - **name**: Unique identifier for this component instance
 - **type**: Must be `"HumanInputComponent"`
-- **responds_to**: Name of the target component that should receive the user's response in conversation history
+- **sends_response_to**: Name of the target component that should receive the user's response in conversation history
 
 #### Optional Parameters
 
@@ -378,7 +378,7 @@ The HumanInputComponent processes different types of user events:
 
 Each HumanInputComponent automatically produces:
 
-- **conversation_history:{responds_to}**: User messages directed to the target component
+- **conversation_history:{sends_response_to}**: User messages directed to the target component
 - **context:{component_name}.approval**: User approval decision (`"approve"` or `"reject"`)
 
 #### UI Log Events
@@ -397,7 +397,7 @@ The HumanInputComponent is only supported in the `"ide"` environment, as it requ
 components:
   - name: "user_approval"
     type: HumanInputComponent
-    responds_to: "code_assistant"
+    sends_response_to: "code_assistant"
     prompt_id: "approval_request"
     prompt_version: "^1.0.0"
     inputs:
@@ -475,7 +475,7 @@ components:
 
   - name: "approval_request"
     type: HumanInputComponent
-    responds_to: "code_executor"
+    sends_response_to: "code_executor"
     prompt_id: "approval_prompt"
     prompt_version: "^1.0.0"
     inputs:
@@ -531,7 +531,7 @@ components:
 
   - name: "user_input"
     type: HumanInputComponent
-    responds_to: "chat_agent"
+    sends_response_to: "chat_agent"
     prompt_id: "continue_conversation"
     prompt_version: "^1.0.0"
     ui_log_events: ["on_user_input_prompt"]
@@ -565,7 +565,7 @@ components:
 
   - name: "user_clarification"
     type: HumanInputComponent
-    responds_to: "final_processor"
+    sends_response_to: "final_processor"
     prompt_id: "clarification_request"
     prompt_version: "^1.0.0"
     inputs:

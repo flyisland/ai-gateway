@@ -35,7 +35,7 @@ class TestHumanInputComponent:
         """Create a HumanInputComponent instance for testing."""
         return HumanInputComponent(
             name="test_human_input",
-            responds_to="awesome_agent",
+            sends_response_to="awesome_agent",
             flow_id="test_flow",
             flow_type=CategoryEnum.WORKFLOW_CHAT,
             prompt_id="test_prompt",
@@ -48,7 +48,7 @@ class TestHumanInputComponent:
         )
 
     def test_iokey_template_replacement(self, human_input_component):
-        """Test that IOKeyTemplate correctly replaces RESPOND_TO_COMPONENT_NAME_TEMPLATE."""
+        """Test that IOKeyTemplate correctly replaces SENDS_RESPONSE_TO_COMPONENT_NAME_TEMPLATE."""
         outputs = human_input_component.outputs
 
         assert len(outputs) == 2
@@ -111,7 +111,7 @@ class TestHumanInputComponent:
             mock_fetch_node.assert_called_once_with(
                 name="test_human_input#fetch",
                 component_name="test_human_input",
-                responds_to="awesome_agent",
+                sends_response_to="awesome_agent",
                 output=human_input_component._approval_output,
                 ui_history=mock_fetch_node.call_args[1]["ui_history"],
             )
@@ -166,7 +166,7 @@ class TestHumanInputComponent:
         """Test that prompt is optional when no prompt_id or prompt_version provided."""
         component = HumanInputComponent(
             name="test_human_input",
-            responds_to="awesome_agent",
+            sends_response_to="awesome_agent",
             flow_id="test_flow",
             flow_type=CategoryEnum.WORKFLOW_CHAT,
             prompt_registry=mock_prompt_registry,

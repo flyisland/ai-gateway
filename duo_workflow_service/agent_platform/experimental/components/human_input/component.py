@@ -49,11 +49,15 @@ class HumanInputComponent(BaseComponent):
     Supports different event types:
     - RESPONSE: Regular text input from user
     - APPROVE/REJECT: User approval decisions that are stored in context
+
+    Available UI Log Events:
+    - on_user_input_prompt: Agent's prompt/question to user (OPTIONAL)
+    - on_user_response: User's response/input (OPTIONAL)
     """
 
-    _responds_to_component: ClassVar[IOKeyTemplate] = IOKeyTemplate(
+    _sends_response_to_component: ClassVar[IOKeyTemplate] = IOKeyTemplate(
         target="conversation_history",
-        subkeys=[IOKeyTemplate.RESPOND_TO_COMPONENT_NAME_TEMPLATE],
+        subkeys=[IOKeyTemplate.SENDS_RESPONSE_TO_COMPONENT_NAME_TEMPLATE],
     )
 
     _user_approval: ClassVar[IOKeyTemplate] = IOKeyTemplate(
@@ -62,13 +66,13 @@ class HumanInputComponent(BaseComponent):
     )
 
     _outputs: ClassVar[tuple[IOKeyTemplate, ...]] = (
-        _responds_to_component,
+        _sends_response_to_component,
         _user_approval,
     )
 
     supported_environments: ClassVar[tuple[str, ...]] = ("ide",)
 
-    responds_to: str
+    sends_response_to: str
     prompt_id: Optional[str] = None
     prompt_version: Optional[str] = None
 
@@ -87,7 +91,7 @@ class HumanInputComponent(BaseComponent):
     def outputs(self) -> tuple[IOKey, ...]:
         replacements = {
             IOKeyTemplate.COMPONENT_NAME_TEMPLATE: self.name,
-            IOKeyTemplate.RESPOND_TO_COMPONENT_NAME_TEMPLATE: self.responds_to,
+            IOKeyTemplate.SENDS_RESPONSE_TO_COMPONENT_NAME_TEMPLATE: self.sends_response_to,
         }
         return tuple(output.to_iokey(replacements) for output in self._outputs)
 
@@ -128,7 +132,7 @@ class HumanInputComponent(BaseComponent):
         fetch_node = FetchNode(
             name=f"{self.name}#fetch",
             component_name=self.name,
-            responds_to=self.responds_to,
+            sends_response_to=self.sends_response_to,
             output=self._approval_output,
             ui_history=user_response_ui_history,
         )

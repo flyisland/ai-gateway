@@ -224,7 +224,9 @@ class IOKey(BaseModel):
 
 class IOKeyTemplate(IOKey):
     COMPONENT_NAME_TEMPLATE: ClassVar[str] = "<name>"
-    RESPOND_TO_COMPONENT_NAME_TEMPLATE: ClassVar[str] = "<responds_to_component>"
+    SENDS_RESPONSE_TO_COMPONENT_NAME_TEMPLATE: ClassVar[str] = (
+        "<sends_response_to_component>"
+    )
 
     def to_iokey(self, replacements: dict[str, str]) -> IOKey:
         return IOKey(target=self.target, subkeys=self._resolved_subkeys(replacements))

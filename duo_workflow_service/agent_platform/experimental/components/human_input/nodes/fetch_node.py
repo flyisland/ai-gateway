@@ -25,7 +25,7 @@ class FetchNode(BaseModel):
 
     name: str
     component_name: str
-    responds_to: str
+    sends_response_to: str
     output: IOKey
     ui_history: UIHistory
 
@@ -56,7 +56,7 @@ class FetchNode(BaseModel):
 
                 human_message = HumanMessage(content=event["message"])
                 result[FlowStateKeys.CONVERSATION_HISTORY] = {
-                    self.responds_to: [human_message]
+                    self.sends_response_to: [human_message]
                 }
 
             result.update(self.ui_history.pop_state_updates())
@@ -79,7 +79,9 @@ class FetchNode(BaseModel):
             return {
                 **self.ui_history.pop_state_updates(),
                 FlowStateKeys.STATUS: WorkflowStatusEnum.EXECUTION.value,
-                FlowStateKeys.CONVERSATION_HISTORY: {self.responds_to: [human_message]},
+                FlowStateKeys.CONVERSATION_HISTORY: {
+                    self.sends_response_to: [human_message]
+                },
             }
 
         # For any other event type, raise error as this should not happen
