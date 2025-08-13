@@ -1,3 +1,4 @@
+import json
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
@@ -422,6 +423,46 @@ class TestReadFiles:
 
         message = tool.format_display_message(input_data)
         assert message == "Read 3 files"
+
+    @pytest.mark.asyncio
+    async def test_read_files_with_file_exclusion_policy(self, mock_project):
+        mock_outbox = MagicMock()
+        mock_outbox.put = AsyncMock()
+
+        mock_response = '{"allowed_file.py": {"content": "hi"}}'
+        mock_inbox = MagicMock()
+        mock_inbox.get = AsyncMock(
+            return_value=contract_pb2.ClientEvent(
+                actionResponse=contract_pb2.ActionResponse(response=mock_response)
+            )
+        )
+
+        tool = ReadFiles(description="Read multiple files")
+        tool.metadata = {
+            "outbox": mock_outbox,
+            "inbox": mock_inbox,
+            "project": mock_project,
+        }
+
+        file_paths = ["allowed_file.py", ".env", ".ssh/config"]
+
+        with patch.object(FileExclusionPolicy, "filter_allowed") as mock_filter_allowed:
+            mock_filter_allowed.return_value = (["allowed_file.py"], [".env", ".ssh/config"])
+
+            response = await tool._arun(file_paths)
+
+            result_dict = json.loads(response)
+
+            assert "allowed_file.py" in result_dict
+            assert ".env" in result_dict
+            assert ".ssh/config" in result_dict
+            assert result_dict["allowed_file.py"]["content"] == "hi"
+            assert result_dict[".env"]["error"] == "File excluded due to policy"
+            assert result_dict[".ssh/config"]["error"] == "File excluded due to policy"
+
+            # Should only call the action with allowed files
+            action = mock_outbox.put.call_args[0][0]
+            assert set(action.runReadFiles.filepaths) == {"allowed_file.py"}
 
 
 class TestWriteFile:

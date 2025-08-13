@@ -1,3 +1,4 @@
+import json
 from enum import IntEnum
 from typing import Any, Type
 
@@ -127,16 +128,31 @@ class ReadFiles(DuoBaseTool):
     handle_tool_error: bool = True
 
     async def _arun(self, file_paths: list[str]) -> str:
-        # Check path security for all files before proceeding
+        policy = FileExclusionPolicy(self.project)
+        file_paths, excluded_file_paths = policy.filter_allowed(file_paths)
+
         for file_path in file_paths:
             validate_duo_context_exclusions(file_path)
 
-        return await _execute_action(
-            self.metadata,  # type: ignore
-            contract_pb2.Action(
-                runReadFiles=contract_pb2.ReadFiles(filepaths=file_paths)
-            ),
-        )
+        result_dict = {}
+
+        if file_paths:
+            file_contents_result = await _execute_action(
+                self.metadata,  # type: ignore
+                contract_pb2.Action(
+                    runReadFiles=contract_pb2.ReadFiles(filepaths=file_paths)
+                ),
+            )
+
+            result_dict = json.loads(file_contents_result)
+
+        # Add excluded files with error messages
+        for path in excluded_file_paths:
+            result_dict[path] = {"error": "File excluded due to policy"}
+
+        # Return as JSON string
+        return json.dumps(result_dict)
+
 
     def format_display_message(
         self, args: ReadFilesInput, _tool_response: Any = None
