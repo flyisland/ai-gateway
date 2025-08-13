@@ -135,7 +135,10 @@ class Flow(AbstractWorkflow):
                     message=self._approval.rejection.message,
                 )
             case _:
-                pass
+                # This should never happen according to contract.proto
+                raise ValueError(
+                    f"Unexpected approval decision: {self._approval.WhichOneof('user_decision')}"
+                )
 
         return Command(resume=event)
 

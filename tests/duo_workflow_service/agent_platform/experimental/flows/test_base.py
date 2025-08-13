@@ -564,3 +564,52 @@ class TestFlow:
 
             # Assert workflow completed
             assert flow.is_done
+
+    @pytest.mark.asyncio
+    async def test_resume_command_with_invalid_approval_decision(
+        self,
+        mock_flow_metadata,
+        mock_invocation_metadata,
+        sample_flow_config,
+        mock_state_graph,  # pylint: disable=unused-argument
+        mock_checkpointer,
+        mock_tools_registry,  # pylint: disable=unused-argument
+    ):
+        """Test _resume_command raises ValueError for invalid approval decision."""
+        # Create approval mock with invalid decision
+        approval = Mock(spec=contract_pb2.Approval)
+        approval.WhichOneof.return_value = "invalid_decision"
+
+        with (
+            self.mock_components(["AgentComponent"]),
+            patch("duo_workflow_service.agent_platform.experimental.flows.base.Router"),
+            patch(
+                "duo_workflow_service.agent_platform.experimental.flows.base.log_exception"
+            ) as mock_log_exception,
+        ):
+            flow = Flow(
+                workflow_id="test-workflow-invalid-approval",
+                workflow_metadata=mock_flow_metadata,
+                workflow_type=CategoryEnum.WORKFLOW_CHAT,
+                config=sample_flow_config,
+                invocation_metadata=mock_invocation_metadata,
+                approval=approval,
+            )
+
+            mock_checkpointer.initial_status_event = WorkflowStatusEventEnum.RESUME
+            goal = "test goal"
+
+            # The error should be logged via _handle_workflow_failure
+            await flow.run(goal)
+
+            # Verify that log_exception was called with the ValueError
+            mock_log_exception.assert_called_once()
+            mock_log_exception_call = mock_log_exception.call_args
+            assert isinstance(mock_log_exception_call[0][0], ValueError)
+            assert "Unexpected approval decision: invalid_decision" in str(
+                mock_log_exception_call[0][0]
+            )
+            assert mock_log_exception_call[1]["extra"] == {
+                "workflow_id": "test-workflow-invalid-approval",
+                "source": "duo_workflow_service.agent_platform.experimental.flows.base",
+            }
