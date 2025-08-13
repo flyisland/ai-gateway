@@ -121,14 +121,3 @@ class HandoverAgent:
             return [summary]
 
         return []
-
-    def _get_last_message_or_summary_to_handover(
-        self, summary: Optional[BaseMessage], last_message: BaseMessage
-    ):
-        if summary is not None and summary.content != "":
-            return summary
-
-        if not isinstance(last_message, AIMessage):
-            return last_message
-
-        return AIMessage(id=last_message.id, content=last_message.content)
