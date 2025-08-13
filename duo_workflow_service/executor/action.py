@@ -66,7 +66,8 @@ async def _execute_action_and_get_action_response(
         log_exception(ex)
         raise
 
-    if event.actionResponse:
+    response = None
+    if event.HasField("actionResponse"):
         duration = time.time() - start_time
         log.info(
             "Read ClientEvent into the ingres queue",
@@ -77,9 +78,10 @@ async def _execute_action_and_get_action_response(
 
         # Record all metrics in the separate function
         record_metrics(action_class, duration)
+        response = event.actionResponse
 
     inbox.task_done()
-    return event.actionResponse
+    return response
 
 
 async def _execute_action(metadata: Dict[str, Any], action: contract_pb2.Action) -> str:
