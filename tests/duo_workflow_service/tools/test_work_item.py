@@ -1226,6 +1226,24 @@ async def test_create_epic_in_project_error(
     )
 
 
+@pytest.mark.asyncio
+async def test_create_work_item_rejects_quick_actions_in_description(
+    gitlab_client_mock, metadata
+):
+    tool = CreateWorkItem(description="create work item", metadata=metadata)
+
+    response = await tool._arun(
+        group_id="namespace/group",
+        title="Blocked",
+        type_name="Issue",
+        description="/close",
+    )
+
+    resp = json.loads(response)
+    assert "error" in resp
+    gitlab_client_mock.graphql.assert_not_called()
+
+
 @pytest.mark.parametrize(
     "input_data,expected_message",
     [
@@ -1473,6 +1491,24 @@ async def test_update_work_item_invalid_work_item(gitlab_client_mock, metadata):
     expected_response = json.dumps({"error": "Work item not found"})
     assert response == expected_response
 
+    gitlab_client_mock.graphql.assert_not_called()
+
+
+@pytest.mark.asyncio
+async def test_update_work_item_rejects_quick_actions_in_description(
+    gitlab_client_mock, metadata, resolved_work_item
+):
+    tool = UpdateWorkItem(description="update work item", metadata=metadata)
+    tool._resolve_work_item_data = AsyncMock(return_value=resolved_work_item)
+
+    response = await tool._arun(
+        project_id="namespace/project",
+        work_item_iid=42,
+        description="/close",
+    )
+
+    resp = json.loads(response)
+    assert "error" in resp
     gitlab_client_mock.graphql.assert_not_called()
 
 

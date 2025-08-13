@@ -18,6 +18,7 @@ from gitlab_cloud_connector import GitLabUnitPrimitive
 from pydantic import BaseModel, Field, StringConstraints
 
 from duo_workflow_service.gitlab.url_parser import GitLabUrlParseError, GitLabUrlParser
+from duo_workflow_service.security.quick_actions import validate_no_quick_actions
 from duo_workflow_service.tools.duo_base_tool import DuoBaseTool
 from duo_workflow_service.tools.queries.work_items import (
     CREATE_WORK_ITEM_MUTATION,
@@ -60,6 +61,10 @@ WORK_ITEM_IDENTIFICATION_DESCRIPTION = """To identify a work item you must provi
     - https://gitlab.com/groups/namespace/group/-/work_items/42
     - https://gitlab.com/namespace/project/-/work_items/42
 """
+
+WORK_ITEM_QUICK_ACTION_NOTE = """You are NOT allowed to ever use a GitLab quick action in work item description.
+    Quick actions are text-based shortcuts for common GitLab actions. They are commands that are on their own line and
+    start with a backslash. Examples include /merge, /approve, /close, etc."""
 
 
 class ResolvedParent(NamedTuple):
@@ -449,6 +454,90 @@ class WorkItemBaseTool(DuoBaseTool):
             work_item_iid=resolved.work_item_iid,
         )
 
+    async def _create_work_item(self, resolved, type_name: str, kwargs: dict) -> str:
+        if type_name not in ALL_TYPES:
+            supported_types = ", ".join(sorted(ALL_TYPES))
+            return json.dumps(
+                {
+                    "error": f"Unknown work item type: '{type_name}'. "
+                    f"Supported types are: {supported_types}."
+                }
+            )
+
+        if kwargs.get("description") is not None:
+            err = validate_no_quick_actions(kwargs["description"], field="description")
+            if err:
+                return json.dumps({"error": err})
+
+        if resolved.type == "project" and type_name in GROUP_ONLY_TYPES:
+            return json.dumps(
+                {
+                    "error": f"Work item type '{type_name}' cannot be created in a project – only in groups."
+                }
+            )
+
+        try:
+            type_id_or_error = await self._resolve_work_item_type_id(
+                resolved.full_path, type_name
+            )
+            if isinstance(type_id_or_error, dict):
+                return json.dumps(type_id_or_error)
+
+            created = await self._create_work_item_with_type_id(
+                namespace_path=resolved.full_path,
+                type_id=type_id_or_error,
+                input_kwargs=kwargs,
+            )
+            return created
+
+        except Exception as e:
+            return json.dumps({"error": str(e)})
+
+    async def _update_work_item(self, resolved, kwargs: dict) -> str:
+        work_item_id = resolved.id
+
+        if not kwargs.get("type_name"):
+            kwargs["type_name"] = (
+                (resolved.full_data or {}).get("workItemType", {}).get("name", "")
+            )
+
+        if kwargs.get("description") is not None:
+            err = validate_no_quick_actions(kwargs["description"], field="description")
+            if err:
+                return json.dumps({"error": err})
+
+        input_fields, warnings = self._build_work_item_input_fields(kwargs)
+
+        state = kwargs.get("state")
+        if state in STATE_EVENT_MAPPING:
+            input_fields["stateEvent"] = STATE_EVENT_MAPPING[state]
+
+        variables = {
+            "input": {
+                "id": work_item_id,
+                **input_fields,
+            }
+        }
+
+        try:
+            response = await self.gitlab_client.graphql(
+                UPDATE_WORK_ITEM_MUTATION, variables
+            )
+
+            if "errors" in response:
+                return json.dumps({"error": response["errors"]})
+
+            updated = (
+                response.get("data", {}).get("workItemUpdate", {}).get("workItem", {})
+            )
+            result = {"updated_work_item": updated}
+            if warnings:
+                result["warnings"] = warnings
+            return json.dumps(result)
+
+        except Exception as e:
+            return json.dumps({"error": str(e)})
+
 
 class ParentResourceInput(BaseModel):
     url: Optional[str] = Field(
@@ -834,6 +923,8 @@ class CreateWorkItem(WorkItemBaseTool):
     name: str = "create_work_item"
     description: str = f"""Create a new work item in a GitLab group or project.
 
+    {WORK_ITEM_QUICK_ACTION_NOTE}
+
     {PARENT_IDENTIFICATION_DESCRIPTION}
 
     For example:
@@ -852,38 +943,7 @@ class CreateWorkItem(WorkItemBaseTool):
         if isinstance(resolved, str):
             return json.dumps({"error": resolved})
 
-        if type_name not in ALL_TYPES:
-            supported_types = ", ".join(sorted(ALL_TYPES))
-            return json.dumps(
-                {
-                    "error": f"Unknown work item type: '{type_name}'. "
-                    f"Supported types are: {supported_types}."
-                }
-            )
-
-        if resolved.type == "project" and type_name in GROUP_ONLY_TYPES:
-            return json.dumps(
-                {
-                    "error": f"Work item type '{type_name}' cannot be created in a project – only in groups."
-                }
-            )
-
-        try:
-            type_id_or_error = await self._resolve_work_item_type_id(
-                resolved.full_path, type_name
-            )
-            if isinstance(type_id_or_error, dict):
-                return json.dumps(type_id_or_error)
-
-            created = await self._create_work_item_with_type_id(
-                namespace_path=resolved.full_path,
-                type_id=type_id_or_error,
-                input_kwargs=kwargs,
-            )
-            return created
-
-        except Exception as e:
-            return json.dumps({"error": str(e)})
+        return await self._create_work_item(resolved, type_name, kwargs)
 
     def format_display_message(
         self, args: CreateWorkItemInput, _tool_response: Any = None
@@ -939,6 +999,8 @@ class UpdateWorkItem(WorkItemBaseTool):
     name: str = "update_work_item"
     description: str = f"""Update an existing work item in a GitLab group or project.
 
+    {WORK_ITEM_QUICK_ACTION_NOTE}
+
     {WORK_ITEM_IDENTIFICATION_DESCRIPTION}
 
     For example:
@@ -960,44 +1022,7 @@ class UpdateWorkItem(WorkItemBaseTool):
         if isinstance(resolved, str):
             return json.dumps({"error": resolved})
 
-        work_item_id = resolved.id
-
-        if not kwargs.get("type_name"):
-            kwargs["type_name"] = (
-                (resolved.full_data or {}).get("workItemType", {}).get("name", "")
-            )
-
-        input_fields, warnings = self._build_work_item_input_fields(kwargs)
-
-        state = kwargs.get("state")
-        if state in STATE_EVENT_MAPPING:
-            input_fields["stateEvent"] = STATE_EVENT_MAPPING[state]
-
-        variables = {
-            "input": {
-                "id": work_item_id,
-                **input_fields,
-            }
-        }
-
-        try:
-            response = await self.gitlab_client.graphql(
-                UPDATE_WORK_ITEM_MUTATION, variables
-            )
-
-            if "errors" in response:
-                return json.dumps({"error": response["errors"]})
-
-            updated = (
-                response.get("data", {}).get("workItemUpdate", {}).get("workItem", {})
-            )
-            result = {"updated_work_item": updated}
-            if warnings:
-                result["warnings"] = warnings
-            return json.dumps(result)
-
-        except Exception as e:
-            return json.dumps({"error": str(e)})
+        return await self._update_work_item(resolved, kwargs)
 
     def format_display_message(
         self, args: UpdateWorkItemInput, _tool_response: Any = None
