@@ -49,16 +49,6 @@ class PlanTerminatorAgent:
 
         return {
             "plan": {"steps": updated_steps},
-            "ui_chat_log": [
-                UiChatLog(
-                    message_type=MessageTypeEnum.WORKFLOW_END,
-                    message_sub_type=None,
-                    content=message,
-                    timestamp=datetime.now(timezone.utc).isoformat(),
-                    status=ToolStatus.FAILURE,
-                    correlation_id=None,
-                    tool_info=None,
-                    additional_context=None,
-                )
-            ],
+            # Removed workflow_end message generation as per issue #1373
+            # workflow_end messages are no longer being used and should not be sent
         }
