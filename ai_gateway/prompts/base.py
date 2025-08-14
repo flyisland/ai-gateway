@@ -260,12 +260,10 @@ class Prompt(RunnableBinding[Input, Output]):
 
                 additional_properties = InternalEventAdditionalProperties(
                     label="cache_details",
-                    extra={
-                        "cache_read": cache_read,
-                        "cache_creation": cache_creation,
-                        "ephemeral_5m_input_tokens": ephemeral_5m_input_tokens,
-                        "ephemeral_1h_input_tokens": ephemeral_1h_input_tokens,
-                    },
+                    cache_read=cache_read,
+                    cache_creation=cache_creation,
+                    ephemeral_5m_input_tokens=ephemeral_5m_input_tokens,
+                    ephemeral_1h_input_tokens=ephemeral_1h_input_tokens,
                 )
 
                 self.internal_event_client.track_event(
