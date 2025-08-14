@@ -74,7 +74,7 @@ def convert_to_eval_cases(
         eval_cases.append(
             EvalCase(
                 tools=(
-                    [tool for tool in all_tools if tool in tool_names]
+                    [tool for tool in all_tools if tool.name in tool_names]
                     if tool_names
                     else all_tools
                 ),
