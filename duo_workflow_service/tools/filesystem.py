@@ -8,7 +8,10 @@ from pydantic import BaseModel, Field
 
 from contract import contract_pb2
 from duo_workflow_service.executor.action import _execute_action
-from duo_workflow_service.policies.file_exclusion_policy import FileExclusionPolicy
+from duo_workflow_service.policies.file_exclusion_policy import (
+    CONTEXT_EXCLUSION_MESSAGE,
+    FileExclusionPolicy,
+)
 from duo_workflow_service.tools.duo_base_tool import DuoBaseTool
 
 # Security denylist of sensitive directories and files that should not be accessed
@@ -148,17 +151,31 @@ class ReadFiles(DuoBaseTool):
 
         # Add excluded files with error messages
         for path in excluded_file_paths:
-            result_dict[path] = {"error": "File excluded due to policy"}
+            result_dict[path] = {"error": CONTEXT_EXCLUSION_MESSAGE}
 
         # Return as JSON string
         return json.dumps(result_dict)
 
-
     def format_display_message(
-        self, args: ReadFilesInput, _tool_response: Any = None
+        self, args: ReadFilesInput, tool_response: Any = None
     ) -> str:
         file_count = len(args.file_paths)
-        return f"Read {file_count} file{'s' if file_count != 1 else ''}"
+        excluded_files_msg = ""
+
+        if tool_response:
+            excluded_files = [
+                path
+                for path, data in json.loads(tool_response.content).items()
+                if data.get("error") == CONTEXT_EXCLUSION_MESSAGE
+            ]
+
+            excluded_files_msg = FileExclusionPolicy.format_user_exclusion_message(
+                excluded_files
+            )
+
+            file_count -= len(excluded_files)
+
+        return f"Read {file_count} file{'s' if file_count != 1 else ''}{excluded_files_msg}"
 
 
 class WriteFileInput(BaseModel):

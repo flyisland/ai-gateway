@@ -6,6 +6,8 @@ import gitmatch
 from duo_workflow_service.gitlab.gitlab_api import Project
 from lib.feature_flags.context import FeatureFlag, is_feature_enabled
 
+CONTEXT_EXCLUSION_MESSAGE = "excluded due to policy"
+
 
 class FileExclusionPolicy:
     def __init__(self, project: Project):
