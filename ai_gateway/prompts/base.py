@@ -167,6 +167,10 @@ class Prompt(RunnableBinding[Input, Output]):
             limits=self.limits,
         )
 
+    @property
+    def internal_event_extra(self) -> dict[str, Any]:
+        return {}
+
     def set_limits(self, model_limits: ConfigModelLimits):
         self.limits = model_limits.for_model(
             engine=self.model._llm_type, name=self.model_name
@@ -264,6 +268,7 @@ class Prompt(RunnableBinding[Input, Output]):
                     cache_creation=cache_creation,
                     ephemeral_5m_input_tokens=ephemeral_5m_input_tokens,
                     ephemeral_1h_input_tokens=ephemeral_1h_input_tokens,
+                    **self.internal_event_extra,
                 )
 
                 self.internal_event_client.track_event(

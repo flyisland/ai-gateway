@@ -3,7 +3,7 @@ from contextlib import contextmanager
 from pathlib import Path
 from typing import Any, Generator, Iterator, List, Optional, Type
 from unittest import mock
-from unittest.mock import Mock, call
+from unittest.mock import Mock, PropertyMock, call
 
 import pytest
 from anthropic import APITimeoutError, AsyncAnthropic
@@ -287,7 +287,7 @@ class TestPrompt:
 
     @pytest.mark.asyncio
     @pytest.mark.parametrize(
-        ("usage_metadata", "expected_additional_properties"),
+        ("usage_metadata", "internal_event_extra", "expected_additional_properties"),
         [
             (
                 UsageMetadata(
@@ -298,6 +298,7 @@ class TestPrompt:
                         audio=0, cache_creation=0, cache_read=0
                     ),
                 ),
+                {},
                 InternalEventAdditionalProperties(
                     label="cache_details",
                     property=None,
@@ -320,6 +321,7 @@ class TestPrompt:
                         ephemeral_5m_input_tokens=10,  # type: ignore[typeddict-unknown-key]
                     ),
                 ),
+                {"test_key": "test_value"},
                 InternalEventAdditionalProperties(
                     label="cache_details",
                     property=None,
@@ -328,6 +330,7 @@ class TestPrompt:
                     cache_creation=0,
                     ephemeral_5m_input_tokens=10,
                     ephemeral_1h_input_tokens=0,
+                    test_key="test_value",
                 ),
             ),
             (
@@ -342,6 +345,7 @@ class TestPrompt:
                         ephemeral_1h_input_tokens=25,  # type: ignore[typeddict-unknown-key]
                     ),
                 ),
+                {},
                 InternalEventAdditionalProperties(
                     label="cache_details",
                     property=None,
@@ -365,6 +369,7 @@ class TestPrompt:
                         ephemeral_1h_input_tokens=25,  # type: ignore[typeddict-unknown-key]
                     ),
                 ),
+                {},
                 InternalEventAdditionalProperties(
                     label="cache_details",
                     property=None,
@@ -383,12 +388,22 @@ class TestPrompt:
         internal_event_client: mock.Mock,
         prompt: Prompt,
         usage_metadata: UsageMetadata,
+        internal_event_extra: dict[str, Any],
         expected_additional_properties: InternalEventAdditionalProperties,
     ):
         mock_watcher = mock_watch.return_value.__enter__.return_value
 
         prompt.internal_event_client = internal_event_client
-        with self._mock_usage_metadata(prompt.model_name, usage_metadata):
+
+        with (
+            self._mock_usage_metadata(prompt.model_name, usage_metadata),
+            mock.patch.object(
+                Prompt,
+                "internal_event_extra",
+                new_callable=PropertyMock,
+                return_value=internal_event_extra,
+            ),
+        ):
             await prompt.ainvoke({"name": "Duo", "content": "What's up?"})
 
         _assert_usage_metadata_handling(

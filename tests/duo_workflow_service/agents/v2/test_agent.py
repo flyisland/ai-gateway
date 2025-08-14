@@ -54,6 +54,12 @@ def agent_fixture(
 
 
 class TestAgent:
+    def test_internal_event_extra(self, agent: Agent):
+        assert agent.internal_event_extra == {
+            "agent_name": agent.name,
+            "workflow_id": agent.workflow_id,
+        }
+
     @pytest.mark.asyncio
     async def test_run_with_empty_conversation(
         self,

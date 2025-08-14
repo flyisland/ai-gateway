@@ -188,3 +188,10 @@ class Agent(Prompt):
             tool_info=None,
             additional_context=None,
         )
+
+    @property
+    def internal_event_extra(self) -> dict[str, Any]:
+        return {
+            "agent_name": self.name,
+            "workflow_id": self.workflow_id,
+        }
