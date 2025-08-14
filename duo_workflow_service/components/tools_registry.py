@@ -119,6 +119,7 @@ _AGENT_PRIVILEGES: dict[str, list[Type[BaseTool]]] = {
         tools.CreateCommit,
         tools.DismissVulnerability,
         tools.CreateWorkItem,
+        tools.CreateWorkItemNote,
         tools.LinkVulnerabilityToIssue,
         *_READ_ONLY_GITLAB_TOOLS,
     ],
