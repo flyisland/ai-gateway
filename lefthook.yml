@@ -1,11 +1,27 @@
 pre-commit:
-  parallel: true
+  # Parallel script execution is disabled to prevent race conditions
+  # when installing dependencies. Multiple scripts trying to modify
+  # the same Python packages simultaneously can corrupt the environment.
+  # See: https://gitlab.com/gitlab-org/modelops/applied-ml/code-suggestions/ai-assist/-/merge_requests/3160
+  parallel: false
   skip:
     - ref: main
   commands:
-    lint-code:
+    lint-python:
       glob: "*.py"
-      run: make lint-code
+      run: |
+        # Process staged_files to be passed to environment variables.
+        export STAGED_FILES="$(echo '{staged_files}')"
+        make lint-code LINT_WORKING_DIR="$STAGED_FILES" \
+          CODESPELL_LINT_WORKING_DIR="$STAGED_FILES" \
+          EDITORCONFIG_LINT_WORKING_DIR="$STAGED_FILES"
+    lint-other:
+      exclude:
+        - "*.py"
+      run: |
+        export STAGED_FILES="$(echo '{staged_files}')"
+        make check-codespell CODESPELL_LINT_WORKING_DIR="$STAGED_FILES"
+        make check-editorconfig EDITORCONFIG_LINT_WORKING_DIR="$STAGED_FILES"
     lint-doc:
       glob: "*.md"
       run: make lint-doc
