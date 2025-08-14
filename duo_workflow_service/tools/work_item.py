@@ -373,7 +373,8 @@ class ListWorkItemsInput(ParentResourceInput):
 class ListWorkItems(WorkItemBaseTool):
     name: str = "list_work_items"
     description: str = f"""List work items in a GitLab project or group.
-    By default, only returns the first 20 work items - use page parameter to get complete results.
+    By default, only returns the first 20 work items. Use 'after' parameter with the
+    endCursor from previous responses to fetch subsequent pages.
 
     {PARENT_IDENTIFICATION_DESCRIPTION}
 
@@ -409,7 +410,7 @@ class ListWorkItems(WorkItemBaseTool):
 
         variables = {
             "fullPath": resolved.full_path,
-            "first": kwargs.get("first", 20),
+            "first": kwargs.get("first"),
             "after": kwargs.get("after"),
         }
 
