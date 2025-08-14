@@ -522,7 +522,7 @@ class ListMergeRequest(DuoBaseTool):
         ]
 
         for param in optional_params:
-            if param in kwargs and kwargs[param] is not None:
+            if param in kwargs and kwargs.get(param) is not None:
                 params[param] = kwargs[param]
 
         try:
