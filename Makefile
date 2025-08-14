@@ -18,6 +18,11 @@ LINT_WORKING_DIR ?= ${AI_GATEWAY_DIR} \
 	${TESTS_DIR} \
 	${INTEGRATION_TESTS_DIR}
 
+# Override LINT_WORKING_DIR to only include changed files when 'lint-changes' is specified
+ifeq (lint-changes,$(filter lint-changes,$(MAKECMDGOALS)))
+LINT_WORKING_DIR := $(shell git diff --name-only --diff-filter=ACMR HEAD | grep -E '\.(py)$$' | tr '\n' ' ')
+endif
+
 MYPY_LINT_TODO_DIR ?= --exclude "ai_gateway/models/litellm.py" \
 	--exclude "ai_gateway/api/middleware/base.py" \
 	--exclude "ai_gateway/api/middleware/feature_flag.py" \
@@ -179,6 +184,9 @@ format: codespell black isort docformatter
 
 .PHONY: lint
 lint: lint-code lint-doc
+
+.PHONY: lint-changes
+lint-changes: lint-code lint-doc
 
 .PHONY: lint-code
 lint-code: flake8 check-black check-isort check-pylint check-mypy check-codespell check-docformatter check-editorconfig
