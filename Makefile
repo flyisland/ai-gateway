@@ -18,6 +18,24 @@ LINT_WORKING_DIR ?= ${AI_GATEWAY_DIR} \
 	${TESTS_DIR} \
 	${INTEGRATION_TESTS_DIR}
 
+# Override LINT_WORKING_DIR to only include changed files when 'lint-changes' is specified
+ifeq (lint-diff,$(filter lint-diff,$(MAKECMDGOALS)))
+# Extract directory names from LINT_WORKING_DIR paths
+LINT_DIRS := $(shell echo "${LINT_WORKING_DIR}" | sed 's|${ROOT_DIR}/||g' | tr ' ' '\n' | sort -u | tr '\n' ' ')
+
+# Find changed Python files in the specified directories
+CHANGED_FILES := $(shell git diff --name-only --diff-filter=ACMR HEAD -- $(LINT_DIRS) | grep -E '\.(py)$$' | tr '\n' ' ')
+
+# Check if any Python files have changed
+ifeq ($(strip $(CHANGED_FILES)),)
+$(error No Python files have been modified. Use 'make lint' to lint all files instead.)
+else
+# Override to lint only changed files
+LINT_WORKING_DIR := $(CHANGED_FILES)
+endif
+
+endif
+
 MYPY_LINT_TODO_DIR ?= --exclude "ai_gateway/models/litellm.py" \
 	--exclude "ai_gateway/api/middleware/base.py" \
 	--exclude "ai_gateway/api/middleware/feature_flag.py" \
@@ -179,6 +197,9 @@ format: codespell black isort docformatter
 
 .PHONY: lint
 lint: lint-code lint-doc
+
+.PHONY: lint-diff
+lint-diff: lint-code lint-doc
 
 .PHONY: lint-code
 lint-code: flake8 check-black check-isort check-pylint check-mypy check-codespell check-docformatter check-editorconfig
