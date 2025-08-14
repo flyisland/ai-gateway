@@ -202,6 +202,7 @@ class ChatAmazonQ(BaseChatModel):
         """
         q_client = self.amazon_q_client_factory.get_client(
             current_user=user,
+            auth_header=f"Bearer {user.cloud_connector_token}",
             role_arn=role_arn,
         )
 

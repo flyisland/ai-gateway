@@ -75,6 +75,7 @@ class AmazonQModel(TextGenModelBase):
         try:
             q_client = self._client_factory.get_client(
                 current_user=self._current_user,
+                auth_header=f"Bearer {self._current_user.cloud_connector_token}",
                 role_arn=self._role_arn,
             )
             response = q_client.generate_code_recommendations(request_payload)

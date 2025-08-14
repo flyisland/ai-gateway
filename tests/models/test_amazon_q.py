@@ -31,6 +31,7 @@ def test_amazon_q_model_init():
 )
 async def test_amazon_q_model_generate(suffix, expected_suffix):
     mock_user = MagicMock(spec=StarletteUser)
+    mock_user.cloud_connector_token = "test-token"
     mock_factory = MagicMock(spec=AmazonQClientFactory)
     mock_client = MagicMock()
     mock_factory.get_client.return_value = mock_client
@@ -63,6 +64,7 @@ async def test_amazon_q_model_generate(suffix, expected_suffix):
 @pytest.mark.asyncio
 async def test_amazon_q_model_generate_streaming():
     mock_user = MagicMock(spec=StarletteUser)
+    mock_user.cloud_connector_token = "test-token"
     mock_factory = MagicMock(spec=AmazonQClientFactory)
     mock_client = MagicMock()
     mock_factory.get_client.return_value = mock_client
