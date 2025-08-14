@@ -44,7 +44,7 @@ Lint your modified files only.
 make lint-diff
 ```
 
-**Note**: Lint the entire project before committing.
+**Note**: Use `lint-diff` for faster development iterations, but run `make lint` on the entire project before pushing your changes to ensure complete code quality.
 
 ```shell
 make lint
