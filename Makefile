@@ -18,6 +18,17 @@ LINT_WORKING_DIR ?= ${AI_GATEWAY_DIR} \
 	${TESTS_DIR} \
 	${INTEGRATION_TESTS_DIR}
 
+ifeq (lint-diff,$(filter lint-diff,$(MAKECMDGOALS)))
+LINT_DIRS := $(shell echo "${LINT_WORKING_DIR}" | sed 's|${ROOT_DIR}/||g' | tr ' ' '\n' | sort -u | tr '\n' ' ')
+CHANGED_FILES := $(shell git diff --name-only --diff-filter=ACMR HEAD $(shell git merge-base HEAD origin/main 2>/dev/null || echo HEAD^) -- $(LINT_DIRS) | tr '\n' ' ')
+ifeq ($(strip $(CHANGED_FILES)),)
+HAS_CHANGES := false
+else
+HAS_CHANGES := true
+LINT_WORKING_DIR := $(CHANGED_FILES)
+endif
+endif
+
 MYPY_LINT_TODO_DIR ?= --exclude "ai_gateway/models/litellm.py" \
 	--exclude "ai_gateway/api/middleware/base.py" \
 	--exclude "ai_gateway/api/middleware/feature_flag.py" \
@@ -179,6 +190,15 @@ format: codespell black isort docformatter
 
 .PHONY: lint
 lint: lint-code lint-doc
+
+.PHONY: lint-diff
+lint-diff:
+ifeq ($(HAS_CHANGES),false)
+	@echo "No change has been found. Run 'make lint' to lint all files if needed."
+else
+	$(MAKE) lint-code lint-doc
+endif
+
 
 .PHONY: lint-code
 lint-code: flake8 check-black check-isort check-pylint check-mypy check-codespell check-docformatter check-editorconfig

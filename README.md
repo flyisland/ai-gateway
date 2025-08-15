@@ -38,7 +38,13 @@ This project uses the following linting tools:
 - [pylint](https://pylint.pycqa.org): Analyzes code for potential errors and style issues.
 - [mypy](https://mypy-lang.org): Performs static type checking.
 
-To lint the entire projects, you can use the following command:
+Lint your modified files only.
+
+```shell
+make lint-diff
+```
+
+**Note**: Use `lint-diff` for faster development iterations, but run `make lint` on the entire project before pushing your changes to ensure complete code quality.
 
 ```shell
 make lint
