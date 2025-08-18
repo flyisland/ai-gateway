@@ -84,6 +84,12 @@ deploy:
 
 note: This workflow is intended for remote execution as it pushes the code and creates a merge request automatically.
 
+1. Enable `Allow flow execution` setting at the project level. To enable this setting:
+   - On the left sidebar, select **Search or go to** and find your project.
+   - Select **Settings** > **General**.
+   - Expand the **GitLab Duo** section.
+   - Toggle **Allow flow execution**.
+   - Click on **Save changes**.
 1. Open the Jenkinsfile in your remote project repository.
 1. You should see a button `Convert to GitLab CI/CD` in the file view header section. Click the button, you should see a
    flash message Workflow started successfully.
