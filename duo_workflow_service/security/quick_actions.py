@@ -1,7 +1,7 @@
 import re
 from typing import Optional
 
-_QUICK_ACTION_REGEX = re.compile(r"(?mi)^\s*/[a-z][a-z0-9_]*(?=\s|$)")
+_QUICK_ACTION_REGEX = re.compile(r"(?mi)^\s*/[a-z][a-z_]*(?=\s|$)")
 
 
 def validate_no_quick_actions(

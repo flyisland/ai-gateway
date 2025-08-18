@@ -6,15 +6,25 @@ from duo_workflow_service.security.quick_actions import validate_no_quick_action
 @pytest.mark.parametrize(
     "text,should_err",
     [
+        # negatives (should NOT error)
         (None, False),
         ("", False),
         ("regular text", False),
         ("inline /merge is fine", False),
+        ("/etc/hosts", False),
+        ("/foo.bar", False),
+        ("/123", False),
+        ("// comment", False),
+        (". /merge", False),
+        ("/close-issue", False),
+        # positives (should error)
         ("/merge", True),
         ("   /approve", True),
+        ("\t/close", True),
         ("first line\n/label bug", True),
-        ("\n\n/close\n", True),
         ("```\n/close in code block\n```", True),
+        ("/health onTrack", True),
+        ("\n\n/close\n", True),
     ],
 )
 def test_validate_no_quick_actions(text, should_err):
