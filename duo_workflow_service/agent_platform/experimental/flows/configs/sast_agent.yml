@@ -1,0 +1,48 @@
+version: "experimental"
+environment: remote
+components:
+  - name: "sast_vulnerability_details_agent"
+    type: OneOffComponent
+    prompt_id: "sast_vulnerability_details_agent_prompt"
+    prompt_version: "^1.0.0"
+    inputs:
+      - from: "context:goal"
+        as: vulnerability_id
+    toolset:
+      - "read_file"
+      - "get_repository_file"
+      - "list_repository_tree"
+      - "find_files"
+      - "get_vulnerability_details"
+      - "extract_lines_from_text"
+      - "create_file_with_contents"
+    max_correction_attempts: 3
+    ui_log_events:
+      - "on_tool_execution_success"
+      - "on_tool_execution_failed"
+  - name: "sast_fp_detection_agent"
+    type: AgentComponent
+    prompt_id: "sast_fp_detection_agent_prompt"
+    prompt_version: "^1.0.0"
+    inputs:
+      - from: "context:sast_vulnerability_details_agent.execution_result"
+        as: execution_status
+      - from: "context:sast_vulnerability_details_agent.tool_responses"
+        as: vulnerability_details
+    toolset:
+      - "read_file"
+      - "get_repository_file"
+      - "list_repository_tree"
+      - "find_files"
+      - "create_file_with_contents"
+    ui_log_events:
+      - "on_agent_final_answer"
+      - "on_tool_execution_success"
+      - "on_tool_execution_failed"
+routers:
+  - from: "sast_vulnerability_details_agent"
+    to: "sast_fp_detection_agent"
+  - from: "sast_fp_detection_agent"
+    to: "end"
+flow:
+  entry_point: "sast_vulnerability_details_agent"

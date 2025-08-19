@@ -101,6 +101,7 @@ _AGENT_PRIVILEGES: dict[str, list[Type[BaseTool]]] = {
         tools.FindFiles,
         tools.Grep,
         tools.Mkdir,
+        tools.ExtractLinesFromText,
     ],
     "use_git": [
         tools.git.Command,
