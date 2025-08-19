@@ -1247,10 +1247,8 @@ async def test_confirm_vulnerability_with_long_comment_error(
     "input_data,expected_message",
     [
         (
-            ConfirmVulnerabilityInput(
-                vulnerability_id="gid://gitlab/Vulnerability/123"
-            ),
-            "Confirm vulnerability gid://gitlab/Vulnerability/123",
+            ConfirmVulnerabilityInput(vulnerability_id="123"),
+            "Confirm vulnerability 123",
         ),
         (
             ConfirmVulnerabilityInput(
