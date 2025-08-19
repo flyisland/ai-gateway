@@ -45,6 +45,9 @@ class TestBillingEventsClient:
             ) as mock_structured_event_init,
             mock.patch("lib.billing_events.client.uuid") as mock_uuid,
             mock.patch("lib.billing_events.client.datetime") as mock_datetime,
+            mock.patch(
+                "lib.internal_events.client.InternalEventsClient"
+            ) as mock_internal_events_client,
         ):
             mock_uuid.uuid4.return_value.__str__ = mock.Mock(
                 return_value="12345678-1234-5678-9012-123456789012"
@@ -57,6 +60,7 @@ class TestBillingEventsClient:
                 "structured_event_init": mock_structured_event_init,
                 "uuid": mock_uuid,
                 "datetime": mock_datetime,
+                "internal_events_client": mock_internal_events_client,
             }
 
     @pytest.fixture
@@ -67,6 +71,9 @@ class TestBillingEventsClient:
             mock.patch(
                 "snowplow_tracker.emitters.AsyncEmitter.__init__", return_value=None
             ),
+            mock.patch(
+                "lib.internal_events.client.InternalEventsClient"
+            ) as mock_internal_events,
         ):
             yield BillingEventsClient(
                 enabled=True,
@@ -75,6 +82,7 @@ class TestBillingEventsClient:
                 namespace="gl",
                 batch_size=3,
                 thread_count=2,
+                internal_events_client=mock_internal_events.return_value,
             )
 
     @pytest.fixture(name="user")
@@ -83,9 +91,12 @@ class TestBillingEventsClient:
             authenticated=True, claims=UserClaims(gitlab_instance_uid="abc")
         )
 
+    @mock.patch("lib.internal_events.client.InternalEventsClient")
     @mock.patch("snowplow_tracker.Tracker.__init__")
     @mock.patch("snowplow_tracker.emitters.AsyncEmitter.__init__")
-    def test_initialization(self, mock_emitter_init, mock_tracker_init):
+    def test_initialization(
+        self, mock_emitter_init, mock_tracker_init, mock_internal_events
+    ):
         mock_emitter_init.return_value = None
         mock_tracker_init.return_value = None
 
@@ -96,6 +107,7 @@ class TestBillingEventsClient:
             namespace="gl",
             batch_size=3,
             thread_count=2,
+            internal_events_client=mock_internal_events.return_value,
         )
 
         mock_emitter_init.assert_called_once()
@@ -206,7 +218,8 @@ class TestBillingEventsClient:
         assert context.schema == client.BILLING_CONTEXT_SCHEMA
         assert context.data == expected_context_data
 
-    def test_track_billing_event_disabled_client(self, user):
+    @mock.patch("lib.internal_events.client.InternalEventsClient")
+    def test_track_billing_event_disabled_client(self, mock_internal_events, user):
         client = BillingEventsClient(
             enabled=False,
             endpoint="https://billing.local",
@@ -214,6 +227,7 @@ class TestBillingEventsClient:
             namespace="gl",
             batch_size=3,
             thread_count=2,
+            internal_events_client=mock_internal_events.return_value,
         )
 
         assert not hasattr(client, "snowplow_tracker")
