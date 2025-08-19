@@ -154,11 +154,19 @@ class AmazonQClient:
             raise ex
 
     @raise_aws_errors
-    def send_message(self, message: str, history: List[dict[str, str]]):
+    def send_message(
+        self,
+        message: str,
+        history: List[dict[str, str]],
+        tools: List[dict[str, str]] = None,
+        tool_results: List[dict[str, str]] = None,
+    ):
         return self.client.send_message(
             message=message,
             conversationId="conversation_id",
             history=history,
+            tools=tools,
+            toolResults=tool_results,
         )
 
     @raise_aws_errors
