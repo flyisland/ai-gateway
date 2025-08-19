@@ -617,7 +617,7 @@ async def test_get_work_item_not_found(gitlab_client_mock, metadata):
 
     response = await tool._arun(project_id="namespace/project", work_item_iid=999)
 
-    expected_response = json.dumps({"work_item": None})
+    expected_response = json.dumps({"error": "Work item not found"})
     assert response == expected_response
 
     gitlab_client_mock.graphql.assert_called_once()

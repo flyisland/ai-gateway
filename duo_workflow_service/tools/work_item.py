@@ -7,7 +7,10 @@ from pydantic import BaseModel, Field
 
 from duo_workflow_service.gitlab.url_parser import GitLabUrlParseError, GitLabUrlParser
 from duo_workflow_service.security.quick_actions import validate_no_quick_actions
-from duo_workflow_service.tools.duo_base_tool import DuoBaseTool
+from duo_workflow_service.tools.duo_base_tool import (
+    DESCRIPTION_CHARACTER_LIMIT,
+    DuoBaseTool,
+)
 from duo_workflow_service.tools.queries.work_items import (
     CREATE_NOTE_MUTATION,
     CREATE_WORK_ITEM_MUTATION,
@@ -562,7 +565,10 @@ class GetWorkItem(WorkItemBaseTool):
 
         try:
             work_item = await self._get_work_item_data(resolved)
-            if isinstance(work_item, dict) and "error" in work_item:
+            if work_item is None:
+                return json.dumps({"error": "Work item not found"})
+
+            if work_item.get("error"):
                 return json.dumps(work_item)
 
             return json.dumps({"work_item": work_item})
@@ -663,7 +669,8 @@ class CreateWorkItemInput(ParentResourceInput):
         description="Work item type. One of: 'Issue', 'Epic', 'Task', 'Objective', 'Key Result'."
     )
     description: Optional[str] = Field(
-        default=None, description="The description of the work item."
+        default=None,
+        description=f"The description of the work item. Limited to {DESCRIPTION_CHARACTER_LIMIT} characters.",
     )
     assignee_ids: Optional[List[int]] = Field(
         default=None, description="IDs of users to assign"
@@ -759,8 +766,8 @@ class CreateWorkItem(WorkItemBaseTool):
 
 class CreateWorkItemNoteInput(WorkItemResourceInput):
     body: str = Field(
-        description="The content of the note. Limited to 1,000,000 characters.",
-        max_length=1_000_000,
+        description=f"The content of the note. Limited to {DESCRIPTION_CHARACTER_LIMIT} characters.",
+        max_length=1_048_576,
     )
     internal: Optional[bool] = Field(
         default=None, description="Internal flag for a note. Default is false."
@@ -800,8 +807,7 @@ class CreateWorkItemNote(WorkItemBaseTool):
         internal = kwargs.pop("internal", None)
         discussion_id = kwargs.pop("discussion_id", None)
 
-        err = validate_no_quick_actions(body, field="body")
-        if err:
+        if err := validate_no_quick_actions(body, field="body"):
             return json.dumps({"error": err})
 
         resolved = await self._validate_work_item_url(
@@ -856,13 +862,12 @@ class CreateWorkItemNote(WorkItemBaseTool):
     def _process_note_response(self, note_response: dict) -> str:
         """Process the GraphQL response from creating a note."""
         # Top-level GraphQL errors (e.g., auth, syntax, variables)
-        top_errors = note_response.get("errors")
-        if top_errors:
+        if top_errors := note_response.get("errors"):
             return json.dumps({"error": top_errors})
 
-        create_note = note_response.get("createNote") or {}
-        created_note = create_note.get("note") or {}
-        note_errors = create_note.get("errors") or []
+        create_note = note_response.get("createNote", {})
+        created_note = create_note.get("note", {})
+        note_errors = create_note.get("errors", [])
 
         # Application-level errors (mutation ran but failed validation)
         if note_errors or not created_note.get("id"):
