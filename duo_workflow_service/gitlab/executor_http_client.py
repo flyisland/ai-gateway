@@ -45,6 +45,9 @@ class ExecutorGitLabHttpClient(GitlabHttpClient):
                 ),
             )
 
+            if action_response is None:
+                return None
+
             body = self._parse_response(
                 action_response.httpResponse.body,
                 parse_json=parse_json,
