@@ -20,6 +20,7 @@ from duo_workflow_service.entities.state import (
     WorkflowStatusEnum,
 )
 from duo_workflow_service.gitlab.http_client import GitlabHttpClient
+from lib.internal_events.event_enum import CategoryEnum
 
 
 @pytest.fixture(name="prompt_template")
@@ -41,6 +42,7 @@ def agent_fixture(
     model_factory: TypeModelFactory,
     prompt_config: PromptConfig,
     model_metadata: TypeModelMetadata | None,
+    workflow_type: CategoryEnum,
     check_events: bool,
 ) -> Agent:
     return Agent(
@@ -48,6 +50,7 @@ def agent_fixture(
         config=prompt_config,  # type: ignore[arg-type] # mypy gets confused with `config` from `Runnable`
         model_metadata=model_metadata,
         workflow_id="test-workflow-123",
+        workflow_type=workflow_type,
         http_client=gl_http_client,
         check_events=check_events,
     )  # type: ignore[call-arg]
@@ -58,6 +61,7 @@ class TestAgent:
         assert agent.internal_event_extra == {
             "agent_name": agent.name,
             "workflow_id": agent.workflow_id,
+            "workflow_type": agent.workflow_type.value,
         }
 
     @pytest.mark.asyncio
