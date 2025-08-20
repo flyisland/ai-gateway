@@ -818,14 +818,11 @@ class CreateWorkItemNote(WorkItemBaseTool):
             return json.dumps({"error": resolved})
 
         try:
-            work_item_id = await self._get_work_item_id(resolved)
-            if isinstance(work_item_id, dict):
-                return json.dumps(work_item_id)
+            result = await self._get_work_item_id(resolved)
+            if "error" in result:
+                return json.dumps(result)
 
-            note_input = {
-                "noteableId": work_item_id,
-                "body": body,
-            }
+            note_input = {"noteableId": result["id"], "body": body}
 
             if internal is not None:
                 note_input["internal"] = internal
@@ -842,7 +839,7 @@ class CreateWorkItemNote(WorkItemBaseTool):
         except Exception as e:
             return json.dumps({"error": str(e)})
 
-    async def _get_work_item_id(self, resolved: ResolvedWorkItem) -> Union[str, dict]:
+    async def _get_work_item_id(self, resolved: ResolvedWorkItem) -> dict:
         """Get work item ID from resolved work item."""
         try:
             work_item = await self._get_work_item_data(resolved)
@@ -854,7 +851,7 @@ class CreateWorkItemNote(WorkItemBaseTool):
             if not work_item.get("id"):
                 return {"error": "Work item exists but has no ID field"}
 
-            return work_item["id"]
+            return {"id": work_item["id"]}
 
         except Exception as e:
             return {"error": f"Failed to get work item ID: {str(e)}"}
