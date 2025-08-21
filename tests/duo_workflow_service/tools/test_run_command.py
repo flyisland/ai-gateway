@@ -19,8 +19,8 @@ from duo_workflow_service.tools.command import RunCommand, RunCommandInput
         ),
         (
             "pytest",
-            "  tests/test_main.py  test_app_start ",
-            ["tests/test_main.py", "test_app_start"],
+            "  tests/test_main.py::test_app_start ",
+            ["tests/test_main.py::test_app_start"],
         ),
     ],
 )
