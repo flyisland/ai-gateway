@@ -497,7 +497,7 @@ class LinkVulnerabilityToIssue(DuoBaseTool):
 class ConfirmVulnerabilityInput(BaseModel):
     vulnerability_id: str = Field(
         description="The ID of the vulnerability to be confirmed "
-        "(e.g., either integer ids like '123' or gid like 'gid://gitlab/Vulnerability/123')",
+        "(e.g., either digit ids like '123' or gid like 'gid://gitlab/Vulnerability/123')",
     )
     comment: Optional[str] = Field(
         default=None,
