@@ -1,5 +1,5 @@
 import re
-from typing import Any, Callable
+from typing import Any, Callable, Dict, List, Union
 
 import bleach
 
@@ -24,6 +24,8 @@ def _apply_recursively(response: Any, func: Callable[[str], str]) -> Any:
         return func(response)
     elif response is None:
         return None  # Allow None values
+    elif isinstance(response, (int, float, bool)):
+        return response  # Safe primitive types
     else:
         # Never allow unknown types to bypass filtering
         raise SecurityException(
@@ -32,7 +34,7 @@ def _apply_recursively(response: Any, func: Callable[[str], str]) -> Any:
         )
 
 
-def strip_hidden_html_comments(response: str | dict | list) -> str | dict | list:
+def strip_hidden_html_comments(response: Union[str, Dict[str, Any], List[Any]]) -> Union[str, List[Union[str, Dict[str, Any]]]]:
     """Strip HTML comments using Bleach, leave everything else unchanged.
 
     Uses Mozilla's Bleach library (https://github.com/mozilla/bleach) to safely

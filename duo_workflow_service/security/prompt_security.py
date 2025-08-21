@@ -1,6 +1,6 @@
 # flake8: noqa: W605
 import re
-from typing import Callable, Dict, List, Union, Any
+from typing import Any, Callable, Dict, List, Union
 
 from duo_workflow_service.security.exceptions import SecurityException
 from duo_workflow_service.security.markdown_content_security import (
@@ -8,7 +8,7 @@ from duo_workflow_service.security.markdown_content_security import (
 )
 
 
-def encode_dangerous_tags(response: str | dict | list) -> str | dict | list:
+def encode_dangerous_tags(response: Union[str, Dict[str, Any], List[Any]]) -> Union[str, List[Union[str, Dict[str, Any]]]]:
     """Recursively encode dangerous HTML tags in the response.
 
     Args:
@@ -90,8 +90,8 @@ class PromptSecurity:
 
     @staticmethod
     def apply_security(
-        response: str | dict | list, tool_name: str
-    ) -> str | dict | list:
+        response: Union[str, Dict[str, Any], List[Any]], tool_name: str
+    ) -> Union[str, List[Union[str, Dict[str, Any]]]]:
         """Apply all configured security functions for a specific tool.
 
         Each security function should either:
