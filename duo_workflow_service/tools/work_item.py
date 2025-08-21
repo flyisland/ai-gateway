@@ -234,17 +234,37 @@ class WorkItemBaseTool(DuoBaseTool):
     async def _create_work_item_with_type_id(
         self,
         namespace_path: str,
-        type_id: str,
+        type_id: Optional[str],
         input_kwargs: Dict[str, Any],
+        *,
+        type_name: Optional[str] = None,
     ) -> str:
+
+        raw_desc = input_kwargs.get("description")
+        if raw_desc is not None:
+            err = validate_no_quick_actions(raw_desc, field="description")
+            if err:
+                return json.dumps({"error": err})
+
+        if not type_id:
+            if not type_name:
+                return json.dumps({"error": "Missing work item type."})
+            type_id_or_error = await self._resolve_work_item_type_id(
+                namespace_path, type_name
+            )
+            if isinstance(type_id_or_error, dict):
+                return json.dumps(type_id_or_error)
+            type_id = type_id_or_error
+
         input_fields, warnings = self._build_work_item_input_fields(input_kwargs)
+
         variables = {
             "input": {
                 "namespacePath": namespace_path,
                 "workItemTypeId": type_id,
+                **input_fields,
             }
         }
-        variables["input"].update(input_fields)
 
         response = await self.gitlab_client.graphql(
             CREATE_WORK_ITEM_MUTATION, variables
@@ -271,7 +291,6 @@ class WorkItemBaseTool(DuoBaseTool):
             "message": f"Work item '{created.get('title')}' created successfully.",
             "work_item": created,
         }
-
         if warnings:
             result["warnings"] = warnings
 
@@ -464,11 +483,6 @@ class WorkItemBaseTool(DuoBaseTool):
                 }
             )
 
-        if kwargs.get("description") is not None:
-            err = validate_no_quick_actions(kwargs["description"], field="description")
-            if err:
-                return json.dumps({"error": err})
-
         if resolved.type == "project" and type_name in GROUP_ONLY_TYPES:
             return json.dumps(
                 {
@@ -477,19 +491,12 @@ class WorkItemBaseTool(DuoBaseTool):
             )
 
         try:
-            type_id_or_error = await self._resolve_work_item_type_id(
-                resolved.full_path, type_name
-            )
-            if isinstance(type_id_or_error, dict):
-                return json.dumps(type_id_or_error)
-
-            created = await self._create_work_item_with_type_id(
+            return await self._create_work_item_with_type_id(
                 namespace_path=resolved.full_path,
-                type_id=type_id_or_error,
+                type_id=None,
                 input_kwargs=kwargs,
+                type_name=type_name,
             )
-            return created
-
         except Exception as e:
             return json.dumps({"error": str(e)})
 
