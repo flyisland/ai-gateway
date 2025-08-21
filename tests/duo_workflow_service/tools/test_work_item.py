@@ -11,11 +11,13 @@ from duo_workflow_service.tools.work_item import (
     GetWorkItemNotesInput,
     ListWorkItems,
     ListWorkItemsInput,
-    ResolvedParent,
-    ResolvedWorkItem,
     UpdateWorkItem,
     UpdateWorkItemInput,
     WorkItemResourceInput,
+)
+from duo_workflow_service.tools.work_items.base_tool import (
+    ResolvedParent,
+    ResolvedWorkItem,
 )
 
 
