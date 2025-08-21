@@ -52,6 +52,23 @@ async def test_run_command_success(
     assert action.runCommand.arguments == expected_action_args
     assert action.runCommand.flags == []
 
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    "program",
+    [
+        "git",
+        "ls && git",
+        "echo 1 || git",
+        "echo / | xargs rm -rf",
+    ],
+)
+@mock.patch("duo_workflow_service.tools.command._execute_action")
+async def test_run_disallowed_command(execute_action_mock, program):
+    run_command = RunCommand(name="run_command", description="Run a shell command")
+
+    await run_command._arun(program=program, args="")
+
+    execute_action_mock.assert_not_called()
 
 def test_run_command_format_display_message():
     tool = RunCommand(description="Run a shell command")
