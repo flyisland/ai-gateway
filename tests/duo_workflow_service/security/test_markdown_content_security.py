@@ -72,9 +72,14 @@ multiple lines --> more text"""
 
     def test_edge_cases(self):
         """Test edge cases."""
+        import pytest
+        
         assert strip_hidden_html_comments("") == ""
-        assert strip_hidden_html_comments(123) == 123
         assert strip_hidden_html_comments(None) == None
+        
+        # Numbers now raise SecurityException for strict security
+        with pytest.raises(SecurityException):
+            strip_hidden_html_comments(123)
 
     def test_preserves_non_comment_content(self):
         """Test that non-comment content is preserved exactly."""
@@ -150,22 +155,34 @@ def hello():
 class TestMarkdownSecurityEdgeCases:
     """Test edge cases and security behavior for markdown content security."""
 
-    def test_safe_primitive_types_allowed(self):
-        """Test that safe primitive types are allowed through unchanged."""
+    def test_primitive_types_raise_security_exception(self):
+        """Test that primitive types now raise SecurityException for strict security."""
+        import pytest
+        
         # Test integers
-        assert strip_hidden_html_comments(42) == 42
-        assert strip_hidden_html_comments(0) == 0
-        assert strip_hidden_html_comments(-123) == -123
-
+        with pytest.raises(SecurityException) as exc_info:
+            strip_hidden_html_comments(42)
+        assert "Unsupported type for security processing: int" in str(exc_info.value)
+        
+        with pytest.raises(SecurityException) as exc_info:
+            strip_hidden_html_comments(0)
+        assert "Unsupported type for security processing: int" in str(exc_info.value)
+        
         # Test floats
-        assert strip_hidden_html_comments(3.14) == 3.14
-        assert strip_hidden_html_comments(-2.5) == -2.5
-
+        with pytest.raises(SecurityException) as exc_info:
+            strip_hidden_html_comments(3.14)
+        assert "Unsupported type for security processing: float" in str(exc_info.value)
+        
         # Test booleans
-        assert strip_hidden_html_comments(True) == True
-        assert strip_hidden_html_comments(False) == False
-
-        # Test None
+        with pytest.raises(SecurityException) as exc_info:
+            strip_hidden_html_comments(True)
+        assert "Unsupported type for security processing: bool" in str(exc_info.value)
+        
+        with pytest.raises(SecurityException) as exc_info:
+            strip_hidden_html_comments(False)
+        assert "Unsupported type for security processing: bool" in str(exc_info.value)
+        
+        # Test None is still allowed
         assert strip_hidden_html_comments(None) == None
 
     def test_unsupported_types_raise_security_exception(self):

@@ -24,8 +24,6 @@ def _apply_recursively(response: Any, func: Callable[[str], str]) -> Any:
         return func(response)
     elif response is None:
         return None  # Allow None values
-    elif isinstance(response, (int, float, bool)):
-        return response  # Safe primitive types
     else:
         # Never allow unknown types to bypass filtering
         raise SecurityException(
