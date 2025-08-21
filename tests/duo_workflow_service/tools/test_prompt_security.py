@@ -249,7 +249,7 @@ class TestPromptSecurity:
 
     def test_security_function_exception_handling(self):
         """Test that security exceptions are properly wrapped."""
-        from duo_workflow_service.security.prompt_security import SecurityException
+        from duo_workflow_service.security.exceptions import SecurityException
 
         # Test with a security function that raises an exception
         def mock_security_function(response):
@@ -274,7 +274,7 @@ class TestPromptSecurity:
 
     def test_security_function_direct_security_exception(self):
         """Test that SecurityException is re-raised directly."""
-        from duo_workflow_service.security.prompt_security import SecurityException
+        from duo_workflow_service.security.exceptions import SecurityException
 
         # Test with a security function that raises SecurityException directly
         def mock_security_function(response):

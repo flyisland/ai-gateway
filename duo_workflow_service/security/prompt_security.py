@@ -1,14 +1,11 @@
 # flake8: noqa: W605
 import re
-from typing import Callable, Dict, List
+from typing import Callable, Dict, List, Union, Any
 
+from duo_workflow_service.security.exceptions import SecurityException
 from duo_workflow_service.security.markdown_content_security import (
     strip_hidden_html_comments,
 )
-
-
-class SecurityException(Exception):
-    """Custom exception raised when security validation fails."""
 
 
 def encode_dangerous_tags(response: str | dict | list) -> str | dict | list:
@@ -68,7 +65,10 @@ class PromptSecurity:
 
     # Default security functions to apply to ALL tools
     DEFAULT_SECURITY_FUNCTIONS: List[
-        Callable[[str | dict | list], str | dict | list]
+        Callable[
+            [Union[str, Dict[str, Any], List[Any]]],
+            Union[str, List[Union[str, Dict[str, Any]]]],
+        ]
     ] = [
         encode_dangerous_tags,
         strip_hidden_html_comments,
@@ -76,10 +76,16 @@ class PromptSecurity:
 
     # Tool-specific additional security functions
     TOOL_SPECIFIC_FUNCTIONS: Dict[
-        str, List[Callable[[str | dict | list], str | dict | list]]
+        str,
+        List[
+            Callable[
+                [Union[str, Dict[str, Any], List[Any]]],
+                Union[str, List[Union[str, Dict[str, Any]]]],
+            ]
+        ],
     ] = {
-        # 'file_read': [validate_no_script_tags],
-        # Add tools that need EXTRA security functions
+        # Example: 'file_read': [validate_no_script_tags],
+        # Add tools that need EXTRA security functions beyond the defaults
     }
 
     @staticmethod

@@ -3,6 +3,8 @@ from typing import Any, Callable
 
 import bleach
 
+from duo_workflow_service.security.exceptions import SecurityException
+
 
 def _apply_recursively(response: Any, func: Callable[[str], str]) -> Any:
     """Apply a function recursively to strings in dict/list structures.
@@ -20,8 +22,14 @@ def _apply_recursively(response: Any, func: Callable[[str], str]) -> Any:
         return [_apply_recursively(item, func) for item in response]
     elif isinstance(response, str):
         return func(response)
+    elif response is None:
+        return None  # Allow None values
     else:
-        return response
+        # Never allow unknown types to bypass filtering
+        raise SecurityException(
+            f"Unsupported type for security processing: {type(response).__name__}. "
+            f"All data must be explicitly validated for security."
+        )
 
 
 def strip_hidden_html_comments(response: str | dict | list) -> str | dict | list:
