@@ -52,6 +52,7 @@ async def test_run_command_success(
     assert action.runCommand.arguments == expected_action_args
     assert action.runCommand.flags == []
 
+
 @pytest.mark.asyncio
 @pytest.mark.parametrize(
     "program",
@@ -69,6 +70,7 @@ async def test_run_disallowed_command(execute_action_mock, program):
     await run_command._arun(program=program, args="")
 
     execute_action_mock.assert_not_called()
+
 
 def test_run_command_format_display_message():
     tool = RunCommand(description="Run a shell command")
