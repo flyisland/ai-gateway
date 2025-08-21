@@ -73,7 +73,6 @@ sentry-sdk = "^2.17.0"
 websockets = "^15.0.1"
 langgraph-checkpoint = "2.0.26"
 gitmatch = "^0.2.1"
-bleach = "^6.2.0"
 langchain-openai = "^0.3.30"
 
 [[tool.poetry.source]]
@@ -123,8 +122,6 @@ types-requests = "^2.31.0.20240406"
 codespell = "^2.4.1"
 docformatter = "^1.7.7"
 editorconfig-checker = "^3.2.1"
-types-markdown = "^3.8.0.20250708"
-types-bleach = "^6.2.0.20250514"
 
 [tool.codespell]
 skip = """
@@ -153,15 +150,15 @@ asyncio_default_fixture_loop_scope = "function"
 
 [tool.coverage.run]
 source = [
-    "ai_gateway",
-    "duo_workflow_service",
-    "eval",
-    "lib",
-    "lints",
+  "ai_gateway",
+  "duo_workflow_service",
+  "eval",
+  "lib",
+  "lints",
 ]
 omit = [
-    "tests/*",
-    "*.jinja",
+  "tests/*",
+  "*.jinja",
 ]
 
 [tool.isort]
@@ -171,14 +168,12 @@ profile = "black"
 extension-pkg-allow-list = ["dependency_injector"]
 # Exclude protobuf packages because they can't be parsed properly by pylint, leading to `no-name-in-module` errors.
 # See https://github.com/protocolbuffers/protobuf/issues/10372
-ignored-modules = ["contract.contract_pb2", "google.protobuf.struct_pb2", "google.rpc.error_details_pb2"]
-# Ignore eval directory since it has optional dependencies
-ignore-paths = ["eval"]
+ignored-modules=["contract.contract_pb2", "google.protobuf.struct_pb2", "google.rpc.error_details_pb2"]
 jobs = 0
 load-plugins = [
-    "lints.unsafe_dependency_resolution",
-    "lints.direct_environment_variable_reference",
-    "lints.file_naming_for_tests",
+  "lints.unsafe_dependency_resolution",
+  "lints.direct_environment_variable_reference",
+  "lints.file_naming_for_tests",
 ]
 
 [tool.pylint.format]
@@ -209,8 +204,8 @@ disable = [
   "duplicate-code",
 ]
 enable = [
-    "unsafe-dependency-resolution",
-    "direct-environment-variable-reference",
+  "unsafe-dependency-resolution",
+  "direct-environment-variable-reference",
 ]
 
 [tool.pylint.reports]
