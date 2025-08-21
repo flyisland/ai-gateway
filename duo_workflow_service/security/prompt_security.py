@@ -18,57 +18,61 @@ def run_from_args():
     return PromptSecurity.apply_security_to_tool_response(content, "test-tool")
 
 
-def encode_dangerous_tags(response: Union[str, Dict[str, Any], List[Any]]) -> Union[str, List[Union[str, Dict[str, Any]]]]:
+def encode_dangerous_tags(
+    response: Union[str, Dict[str, Any], List[Any]],
+) -> Union[str, List[Union[str, Dict[str, Any]]]]:
     """Recursively encode dangerous HTML tags in the response.
 
     Args:
         response: The response data to encode
 
     Returns:
-        Response with encoded dangerous tags
+        Response with encoded dangerous tags, compatible with ToolMessage.content
     """
-    # Define dangerous tags to encode
-    # These tags are commonly used in prompt injection attacks to manipulate LLM behavior:
-    # - "goal": Used to override or redirect the primary task objective
-    # - "system": Used to inject system-level instructions or override system prompts
-    DANGEROUS_TAGS = {
-        "goal": "goal",
-        "system": "system",
-    }
 
-    if isinstance(response, dict):
-        result = {k: encode_dangerous_tags(v) for k, v in response.items()}
-        return [result]  # Convert dict to list for ToolMessage compatibility
-    elif isinstance(response, list):
-        return [encode_dangerous_tags(item) for item in response]
+    def _encode_recursive(data: Any) -> Any:
+        """Internal recursive function that doesn't change top-level structure."""
+        DANGEROUS_TAGS = {
+            "goal": "goal",
+            "system": "system",
+        }
 
-    # Process string responses
-    for tag_name, replacement in DANGEROUS_TAGS.items():
-        # Pattern 1: Regular HTML tags like <goal> or </goal>
-        response = re.sub(
-            rf"<\s*(/?)\s*{re.escape(tag_name)}\s*>",
-            f"&lt;\\1{replacement}&gt;",
-            response,
-            flags=re.IGNORECASE,
-        )
+        if isinstance(data, dict):
+            return {k: _encode_recursive(v) for k, v in data.items()}
+        elif isinstance(data, list):
+            return [_encode_recursive(item) for item in data]
 
-        # Pattern 2: Unicode-escaped tags like \u003cgoal\u003e
-        response = re.sub(
-            rf"\\u003c\s*(/?)\s*{re.escape(tag_name)}\s*\\u003e",
-            f"&lt;\\1{replacement}&gt;",
-            response,
-            flags=re.IGNORECASE,
-        )
+        for tag_name, replacement in DANGEROUS_TAGS.items():
+            data = re.sub(
+                rf"<\s*(/?)\s*{re.escape(tag_name)}\s*>",
+                f"&lt;\\1{replacement}&gt;",
+                data,
+                flags=re.IGNORECASE,
+            )
 
-        # Pattern 3: Mixed format with double backslashes
-        response = re.sub(
-            rf"\\\\u003c\s*(/?)\s*{re.escape(tag_name)}\s*\\\\u003e",
-            f"&lt;\\1{replacement}&gt;",
-            response,
-            flags=re.IGNORECASE,
-        )
+            data = re.sub(
+                rf"\\u003c\s*(/?)\s*{re.escape(tag_name)}\s*\\u003e",
+                f"&lt;\\1{replacement}&gt;",
+                data,
+                flags=re.IGNORECASE,
+            )
 
-    return response
+            data = re.sub(
+                rf"\\\\u003c\s*(/?)\s*{re.escape(tag_name)}\s*\\\\u003e",
+                f"&lt;\\1{replacement}&gt;",
+                data,
+                flags=re.IGNORECASE,
+            )
+
+        return data
+
+    processed = _encode_recursive(response)
+
+    if isinstance(processed, dict):
+        return [processed]
+
+    # Type assertion: processed is guaranteed to be str or list after security processing
+    return processed  # type: ignore[no-any-return]
 
 
 class PromptSecurity:
