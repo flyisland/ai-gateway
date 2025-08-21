@@ -1,8 +1,9 @@
 import json
-from unittest.mock import AsyncMock, Mock
+from unittest.mock import AsyncMock, Mock, patch
 
 import pytest
 
+from duo_workflow_service.gitlab.gitlab_api import Project
 from duo_workflow_service.tools.merge_request import (
     CreateMergeRequest,
     CreateMergeRequestInput,
@@ -10,7 +11,9 @@ from duo_workflow_service.tools.merge_request import (
     CreateMergeRequestNoteInput,
     GetMergeRequest,
     ListAllMergeRequestNotes,
+    ListMergeRequest,
     ListMergeRequestDiffs,
+    ListMergeRequestInput,
     MergeRequestResourceInput,
     UpdateMergeRequest,
     UpdateMergeRequestInput,
@@ -85,11 +88,26 @@ def gitlab_client_mock_fixture():
     return Mock()
 
 
+@pytest.fixture(name="project_mock")
+def project_mock_fixture():
+    """Fixture for mock project with exclusion rules."""
+    return Project(
+        id=1,
+        name="test-project",
+        description="Test project",
+        http_url_to_repo="http://example.com/repo.git",
+        web_url="http://example.com/repo",
+        languages=[],
+        exclusion_rules=["**/*.log", "/secrets/**", "**/node_modules/**"],
+    )
+
+
 @pytest.fixture(name="metadata")
-def metadata_fixture(gitlab_client_mock):
+def metadata_fixture(gitlab_client_mock, project_mock):
     return {
         "gitlab_client": gitlab_client_mock,
         "gitlab_host": "gitlab.com",
+        "project": project_mock,
     }
 
 
@@ -491,7 +509,7 @@ async def test_list_merge_request_diffs(gitlab_client_mock, metadata):
 
     response = await tool._arun(project_id=1, merge_request_iid=123)
 
-    expected_response = json.dumps({"diffs": '{"diffs": []}'})
+    expected_response = json.dumps({"diffs": {"diffs": []}})
     assert response == expected_response
 
     gitlab_client_mock.aget.assert_called_once_with(
@@ -534,7 +552,7 @@ async def test_list_merge_request_diffs_with_url_success(
         response_data=diffs_data,
     )
 
-    expected_response = json.dumps({"diffs": '{"diffs": []}'})
+    expected_response = json.dumps({"diffs": {"diffs": []}})
     assert response == expected_response
 
     gitlab_client_mock.aget.assert_called_once_with(
@@ -1196,5 +1214,296 @@ def test_list_all_merge_request_notes_format_display_message(
 )
 def test_update_merge_request_format_display_message(input_data, expected_message):
     tool = UpdateMergeRequest(description="Update merge request")
+    message = tool.format_display_message(input_data)
+    assert message == expected_message
+
+
+# Tests for DiffExclusionPolicy integration
+@pytest.mark.asyncio
+@patch("duo_workflow_service.policies.file_exclusion_policy.is_feature_enabled")
+@patch("duo_workflow_service.policies.diff_exclusion_policy.is_feature_enabled")
+async def test_list_merge_request_diffs_with_diff_exclusion_policy_enabled(
+    mock_diff_feature_flag, mock_file_feature_flag, gitlab_client_mock, metadata
+):
+    """Test ListMergeRequestDiffs applies DiffExclusionPolicy when feature flag is enabled."""
+    mock_diff_feature_flag.return_value = True
+    mock_file_feature_flag.return_value = True
+
+    # Mock diff data with both allowed and excluded files
+    diff_data = [
+        {
+            "old_path": "src/main.py",
+            "new_path": "src/main.py",
+            "diff": "@@ -1,3 +1,3 @@\n-old content\n+new content",
+        },
+        {
+            "old_path": "app.log",
+            "new_path": "app.log",
+            "diff": "@@ -1,3 +1,3 @@\n-old log\n+new log",
+        },
+        {
+            "old_path": "secrets/api_key.txt",
+            "new_path": "secrets/api_key.txt",
+            "diff": "@@ -1,3 +1,3 @@\n-old key\n+new key",
+        },
+        {
+            "old_path": "node_modules/react/index.js",
+            "new_path": "node_modules/react/index.js",
+            "diff": "@@ -1,3 +1,3 @@\n-old react\n+new react",
+        },
+    ]
+
+    gitlab_client_mock.aget = AsyncMock(return_value=json.dumps(diff_data))
+
+    tool = ListMergeRequestDiffs(metadata=metadata)
+
+    response = await tool._arun(project_id=1, merge_request_iid=123)
+
+    response_data = json.loads(response)
+
+    # Only the allowed diff should remain (src/main.py)
+    assert "diffs" in response_data
+    assert len(response_data["diffs"]) == 1
+
+    # Verify the remaining diff is the allowed one
+    remaining_diff = response_data["diffs"][0]
+    assert remaining_diff["old_path"] == "src/main.py"
+    assert remaining_diff["new_path"] == "src/main.py"
+
+    # Check for excluded_files and excluded_reason when there are excluded files
+    assert "excluded_files" in response_data
+    assert "excluded_reason" in response_data
+
+    # Verify excluded files list contains the expected files
+    expected_excluded_files = [
+        "app.log",
+        "secrets/api_key.txt",
+        "node_modules/react/index.js",
+    ]
+    assert set(response_data["excluded_files"]) == set(expected_excluded_files)
+
+    # Verify excluded_reason contains the expected message format
+    assert (
+        "Files excluded due to policy, continue without files:"
+        in response_data["excluded_reason"]
+    )
+    for excluded_file in expected_excluded_files:
+        assert excluded_file in response_data["excluded_reason"]
+
+    gitlab_client_mock.aget.assert_called_once_with(
+        path="/api/v4/projects/1/merge_requests/123/diffs", parse_json=False
+    )
+
+
+@pytest.mark.asyncio
+@patch("duo_workflow_service.policies.file_exclusion_policy.is_feature_enabled")
+@patch("duo_workflow_service.policies.diff_exclusion_policy.is_feature_enabled")
+async def test_list_merge_request_diffs_with_no_excluded_files(
+    mock_diff_feature_flag, mock_file_feature_flag, gitlab_client_mock, metadata
+):
+    """Test ListMergeRequestDiffs does not include excluded_files/excluded_reason when no files are excluded."""
+    mock_diff_feature_flag.return_value = True
+    mock_file_feature_flag.return_value = True
+
+    # Mock diff data with only allowed files
+    diff_data = [
+        {
+            "old_path": "src/main.py",
+            "new_path": "src/main.py",
+            "diff": "@@ -1,3 +1,3 @@\n-old content\n+new content",
+        },
+        {
+            "old_path": "src/utils.py",
+            "new_path": "src/utils.py",
+            "diff": "@@ -1,3 +1,3 @@\n-old utils\n+new utils",
+        },
+    ]
+
+    gitlab_client_mock.aget = AsyncMock(return_value=json.dumps(diff_data))
+
+    tool = ListMergeRequestDiffs(metadata=metadata)
+
+    response = await tool._arun(project_id=1, merge_request_iid=123)
+
+    response_data = json.loads(response)
+
+    # All diffs should remain
+    assert "diffs" in response_data
+    assert len(response_data["diffs"]) == 2
+
+    # Should not include excluded_files or excluded_reason when no files are excluded
+    assert "excluded_files" not in response_data
+    assert "excluded_reason" not in response_data
+
+    gitlab_client_mock.aget.assert_called_once_with(
+        path="/api/v4/projects/1/merge_requests/123/diffs", parse_json=False
+    )
+
+
+@pytest.mark.asyncio
+async def test_list_merge_request_basic(gitlab_client_mock, metadata):
+    gitlab_client_mock.aget = AsyncMock(
+        return_value=[{"id": 1, "title": "Test MR", "author": {"username": "testuser"}}]
+    )
+
+    tool = ListMergeRequest(metadata=metadata)
+
+    response = await tool._arun(project_id=1)
+
+    expected_response = json.dumps(
+        {
+            "merge_requests": [
+                {"id": 1, "title": "Test MR", "author": {"username": "testuser"}}
+            ]
+        }
+    )
+    assert response == expected_response
+
+    gitlab_client_mock.aget.assert_called_once_with(
+        path="/api/v4/projects/1/merge_requests", params={}, parse_json=False
+    )
+
+
+@pytest.mark.asyncio
+async def test_list_merge_request_with_filters(gitlab_client_mock, metadata):
+    gitlab_client_mock.aget = AsyncMock(
+        return_value=[{"id": 1, "title": "Test MR", "author": {"username": "testuser"}}]
+    )
+
+    tool = ListMergeRequest(metadata=metadata)
+
+    response = await tool._arun(
+        project_id=1,
+        author_username="testuser",
+        state="opened",
+        labels="bug,urgent",
+        search="test search",
+    )
+
+    expected_response = json.dumps(
+        {
+            "merge_requests": [
+                {"id": 1, "title": "Test MR", "author": {"username": "testuser"}}
+            ]
+        }
+    )
+    assert response == expected_response
+
+    expected_params = {
+        "author_username": "testuser",
+        "state": "opened",
+        "labels": "bug,urgent",
+        "search": "test search",
+    }
+    gitlab_client_mock.aget.assert_called_once_with(
+        path="/api/v4/projects/1/merge_requests",
+        params=expected_params,
+        parse_json=False,
+    )
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    "url,project_id,expected_path",
+    [
+        (
+            "https://gitlab.com/namespace/project",
+            None,
+            "/api/v4/projects/namespace%2Fproject/merge_requests",
+        ),
+        (
+            "https://gitlab.com/namespace/project",
+            "namespace%2Fproject",
+            "/api/v4/projects/namespace%2Fproject/merge_requests",
+        ),
+    ],
+)
+async def test_list_merge_request_with_url_success(
+    url, project_id, expected_path, gitlab_client_mock, metadata
+):
+    mock_response = [{"id": 1, "title": "Test MR"}]
+    gitlab_client_mock.aget = AsyncMock(return_value=mock_response)
+
+    tool = ListMergeRequest(metadata=metadata)
+
+    response = await tool._arun(url=url, project_id=project_id)
+
+    expected_response = json.dumps({"merge_requests": mock_response})
+    assert response == expected_response
+
+    gitlab_client_mock.aget.assert_called_once_with(
+        path=expected_path, params={}, parse_json=False
+    )
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    "url,project_id,error_contains",
+    [
+        (
+            "https://gitlab.com/namespace/project",
+            "different%2Fproject",
+            "Project ID mismatch",
+        ),
+        (
+            "https://example.com/not-gitlab",
+            None,
+            "Failed to parse URL",
+        ),
+    ],
+)
+async def test_list_merge_request_with_url_error(
+    url, project_id, error_contains, gitlab_client_mock, metadata
+):
+    tool = ListMergeRequest(metadata=metadata)
+
+    response = await tool._arun(url=url, project_id=project_id)
+
+    error_response = json.loads(response)
+    assert "error" in error_response
+    assert error_contains in error_response["error"]
+
+    gitlab_client_mock.aget.assert_not_called()
+
+
+@pytest.mark.asyncio
+async def test_list_merge_request_exception(gitlab_client_mock, metadata):
+    error_message = "API error"
+    gitlab_client_mock.aget = AsyncMock(side_effect=Exception(error_message))
+
+    tool = ListMergeRequest(metadata=metadata)
+
+    response = await tool._arun(project_id=1)
+
+    expected_response = json.dumps({"error": error_message})
+    assert response == expected_response
+
+
+@pytest.mark.parametrize(
+    "input_data,expected_message",
+    [
+        (
+            ListMergeRequestInput(project_id=42),
+            "List merge requests in project 42 ",
+        ),
+        (
+            ListMergeRequestInput(
+                project_id=42,
+                author_username="testuser",
+                state="opened",
+                labels="bug,urgent",
+            ),
+            "List merge requests in project 42 with filters: author: testuser, state: opened, labels: bug,urgent",
+        ),
+        (
+            ListMergeRequestInput(
+                url="https://gitlab.com/namespace/project", author_username="testuser"
+            ),
+            "List merge requests in https://gitlab.com/namespace/project with filters: author: testuser",
+        ),
+    ],
+)
+def test_list_merge_request_format_display_message(input_data, expected_message):
+    tool = ListMergeRequest(description="List merge requests")
     message = tool.format_display_message(input_data)
     assert message == expected_message

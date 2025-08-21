@@ -1,11 +1,21 @@
 # flake8: noqa: W605
 import re
+import sys
+from pathlib import Path
 from typing import Any, Callable, Dict, List, Union
 
 from duo_workflow_service.security.exceptions import SecurityException
 from duo_workflow_service.security.markdown_content_security import (
     strip_hidden_html_comments,
 )
+
+
+def run_from_args():
+    args = sys.argv[1:]
+    filename = args[0]
+    content = Path(filename).read_text()
+
+    return PromptSecurity.apply_security_to_tool_response(content, "test-tool")
 
 
 def encode_dangerous_tags(response: Union[str, Dict[str, Any], List[Any]]) -> Union[str, List[Union[str, Dict[str, Any]]]]:
@@ -27,7 +37,8 @@ def encode_dangerous_tags(response: Union[str, Dict[str, Any], List[Any]]) -> Un
     }
 
     if isinstance(response, dict):
-        return {k: encode_dangerous_tags(v) for k, v in response.items()}
+        result = {k: encode_dangerous_tags(v) for k, v in response.items()}
+        return [result]  # Convert dict to list for ToolMessage compatibility
     elif isinstance(response, list):
         return [encode_dangerous_tags(item) for item in response]
 
@@ -89,7 +100,7 @@ class PromptSecurity:
     }
 
     @staticmethod
-    def apply_security(
+    def apply_security_to_tool_response(
         response: Union[str, Dict[str, Any], List[Any]], tool_name: str
     ) -> Union[str, List[Union[str, Dict[str, Any]]]]:
         """Apply all configured security functions for a specific tool.
@@ -99,21 +110,19 @@ class PromptSecurity:
         - Raise SecurityException if validation fails
 
         Args:
-            response: The response to secure
+            response: The response to secure (compatible with LangChain ToolCall/ToolMessage)
             tool_name: Name of the tool being used
 
         Returns:
-            Secured response (same type as input)
+            Secured response compatible with ToolMessage.content (str | list[str | dict])
 
         Raises:
             SecurityException: If any security validation fails
         """
-        # Get all applicable functions
         all_functions = list(PromptSecurity.DEFAULT_SECURITY_FUNCTIONS)
         if tool_name in PromptSecurity.TOOL_SPECIFIC_FUNCTIONS:
             all_functions.extend(PromptSecurity.TOOL_SPECIFIC_FUNCTIONS[tool_name])
 
-        # Apply each function in sequence
         secured_response = response
         for func in all_functions:
             try:
@@ -123,9 +132,9 @@ class PromptSecurity:
                 raise
 
             except Exception as e:
-                # Wrap other exceptions for better error context
                 raise SecurityException(
-                    f"Security function {func.__name__} failed: {str(e)}"
+                    f"Security function {func.__name__} failed for tool '{tool_name}': {str(e)}"
                 ) from e
 
-        return secured_response
+        # Type assertion: security functions guarantee proper return type
+        return secured_response  # type: ignore[return-value]

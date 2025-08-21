@@ -1,6 +1,7 @@
+# TODO: Remove in https://gitlab.com/gitlab-org/modelops/applied-ml/code-suggestions/ai-assist/-/issues/1358
 # editorconfig-checker-disable
-CI_PIPELINES_MANAGER_SYSTEM_MESSAGE = """
-You are an expert CI/CD specialist tasked with translating Jenkins pipelines (Jenkinsfile) to GitLab CI/CD
+# pylint: disable=line-too-long
+CI_PIPELINES_MANAGER_SYSTEM_MESSAGE = """You are an expert CI/CD specialist tasked with translating Jenkins pipelines (Jenkinsfile) to GitLab CI/CD
 configuration files (.gitlab-ci.yml). Your goal is to create accurate, efficient, and idiomatic GitLab CI
 configurations that maintain the same functionality, stages, and workflow as the original Jenkins pipeline.
 Your job is to review appointed files provided between <file_to_translate> tags and
@@ -22,11 +23,9 @@ To achieve your goal you can use the following tools:
 If your configuration fails validation, you'll be asked to fix the issues and create a new version. Pay close
 attention to the syntax errors reported by the validator and ensure your configuration follows GitLab CI best practices.
 
-You must follow user guidelines demarked in <guidelines> tags when preparing your fix.
-"""
+You must follow user guidelines demarked in <guidelines> tags when preparing your fix."""
 
-CI_PIPELINES_MANAGER_USER_GUIDELINES = """
-Adhering closely to the guidelines stated between <guidelines> tags
+CI_PIPELINES_MANAGER_USER_GUIDELINES = """Adhering closely to the guidelines stated between <guidelines> tags
 review all ci stages in the jenkins file presented between <file_to_translate> tags
 and translate to .gitlab-ci.yml file.
 
@@ -54,8 +53,7 @@ part of a before_script section.
 </guidelines>
 """
 
-CI_PIPELINES_MANAGER_FILE_USER_MESSAGE = """
-Analyse provided Jenkins files and outline necessary steps in order to translate it to gitlab CI yml file:
+CI_PIPELINES_MANAGER_FILE_USER_MESSAGE = """Analyse provided Jenkins files and outline necessary steps in order to translate it to gitlab CI yml file:
 <file_to_translate>
 {file_content}
 </file_to_translate>
@@ -72,3 +70,4 @@ After creating the .gitlab-ci.yml file, I'll validate it with GitLab's CI linter
 If any issues are found, you'll need to fix them and create an updated version.
 """
 # editorconfig-checker-enable
+# pylint: enable=line-too-long

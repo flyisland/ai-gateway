@@ -5,6 +5,7 @@ from typing import Any, Optional, Type
 from gitlab_cloud_connector import GitLabUnitPrimitive
 from pydantic import BaseModel, Field
 
+from duo_workflow_service.policies.diff_exclusion_policy import DiffExclusionPolicy
 from duo_workflow_service.tools.duo_base_tool import DuoBaseTool
 from duo_workflow_service.tools.gitlab_resource_input import ProjectResourceInput
 
@@ -122,7 +123,9 @@ class CreateMergeRequest(DuoBaseTool):
         except Exception as e:
             return json.dumps({"error": str(e)})
 
-    def format_display_message(self, args: CreateMergeRequestInput) -> str:
+    def format_display_message(
+        self, args: CreateMergeRequestInput, _tool_response: Any = None
+    ) -> str:
         if args.url:
             return f"Create merge request from '{args.source_branch}' to '{args.target_branch}' in {args.url}"
         return (
@@ -169,7 +172,9 @@ class GetMergeRequest(DuoBaseTool):
         except Exception as e:
             return json.dumps({"error": str(e)})
 
-    def format_display_message(self, args: MergeRequestResourceInput) -> str:
+    def format_display_message(
+        self, args: MergeRequestResourceInput, _tool_response: Any = None
+    ) -> str:
         if args.url:
             return f"Read merge request {args.url}"
         return (
@@ -211,14 +216,39 @@ class ListMergeRequestDiffs(DuoBaseTool):
                 f"{validation_result.merge_request_iid}/diffs",
                 parse_json=False,
             )
-            return json.dumps({"diffs": response})
+
+            # Parse the response and apply diff exclusion policy
+            diff_data = json.loads(response)
+            diff_policy = DiffExclusionPolicy(self.project)
+            filtered_diff, excluded_files = diff_policy.filter_allowed_diffs(diff_data)
+
+            result: dict[str, Any] = {"diffs": filtered_diff}
+
+            if len(excluded_files) > 0:
+                result["excluded_files"] = excluded_files
+                result["excluded_reason"] = (
+                    DiffExclusionPolicy.format_llm_exclusion_message(excluded_files)
+                )
+
+            return json.dumps(result)
         except Exception as e:
             return json.dumps({"error": str(e)})
 
-    def format_display_message(self, args: MergeRequestResourceInput) -> str:
+    def format_display_message(
+        self, args: MergeRequestResourceInput, tool_response: Any = None
+    ) -> str:
         if args.url:
-            return f"View changes in merge request {args.url}"
-        return f"View changes in merge request !{args.merge_request_iid} in project {args.project_id}"
+            msg = f"View changes in merge request {args.url}"
+        else:
+            msg = f"View changes in merge request !{args.merge_request_iid} in project {args.project_id}"
+
+        if tool_response:
+            excluded_files = json.loads(tool_response.content).get("excluded_files")
+            return msg + DiffExclusionPolicy.format_user_exclusion_message(
+                excluded_files
+            )
+
+        return msg
 
 
 # The merge_request_diff_head_sha parameter is required for the /merge quick action.
@@ -289,7 +319,9 @@ They are commands that are on their own line and start with a backslash. Example
         except Exception as e:
             return json.dumps({"error": str(e)})
 
-    def format_display_message(self, args: CreateMergeRequestNoteInput) -> str:
+    def format_display_message(
+        self, args: CreateMergeRequestNoteInput, _tool_response: Any = None
+    ) -> str:
         if args.url:
             return f"Add comment to merge request {args.url}"
         return f"Add comment to merge request !{args.merge_request_iid} in project {args.project_id}"
@@ -333,7 +365,9 @@ class ListAllMergeRequestNotes(DuoBaseTool):
         except Exception as e:
             return json.dumps({"error": str(e)})
 
-    def format_display_message(self, args: MergeRequestResourceInput) -> str:
+    def format_display_message(
+        self, args: MergeRequestResourceInput, _tool_response: Any = None
+    ) -> str:
         if args.url:
             return f"Read comments on merge request {args.url}"
         return f"Read comments on merge request !{args.merge_request_iid} in project {args.project_id}"
@@ -387,6 +421,152 @@ class UpdateMergeRequestInput(MergeRequestResourceInput):
     )
 
 
+class ListMergeRequestInput(ProjectResourceInput):
+    author_username: Optional[str] = Field(
+        default=None,
+        description="Returns merge requests created by the given username. Mutually exclusive with author_id.",
+    )
+    author_id: Optional[int] = Field(
+        default=None,
+        description="Returns merge requests created by the given user ID. Mutually exclusive with author_username.",
+    )
+    assignee_username: Optional[str] = Field(
+        default=None,
+        description="Returns merge requests assigned to the given username. Mutually exclusive with assignee_id.",
+    )
+    assignee_id: Optional[int] = Field(
+        default=None,
+        description="Returns merge requests assigned to the given user ID. Mutually exclusive with assignee_username.",
+    )
+    reviewer_username: Optional[str] = Field(
+        default=None,
+        description="Returns merge requests with the given username as reviewer. Mutually exclusive with reviewer_id.",
+    )
+    reviewer_id: Optional[int] = Field(
+        default=None,
+        description="Returns merge requests with the given user ID as reviewer. "
+        "Mutually exclusive with reviewer_username.",
+    )
+    state: Optional[str] = Field(
+        default=None,
+        description="Filter by state: 'opened', 'closed', 'locked', 'merged', or 'all'.",
+    )
+    milestone: Optional[str] = Field(
+        default=None,
+        description="Returns merge requests for a specific milestone. 'None' returns merge requests with no milestone.",
+    )
+    labels: Optional[str] = Field(
+        default=None,
+        description="Comma-separated list of label names. Returns merge requests matching all labels.",
+    )
+    search: Optional[str] = Field(
+        default=None,
+        description="Search merge requests against their title and description.",
+    )
+    scope: Optional[str] = Field(
+        default=None,
+        description="Filter by scope: 'created_by_me', 'assigned_to_me', or 'all'.",
+    )
+
+
+class ListMergeRequest(DuoBaseTool):
+    name: str = "gitlab_merge_request_search"
+    description: str = f"""List merge requests in a GitLab project.
+    This tool supports filtering by author, assignee, reviewer, state, milestone, labels, and more.
+    This tool also supports searching for merge requests against their title and description.
+    Use this tool when you need to filter or search for merge requests by author or other specific criteria.
+
+    {PROJECT_IDENTIFICATION_DESCRIPTION}
+
+    For example:
+    - List merge requests by author username:
+        gitlab_merge_request_search(project_id=13, author_username="janedoe1337")
+    - List merge requests assigned to a specific user:
+        gitlab_merge_request_search(project_id=13, assignee_username="janedoe1337")
+    - List all open merge requests:
+        gitlab_merge_request_search(project_id=13, state="opened")
+    - List merge requests with specific labels:
+        gitlab_merge_request_search(project_id=13, labels="bug,urgent")
+    - Given the URL https://gitlab.com/namespace/project and author filter:
+        gitlab_merge_request_search(url="https://gitlab.com/namespace/project", author_username="janedoe1337")
+    - Search merge requests against their title and description
+        gitlab_merge_request_search(project_id=13, search="bug fix")
+    """
+    args_schema: Type[BaseModel] = ListMergeRequestInput
+
+    unit_primitive: GitLabUnitPrimitive = GitLabUnitPrimitive.ASK_MERGE_REQUEST
+
+    async def _arun(self, **kwargs: Any) -> str:
+        url = kwargs.pop("url", None)
+        project_id = kwargs.pop("project_id", None)
+
+        project_id, errors = self._validate_project_url(url, project_id)
+
+        if errors:
+            return json.dumps({"error": "; ".join(errors)})
+
+        # Build query parameters
+        params = {}
+        optional_params = [
+            "author_username",
+            "author_id",
+            "assignee_username",
+            "assignee_id",
+            "reviewer_username",
+            "reviewer_id",
+            "state",
+            "milestone",
+            "labels",
+            "search",
+            "scope",
+        ]
+
+        for param in optional_params:
+            if param in kwargs and kwargs.get(param) is not None:
+                params[param] = kwargs[param]
+
+        try:
+            response = await self.gitlab_client.aget(
+                path=f"/api/v4/projects/{project_id}/merge_requests",
+                params=params,
+                parse_json=False,
+            )
+            return json.dumps({"merge_requests": response})
+        except Exception as e:
+            return json.dumps({"error": str(e)})
+
+    def format_display_message(
+        self, args: ListMergeRequestInput, _tool_response: Any = None
+    ) -> str:
+        filters = []
+        if args.author_username:
+            filters.append(f"author: {args.author_username}")
+        if args.author_id:
+            filters.append(f"author ID: {args.author_id}")
+        if args.assignee_username:
+            filters.append(f"assignee: {args.assignee_username}")
+        if args.assignee_id:
+            filters.append(f"assignee ID: {args.assignee_id}")
+        if args.reviewer_username:
+            filters.append(f"reviewer: {args.reviewer_username}")
+        if args.reviewer_id:
+            filters.append(f"reviewer ID: {args.reviewer_id}")
+        if args.state:
+            filters.append(f"state: {args.state}")
+        if args.milestone:
+            filters.append(f"milestone: {args.milestone}")
+        if args.labels:
+            filters.append(f"labels: {args.labels}")
+        if args.search:
+            filters.append(f"search: {args.search}")
+
+        filter_text = f"with filters: {', '.join(filters)}" if filters else ""
+
+        if args.url:
+            return f"List merge requests in {args.url} {filter_text}"
+        return f"List merge requests in project {args.project_id} {filter_text}"
+
+
 class UpdateMergeRequest(DuoBaseTool):
     name: str = "update_merge_request"
     # pylint: disable=line-too-long
@@ -429,7 +609,9 @@ For example:
         except Exception as e:
             return json.dumps({"error": str(e)})
 
-    def format_display_message(self, args: UpdateMergeRequestInput) -> str:
+    def format_display_message(
+        self, args: UpdateMergeRequestInput, _tool_response: Any = None
+    ) -> str:
         if args.url:
             return f"Update merge request {args.url}"
         return f"Update merge request !{args.merge_request_iid} in project {args.project_id}"

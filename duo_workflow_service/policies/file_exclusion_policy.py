@@ -6,6 +6,8 @@ import gitmatch
 from duo_workflow_service.gitlab.gitlab_api import Project
 from lib.feature_flags.context import FeatureFlag, is_feature_enabled
 
+CONTEXT_EXCLUSION_MESSAGE = "excluded due to policy"
+
 
 class FileExclusionPolicy:
     def __init__(self, project: Project):
@@ -36,27 +38,36 @@ class FileExclusionPolicy:
     def filter_allowed(self, filenames: List[str]):
         """Filter a list of filenames, returning only those allowed by the policy."""
         if not is_feature_enabled(FeatureFlag.USE_DUO_CONTEXT_EXCLUSION):
-            return filenames
+            return filenames, []
 
         if not self._matcher:
-            return filenames
+            return filenames, []
 
         allowed_files = []
+        excluded_files = []
+
         for filename in filenames:
             filename = filename.strip()
             if filename and self.is_allowed(filename):
                 allowed_files.append(filename)
-        return allowed_files
+            elif filename:
+                excluded_files.append(filename)
+
+        return allowed_files, excluded_files
 
     @staticmethod
     def format_user_exclusion_message(blocked_files: List[str]) -> str:
-        file_list = "\n".join(f"{file}" for file in blocked_files)
-        return f" - files excluded:\n{file_list}"
+        if blocked_files:
+            return f" - files excluded:\n{"\n".join(blocked_files)}"
+
+        return ""
 
     @staticmethod
     def format_llm_exclusion_message(blocked_files: List[str]) -> str:
-        file_list = "\n".join(f"{file}" for file in blocked_files)
-        return f"Files excluded due to policy, continue without files:\n{file_list}"
+        if blocked_files:
+            return f"Files excluded due to policy, continue without files:\n{"\n".join(blocked_files)}"
+
+        return ""
 
     @staticmethod
     def is_allowed_for_project(project, filename: str):

@@ -21,6 +21,7 @@ from ai_gateway.model_metadata import (
     ModelMetadata,
     TypeModelMetadata,
 )
+from ai_gateway.models.litellm import KindLiteLlmModel
 from ai_gateway.prompts import LocalPromptRegistry, Prompt
 from ai_gateway.prompts.config import ModelClassProvider
 from ai_gateway.prompts.typing import Model, TypeModelFactory
@@ -184,6 +185,32 @@ prompt_template:
   user: Template2
 params:
   vertex_location: us-east1
+  timeout: 60
+  stop:
+    - Foo
+    - Bar
+""",
+    )
+    fs.create_file(
+        prompts_definitions_dir / "chat" / "react" / "claude_3" / "1.0.0.yml",
+        contents="""
+---
+name: Chat react claude_3 prompt
+model:
+  name: general
+  params:
+    model_class_provider: litellm
+    temperature: 0.1
+    top_p: 0.8
+    top_k: 40
+    max_tokens: 256
+    max_retries: 6
+unit_primitives:
+  - duo_chat
+prompt_template:
+  system: Template1
+  user: Template2
+params:
   timeout: 60
   stop:
     - Foo
@@ -506,6 +533,51 @@ prompt_template:
             assert call_dict["model_identifier"] == expected_identifier
 
     @pytest.mark.usefixtures("mock_fs")
+    def test_logging_with_feature_enabled_by_namespace_ids(
+        self,
+        registry: LocalPromptRegistry,
+    ):
+        """Test that feature_enabled_by_namespace_ids is correctly logged."""
+        with (
+            patch("ai_gateway.prompts.registry.log") as mock_log,
+            patch("ai_gateway.prompts.registry.current_event_context") as mock_context,
+        ):
+
+            mock_event_context = Mock()
+            mock_event_context.feature_enabled_by_namespace_ids = [123, 456]
+            mock_context.get.return_value = mock_event_context
+
+            registry.get(
+                "chat/react",
+                "^1.0.0",
+            )
+
+            call_dict = mock_log.info.call_args[1]
+            assert call_dict["gitlab_feature_enabled_by_namespace_ids"] == [123, 456]
+
+    @pytest.mark.usefixtures("mock_fs")
+    def test_logging_with_missing_feature_enabled_by_namespace_ids(
+        self,
+        registry: LocalPromptRegistry,
+    ):
+        """Test that logging works when feature_enabled_by_namespace_ids is missing from context."""
+        with (
+            patch("ai_gateway.prompts.registry.log") as mock_log,
+            patch("ai_gateway.prompts.registry.current_event_context") as mock_context,
+        ):
+
+            mock_event_context = Mock(spec=[])
+            mock_context.get.return_value = mock_event_context
+
+            registry.get(
+                "chat/react",
+                "^1.0.0",
+            )
+
+            call_dict = mock_log.info.call_args[1]
+            assert call_dict["gitlab_feature_enabled_by_namespace_ids"] is None
+
+    @pytest.mark.usefixtures("mock_fs")
     @pytest.mark.parametrize(
         ("tool_choice", "prompt_class"),
         [
@@ -739,6 +811,33 @@ prompt_template:
                     "api_key": "token",
                     "api_base": "http://localhost:4000",
                     "vertex_location": "us-east1",
+                },
+                {
+                    "temperature": 0.1,
+                    "top_p": 0.8,
+                    "top_k": 40,
+                    "max_tokens": 256,
+                    "max_retries": 6,
+                },
+                ChatLiteLLM,
+            ),
+            (
+                "chat/react",
+                "^1.0.0",
+                ModelMetadata(
+                    name=KindLiteLlmModel.GENERAL,
+                    provider="litellm",
+                ),
+                False,
+                "Chat react claude_3 prompt",  # Should map to claude_3 variant
+                MockPromptClass,
+                [("system", "Template1"), ("user", "Template2")],
+                "general",  # The model_metadata.name overrides the prompt file's model name
+                {
+                    "stop": ["Foo", "Bar"],
+                    "timeout": 60,
+                    "custom_llm_provider": "litellm",
+                    "model": "general",
                 },
                 {
                     "temperature": 0.1,

@@ -25,12 +25,7 @@ from duo_workflow_service.security.prompt_security import (
     PromptSecurity,
     SecurityException,
 )
-from duo_workflow_service.tools import (
-    PipelineException,
-    RunCommand,
-    Toolset,
-    format_tool_display_message,
-)
+from duo_workflow_service.tools import RunCommand, Toolset, format_tool_display_message
 from duo_workflow_service.tools.planner import PlannerTool
 from lib.internal_events import InternalEventAdditionalProperties, InternalEventsClient
 from lib.internal_events.event_enum import CategoryEnum, EventEnum, EventLabelEnum
@@ -95,9 +90,11 @@ class ToolsExecutor:
             response = result.get("response")
             if response and hasattr(response, "content"):
                 try:
-                    result["response"].content = PromptSecurity.apply_security(
-                        response=result["response"].content,
-                        tool_name=tool_name,
+                    result["response"].content = (
+                        PromptSecurity.apply_security_to_tool_response(
+                            response=result["response"].content,
+                            tool_name=tool_name,
+                        )
                     )
                 except SecurityException as e:
                     self._logger.error(
@@ -175,12 +172,14 @@ class ToolsExecutor:
         status: ToolStatus,
         ui_chat_logs: List[UiChatLog],
         error_message: Optional[str] = None,
+        tool_response: Optional[Any] = None,
     ):
         chat_log = self._create_tool_ui_chat_log(
             tool_name=tool_info["name"],
             tool_args=tool_info["args"],
             status=status,
             error_message=error_message,
+            tool_response=tool_response,
         )
         if chat_log:
             ui_chat_logs.append(chat_log)
@@ -210,6 +209,7 @@ class ToolsExecutor:
                 tool_info={"name": tool_name, "args": tool_args},
                 status=ToolStatus.SUCCESS,
                 ui_chat_logs=chat_logs,
+                tool_response=tool_response,
             )
 
             return {
@@ -223,9 +223,6 @@ class ToolsExecutor:
 
         except ValidationError as error:
             return self._handle_validation_error(tool_name, tool_args, error, chat_logs)
-
-        except PipelineException as error:
-            return self._handle_pipeline_error(tool_name, tool_args, error, chat_logs)
 
     def _handle_type_error(
         self,
@@ -301,36 +298,6 @@ class ToolsExecutor:
             "chat_logs": chat_logs,
         }
 
-    def _handle_pipeline_error(
-        self,
-        tool_name: str,
-        tool_args: Dict[str, Any],
-        error: PipelineException,
-        chat_logs: List[UiChatLog],
-    ) -> Dict[str, Any]:
-        tool_response = f"Pipeline exception due to {error}"
-        self._track_internal_event(
-            event_name=EventEnum.WORKFLOW_TOOL_FAILURE,
-            tool_name=tool_name,
-            extra={
-                "error": str(error),
-                "error_type": type(error).__name__,
-            },
-        )
-
-        self._add_tool_ui_chat_log(
-            tool_info={"name": tool_name, "args": tool_args},
-            status=ToolStatus.FAILURE,
-            ui_chat_logs=chat_logs,
-            error_message=f"Pipeline error: {error}",
-        )
-
-        return {
-            "response": tool_response,
-            "chat_logs": chat_logs,
-            "status": WorkflowStatusEnum.ERROR,
-        }
-
     def _track_internal_event(
         self,
         event_name: EventEnum,
@@ -361,8 +328,11 @@ class ToolsExecutor:
         tool_args: Dict[str, Any],
         status: ToolStatus = ToolStatus.SUCCESS,
         error_message: Optional[str] = None,
+        tool_response: Optional[Any] = None,
     ) -> Optional[UiChatLog]:
-        display_message = self.get_tool_display_message(tool_name, tool_args)
+        display_message = self.get_tool_display_message(
+            tool_name, tool_args, tool_response
+        )
 
         if not display_message:
             return None
@@ -387,7 +357,7 @@ class ToolsExecutor:
         )
 
     def get_tool_display_message(
-        self, tool_name: str, args: Dict[str, Any]
+        self, tool_name: str, args: Dict[str, Any], tool_response: Any = None
     ) -> Optional[str]:
         if tool_name in _HIDDEN_TOOLS:
             return None
@@ -397,7 +367,9 @@ class ToolsExecutor:
 
         if tool_name in self._toolset:
             tool = self._toolset[tool_name]
-            message = format_tool_display_message(tool, args) or message
+            message = (
+                format_tool_display_message(tool, args, tool_response or "") or message
+            )
 
         return message
 

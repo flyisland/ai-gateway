@@ -1,5 +1,6 @@
+import json
 from enum import IntEnum
-from typing import Type
+from typing import Any, Type
 
 import gitmatch
 from langchain.tools.base import ToolException
@@ -7,7 +8,10 @@ from pydantic import BaseModel, Field
 
 from contract import contract_pb2
 from duo_workflow_service.executor.action import _execute_action
-from duo_workflow_service.policies.file_exclusion_policy import FileExclusionPolicy
+from duo_workflow_service.policies.file_exclusion_policy import (
+    CONTEXT_EXCLUSION_MESSAGE,
+    FileExclusionPolicy,
+)
 from duo_workflow_service.tools.duo_base_tool import DuoBaseTool
 
 # Security denylist of sensitive directories and files that should not be accessed
@@ -105,7 +109,9 @@ class ReadFile(DuoBaseTool):
             contract_pb2.Action(runReadFile=contract_pb2.ReadFile(filepath=file_path)),
         )
 
-    def format_display_message(self, args: ReadFileInput) -> str:
+    def format_display_message(
+        self, args: ReadFileInput, _tool_response: Any = None
+    ) -> str:
         msg = "Read file"
         if not FileExclusionPolicy.is_allowed_for_project(self.project, args.file_path):
             msg += FileExclusionPolicy.format_user_exclusion_message([args.file_path])
@@ -125,20 +131,51 @@ class ReadFiles(DuoBaseTool):
     handle_tool_error: bool = True
 
     async def _arun(self, file_paths: list[str]) -> str:
-        # Check path security for all files before proceeding
+        policy = FileExclusionPolicy(self.project)
+        file_paths, excluded_file_paths = policy.filter_allowed(file_paths)
+
         for file_path in file_paths:
             validate_duo_context_exclusions(file_path)
 
-        return await _execute_action(
-            self.metadata,  # type: ignore
-            contract_pb2.Action(
-                runReadFiles=contract_pb2.ReadFiles(filepaths=file_paths)
-            ),
-        )
+        result_dict = {}
 
-    def format_display_message(self, args: ReadFilesInput) -> str:
+        if file_paths:
+            file_contents_result = await _execute_action(
+                self.metadata,  # type: ignore
+                contract_pb2.Action(
+                    runReadFiles=contract_pb2.ReadFiles(filepaths=file_paths)
+                ),
+            )
+
+            result_dict = json.loads(file_contents_result)
+
+        # Add excluded files with error messages
+        for path in excluded_file_paths:
+            result_dict[path] = {"error": CONTEXT_EXCLUSION_MESSAGE}
+
+        # Return as JSON string
+        return json.dumps(result_dict)
+
+    def format_display_message(
+        self, args: ReadFilesInput, tool_response: Any = None
+    ) -> str:
         file_count = len(args.file_paths)
-        return f"Read {file_count} file{'s' if file_count != 1 else ''}"
+        excluded_files_msg = ""
+
+        if tool_response:
+            excluded_files = [
+                path
+                for path, data in json.loads(tool_response.content).items()
+                if data.get("error") == CONTEXT_EXCLUSION_MESSAGE
+            ]
+
+            excluded_files_msg = FileExclusionPolicy.format_user_exclusion_message(
+                excluded_files
+            )
+
+            file_count -= len(excluded_files)
+
+        return f"Read {file_count} file{'s' if file_count != 1 else ''}{excluded_files_msg}"
 
 
 class WriteFileInput(BaseModel):
@@ -173,7 +210,9 @@ class WriteFile(DuoBaseTool):
             ),
         )
 
-    def format_display_message(self, args: WriteFileInput) -> str:
+    def format_display_message(
+        self, args: WriteFileInput, _tool_response: Any = None
+    ) -> str:
         msg = "Create file"
         if not FileExclusionPolicy.is_allowed_for_project(self.project, args.file_path):
             msg += FileExclusionPolicy.format_user_exclusion_message([args.file_path])
@@ -237,7 +276,7 @@ class FindFiles(DuoBaseTool):
         # Filter results based on file exclusion policy
         policy = FileExclusionPolicy(self.project)
         lines = result.strip().split("\n") if result.strip() else []
-        allowed_files = policy.filter_allowed(lines)
+        allowed_files, _excluded_files = policy.filter_allowed(lines)
 
         # Build the response
         response_parts = []
@@ -250,7 +289,9 @@ class FindFiles(DuoBaseTool):
             else _format_no_matches_message(name_pattern)
         )
 
-    def format_display_message(self, args: FindFilesInput) -> str:
+    def format_display_message(
+        self, args: FindFilesInput, _tool_response: Any = None
+    ) -> str:
         return f"Search files with pattern '{args.name_pattern}'"
 
 
@@ -283,7 +324,9 @@ class Mkdir(DuoBaseTool):
             ),
         )
 
-    def format_display_message(self, args: MkdirInput) -> str:
+    def format_display_message(
+        self, args: MkdirInput, _tool_response: Any = None
+    ) -> str:
         return f"Create directory '{args.directory_path}'"
 
 
@@ -390,7 +433,9 @@ Examples of batched file edits:
             ),
         )
 
-    def format_display_message(self, args: EditFileInput) -> str:
+    def format_display_message(
+        self, args: EditFileInput, _tool_response: Any = None
+    ) -> str:
         msg = "Edit file"
         if not FileExclusionPolicy.is_allowed_for_project(self.project, args.file_path):
             msg += FileExclusionPolicy.format_user_exclusion_message([args.file_path])
@@ -449,7 +494,7 @@ class ListDir(DuoBaseTool):
         # Filter results based on file exclusion policy
         policy = FileExclusionPolicy(self.project)
         lines = result.strip().split("\n") if result.strip() else []
-        allowed_files = policy.filter_allowed(lines)
+        allowed_files, _excluded_files = policy.filter_allowed(lines)
 
         # Build the response
         response_parts = []

@@ -24,7 +24,6 @@ from duo_workflow_service.workflows.type_definitions import (
     AdditionalContext,
     OsInformationContext,
 )
-from lib.feature_flags.context import current_feature_flag_context
 
 
 @pytest.fixture(name="approval_component")
@@ -97,19 +96,6 @@ def mock_model_ainvoke_fixture(
     else:
         mock_create_model.ainvoke = AsyncMock(return_value=end_message)
         yield mock_create_model.ainvoke
-
-
-@pytest.fixture(name="duo_workflow_prompt_registry_enabled")
-def duo_workflow_prompt_registry_enabled_fixture() -> bool:
-    return False
-
-
-@pytest.fixture(autouse=True)
-def stub_feature_flags(duo_workflow_prompt_registry_enabled: bool):
-    if duo_workflow_prompt_registry_enabled:
-        current_feature_flag_context.set({"duo_workflow_prompt_registry"})
-
-    yield
 
 
 @pytest.fixture(name="mock_agent")
@@ -250,8 +236,12 @@ class TestExecutorComponent:
         # Verify return value
         assert entry_node == "execution"
 
+    @patch(
+        "duo_workflow_service.components.executor.component.current_model_metadata_context"
+    )
     def test_attach_creates_agent_with_correct_parameters(
         self,
+        mock_model_metadata_context,
         mock_agent,
         mock_create_model,
         executor_component,
@@ -260,6 +250,10 @@ class TestExecutorComponent:
     ):
         """Test that Agent is created with correct parameters."""
         mock_graph = Mock(spec=StateGraph)
+
+        mock_model_metadata = MagicMock()
+        mock_model_metadata_context.get.return_value = mock_model_metadata
+
         executor_component.attach(mock_graph, "exit_node", "next_node", None)
 
         # Verify Agent was called with correct parameters
@@ -273,6 +267,7 @@ class TestExecutorComponent:
                 tools=executor_component.executor_toolset.bindable,
                 workflow_id="test-workflow-123",
                 http_client=executor_component.http_client,
+                model_metadata=mock_model_metadata,
             )
         else:
             call_args = mock_agent.call_args
@@ -610,8 +605,12 @@ class TestExecutorComponent:
             ),
         ],
     )
+    @patch(
+        "duo_workflow_service.components.executor.component.current_model_metadata_context"
+    )
     def test_agentV2_prompt_template_inputs(
         self,
+        mock_model_metadata_context,
         agent_user_environment,
         existing_prompt_template_inputs,
         want,
@@ -621,7 +620,15 @@ class TestExecutorComponent:
     ):
         mock_graph = Mock(spec=StateGraph)
         mock_agent.return_value.prompt_template_inputs = existing_prompt_template_inputs
+
+        mock_model_metadata = MagicMock()
+        mock_model_metadata_context.get.return_value = mock_model_metadata
+
         if duo_workflow_prompt_registry_enabled:
             executor_component.agent_user_environment = agent_user_environment
             executor_component.attach(mock_graph, "exit_node", "next_node", None)
             assert mock_agent.return_value.prompt_template_inputs == want
+
+            mock_agent.assert_called_once()
+            call_args = mock_agent.call_args
+            assert call_args.kwargs["model_metadata"] == mock_model_metadata

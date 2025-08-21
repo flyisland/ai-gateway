@@ -1,4 +1,5 @@
 from datetime import datetime, timezone
+from enum import StrEnum
 from typing import Any, Dict, Optional
 
 from dependency_injector.wiring import Provide, inject
@@ -20,6 +21,10 @@ from duo_workflow_service.agent_platform.experimental.flows.flow_config import (
 )
 from duo_workflow_service.agent_platform.experimental.routers import Router
 from duo_workflow_service.agent_platform.experimental.state import FlowState
+from duo_workflow_service.agent_platform.experimental.state.base import (
+    FlowEvent,
+    FlowEventType,
+)
 from duo_workflow_service.checkpointer.gitlab_workflow import WorkflowStatusEventEnum
 from duo_workflow_service.components.tools_registry import ToolsRegistry
 from duo_workflow_service.entities.state import (
@@ -38,6 +43,11 @@ from lib.internal_events.client import InternalEventsClient
 from lib.internal_events.event_enum import CategoryEnum
 
 __all__ = ["Flow"]
+
+
+class UserDecision(StrEnum):
+    APPROVE = "approval"
+    REJECT = "rejection"
 
 
 class Flow(AbstractWorkflow):
@@ -110,12 +120,34 @@ class Flow(AbstractWorkflow):
             },
         )
 
+    def _resume_command(self, goal: str) -> Command:
+        event = FlowEvent(event_type=FlowEventType.RESPONSE, message=goal)
+        if not self._approval:
+            # Handle case where approval is None
+            return Command(resume=event)
+
+        match self._approval.WhichOneof("user_decision"):
+            case UserDecision.APPROVE:
+                event = FlowEvent(event_type=FlowEventType.APPROVE)
+            case UserDecision.REJECT:
+                event = FlowEvent(
+                    event_type=FlowEventType.REJECT,
+                    message=self._approval.rejection.message,
+                )
+            case _:
+                # This should never happen according to contract.proto
+                raise ValueError(
+                    f"Unexpected approval decision: {self._approval.WhichOneof('user_decision')}"
+                )
+
+        return Command(resume=event)
+
     async def get_graph_input(self, goal: str, status_event: str) -> Any:
         match status_event:
             case WorkflowStatusEventEnum.START:
                 return self.get_workflow_state(goal)
             case WorkflowStatusEventEnum.RESUME:
-                return Command(resume=goal)
+                return self._resume_command(goal)
             case _:
                 return None
 
@@ -146,6 +178,11 @@ class Flow(AbstractWorkflow):
 
             if "toolset" in comp_params:
                 comp_params["toolset"] = tools_registry.toolset(comp_params["toolset"])
+            elif "tool_name" in comp_params:
+                # If a tool_name is specified without a toolset, create a toolset containing just that tool.
+                comp_params["toolset"] = tools_registry.toolset(
+                    [comp_params["tool_name"]]
+                )
 
             if comp_name in components:
                 raise ValueError(
@@ -220,4 +257,6 @@ class Flow(AbstractWorkflow):
     async def _handle_workflow_failure(
         self, error: BaseException, compiled_graph: Any, graph_config: Any
     ):
-        log_exception(error, extra={"workflow_id": self._workflow_id})
+        log_exception(
+            error, extra={"workflow_id": self._workflow_id, "source": __name__}
+        )
