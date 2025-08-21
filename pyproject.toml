@@ -125,6 +125,10 @@ codespell = "^2.4.1"
 docformatter = "^1.7.7"
 editorconfig-checker = "^3.2.1"
 
+
+[tool.poetry.group.dev.dependencies]
+types-bleach = "^6.2.0.20250809"
+
 [tool.codespell]
 skip = """
 *.db,\
