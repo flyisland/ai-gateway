@@ -42,7 +42,7 @@ __all__ = [
     "ListVulnerabilities",
     "DismissVulnerability",
     "LinkVulnerabilityToIssue",
-    "ConfirmVulnerability"
+    "ConfirmVulnerability",
 ]
 
 
