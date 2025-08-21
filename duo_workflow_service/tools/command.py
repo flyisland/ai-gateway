@@ -11,9 +11,9 @@ _DISALLOWED_OPERATORS = ["&&", "||", "|"]
 
 
 class RunCommandInput(BaseModel):
-    program: str = Field(description="The name of bash program to execute eg: 'peotry'")
+    program: str = Field(description="The name of bash program to execute eg: 'poetry'")
     args: str = Field(
-        description="All arguments and flags for the bash program as a single string "
+        description="All arguments and flags for the bash program as a single string. "
         "eg: 'run python main.py --tools read_file'"
     )
 
