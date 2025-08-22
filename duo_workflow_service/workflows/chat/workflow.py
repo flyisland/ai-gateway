@@ -17,7 +17,6 @@ from duo_workflow_service.agents.tools_executor import ToolsExecutor
 from duo_workflow_service.checkpointer.gitlab_workflow import WorkflowStatusEventEnum
 from duo_workflow_service.components.tools_registry import ToolsRegistry
 from duo_workflow_service.entities.state import (
-    ApprovalState,
     ApprovalStateRejection,
     ChatWorkflowState,
     MessageTypeEnum,
@@ -156,6 +155,7 @@ class Workflow(AbstractWorkflow):
             project=self._project,
             namespace=self._namespace,
             approval=None,
+            preapproved_tools=self._preapproved_tools,
         )
 
     async def get_graph_input(self, goal: str, status_event: str) -> Any:
@@ -171,17 +171,10 @@ class Workflow(AbstractWorkflow):
                 match self._approval and self._approval.WhichOneof("user_decision"):
                     case "approval":
                         next_step = "run_tools"
-                        preapproved_tools = list(self._approval.approval.preapproved_tools)  # type: ignore
-                        state_update["approval"] = ApprovalState(
-                            preapproved_tools=preapproved_tools, current_state=None
-                        )
                     case "rejection":
                         new_chat_message = self._approval.rejection.message  # type: ignore
-                        state_update["approval"] = ApprovalState(
-                            preapproved_tools=[],
-                            current_state=ApprovalStateRejection(
-                                message=new_chat_message
-                            ),
+                        state_update["approval"] = ApprovalStateRejection(
+                            message=new_chat_message
                         )
                     case _:
                         state_update["conversation_history"] = {
@@ -244,6 +237,7 @@ class Workflow(AbstractWorkflow):
             model_metadata=model_metadata,
             internal_event_category=__name__,
             tools=agents_toolset.bindable,  # type: ignore[arg-type]
+            preapproved_tools=self._preapproved_tools,
         )
         self._agent.tools_registry = tools_registry
 

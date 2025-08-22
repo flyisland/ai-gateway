@@ -42,6 +42,7 @@ export interface StartWorkflowRequest {
   approval?: Approval | undefined;
   flowConfig?: { [key: string]: any } | undefined;
   flowConfigSchemaVersion?: string | undefined;
+  preapprovedTools: string[];
 }
 
 export interface ActionResponse {
@@ -180,7 +181,6 @@ export interface Approval {
 }
 
 export interface Approval_Approved {
-  preapprovedTools: string[];
 }
 
 export interface Approval_Rejected {
@@ -307,6 +307,7 @@ function createBaseStartWorkflowRequest(): StartWorkflowRequest {
     approval: undefined,
     flowConfig: undefined,
     flowConfigSchemaVersion: undefined,
+    preapprovedTools: [],
   };
 }
 
@@ -344,6 +345,9 @@ export const StartWorkflowRequest: MessageFns<StartWorkflowRequest> = {
     }
     if (message.flowConfigSchemaVersion !== undefined) {
       writer.uint32(98).string(message.flowConfigSchemaVersion);
+    }
+    for (const v of message.preapprovedTools) {
+      writer.uint32(106).string(v!);
     }
     return writer;
   },
@@ -443,6 +447,14 @@ export const StartWorkflowRequest: MessageFns<StartWorkflowRequest> = {
           message.flowConfigSchemaVersion = reader.string();
           continue;
         }
+        case 13: {
+          if (tag !== 106) {
+            break;
+          }
+
+          message.preapprovedTools.push(reader.string());
+          continue;
+        }
       }
       if ((tag & 7) === 4 || tag === 0) {
         break;
@@ -471,6 +483,9 @@ export const StartWorkflowRequest: MessageFns<StartWorkflowRequest> = {
       flowConfigSchemaVersion: isSet(object.flowConfigSchemaVersion)
         ? globalThis.String(object.flowConfigSchemaVersion)
         : undefined,
+      preapprovedTools: globalThis.Array.isArray(object?.preapprovedTools)
+        ? object.preapprovedTools.map((e: any) => globalThis.String(e))
+        : [],
     };
   },
 
@@ -509,6 +524,9 @@ export const StartWorkflowRequest: MessageFns<StartWorkflowRequest> = {
     if (message.flowConfigSchemaVersion !== undefined) {
       obj.flowConfigSchemaVersion = message.flowConfigSchemaVersion;
     }
+    if (message.preapprovedTools?.length) {
+      obj.preapprovedTools = message.preapprovedTools;
+    }
     return obj;
   },
 
@@ -530,6 +548,7 @@ export const StartWorkflowRequest: MessageFns<StartWorkflowRequest> = {
       : undefined;
     message.flowConfig = object.flowConfig ?? undefined;
     message.flowConfigSchemaVersion = object.flowConfigSchemaVersion ?? undefined;
+    message.preapprovedTools = object.preapprovedTools?.map((e) => e) || [];
     return message;
   },
 };
@@ -2665,14 +2684,11 @@ export const Approval: MessageFns<Approval> = {
 };
 
 function createBaseApproval_Approved(): Approval_Approved {
-  return { preapprovedTools: [] };
+  return {};
 }
 
 export const Approval_Approved: MessageFns<Approval_Approved> = {
-  encode(message: Approval_Approved, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
-    for (const v of message.preapprovedTools) {
-      writer.uint32(10).string(v!);
-    }
+  encode(_: Approval_Approved, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
     return writer;
   },
 
@@ -2683,14 +2699,6 @@ export const Approval_Approved: MessageFns<Approval_Approved> = {
     while (reader.pos < end) {
       const tag = reader.uint32();
       switch (tag >>> 3) {
-        case 1: {
-          if (tag !== 10) {
-            break;
-          }
-
-          message.preapprovedTools.push(reader.string());
-          continue;
-        }
       }
       if ((tag & 7) === 4 || tag === 0) {
         break;
@@ -2700,28 +2708,20 @@ export const Approval_Approved: MessageFns<Approval_Approved> = {
     return message;
   },
 
-  fromJSON(object: any): Approval_Approved {
-    return {
-      preapprovedTools: globalThis.Array.isArray(object?.preapprovedTools)
-        ? object.preapprovedTools.map((e: any) => globalThis.String(e))
-        : [],
-    };
+  fromJSON(_: any): Approval_Approved {
+    return {};
   },
 
-  toJSON(message: Approval_Approved): unknown {
+  toJSON(_: Approval_Approved): unknown {
     const obj: any = {};
-    if (message.preapprovedTools?.length) {
-      obj.preapprovedTools = message.preapprovedTools;
-    }
     return obj;
   },
 
   create<I extends Exact<DeepPartial<Approval_Approved>, I>>(base?: I): Approval_Approved {
     return Approval_Approved.fromPartial(base ?? ({} as any));
   },
-  fromPartial<I extends Exact<DeepPartial<Approval_Approved>, I>>(object: I): Approval_Approved {
+  fromPartial<I extends Exact<DeepPartial<Approval_Approved>, I>>(_: I): Approval_Approved {
     const message = createBaseApproval_Approved();
-    message.preapprovedTools = object.preapprovedTools?.map((e) => e) || [];
     return message;
   },
 };
