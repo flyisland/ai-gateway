@@ -1,4 +1,4 @@
-from typing import Any, Type
+from typing import Any, Optional, Type
 
 from pydantic import BaseModel, Field
 
@@ -11,10 +11,11 @@ _DISALLOWED_OPERATORS = ["&&", "||", "|"]
 
 
 class RunCommandInput(BaseModel):
-    program: str = Field(description="The name of bash program to execute eg: 'poetry'")
-    args: str = Field(
+    program: str = Field(description="The name of bash program to execute eg: 'cp'")
+    args: Optional[str] = Field(
         description="All arguments and flags for the bash program as a single string. "
-        "eg: 'run pytest tests/test_app.py'"
+        "eg: '-v -p source.txt destination.txt'",
+        default=None,
     )
 
 
@@ -32,8 +33,10 @@ class RunCommand(DuoBaseTool):
     async def _arun(
         self,
         program: str,
-        args: str,
+        args: Optional[str] = None,
     ) -> str:
+        args = args or ""
+
         for disallowed_operator in _DISALLOWED_OPERATORS:
             if disallowed_operator in program:
                 # pylint: disable=line-too-long
