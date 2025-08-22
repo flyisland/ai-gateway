@@ -54,6 +54,7 @@ CHAT_READ_ONLY_TOOLS = [
     "gitlab_merge_request_search",
     "gitlab_documentation_search",
     "read_file",
+    "read_files",
     "get_repository_file",
     "list_dir",
     "find_files",
@@ -91,6 +92,7 @@ CHAT_GITLAB_MUTATION_TOOLS = [
     "update_epic",
     "create_commit",
     "dismiss_vulnerability",
+    "confirm_vulnerability",
     "create_work_item",
     "link_vulnerability_to_issue",
 ]
