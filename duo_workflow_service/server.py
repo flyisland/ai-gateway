@@ -72,9 +72,6 @@ CONTAINER_APPLICATION_PACKAGES = ["duo_workflow_service"]
 class GRPCMessageReceiverEOFError(Exception):
     """Error that is raised when the grpc message receiver reaches EOF of client messages."""
 
-class GRPCClientCanceledError(Exception):
-    """Error that is raised when the client canceled the workflow execution."""
-
 
 log = structlog.stdlib.get_logger("server")
 
@@ -281,9 +278,7 @@ class DuoWorkflowService(contract_pb2_grpc.DuoWorkflowServicer):
                     log.info(
                         "Received a request to stop the workflow."
                     )
-                    raise GRPCClientCanceledError(
-                        f"Client requested to stop workflow."
-                    )
+                    await workflow.stop()
 
 
         async def cancel_workflow(
@@ -313,16 +308,13 @@ class DuoWorkflowService(contract_pb2_grpc.DuoWorkflowServicer):
                 yield action
 
             await workflow_task
-        except (GRPCMessageReceiverEOFError, GRPCClientCanceledError, asyncio.CancelledError) as err:
+        except (GRPCMessageReceiverEOFError, asyncio.CancelledError) as err:
             #
             # GRPCMessageReceiverEOFError:
             #
             # This exception could happen when gRPC connection is established from client directly
             # and the client disposed the gRPC client.
             # e.g. User selects gRPC connection type in node executor, and cancel the workflow.
-            #
-            # GRPCClientCanceledError
-            # This exception is raised when the client request to stop workflow.
             #
             # asyncio.CancelledError:
             #
