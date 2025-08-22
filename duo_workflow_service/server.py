@@ -229,8 +229,8 @@ class DuoWorkflowService(contract_pb2_grpc.DuoWorkflowServicer):
             mcp_tools = list(start_workflow_request.startRequest.mcpTools)
 
         # for testing purposes stub to
-        # workflow_class: FlowFactory = resolve_workflow_class("prototype/experimental")
-        workflow_class: FlowFactory = resolve_workflow_class(workflow_definition)
+        workflow_class: FlowFactory = resolve_workflow_class("prototype/experimental")
+        # workflow_class: FlowFactory = resolve_workflow_class(workflow_definition)
 
         invocation_metadata = dict(context.invocation_metadata())
 
