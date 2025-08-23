@@ -5183,14 +5183,14 @@ sqlcipher = ["sqlcipher3_binary"]
 
 [[package]]
 name = "sse-starlette"
-version = "2.3.6"
+version = "3.0.2"
 description = "SSE plugin for Starlette"
 optional = false
 python-versions = ">=3.9"
 groups = ["main"]
 files = [
-    {file = "sse_starlette-2.3.6-py3-none-any.whl", hash = "sha256:d49a8285b182f6e2228e2609c350398b2ca2c36216c2675d875f81e93548f760"},
-    {file = "sse_starlette-2.3.6.tar.gz", hash = "sha256:0382336f7d4ec30160cf9ca0518962905e1b69b72d6c1c995131e0a703b436e3"},
+    {file = "sse_starlette-3.0.2-py3-none-any.whl", hash = "sha256:16b7cbfddbcd4eaca11f7b586f3b8a080f1afe952c15813455b162edea619e5a"},
+    {file = "sse_starlette-3.0.2.tar.gz", hash = "sha256:ccd60b5765ebb3584d0de2d7a6e4f745672581de4f5005ab31c3a25d10b52b3a"},
 ]
 
 [package.dependencies]
@@ -5198,7 +5198,7 @@ anyio = ">=4.7.0"
 
 [package.extras]
 daphne = ["daphne (>=4.2.0)"]
-examples = ["aiosqlite (>=0.21.0)", "fastapi (>=0.115.12)", "sqlalchemy[asyncio,examples] (>=2.0.41)", "starlette (>=0.41.3)", "uvicorn (>=0.34.0)"]
+examples = ["aiosqlite (>=0.21.0)", "fastapi (>=0.115.12)", "sqlalchemy[asyncio] (>=2.0.41)", "starlette (>=0.41.3)", "uvicorn (>=0.34.0)"]
 granian = ["granian (>=2.3.1)"]
 uvicorn = ["uvicorn (>=0.34.0)"]
 
@@ -6490,4 +6490,4 @@ cffi = ["cffi (>=1.11)"]
 [metadata]
 lock-version = "2.1"
 python-versions = ">=3.12.0,<3.13.0"
-content-hash = "46de18cd29eedf505644e4c7eda607d9ab9967c4781cd4c046266dc7cc0ee0af"
+content-hash = "be9f225760e94eef7eac76c6e6d8c90870bdefdb079ce707780f666493cba14b"
