@@ -50,10 +50,13 @@ async def user_access_token(
     if not current_user.can(
         GitLabUnitPrimitive.COMPLETE_CODE,
         disallowed_issuers=[CloudConnectorConfig().service_name],
+    ) and not current_user.can(
+        GitLabUnitPrimitive.DUO_AGENT_PLATFORM,
+        disallowed_issuers=[CloudConnectorConfig().service_name],
     ):
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
-            detail="Unauthorized to create user access token for code suggestions",
+            detail="Unauthorized to create user access token",
         )
 
     internal_event_client.track_event(
@@ -79,13 +82,19 @@ async def user_access_token(
             detail="Missing X-Gitlab-Realm header",
         )
 
+    scopes = []
+    if current_user.can(GitLabUnitPrimitive.COMPLETE_CODE):
+        scopes.append(GitLabUnitPrimitive.COMPLETE_CODE)
+    if current_user.can(GitLabUnitPrimitive.DUO_AGENT_PLATFORM):
+        scopes.append(GitLabUnitPrimitive.DUO_AGENT_PLATFORM)
+
     try:
         token, expires_at = token_authority.encode(
             x_gitlab_global_user_id,
             x_gitlab_realm,
             current_user,
             x_gitlab_instance_id,
-            scopes=[GitLabUnitPrimitive.COMPLETE_CODE],
+            scopes=scopes,
         )
     except Exception:
         raise HTTPException(
