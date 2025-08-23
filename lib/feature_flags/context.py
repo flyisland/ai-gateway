@@ -19,7 +19,10 @@ class FeatureFlag(StrEnum):
     DUO_WORKFLOW_WORK_ITEM_TOOLS = "duo_workflow_work_item_tools"
     DUO_WORKFLOW_PROMPT_REGISTRY = "duo_workflow_prompt_registry"
     USE_DUO_CONTEXT_EXCLUSION = "use_duo_context_exclusion"
+
+    # Model-specific flags
     DUO_AGENTIC_CHAT_OPENAI_GPT_5 = "duo_agentic_chat_openai_gpt_5"
+    FLOW_SOFTWARE_DEVELOPMENT_OPENAI_GPT_5 = "flow_software_development_openai_gpt_5"
 
 
 def is_feature_enabled(feature_name: FeatureFlag | str) -> bool:

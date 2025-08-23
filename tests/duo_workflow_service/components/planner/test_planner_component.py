@@ -228,11 +228,11 @@ class TestPlannerComponent:
         assert entry_node == "planning"
 
     @patch(
-        "duo_workflow_service.components.planner.component.current_model_metadata_context"
+        "duo_workflow_service.components.planner.component.resolve_model_from_prompt_registry"
     )
     def test_attach_creates_agent_with_correct_parameters(
         self,
-        mock_model_metadata_context,
+        mock_resolve_model_from_prompt_registry,
         mock_agent,
         mock_create_model,
         planner_component,
@@ -244,7 +244,7 @@ class TestPlannerComponent:
         mock_graph = Mock(spec=StateGraph)
 
         mock_model_metadata = MagicMock()
-        mock_model_metadata_context.get.return_value = mock_model_metadata
+        mock_resolve_model_from_prompt_registry.return_value = mock_model_metadata
 
         planner_component.attach(mock_graph, "exit_node", "next_node", None)
 

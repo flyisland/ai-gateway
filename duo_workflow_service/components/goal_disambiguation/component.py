@@ -18,6 +18,9 @@ from langgraph.types import interrupt
 
 from duo_workflow_service.agents import Agent, AgentV2
 from duo_workflow_service.agents.handover import HandoverAgent
+from duo_workflow_service.agents.model_selection import (
+    resolve_model_from_prompt_registry,
+)
 from duo_workflow_service.components.base import BaseComponent
 from duo_workflow_service.entities.event import WorkflowEvent, WorkflowEventType
 from duo_workflow_service.entities.state import (
@@ -79,12 +82,15 @@ class GoalDisambiguationComponent(BaseComponent):
         )
 
         if is_feature_enabled(FeatureFlag.DUO_WORKFLOW_PROMPT_REGISTRY):
+            model_metadata = resolve_model_from_prompt_registry(self.workflow_type)
+
             task_clarity_judge_v2: AgentV2 = cast(
                 AgentV2,
                 self.prompt_registry.get_on_behalf(
                     self.user,
                     "workflow/goal_disambiguation",
                     "^1.0.0",
+                    model_metadata=model_metadata,
                     tools=toolset.bindable,  # type: ignore[arg-type]
                     workflow_id=self.workflow_id,
                     http_client=self.http_client,

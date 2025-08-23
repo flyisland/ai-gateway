@@ -18,7 +18,6 @@ from langgraph.graph import (  # pylint: disable=no-langgraph-langchain-imports
     StateGraph,
 )
 
-from ai_gateway.model_metadata import current_model_metadata_context
 from duo_workflow_service.agents import (
     Agent,
     AgentV2,
@@ -26,6 +25,9 @@ from duo_workflow_service.agents import (
     PlanSupervisorAgent,
     PlanTerminatorAgent,
     ToolsExecutor,
+)
+from duo_workflow_service.agents.model_selection import (
+    resolve_model_from_prompt_registry,
 )
 from duo_workflow_service.agents.prompts import (
     BUILD_CONTEXT_SYSTEM_MESSAGE,
@@ -366,6 +368,8 @@ class Workflow(AbstractWorkflow):
         context_builder_toolset = tools_registry.toolset(CONTEXT_BUILDER_TOOLS)
 
         if is_feature_enabled(FeatureFlag.DUO_WORKFLOW_PROMPT_REGISTRY):
+            model_metadata = resolve_model_from_prompt_registry(self._workflow_type)
+
             context_builder: AgentV2 = cast(
                 AgentV2,
                 self._prompt_registry.get_on_behalf(
@@ -375,7 +379,7 @@ class Workflow(AbstractWorkflow):
                     tools=context_builder_toolset.bindable,  # type: ignore[arg-type]
                     workflow_id=self._workflow_id,
                     http_client=self._http_client,
-                    model_metadata=current_model_metadata_context.get(),
+                    model_metadata=model_metadata,
                 ),
             )
         else:
