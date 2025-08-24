@@ -311,7 +311,7 @@ def test_registry_initialization_initialises_tools_with_correct_attributes(
         "edit_file": tools.EditFile(metadata=tool_metadata),
         "find_files": tools.FindFiles(metadata=tool_metadata),
         "grep": tools.Grep(metadata=tool_metadata),
-        # "mkdir": tools.Mkdir(metadata=tool_metadata),
+        "mkdir": tools.Mkdir(metadata=tool_metadata),
         "run_git_command": tools.git.Command(metadata=tool_metadata),
         "handover_tool": tools.HandoverTool,
         "request_user_clarification_tool": tools.RequestUserClarificationTool,
