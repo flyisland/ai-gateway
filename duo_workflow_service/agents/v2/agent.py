@@ -24,6 +24,7 @@ from duo_workflow_service.gitlab.http_client import GitlabHttpClient
 from duo_workflow_service.llm_factory import AnthropicStopReason
 from duo_workflow_service.monitoring import duo_workflow_metrics
 from duo_workflow_service.tools.handover import HandoverTool
+from duo_workflow_service.message_filters.tool_use_filter import filter_orphaned_tool_use_blocks
 
 log = structlog.stdlib.get_logger("agent_v2")
 
@@ -44,7 +45,8 @@ class AgentPromptTemplate(Runnable[dict, PromptValue]):
         **kwargs: Any,
     ) -> PromptValue:
         if self.agent_name in input["conversation_history"]:
-            messages = input["conversation_history"][self.agent_name]
+            # Filter out orphaned tool_use blocks before processing messages
+            messages = filter_orphaned_tool_use_blocks(input["conversation_history"][self.agent_name])
         else:
             if "handover" in input:
                 # Transform handover into an agent-readable representation

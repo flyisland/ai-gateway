@@ -18,6 +18,7 @@ from duo_workflow_service.token_counter.approximate_token_counter import (
     ApproximateTokenCounter,
 )
 from duo_workflow_service.workflows.type_definitions import AdditionalContext
+from duo_workflow_service.message_filters.tool_use_filter import filter_orphaned_tool_use_blocks
 
 # max content tokens is 200K but adding a buffer of 10% just in case
 MAX_CONTEXT_TOKENS = int(200_000 * 0.90)
@@ -189,7 +190,9 @@ def _conversation_history_reducer(
                 allow_partial=False,
             )
 
-            reduced[agent_name] = _restore_message_consistency(trimmed_messages)
+            # Apply tool_use filter and restore message consistency
+            filtered_messages = filter_orphaned_tool_use_blocks(trimmed_messages)
+            reduced[agent_name] = _restore_message_consistency(filtered_messages)
 
             # If trimming resulted in empty list, keep at least the last few messages along with the system message
             if not reduced[agent_name] or len(reduced[agent_name]) == 1:
@@ -206,7 +209,9 @@ def _conversation_history_reducer(
                     system_messages + non_system_messages[-min_non_system:]
                 )
 
-                reduced[agent_name] = _restore_message_consistency(fallback_messages)
+                # Apply tool_use filter and restore message consistency
+                filtered_fallback = filter_orphaned_tool_use_blocks(fallback_messages)
+                reduced[agent_name] = _restore_message_consistency(filtered_fallback)
 
                 logger.warning(
                     "Trim resulted in empty messages/invalid messages - falling back to minimal context",
@@ -240,7 +245,9 @@ def _conversation_history_reducer(
             ]
 
             fallback_messages = system_messages + non_system_messages[-5:]
-            reduced[agent_name] = _restore_message_consistency(fallback_messages)
+            # Apply tool_use filter and restore message consistency
+            filtered_fallback = filter_orphaned_tool_use_blocks(fallback_messages)
+            reduced[agent_name] = _restore_message_consistency(filtered_fallback)
 
     return reduced
 

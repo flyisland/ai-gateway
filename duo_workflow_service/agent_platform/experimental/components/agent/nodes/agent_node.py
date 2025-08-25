@@ -19,6 +19,7 @@ from duo_workflow_service.monitoring import duo_workflow_metrics
 from duo_workflow_service.token_counter.approximate_token_counter import (
     ApproximateTokenCounter,
 )
+from duo_workflow_service.message_filters.tool_use_filter import filter_orphaned_tool_use_blocks
 from lib.internal_events import InternalEventAdditionalProperties, InternalEventsClient
 from lib.internal_events.event_enum import CategoryEnum, EventEnum, EventPropertyEnum
 
@@ -83,6 +84,8 @@ class AgentNode:
         history = state[FlowStateKeys.CONVERSATION_HISTORY].get(
             self._component_name, []
         )
+        # Filter out orphaned tool_use blocks before sending to LLM
+        history = filter_orphaned_tool_use_blocks(history)
         variables = get_vars_from_state(self._inputs, state)
         model_name = getattr(self._prompt.model, "model_name", "unknown")
         request_type = f"{self._component_name}_completion"
