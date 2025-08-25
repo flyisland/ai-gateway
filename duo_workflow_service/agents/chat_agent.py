@@ -34,6 +34,7 @@ from duo_workflow_service.gitlab.gitlab_service_context import GitLabServiceCont
 from duo_workflow_service.llm_factory import AnthropicStopReason
 from duo_workflow_service.slash_commands.goal_parser import parse as slash_command_parse
 from duo_workflow_service.structured_logging import _workflow_id
+from duo_workflow_service.message_filters.tool_use_filter import filter_orphaned_tool_use_blocks
 from lib.internal_events import InternalEventAdditionalProperties
 from lib.internal_events.event_enum import CategoryEnum, EventEnum, EventPropertyEnum
 
@@ -104,7 +105,10 @@ class ChatAgentPromptTemplate(Runnable[ChatWorkflowState, PromptValue]):
             )
             messages.append(SystemMessage(content=dynamic_content))
 
-        for m in input["conversation_history"][agent_name]:
+        # Filter out orphaned tool_use blocks before processing messages
+        filtered_messages = filter_orphaned_tool_use_blocks(input["conversation_history"][agent_name])
+        
+        for m in filtered_messages:
             if isinstance(m, HumanMessage):
                 slash_command = None
 

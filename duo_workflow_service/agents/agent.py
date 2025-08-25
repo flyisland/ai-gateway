@@ -34,6 +34,7 @@ from duo_workflow_service.token_counter.approximate_token_counter import (
     ApproximateTokenCounter,
 )
 from duo_workflow_service.tools import Toolset
+from duo_workflow_service.message_filters.tool_use_filter import filter_orphaned_tool_use_blocks
 from lib.internal_events import InternalEventAdditionalProperties, InternalEventsClient
 from lib.internal_events.event_enum import CategoryEnum, EventEnum, EventPropertyEnum
 
@@ -107,9 +108,11 @@ class Agent:  # pylint: disable=too-many-instance-attributes
                         return {"status": WorkflowStatusEnum.CANCELLED}
 
                 if self.name in state["conversation_history"]:
-                    model_completion = await self._model_completion(
+                    # Filter out orphaned tool_use blocks before sending to LLM
+                    filtered_messages = filter_orphaned_tool_use_blocks(
                         state["conversation_history"][self.name]
                     )
+                    model_completion = await self._model_completion(filtered_messages)
                     updates["conversation_history"] = {self.name: model_completion}
                 else:
                     messages = self._conversation_preamble(state)
