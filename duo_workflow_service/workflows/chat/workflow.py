@@ -1,5 +1,4 @@
-# pylint: disable=direct-environment-variable-reference,invalid-name,attribute-defined-outside-init
-import os
+# pylint: disable=attribute-defined-outside-init
 from datetime import datetime, timezone
 from enum import StrEnum
 from typing import Any, List, override
@@ -9,7 +8,10 @@ from langgraph.checkpoint.memory import BaseCheckpointSaver
 from langgraph.graph import END, StateGraph
 from langgraph.types import Command
 
-from ai_gateway.model_metadata import current_model_metadata_context
+from ai_gateway.model_metadata import (
+    ModelSelectionMetadata,
+    current_model_metadata_context,
+)
 from duo_workflow_service.agents.chat_agent import ChatAgent
 from duo_workflow_service.agents.tools_executor import ToolsExecutor
 from duo_workflow_service.checkpointer.gitlab_workflow import WorkflowStatusEventEnum
@@ -25,11 +27,6 @@ from duo_workflow_service.entities.state import (
 from duo_workflow_service.tracking.errors import log_exception
 from duo_workflow_service.workflows.abstract_workflow import AbstractWorkflow
 from lib.feature_flags.context import FeatureFlag, is_feature_enabled
-
-MAX_TOKENS_TO_SAMPLE = 16384
-DEBUG = os.getenv("DEBUG")
-MAX_MESSAGE_LENGTH = 200
-RECURSION_LIMIT = 500
 
 
 class Routes(StrEnum):
@@ -57,6 +54,7 @@ CHAT_READ_ONLY_TOOLS = [
     "gitlab_merge_request_search",
     "gitlab_documentation_search",
     "read_file",
+    "read_files",
     "get_repository_file",
     "list_dir",
     "find_files",
@@ -78,10 +76,12 @@ CHAT_READ_ONLY_TOOLS = [
     "list_group_audit_events",
     "list_project_audit_events",
     "get_current_user",
+    "get_vulnerability_details",
 ]
 
 
 CHAT_GITLAB_MUTATION_TOOLS = [
+    "update_vulnerability_severity",
     "create_issue",
     "update_issue",
     "create_issue_note",
@@ -92,7 +92,9 @@ CHAT_GITLAB_MUTATION_TOOLS = [
     "update_epic",
     "create_commit",
     "dismiss_vulnerability",
+    "confirm_vulnerability",
     "create_work_item",
+    "link_vulnerability_to_issue",
 ]
 
 
@@ -217,11 +219,21 @@ class Workflow(AbstractWorkflow):
         tools = self._get_tools()
         agents_toolset = tools_registry.toolset(tools)
 
+        prompt_version = "^1.0.0"
+        model_metadata = current_model_metadata_context.get()
+        if not model_metadata and is_feature_enabled(
+            FeatureFlag.DUO_AGENTIC_CHAT_OPENAI_GPT_5
+        ):
+            # temporary approach: model selection doesn't support feature flags
+            model_metadata = ModelSelectionMetadata(
+                name="gpt_5"
+            )  # it will force the prompt registry load the chat/agent/gpt_5 prompt
+
         self._agent: ChatAgent = self._prompt_registry.get_on_behalf(  # type: ignore[assignment]
             user=self._user,
             prompt_id="chat/agent",
-            prompt_version="^1.0.0",
-            model_metadata=current_model_metadata_context.get(),
+            prompt_version=prompt_version,
+            model_metadata=model_metadata,
             internal_event_category=__name__,
             tools=agents_toolset.bindable,  # type: ignore[arg-type]
         )
@@ -252,17 +264,21 @@ class Workflow(AbstractWorkflow):
         return graph.compile(checkpointer=checkpointer)
 
     def _get_tools(self):
-        available_tools = CHAT_READ_ONLY_TOOLS + CHAT_MUTATION_TOOLS + RUN_COMMAND_TOOLS
-
-        if is_feature_enabled(FeatureFlag.DUO_WORKFLOW_WEB_CHAT_MUTATION_TOOLS):
-            available_tools += CHAT_GITLAB_MUTATION_TOOLS
+        available_tools = (
+            CHAT_READ_ONLY_TOOLS
+            + CHAT_MUTATION_TOOLS
+            + RUN_COMMAND_TOOLS
+            + CHAT_GITLAB_MUTATION_TOOLS
+        )
 
         return available_tools
 
     async def _handle_workflow_failure(
         self, error: BaseException, compiled_graph: Any, graph_config: Any
     ):
-        log_exception(error, extra={"workflow_id": self._workflow_id})
+        log_exception(
+            error, extra={"workflow_id": self._workflow_id, "source": __name__}
+        )
 
     @override
     def _support_namespace_level_workflow(self) -> bool:

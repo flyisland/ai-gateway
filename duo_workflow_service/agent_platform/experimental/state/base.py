@@ -1,9 +1,11 @@
+from enum import StrEnum
 from typing import (
     Annotated,
     Any,
     ClassVar,
     Final,
     Literal,
+    NotRequired,
     Optional,
     Self,
     TypedDict,
@@ -23,6 +25,8 @@ from duo_workflow_service.entities.state import (
 )
 
 __all__ = [
+    "FlowEvent",
+    "FlowEventType",
     "FlowState",
     "FlowStateKeys",
     "merge_nested_dict",
@@ -32,6 +36,17 @@ __all__ = [
     "IOKeyTemplate",
     "get_vars_from_state",
 ]
+
+
+class FlowEventType(StrEnum):
+    RESPONSE = "response"
+    APPROVE = "approve"
+    REJECT = "reject"
+
+
+class FlowEvent(TypedDict):
+    event_type: FlowEventType
+    message: NotRequired[str]
 
 
 def merge_nested_dict(existing: dict[str, Any], new: dict[str, Any]) -> dict[str, Any]:
@@ -100,6 +115,7 @@ class IOKey(BaseModel):
     target: str
     subkeys: Optional[list[str]] = None
     alias: Optional[str] = None
+    literal: Optional[bool] = False
 
     _target_separator: ClassVar[str] = ":"
     _key_separator: ClassVar[str] = "."
@@ -107,34 +123,38 @@ class IOKey(BaseModel):
     class _AliasedIOKeyConfig(BaseModel):
         from_: str = Field(alias="from")
         as_: Optional[str] = Field(default=None, alias="as")
+        literal_: Optional[bool] = Field(default=False, alias="literal")
 
     @model_validator(mode="after")
     def parse_valid_target(self) -> Self:
+        if self.literal:
+            if not self.alias or self.alias.strip() == "":
+                raise ValueError("Field 'as' is required when using 'literal: true'")
+        else:
+            allowed_targets = FlowState.__annotations__.keys()
+            if self.target not in allowed_targets:
+                raise ValueError(
+                    f"Invalid target: {self.target} allowed targets are {allowed_targets}"
+                )
 
-        allowed_targets = FlowState.__annotations__.keys()
-        if self.target not in allowed_targets:
-            raise ValueError(
-                f"Invalid target: {self.target} allowed targets are {allowed_targets}"
-            )
+            targets_with_subkeys: set[str] = set([])
 
-        targets_with_subkeys: set[str] = set([])
+            for attribute, annotation in FlowState.__annotations__.items():
+                annotation_type = get_origin(annotation)
 
-        for attribute, annotation in FlowState.__annotations__.items():
-            annontation_type = get_origin(annotation)
+                if annotation_type is None:
+                    continue
 
-            if annontation_type is None:
-                continue
+                if annotation_type is dict:
+                    targets_with_subkeys.add(attribute)
+                elif (
+                    annotation_type is Annotated
+                    and get_origin(get_args(annotation)[0]) is dict
+                ):
+                    targets_with_subkeys.add(attribute)
 
-            if annontation_type is dict:
-                targets_with_subkeys.add(attribute)
-            elif (
-                annontation_type is Annotated
-                and get_origin(get_args(annotation)[0]) is dict
-            ):
-                targets_with_subkeys.add(attribute)
-
-        if self.target not in targets_with_subkeys and self.subkeys:
-            raise ValueError(f"{self.target} does not support subkeys")
+            if self.target not in targets_with_subkeys and self.subkeys:
+                raise ValueError(f"{self.target} does not support subkeys")
 
         return self
 
@@ -145,24 +165,31 @@ class IOKey(BaseModel):
     @classmethod
     def parse_key(cls, key: str | dict) -> Self:
         alias: Optional[str] = None
+        literal: Optional[bool] = False
 
         if isinstance(key, dict):
             key_config = cls._AliasedIOKeyConfig(**key)
             key = key_config.from_
             alias = key_config.as_
+            literal = key_config.literal_
 
-        target, _, remaining = key.partition(cls._target_separator)
-
-        if not remaining:
-            subkeys = None
+        subkeys = None
+        if literal:
+            target = key
         else:
-            subkeys = remaining.split(cls._key_separator)
+            target, _, remaining = key.partition(cls._target_separator)
 
-        return cls(target=target, subkeys=subkeys, alias=alias)
+            if remaining:
+                subkeys = remaining.split(cls._key_separator)
+
+        return cls(target=target, subkeys=subkeys, alias=alias, literal=literal)
 
     def template_variable_from_state(self, state: FlowState) -> dict[str, Any]:
         # self.target presence in state is validated in parse_valid_target
         # thereby state[self.target] will always succeed
+        if self.literal:
+            return {self.alias: self.target}  # type: ignore[dict-item]
+
         value = self.value_from_state(state)
         if self.alias:
             return {self.alias: value}
@@ -181,9 +208,37 @@ class IOKey(BaseModel):
                 current = current[key]
         return current
 
+    def to_nested_dict(self, value: Any) -> dict[str, Any]:
+        """Generate nested dictionary matching target and subkeys list, with value supplied as argument.
+
+        Args:
+            value: The value to be placed at the nested location
+
+        Returns:
+            A nested dictionary with the structure matching target and subkeys
+
+        Examples:
+            IOKey(target="context", subkeys=["project", "name"]).to_nested_dict("test")
+            # Returns: {"context": {"project": {"name": "test"}}}
+
+            IOKey(target="status").to_nested_dict("active")
+            # Returns: {"status": "active"}
+        """
+        if self.subkeys:
+            # Create nested structure: target -> subkeys -> value
+            keys = [self.target] + self.subkeys
+        else:
+            # Simple structure: target -> value
+            keys = [self.target]
+
+        return create_nested_dict(keys, value)
+
 
 class IOKeyTemplate(IOKey):
     COMPONENT_NAME_TEMPLATE: ClassVar[str] = "<name>"
+    SENDS_RESPONSE_TO_COMPONENT_NAME_TEMPLATE: ClassVar[str] = (
+        "<sends_response_to_component>"
+    )
 
     def to_iokey(self, replacements: dict[str, str]) -> IOKey:
         return IOKey(target=self.target, subkeys=self._resolved_subkeys(replacements))

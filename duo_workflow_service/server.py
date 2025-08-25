@@ -54,7 +54,7 @@ from duo_workflow_service.interceptors.monitoring_interceptor import (
     MonitoringInterceptor,
 )
 from duo_workflow_service.llm_factory import validate_llm_access
-from duo_workflow_service.monitoring import setup_monitoring
+from duo_workflow_service.monitoring import duo_workflow_metrics, setup_monitoring
 from duo_workflow_service.profiling import setup_profiling
 from duo_workflow_service.structured_logging import set_workflow_id, setup_logging
 from duo_workflow_service.tracking import MonitoringContext, current_monitoring_context
@@ -64,9 +64,16 @@ from duo_workflow_service.workflows.abstract_workflow import AbstractWorkflow
 from duo_workflow_service.workflows.registry import FlowFactory, resolve_workflow_class
 from duo_workflow_service.workflows.type_definitions import AdditionalContext
 from lib.internal_events import InternalEventsClient
-from lib.internal_events.event_enum import CategoryEnum
+from lib.internal_events.context import InternalEventAdditionalProperties
+from lib.internal_events.event_enum import (
+    CategoryEnum,
+    EventEnum,
+    EventLabelEnum,
+    EventPropertyEnum,
+)
 
 CONTAINER_APPLICATION_PACKAGES = ["duo_workflow_service"]
+
 
 log = structlog.stdlib.get_logger("server")
 
@@ -176,6 +183,19 @@ class DuoWorkflowService(contract_pb2_grpc.DuoWorkflowServicer):
         workflow_id = start_workflow_request.startRequest.workflowID
         set_workflow_id(workflow_id)
         log.info("Starting workflow %s", clean_start_request(start_workflow_request))
+        workflow_type = string_to_category_enum(workflow_definition)
+        duo_workflow_metrics.count_agent_platform_receive_start_counter(
+            flow_type=workflow_type
+        )
+        internal_event_client.track_event(
+            event_name=EventEnum.RECEIVE_START_REQUEST.value,
+            additional_properties=InternalEventAdditionalProperties(
+                label=EventLabelEnum.WORKFLOW_RECEIVE_START_REQUEST_LABEL.value,
+                property=EventPropertyEnum.WORKFLOW_ID.value,
+                value=workflow_id,
+            ),
+            category=workflow_type.value,
+        )
 
         goal = start_workflow_request.startRequest.goal
 
@@ -204,8 +224,6 @@ class DuoWorkflowService(contract_pb2_grpc.DuoWorkflowServicer):
         if start_workflow_request.startRequest.mcpTools:
             mcp_tools = list(start_workflow_request.startRequest.mcpTools)
 
-        workflow_type = string_to_category_enum(workflow_definition)
-
         # for testing purposes stub to
         # workflow_class: FlowFactory = resolve_workflow_class("prototype/experimental")
         workflow_class: FlowFactory = resolve_workflow_class(workflow_definition)
@@ -229,59 +247,52 @@ class DuoWorkflowService(contract_pb2_grpc.DuoWorkflowServicer):
 
         async def send_events():
             while not workflow.is_done:
-                try:
-                    streaming_action = workflow.get_from_streaming_outbox()
-                    if isinstance(streaming_action, contract_pb2.Action):
-                        yield streaming_action
+                streaming_action = workflow.get_from_streaming_outbox()
+                if isinstance(streaming_action, contract_pb2.Action):
+                    yield streaming_action
 
-                        if (
-                            invocation_metadata.get(
-                                "x-gitlab-unidirectional-streaming", ""
-                            )
-                            != "enabled"
-                        ):
-                            await next_non_heartbeat_event(request_iterator)
+                    if (
+                        invocation_metadata.get("x-gitlab-unidirectional-streaming", "")
+                        != "enabled"
+                    ):
+                        await next_non_heartbeat_event(request_iterator)
 
-                        if workflow.outbox_empty():
-                            continue
+                    if workflow.outbox_empty():
+                        continue
 
-                    action = await workflow.get_from_outbox()
+                action = await workflow.get_from_outbox()
 
-                    if isinstance(action, contract_pb2.Action):
-                        log.info(
-                            "Read action from the egress queue",
-                            requestID=action.requestID,
-                            action_class=action.WhichOneof("action"),
-                        )
+                if action is None:
+                    continue
 
-                    yield action
-
-                    event: contract_pb2.ClientEvent = await next_non_heartbeat_event(
-                        request_iterator
+                if isinstance(action, contract_pb2.Action):
+                    log.info(
+                        "Read action from the egress queue",
+                        requestID=action.requestID,
+                        action_class=action.WhichOneof("action"),
                     )
 
-                    workflow.add_to_inbox(event)
-                    if (
-                        isinstance(event, contract_pb2.ClientEvent)
-                        and event.actionResponse
-                    ):
-                        log.info(
-                            "Wrote ClientEvent into the ingres queue",
-                            requestID=event.actionResponse.requestID,
-                        )
-                except TimeoutError as err:
-                    log.debug("Timeout on reading from queue, trying again", err=err)
-
-        workflow_task = None
-        try:
-            workflow_task = asyncio.create_task(workflow.run(goal))
-            async for action in send_events():
                 yield action
 
-            await workflow_task
-        except BaseException as err:
-            log_exception(err, extra={"workflow_id": workflow_id})
+                event: contract_pb2.ClientEvent | None = await next_non_heartbeat_event(
+                    request_iterator
+                )
+
+                if event is None:
+                    break
+
+                workflow.add_to_inbox(event)
+                if isinstance(event, contract_pb2.ClientEvent) and event.actionResponse:
+                    log.info(
+                        "Wrote ClientEvent into the ingres queue",
+                        requestID=event.actionResponse.requestID,
+                    )
+
+        async def cancel_workflow(
+            workflow_task: Optional[asyncio.Task], err: BaseException
+        ):
             if workflow_task and not workflow_task.done():
+                log.info("Canceling workflow...")
                 workflow_task.cancel(
                     f"Terminated workflow {workflow_id} execution due to an {type(err).__name__}: {err}"
                 )
@@ -294,9 +305,37 @@ class DuoWorkflowService(contract_pb2_grpc.DuoWorkflowServicer):
                     await asyncio.wait_for(
                         workflow_task, timeout=self.TASK_CANCELLATION_TIMEOUT
                     )
-                except (asyncio.TimeoutError, asyncio.CancelledError):
-                    pass
+                except (asyncio.TimeoutError, asyncio.CancelledError) as ex:
+                    log_exception(ex, extra={"source": __name__})
 
+        workflow_task = None
+        try:
+            workflow_task = asyncio.create_task(workflow.run(goal))
+            async for action in send_events():
+                yield action
+
+            await workflow_task
+        except asyncio.CancelledError as err:
+            # This exception could happen when gRPC connection is established from gitlab-workhorse
+            # and the gitlab-workhorse disposed the gRPC client.
+            # e.g. User selects websocket connection type in node executor, and cancel the workflow.
+            # NOTE:
+            # This `ExecuteWorkflow` coroutinue task could be cancelled by grpc lib when the connection is terminated.
+            # This exception is unrelated to `asyncio.CancelledError` exceptions raised in workflow's coroutinue tasks.
+            log_exception(err, extra={"source": __name__})
+            await cancel_workflow(workflow_task, err)
+            await context.abort(
+                grpc.StatusCode.ABORTED, "Operation was aborted by client"
+            )
+        except BaseException as err:
+            log_exception(
+                err,
+                extra={
+                    "workflow_id": workflow_id,
+                    "source": __name__,
+                },
+            )
+            await cancel_workflow(workflow_task, err)
             await context.abort(grpc.StatusCode.INTERNAL, "Something went wrong")
         finally:
             await workflow.cleanup(workflow_id)
@@ -359,10 +398,15 @@ class DuoWorkflowService(contract_pb2_grpc.DuoWorkflowServicer):
 
 async def next_non_heartbeat_event(
     request_iterator: AsyncIterable[contract_pb2.ClientEvent],
-) -> contract_pb2.ClientEvent:
+) -> contract_pb2.ClientEvent | None:
     """Consumes the request iterator until a non-heartbeat event is found."""
     while True:
-        event = await anext(aiter(request_iterator))
+        try:
+            event = await anext(aiter(request_iterator))
+        except StopAsyncIteration:
+            log.info("Client-side streaming has been closed.")
+            return None
+
         if not event.HasField("heartbeat"):
             return event
 

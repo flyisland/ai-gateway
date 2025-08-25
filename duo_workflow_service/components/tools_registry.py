@@ -11,6 +11,9 @@ from duo_workflow_service.gitlab.gitlab_api import Project, WorkflowConfig
 from duo_workflow_service.gitlab.http_client import GitlabHttpClient
 from duo_workflow_service.tools import Toolset, ToolType
 from duo_workflow_service.tools.duo_base_tool import DuoBaseTool
+from duo_workflow_service.tools.vulnerabilities.get_vulnerability_details import (
+    GetVulnerabilityDetails,
+)
 from lib.feature_flags import FeatureFlag, is_feature_enabled
 
 
@@ -49,6 +52,7 @@ _READ_ONLY_GITLAB_TOOLS: list[Type[BaseTool]] = [
     tools.GetIssue,
     tools.GetLogsFromJob,
     tools.GetMergeRequest,
+    tools.ListMergeRequest,
     tools.ListMergeRequestDiffs,
     tools.ListAllMergeRequestNotes,
     tools.GetPipelineErrorsForMergeRequest,
@@ -56,7 +60,6 @@ _READ_ONLY_GITLAB_TOOLS: list[Type[BaseTool]] = [
     tools.DocumentationSearch,
     tools.GroupProjectSearch,
     tools.IssueSearch,
-    tools.MergeRequestSearch,
     tools.MilestoneSearch,
     tools.UserSearch,
     tools.BlobSearch,
@@ -84,6 +87,7 @@ _READ_ONLY_GITLAB_TOOLS: list[Type[BaseTool]] = [
     tools.ListGroupAuditEvents,
     tools.ListProjectAuditEvents,
     tools.GetCurrentUser,
+    GetVulnerabilityDetails,
 ]
 
 _RUN_MCP_TOOLS_PRIVILEGE = "run_mcp_tools"
@@ -103,6 +107,7 @@ _AGENT_PRIVILEGES: dict[str, list[Type[BaseTool]]] = {
         tools.git.Command,
     ],
     "read_write_gitlab": [
+        tools.UpdateVulnerabilitySeverity,
         tools.CreateIssue,
         tools.UpdateIssue,
         tools.CreateIssueNote,
@@ -113,7 +118,9 @@ _AGENT_PRIVILEGES: dict[str, list[Type[BaseTool]]] = {
         tools.UpdateEpic,
         tools.CreateCommit,
         tools.DismissVulnerability,
+        tools.ConfirmVulnerability,
         tools.CreateWorkItem,
+        tools.LinkVulnerabilityToIssue,
         *_READ_ONLY_GITLAB_TOOLS,
     ],
     "read_only_gitlab": _READ_ONLY_GITLAB_TOOLS,

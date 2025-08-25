@@ -68,7 +68,9 @@ EXECUTOR_TOOLS = [
     "get_issue",
     "update_issue",
     "dismiss_vulnerability",
+    "confirm_vulnerability",
     "create_issue_note",
+    "get_vulnerability_details",
     "create_merge_request_note",
     "list_issue_notes",
     "get_issue_note",
@@ -85,6 +87,8 @@ EXECUTOR_TOOLS = [
     "gitlab_merge_request_search",
     "run_command",
     "read_file",
+    "read_files",
+    "update_vulnerability_severity",
     "create_file_with_contents",
     "edit_file",
     "find_files",
@@ -131,6 +135,7 @@ CONTEXT_BUILDER_TOOLS = [
     "gitlab_blob_search",
     "gitlab_merge_request_search",
     "read_file",
+    "read_files",
     "find_files",
     "list_dir",
     "grep",
@@ -206,7 +211,9 @@ class Workflow(AbstractWorkflow):
     async def _handle_workflow_failure(
         self, error: BaseException, compiled_graph, graph_config
     ):
-        log_exception(error, extra={"workflow_id": self._workflow_id})
+        log_exception(
+            error, extra={"workflow_id": self._workflow_id, "source": __name__}
+        )
 
     def _setup_workflow_graph(
         self,
@@ -222,6 +229,7 @@ class Workflow(AbstractWorkflow):
 
         last_node_name = self._add_context_builder_nodes(graph, goal, tools_registry)
         disambiguation_component = GoalDisambiguationComponent(
+            user=self._user,
             goal=goal,
             model_config=self._model_config,
             http_client=self._http_client,

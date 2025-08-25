@@ -2,11 +2,14 @@ from enum import StrEnum
 
 
 class EventEnum(StrEnum):
+    RECEIVE_START_REQUEST = "receive_start_duo_workflow"
     WORKFLOW_START = "request_duo_workflow"
     WORKFLOW_RESUME = "resume_duo_workflow"
     WORKFLOW_PAUSE = "pause_duo_workflow"
     WORKFLOW_RETRY = "retry_request_duo_workflow"
     WORKFLOW_MESSAGE = "message_duo_workflow"
+    WORKFLOW_ABORTED = "request_duo_workflow_aborted"
+    WORKFLOW_REJECT = "reject_duo_agent_platform"
     TOKEN_PER_USER_PROMPT = "tokens_per_user_request_prompt"
     WORKFLOW_FINISH_SUCCESS = "request_duo_workflow_success"
     WORKFLOW_FINISH_FAILURE = "request_duo_workflow_failure"
@@ -15,12 +18,14 @@ class EventEnum(StrEnum):
 
 
 class EventLabelEnum(StrEnum):
+    WORKFLOW_RECEIVE_START_REQUEST_LABEL = "workflow_receive_start_event"
     WORKFLOW_FINISH_LABEL = "workflow_finish_event"
     WORKFLOW_START_LABEL = "workflow_start_event"
     WORKFLOW_TOOL_CALL_LABEL = "workflow_tool_call"
     WORKFLOW_RESUME_LABEL = "workflow_resume_event"
     WORKFLOW_PAUSE_LABEL = "workflow_pause_event"
     WORKFLOW_MESSAGE_LABEL = "workflow_message_event"
+    WORKFLOW_REJECT_LABEL = "workflow_reject_event"
 
 
 class EventPropertyEnum(StrEnum):
@@ -55,4 +60,3 @@ class CategoryEnum(StrEnum):
     WORKFLOW_CONVERT_TO_GITLAB_CI = "convert_to_gitlab_ci"
     WORKFLOW_CHAT = "chat"
     WORKFLOW_ISSUE_TO_MERGE_REQUEST = "issue_to_merge_request"
-    WORKFLOW_FIX_PIPELINE = "fix_pipeline"

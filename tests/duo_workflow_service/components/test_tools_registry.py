@@ -20,6 +20,9 @@ from duo_workflow_service.gitlab.http_client import GitlabHttpClient
 from duo_workflow_service.tools.mcp_tools import (
     convert_mcp_tools_to_langchain_tool_classes,
 )
+from duo_workflow_service.tools.vulnerabilities.get_vulnerability_details import (
+    GetVulnerabilityDetails,
+)
 from duo_workflow_service.tools.work_item import (
     GetWorkItem,
     GetWorkItemNotes,
@@ -124,6 +127,7 @@ _outbox = MagicMock(spec=asyncio.Queue)
                 "list_group_audit_events",
                 "list_project_audit_events",
                 "get_current_user",
+                "get_vulnerability_details",
             },
         ),
         (
@@ -134,6 +138,7 @@ _outbox = MagicMock(spec=asyncio.Queue)
                 "add_new_task",
                 "remove_task",
                 "update_task_description",
+                "update_vulnerability_severity",
                 "get_plan",
                 "set_task_status",
                 "create_issue",
@@ -182,8 +187,11 @@ _outbox = MagicMock(spec=asyncio.Queue)
                 "list_project_audit_events",
                 "create_commit",
                 "dismiss_vulnerability",
+                "confirm_vulnerability",
                 "get_current_user",
                 "create_work_item",
+                "link_vulnerability_to_issue",
+                "get_vulnerability_details",
             },
         ),
         (
@@ -263,6 +271,9 @@ def test_registry_initialization_initialises_tools_with_correct_attributes(
         "add_new_task": tools.AddNewTask(),
         "remove_task": tools.RemoveTask(),
         "update_task_description": tools.UpdateTaskDescription(),
+        "update_vulnerability_severity": tools.UpdateVulnerabilitySeverity(
+            metadata=tool_metadata
+        ),
         "get_plan": tools.GetPlan(),
         "set_task_status": tools.SetTaskStatus(),
         "run_command": tools.RunCommand(metadata=tool_metadata),
@@ -272,6 +283,7 @@ def test_registry_initialization_initialises_tools_with_correct_attributes(
         "update_issue": tools.UpdateIssue(metadata=tool_metadata),
         "get_job_logs": tools.GetLogsFromJob(metadata=tool_metadata),
         "get_merge_request": tools.GetMergeRequest(metadata=tool_metadata),
+        "gitlab_merge_request_search": tools.ListMergeRequest(metadata=tool_metadata),
         "list_merge_request_diffs": tools.ListMergeRequestDiffs(metadata=tool_metadata),
         "create_merge_request_note": tools.CreateMergeRequestNote(
             metadata=tool_metadata
@@ -289,7 +301,6 @@ def test_registry_initialization_initialises_tools_with_correct_attributes(
         "gitlab_documentation_search": tools.DocumentationSearch(
             metadata=tool_metadata
         ),
-        "gitlab_merge_request_search": tools.MergeRequestSearch(metadata=tool_metadata),
         "gitlab_milestone_search": tools.MilestoneSearch(metadata=tool_metadata),
         "gitlab__user_search": tools.UserSearch(metadata=tool_metadata),
         "gitlab_blob_search": tools.BlobSearch(metadata=tool_metadata),
@@ -326,6 +337,7 @@ def test_registry_initialization_initialises_tools_with_correct_attributes(
         "get_commit_comments": tools.GetCommitComments(metadata=tool_metadata),
         "create_commit": tools.CreateCommit(metadata=tool_metadata),
         "dismiss_vulnerability": tools.DismissVulnerability(metadata=tool_metadata),
+        "confirm_vulnerability": tools.ConfirmVulnerability(metadata=tool_metadata),
         "list_instance_audit_events": tools.ListInstanceAuditEvents(
             metadata=tool_metadata
         ),
@@ -335,6 +347,10 @@ def test_registry_initialization_initialises_tools_with_correct_attributes(
         ),
         "get_current_user": tools.GetCurrentUser(metadata=tool_metadata),
         "create_work_item": tools.CreateWorkItem(metadata=tool_metadata),
+        "link_vulnerability_to_issue": tools.LinkVulnerabilityToIssue(
+            metadata=tool_metadata
+        ),
+        "get_vulnerability_details": GetVulnerabilityDetails(metadata=tool_metadata),
     }
 
     assert registry._enabled_tools == expected_tools

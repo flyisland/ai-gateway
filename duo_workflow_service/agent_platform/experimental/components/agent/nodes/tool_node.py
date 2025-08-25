@@ -97,7 +97,9 @@ class ToolNode:
         self, tool_call_args: dict[str, Any], tool: BaseTool
     ) -> str:
         try:
-            with duo_workflow_metrics.time_tool_call(tool_name=tool.name):
+            with duo_workflow_metrics.time_tool_call(
+                tool_name=tool.name, flow_type=self._flow_type.value
+            ):
                 tool_call_result = await tool.arun(tool_call_args)
 
             self._track_internal_event(
@@ -129,15 +131,12 @@ class ToolNode:
             return err_format
 
     def _sanitize_response(
-        self, response: str | list | dict, tool_name: str
-    ) -> str | list:
+        self, response: str | dict | list, tool_name: str
+    ) -> str | list[str | dict]:
         try:
-            sanitized = PromptSecurity.apply_security(
+            return PromptSecurity.apply_security_to_tool_response(
                 response=response, tool_name=tool_name
             )
-            if not isinstance(sanitized, (list, str)):
-                raise ValueError("Sanitized response is neither string nor list")
-            return sanitized
         except SecurityException as e:
             self._logger.error(f"Security validation failed for tool {tool_name}: {e}")
             raise
@@ -163,7 +162,7 @@ class ToolNode:
         self._internal_event_client.track_event(
             event_name=event_name.value,
             additional_properties=additional_properties,
-            category=self._flow_type,
+            category=self._flow_type.value,
         )
 
     def _format_type_error_response(self, tool: BaseTool, error: TypeError) -> str:

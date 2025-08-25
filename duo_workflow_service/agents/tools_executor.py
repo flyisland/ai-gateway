@@ -90,9 +90,11 @@ class ToolsExecutor:
             response = result.get("response")
             if response and hasattr(response, "content"):
                 try:
-                    result["response"].content = PromptSecurity.apply_security(
-                        response=result["response"].content,
-                        tool_name=tool_name,
+                    result["response"].content = (
+                        PromptSecurity.apply_security_to_tool_response(
+                            response=result["response"].content,
+                            tool_name=tool_name,
+                        )
                     )
                 except SecurityException as e:
                     self._logger.error(
@@ -195,7 +197,9 @@ class ToolsExecutor:
             tool.tool_call_id = tool_call["id"]
 
         try:
-            with duo_workflow_metrics.time_tool_call(tool_name=tool_name):
+            with duo_workflow_metrics.time_tool_call(
+                tool_name=tool_name, flow_type=self._workflow_type.value
+            ):
                 tool_response = await tool.ainvoke(tool_call)
 
             self._track_internal_event(

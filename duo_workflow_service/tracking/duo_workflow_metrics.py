@@ -50,7 +50,7 @@ class DuoWorkflowMetrics:  # pylint: disable=too-many-instance-attributes
         self.tool_call_duration = Histogram(
             "duo_workflow_tool_call_seconds",
             "Duration of tool calls in Duo Workflow",
-            ["tool_name"],
+            ["tool_name", "flow_type"],
             registry=registry,
         )
 
@@ -103,6 +103,27 @@ class DuoWorkflowMetrics:  # pylint: disable=too-many-instance-attributes
             registry=registry,
         )
 
+        self.agent_platform_session_retry_counter = Counter(
+            "agent_platform_session_retry_total",
+            "Count of flow retry events in Duo Workflow",
+            ["flow_type"],
+            registry=registry,
+        )
+
+        self.agent_platform_session_reject_counter = Counter(
+            "agent_platform_session_reject_total",
+            "Count of flow reject events in Duo Workflow",
+            ["flow_type"],
+            registry=registry,
+        )
+
+        self.agent_platform_session_resume_counter = Counter(
+            "agent_platform_session_resume_total",
+            "Count of flow resume events in Duo Workflow",
+            ["flow_type"],
+            registry=registry,
+        )
+
         self.agent_platform_session_success_counter = Counter(
             "agent_platform_session_success_total",
             "Count of successful flow completions in Duo Workflow",
@@ -121,6 +142,20 @@ class DuoWorkflowMetrics:  # pylint: disable=too-many-instance-attributes
             "agent_platform_tool_failure_total",
             "Count of failed tools in Duo Workflow",
             ["flow_type", "tool_name", "failure_reason"],
+            registry=registry,
+        )
+
+        self.agent_platform_receive_start_counter = Counter(
+            "agent_platform_receive_start_total",
+            "Count of receive start events in Duo Workflow",
+            ["flow_type"],
+            registry=registry,
+        )
+
+        self.agent_platform_reject_counter = Counter(
+            "agent_platform_reject_total",
+            "Count of reject events in Duo Agent Platform",
+            ["flow_type"],
             registry=registry,
         )
 
@@ -169,6 +204,30 @@ class DuoWorkflowMetrics:  # pylint: disable=too-many-instance-attributes
             flow_type=flow_type,
         ).inc()
 
+    def count_agent_platform_session_retry(
+        self,
+        flow_type: str = "unknown",
+    ) -> None:
+        self.agent_platform_session_retry_counter.labels(
+            flow_type=flow_type,
+        ).inc()
+
+    def count_agent_platform_session_reject(
+        self,
+        flow_type: str = "unknown",
+    ) -> None:
+        self.agent_platform_session_reject_counter.labels(
+            flow_type=flow_type,
+        ).inc()
+
+    def count_agent_platform_session_resume(
+        self,
+        flow_type: str = "unknown",
+    ) -> None:
+        self.agent_platform_session_resume_counter.labels(
+            flow_type=flow_type,
+        ).inc()
+
     def count_agent_platform_session_success(
         self,
         flow_type: str = "unknown",
@@ -199,6 +258,19 @@ class DuoWorkflowMetrics:  # pylint: disable=too-many-instance-attributes
             failure_reason=failure_reason,
         ).inc()
 
+    def count_agent_platform_receive_start_counter(
+        self,
+        flow_type: str = "unknown",
+    ) -> None:
+        self.agent_platform_receive_start_counter.labels(
+            flow_type=flow_type,
+        ).inc()
+
+    def count_agent_platform_reject(self, flow_type: str = "unknown") -> None:
+        self.agent_platform_reject_counter.labels(
+            flow_type=flow_type,
+        ).inc()
+
     def time_llm_request(self, model="unknown", request_type="unknown"):
         return self._timer(
             lambda duration: self.llm_request_duration.labels(
@@ -206,10 +278,11 @@ class DuoWorkflowMetrics:  # pylint: disable=too-many-instance-attributes
             ).observe(duration)
         )
 
-    def time_tool_call(self, tool_name="unknown"):
+    def time_tool_call(self, tool_name="unknown", flow_type="unknown"):
         return self._timer(
             lambda duration: self.tool_call_duration.labels(
-                tool_name=tool_name
+                tool_name=tool_name,
+                flow_type=flow_type,
             ).observe(duration)
         )
 

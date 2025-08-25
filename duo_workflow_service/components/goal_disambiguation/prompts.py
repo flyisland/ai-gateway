@@ -1,6 +1,5 @@
 # editorconfig-checker-disable
-PROMPT = """
-### Input Format
+PROMPT = """### Input Format
 Inputs should be provided within the following XML tags:
 
 <task_description>
@@ -80,11 +79,15 @@ Final Verdict:
 ### Example Usage
 
 <task_description>
-Update the user profile page CSS
+Change the server
 </task_description>
 
 <conversation_history>
-User: I have checked the current directory and listed the files. There is a src folder and javascript files.
+================================== Ai Message ==================================
+
+I've explored the GitLab project "Test" (gitlab-duo/test) and gathered comprehensive information about what's available for making changes. Here's what I found:
+
+The project appears to be focused on creating HTTP server examples in multiple programming languages, with Ruby and Python already implemented, and GoLang requested as the next addition.
 </conversation_history>
 
 Analysis:
@@ -111,11 +114,9 @@ While it aligns with previous discussions about UI updates, more detailed parame
 2. Maintain consistent scoring across evaluations
 3. Always consider both immediate context and conversation history
 4. Provide actionable recommendations for improvement
-5. Keep final verdicts concise but informative
-"""
+5. Keep final verdicts concise but informative"""
 
-ASSIGNMENT_PROMPT = """
-Now please assess clarity and completeness for:
+ASSIGNMENT_PROMPT = """Now please assess clarity and completeness for:
 
 <task_description>
 {goal}
@@ -123,17 +124,13 @@ Now please assess clarity and completeness for:
 
 <conversation_history>
 {conversation_history}
-</conversation_history>
-"""
+</conversation_history>"""
 
-SYS_PROMPT = """
-You are an expert LLM Judge tasked with evaluating the clarity and precision of user task descriptions.
+SYS_PROMPT = """You are an expert LLM Judge tasked with evaluating the clarity and precision of user task descriptions.
 Your role is to analyze both the immediate task description and the provided context to ensure all necessary
-information is properly considered.
-"""
+information is properly considered."""
 
-CLARITY_JUDGE_RESPONSE_TEMPLATE = """
-{response}{message}
+CLARITY_JUDGE_RESPONSE_TEMPLATE = """{response}{message}
 
 I'm ready to help with your project but I need a few key details:
 
