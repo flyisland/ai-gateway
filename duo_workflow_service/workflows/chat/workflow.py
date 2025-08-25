@@ -95,7 +95,7 @@ CHAT_GITLAB_MUTATION_TOOLS = [
     "confirm_vulnerability",
     "create_work_item",
     "link_vulnerability_to_issue",
-    "update_work_item",
+    "create_vulnerability_issue",
 ]
 
 
