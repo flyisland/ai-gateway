@@ -1,11 +1,13 @@
 import time
 import unittest
 from typing import Any, cast
-from unittest.mock import MagicMock
+from unittest.mock import MagicMock, patch
 
-import pytest
-
-from duo_workflow_service.tracking.duo_workflow_metrics import DuoWorkflowMetrics
+from duo_workflow_service.tracking.duo_workflow_metrics import (
+    DuoWorkflowMetrics,
+    SessionTypeEnum,
+)
+from lib.internal_events import InternalEventAdditionalProperties, InternalEventsClient
 
 
 class TestDuoWorkflowMetrics(unittest.TestCase):
@@ -245,11 +247,36 @@ class TestDuoWorkflowMetrics(unittest.TestCase):
             flow_type="test_flow_type",
         )
 
-    def test_agent_platform_session_failure_counter(self):
+    @patch("duo_workflow_service.tracking.duo_workflow_metrics.session_type_context")
+    def test_agent_platform_session_failure_counter_with_session_type(
+        self, mock_session_context
+    ):
+        mock_session_context.get.return_value = SessionTypeEnum.START.value
         self._assert_counter_called(
             "agent_platform_session_failure_counter",
             "count_agent_platform_session_failure",
-            {"flow_type": "test_flow_type", "failure_reason": "model_error"},
+            {
+                "flow_type": "test_flow_type",
+                "failure_reason": "model_error",
+                "session_type": "start",
+            },
+            flow_type="test_flow_type",
+            failure_reason="model_error",
+        )
+
+    @patch("duo_workflow_service.tracking.duo_workflow_metrics.session_type_context")
+    def test_agent_platform_session_failure_counter_without_session_type(
+        self, mock_session_context
+    ):
+        mock_session_context.get.return_value = None
+        self._assert_counter_called(
+            "agent_platform_session_failure_counter",
+            "count_agent_platform_session_failure",
+            {
+                "flow_type": "test_flow_type",
+                "failure_reason": "model_error",
+                "session_type": "unknown",
+            },
             flow_type="test_flow_type",
             failure_reason="model_error",
         )

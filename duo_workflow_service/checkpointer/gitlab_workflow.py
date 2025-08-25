@@ -47,6 +47,10 @@ from duo_workflow_service.status_updater.gitlab_status_updater import (
     GitLabStatusUpdater,
     UnsupportedStatusEvent,
 )
+from duo_workflow_service.tracking.duo_workflow_metrics import (
+    SessionTypeEnum,
+    session_type_context,
+)
 from duo_workflow_service.tracking.errors import log_exception
 from lib.internal_events import InternalEventAdditionalProperties, InternalEventsClient
 from lib.internal_events.event_enum import (
@@ -272,12 +276,15 @@ class GitLabWorkflow(BaseCheckpointSaver[Any], AbstractAsyncContextManager[Any])
             if self.initial_status_event == WorkflowStatusEventEnum.START:
                 label = EventLabelEnum.WORKFLOW_START_LABEL
                 event_name = EventEnum.WORKFLOW_START
+                session_type_context.set(SessionTypeEnum.START.value)
             elif self.initial_status_event == WorkflowStatusEventEnum.RETRY:
                 label = EventLabelEnum.WORKFLOW_RESUME_LABEL
                 event_name = EventEnum.WORKFLOW_RETRY
+                session_type_context.set(SessionTypeEnum.RETRY.value)
             elif self.initial_status_event == WorkflowStatusEventEnum.RESUME:
                 label = EventLabelEnum.WORKFLOW_RESUME_LABEL
                 event_name = EventEnum.WORKFLOW_RESUME
+                session_type_context.set(SessionTypeEnum.RESUME.value)
             else:
                 # no event to track
                 return self

@@ -1,9 +1,16 @@
 import time
+from contextvars import ContextVar
+from enum import StrEnum
+from typing import Optional
 
 import structlog
 from prometheus_client import REGISTRY, Counter, Histogram
 
 from duo_workflow_service.llm_factory import AnthropicStopReason
+
+session_type_context: ContextVar[Optional[str]] = ContextVar(
+    "session_type", default=None
+)
 
 log = structlog.stdlib.get_logger("monitoring")
 
@@ -27,6 +34,12 @@ WORKFLOW_TIME_SCALE_BUCKETS = [
 LLM_TIME_SCALE_BUCKETS = [0.25, 0.5, 1, 2, 4, 7, 10, 20, 30, 60]
 
 ANTHROPIC_STOP_REASONS = AnthropicStopReason.values()
+
+
+class SessionTypeEnum(StrEnum):
+    START = "start"
+    RESUME = "resume"
+    RETRY = "retry"
 
 
 class DuoWorkflowMetrics:  # pylint: disable=too-many-instance-attributes
@@ -134,7 +147,7 @@ class DuoWorkflowMetrics:  # pylint: disable=too-many-instance-attributes
         self.agent_platform_session_failure_counter = Counter(
             "agent_platform_session_failure_total",
             "Count of failed flows in Duo Workflow",
-            ["flow_type", "failure_reason"],
+            ["flow_type", "failure_reason", "session_type"],
             registry=registry,
         )
 
@@ -241,9 +254,11 @@ class DuoWorkflowMetrics:  # pylint: disable=too-many-instance-attributes
         flow_type: str = "unknown",
         failure_reason: str = "unknown",
     ) -> None:
+        session_type = session_type_context.get()
         self.agent_platform_session_failure_counter.labels(
             flow_type=flow_type,
             failure_reason=failure_reason,
+            session_type=session_type or "unknown",
         ).inc()
 
     def count_agent_platform_tool_failure(
