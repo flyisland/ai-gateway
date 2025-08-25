@@ -323,6 +323,10 @@ class AbstractWorkflow(ABC):
             )
             raise
 
+    async def stop(self):
+        self.log.info("Workflow is stoping.")
+        self.is_done = True
+
     def _drain_queue(self, workflow_id, queue, queue_name: str):
         try:
             while True:

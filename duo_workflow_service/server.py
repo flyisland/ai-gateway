@@ -286,7 +286,14 @@ class DuoWorkflowService(contract_pb2_grpc.DuoWorkflowServicer):
                     log.info(
                         "Wrote ClientEvent into the ingres queue",
                         requestID=event.actionResponse.requestID,
+                        action=event.actionResponse,
                     )
+                if isinstance(event, contract_pb2.ClientEvent) and event.HasField('stopRequest'):
+                    log.info(
+                        "Received a request to stop the workflow."
+                    )
+                    await workflow.stop()
+
 
         async def cancel_workflow(
             workflow_task: Optional[asyncio.Task], err: BaseException

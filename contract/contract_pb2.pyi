@@ -8,14 +8,16 @@ from typing import ClassVar as _ClassVar, Optional as _Optional, Union as _Union
 DESCRIPTOR: _descriptor.FileDescriptor
 
 class ClientEvent(_message.Message):
-    __slots__ = ("startRequest", "actionResponse", "heartbeat")
+    __slots__ = ("startRequest", "actionResponse", "heartbeat", "stopRequest")
     STARTREQUEST_FIELD_NUMBER: _ClassVar[int]
     ACTIONRESPONSE_FIELD_NUMBER: _ClassVar[int]
     HEARTBEAT_FIELD_NUMBER: _ClassVar[int]
+    STOPREQUEST_FIELD_NUMBER: _ClassVar[int]
     startRequest: StartWorkflowRequest
     actionResponse: ActionResponse
     heartbeat: HeartbeatRequest
-    def __init__(self, startRequest: _Optional[_Union[StartWorkflowRequest, _Mapping]] = ..., actionResponse: _Optional[_Union[ActionResponse, _Mapping]] = ..., heartbeat: _Optional[_Union[HeartbeatRequest, _Mapping]] = ...) -> None: ...
+    stopRequest: StopWorkflowRequest
+    def __init__(self, startRequest: _Optional[_Union[StartWorkflowRequest, _Mapping]] = ..., actionResponse: _Optional[_Union[ActionResponse, _Mapping]] = ..., heartbeat: _Optional[_Union[HeartbeatRequest, _Mapping]] = ..., stopRequest: _Optional[_Union[StopWorkflowRequest, _Mapping]] = ...) -> None: ...
 
 class StartWorkflowRequest(_message.Message):
     __slots__ = ("clientVersion", "workflowID", "workflowDefinition", "goal", "workflowMetadata", "clientCapabilities", "mcpTools", "additional_context", "approval", "flowConfig", "flowConfigSchemaVersion")
@@ -42,6 +44,10 @@ class StartWorkflowRequest(_message.Message):
     flowConfig: _struct_pb2.Struct
     flowConfigSchemaVersion: str
     def __init__(self, clientVersion: _Optional[str] = ..., workflowID: _Optional[str] = ..., workflowDefinition: _Optional[str] = ..., goal: _Optional[str] = ..., workflowMetadata: _Optional[str] = ..., clientCapabilities: _Optional[_Iterable[str]] = ..., mcpTools: _Optional[_Iterable[_Union[McpTool, _Mapping]]] = ..., additional_context: _Optional[_Iterable[_Union[AdditionalContext, _Mapping]]] = ..., approval: _Optional[_Union[Approval, _Mapping]] = ..., flowConfig: _Optional[_Union[_struct_pb2.Struct, _Mapping]] = ..., flowConfigSchemaVersion: _Optional[str] = ...) -> None: ...
+
+class StopWorkflowRequest(_message.Message):
+    __slots__ = ()
+    def __init__(self) -> None: ...
 
 class ActionResponse(_message.Message):
     __slots__ = ("requestID", "response", "plainTextResponse", "httpResponse")
