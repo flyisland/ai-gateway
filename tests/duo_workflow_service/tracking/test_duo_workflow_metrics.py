@@ -32,6 +32,7 @@ class TestDuoWorkflowMetrics(unittest.TestCase):
             "agent_platform_session_start_counter",
             "agent_platform_session_success_counter",
             "agent_platform_session_failure_counter",
+            "agent_platform_session_abort_counter",
             "agent_platform_tool_failure_counter",
             "agent_platform_receive_start_counter",
         ]:
@@ -279,6 +280,36 @@ class TestDuoWorkflowMetrics(unittest.TestCase):
             },
             flow_type="test_flow_type",
             failure_reason="model_error",
+        )
+
+    @patch("duo_workflow_service.tracking.duo_workflow_metrics.session_type_context")
+    def test_agent_platform_session_abort_counter_with_session_type(
+        self, mock_session_context
+    ):
+        mock_session_context.get.return_value = SessionTypeEnum.START.value
+        self._assert_counter_called(
+            "agent_platform_session_abort_counter",
+            "count_agent_platform_session_abort",
+            {
+                "flow_type": "test_flow_type",
+                "session_type": "start",
+            },
+            flow_type="test_flow_type",
+        )
+
+    @patch("duo_workflow_service.tracking.duo_workflow_metrics.session_type_context")
+    def test_agent_platform_session_abort_counter_without_session_type(
+        self, mock_session_context
+    ):
+        mock_session_context.get.return_value = None
+        self._assert_counter_called(
+            "agent_platform_session_abort_counter",
+            "count_agent_platform_session_abort",
+            {
+                "flow_type": "test_flow_type",
+                "session_type": "unknown",
+            },
+            flow_type="test_flow_type",
         )
 
     def test_agent_platform_tool_failure_counter(self):

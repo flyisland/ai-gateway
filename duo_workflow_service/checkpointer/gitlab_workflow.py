@@ -262,6 +262,11 @@ class GitLabWorkflow(BaseCheckpointSaver[Any], AbstractAsyncContextManager[Any])
                 failure_reason=error_type,
             )
 
+        if event_name == EventEnum.WORKFLOW_ABORTED:
+            duo_workflow_metrics.count_agent_platform_session_abort(
+                flow_type=self._workflow_type.value,
+            )
+
     async def __aenter__(self) -> BaseCheckpointSaver:
         try:
             if self._offline_mode:

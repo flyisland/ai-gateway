@@ -172,6 +172,13 @@ class DuoWorkflowMetrics:  # pylint: disable=too-many-instance-attributes
             registry=registry,
         )
 
+        self.agent_platform_session_abort_counter = Counter(
+            "agent_platform_session_abort_total",
+            "Count of aborted sessions in Duo Agent Platform",
+            ["flow_type", "session_type"],
+            registry=registry,
+        )
+
     def count_llm_response(
         self, model="unknown", request_type="unknown", stop_reason="unknown"
     ):
@@ -258,6 +265,16 @@ class DuoWorkflowMetrics:  # pylint: disable=too-many-instance-attributes
         self.agent_platform_session_failure_counter.labels(
             flow_type=flow_type,
             failure_reason=failure_reason,
+            session_type=session_type or "unknown",
+        ).inc()
+
+    def count_agent_platform_session_abort(
+        self,
+        flow_type: str = "unknown",
+    ) -> None:
+        session_type = session_type_context.get()
+        self.agent_platform_session_abort_counter.labels(
+            flow_type=flow_type,
             session_type=session_type or "unknown",
         ).inc()
 
