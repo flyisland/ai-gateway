@@ -10,6 +10,7 @@ from duo_workflow_service.agents.planner import PlanSupervisorAgent
 from duo_workflow_service.agents.run_tool_node import RunToolNode
 from duo_workflow_service.agents.tools_executor import ToolsExecutor
 from duo_workflow_service.agents.v2 import Agent as AgentV2
+from duo_workflow_service.agents.history_compactor import HistoryCompactor
 
 __all__ = [
     "Agent",
@@ -20,4 +21,5 @@ __all__ = [
     "ToolsExecutor",
     "RunToolNode",
     "HumanApprovalCheckExecutor",
+    "HistoryCompactor",
 ]

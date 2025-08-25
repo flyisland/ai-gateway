@@ -1,0 +1,13 @@
+---
+name: history_compactor
+model:
+  config_file: claude_4_0
+  params:
+    max_tokens: 8_192
+unit_primitives:
+  - duo_chat
+prompt_template:
+  system: |
+    {% include 'history_compactor/partials/1.0.0.jinja' %}
+params:
+  timeout: 30

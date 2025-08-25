@@ -13,16 +13,24 @@ from ai_gateway.model_metadata import (
     current_model_metadata_context,
 )
 from duo_workflow_service.agents.chat_agent import ChatAgent
-from duo_workflow_service.agents.tools_executor import ToolsExecutor
 from duo_workflow_service.checkpointer.gitlab_workflow import WorkflowStatusEventEnum
 from duo_workflow_service.components.tools_registry import ToolsRegistry
+from duo_workflow_service.agents.history_compactor import HistoryCompactor
+from duo_workflow_service.agents.interrupt_node import InterruptNode
+from duo_workflow_service.agents.chat_tools_executor import ChatToolsExecutor
+from duo_workflow_service.workflows.type_definitions import AdditionalContext
 from duo_workflow_service.entities.state import (
-    ApprovalStateRejection,
     ChatWorkflowState,
+    MAX_CONTEXT_TOKENS,
     MessageTypeEnum,
     ToolStatus,
     UiChatLog,
     WorkflowStatusEnum,
+    ChatFlowEvent,
+    ChatFlowEventType
+)
+from duo_workflow_service.token_counter.approximate_token_counter import (
+    ApproximateTokenCounter,
 )
 from duo_workflow_service.tracking.errors import log_exception
 from duo_workflow_service.workflows.abstract_workflow import AbstractWorkflow
@@ -30,9 +38,8 @@ from lib.feature_flags.context import FeatureFlag, is_feature_enabled
 
 
 class Routes(StrEnum):
-    CONTINUE = "continue"
-    NO_CONVERSATION_HISTORY = "no_conversation_history"
-    SHOW_AGENT_MESSAGE = "show_agent_message"
+    COMPACT_HISTORY = "compact_history"
+    CHECK_HISTORY = "check_history"
     TOOL_USE = "tool_use"
     STOP = "stop"
 
@@ -109,9 +116,15 @@ RUN_COMMAND_TOOLS = ["run_command"]
 GIT_TOOLS = ["run_git_command"]
 
 
+class UserDecision(StrEnum):
+    APPROVE = "approval"
+    REJECT = "rejection"
+
+
 class Workflow(AbstractWorkflow):
     _stream: bool = True
     _agent: ChatAgent
+    _history_compactor: HistoryCompactor
 
     def _are_tools_called(self, state: ChatWorkflowState) -> Routes:
         if state["status"] in [WorkflowStatusEnum.CANCELLED, WorkflowStatusEnum.ERROR]:
@@ -125,6 +138,18 @@ class Workflow(AbstractWorkflow):
         if isinstance(last_message, AIMessage) and len(last_message.tool_calls) > 0:
             return Routes.TOOL_USE
 
+        return Routes.CHECK_HISTORY
+
+    def _is_history_compaction_needed(self, state: ChatWorkflowState) -> Routes:
+        if not hasattr(self, '_agent') or not self._agent:
+            return Routes.STOP
+
+        history: List[BaseMessage] = state["conversation_history"][self._agent.name]
+        token_counter = ApproximateTokenCounter(self._agent.name)
+        total_tokens = token_counter.count_tokens(history)
+
+        if total_tokens >= MAX_CONTEXT_TOKENS:
+            return Routes.COMPACT_HISTORY
         return Routes.STOP
 
     def get_workflow_state(self, goal: str) -> ChatWorkflowState:
@@ -159,50 +184,50 @@ class Workflow(AbstractWorkflow):
             approval=None,
         )
 
+    def _resume_command(self, goal: str, additional_context: list[AdditionalContext] | None) -> Command:
+        self.log.info("RESUME_COMMAND"*50)
+        self.log.info(self._approval)
+        event = ChatFlowEvent(
+            event_type=ChatFlowEventType.RESPONSE,
+            message=goal,
+            additional_context=additional_context or [],
+        )
+        if not self._approval:
+            return Command(resume=event)
+
+        match self._approval.WhichOneof("user_decision"):
+            case UserDecision.APPROVE:
+                event = ChatFlowEvent(
+                    event_type=ChatFlowEventType.APPROVE,
+                    additional_context=additional_context,
+                )
+            case UserDecision.REJECT:
+                event = ChatFlowEvent(
+                    event_type=ChatFlowEventType.REJECT,
+                    message=self._approval.rejection.message,
+                    additional_context=additional_context,
+                )
+            case _:
+                event = ChatFlowEvent(
+                    event_type=ChatFlowEventType.RESPONSE,
+                    message=goal,
+                    additional_context=additional_context or [],
+                )
+
+        return Command(resume=event)
+
     async def get_graph_input(self, goal: str, status_event: str) -> Any:
+        #state status work might be necessary
         new_chat_message = goal
+        additional_context = self._additional_context
 
         match status_event:
             case WorkflowStatusEventEnum.START:
                 return self.get_workflow_state(goal)
+            case WorkflowStatusEventEnum.RESUME:
+                return self._resume_command(new_chat_message, additional_context)
             case _:
-                state_update: dict[str, Any] = {"status": WorkflowStatusEnum.EXECUTION}
-                next_step = "agent"
-
-                match self._approval and self._approval.WhichOneof("user_decision"):
-                    case "approval":
-                        next_step = "run_tools"
-                    case "rejection":
-                        new_chat_message = self._approval.rejection.message  # type: ignore
-                        state_update["approval"] = ApprovalStateRejection(
-                            message=new_chat_message
-                        )
-                    case _:
-                        state_update["conversation_history"] = {
-                            self._agent.name: [
-                                HumanMessage(
-                                    content=goal,
-                                    additional_kwargs={
-                                        "additional_context": self._additional_context
-                                    },
-                                )
-                            ]
-                        }
-
-                if new_chat_message and new_chat_message != "null":
-                    new_message_chat_log = UiChatLog(
-                        message_type=MessageTypeEnum.USER,
-                        message_sub_type=None,
-                        content=new_chat_message,
-                        timestamp=datetime.now(timezone.utc).isoformat(),
-                        status=ToolStatus.SUCCESS,
-                        correlation_id=None,
-                        tool_info=None,
-                        additional_context=self._additional_context,
-                    )
-                    state_update["ui_chat_log"] = [new_message_chat_log]
-
-                return Command(goto=next_step, update=state_update)
+                return None
 
     def _compile(
         self,
@@ -226,30 +251,49 @@ class Workflow(AbstractWorkflow):
         if not model_metadata and is_feature_enabled(
             FeatureFlag.DUO_AGENTIC_CHAT_OPENAI_GPT_5
         ):
-            # temporary approach: model selection doesn't support feature flags
-            model_metadata = ModelSelectionMetadata(
-                name="gpt_5"
-            )  # it will force the prompt registry load the chat/agent/gpt_5 prompt
+            model_metadata = ModelSelectionMetadata(name="gpt_5")
 
-        self._agent: ChatAgent = self._prompt_registry.get_on_behalf(  # type: ignore[assignment]
+        self._agent: ChatAgent = self._prompt_registry.get_on_behalf(
             user=self._user,
             prompt_id="chat/agent",
             prompt_version=prompt_version,
             model_metadata=model_metadata,
             internal_event_category=__name__,
-            tools=agents_toolset.bindable,  # type: ignore[arg-type]
+            tools=agents_toolset.bindable,
         )
+
         self._agent.tools_registry = tools_registry
 
-        tools_runner = ToolsExecutor(
+        self._history_compactor: HistoryCompactor = self._prompt_registry.get_on_behalf(
+            user=self._user,
+            prompt_id="history_compactor",
+            prompt_version="^1.0.0",
+            compacting_from=self._agent,
+        )
+
+        chat_tools_runner = ChatToolsExecutor(
             tools_agent_name=self._agent.name,
             toolset=agents_toolset,
             workflow_id=self._workflow_id,
             workflow_type=self._workflow_type,
         ).run
 
+        # Add nodes
         graph.add_node("agent", self._agent.run)
-        graph.add_node("run_tools", tools_runner)
+        graph.add_node("run_tools", chat_tools_runner)
+        graph.add_node("history_compression", self._history_compactor.run)
+        graph.add_node(
+            "tool_interrupt_node",
+            InterruptNode(
+                agent_name=self._agent.name,
+            ).run,
+        )
+        graph.add_node(
+            "no_tool_interrupt_node",
+            InterruptNode(
+                agent_name=self._agent.name,
+            ).run,
+        )
 
         graph.set_entry_point("agent")
 
@@ -257,11 +301,32 @@ class Workflow(AbstractWorkflow):
             "agent",
             self._are_tools_called,
             {
-                Routes.TOOL_USE: "run_tools",
+                Routes.TOOL_USE: "tool_interrupt_node",
+                Routes.CHECK_HISTORY: "no_tool_interrupt_node",
                 Routes.STOP: END,
             },
         )
-        graph.add_edge("run_tools", "agent")
+
+        graph.add_conditional_edges(
+            "no_tool_interrupt_node",
+            self._is_history_compaction_needed,
+            {
+                Routes.COMPACT_HISTORY: "history_compression",
+                Routes.STOP: END,
+            },
+        )
+
+        graph.add_edge("tool_interrupt_node", "run_tools")
+
+        graph.add_conditional_edges(
+            "run_tools",
+            self._is_history_compaction_needed,
+            {
+                Routes.COMPACT_HISTORY: "history_compression",
+                Routes.STOP: END,
+            },
+        )
+        graph.add_edge("history_compression", END)
 
         return graph.compile(checkpointer=checkpointer)
 

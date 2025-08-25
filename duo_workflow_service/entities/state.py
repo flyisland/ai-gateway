@@ -20,7 +20,8 @@ from duo_workflow_service.token_counter.approximate_token_counter import (
 from duo_workflow_service.workflows.type_definitions import AdditionalContext
 
 # max content tokens is 200K but adding a buffer of 10% just in case
-MAX_CONTEXT_TOKENS = int(200_000 * 0.90)
+
+MAX_CONTEXT_TOKENS = int(6_000 * 0.90)
 MAX_SINGLE_MESSAGE_TOKENS = int(MAX_CONTEXT_TOKENS * 0.65)
 
 logger = structlog.stdlib.get_logger("workflow")
@@ -344,9 +345,7 @@ class ApprovalStateRejection(BaseModel):
 class ChatWorkflowState(TypedDict):
     plan: Plan
     status: WorkflowStatusEnum
-    conversation_history: Annotated[
-        Dict[str, List[BaseMessage]], _conversation_history_reducer
-    ]
+    conversation_history: Dict[str, List[BaseMessage]]
     ui_chat_log: Annotated[List[UiChatLog], _ui_chat_log_reducer]
     last_human_input: Union[WorkflowEvent, None]
     project: Project | None
@@ -368,3 +367,15 @@ class WorkflowContext(TypedDict):
 
 class Context(TypedDict):
     workflow: WorkflowContext
+
+
+class ChatFlowEventType(StrEnum):
+    RESPONSE = "response"
+    APPROVE = "approve"
+    REJECT = "reject"
+
+
+class ChatFlowEvent(TypedDict):
+    event_type: ChatFlowEventType
+    message: NotRequired[str]
+    additional_context: NotRequired[List[AdditionalContext]]

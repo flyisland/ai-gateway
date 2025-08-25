@@ -259,13 +259,17 @@ class AbstractWorkflow(ABC):
                 self._workflow_config,
             ) as checkpointer:
                 status_event = getattr(checkpointer, "initial_status_event", None)
+                checkpoint_tuple = await checkpointer.aget_tuple(graph_config)
                 if not status_event:
-                    checkpoint_tuple = await checkpointer.aget_tuple(graph_config)
                     status_event = (
                         "" if checkpoint_tuple else WorkflowStatusEventEnum.START
                     )
 
                 compiled_graph = self._compile(goal, tools_registry, checkpointer)
+                current_state = checkpoint_tuple.checkpoint["channel_values"] if checkpoint_tuple else None
+                self.log.info("ABSTRACT_WORKFLOW" * 50)
+                self.log.info("Current state", state=current_state)
+                # check why the state is None in the second go around.
                 graph_input = await self.get_graph_input(goal, status_event)
 
                 async for type, state in compiled_graph.astream(
