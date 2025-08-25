@@ -9,7 +9,7 @@ from prometheus_client import REGISTRY, Counter, Histogram
 from duo_workflow_service.llm_factory import AnthropicStopReason
 
 session_type_context: ContextVar[Optional[str]] = ContextVar(
-    "session_type", default=None
+    "session_type", default="unknown"
 )
 
 log = structlog.stdlib.get_logger("monitoring")
@@ -254,21 +254,19 @@ class DuoWorkflowMetrics:  # pylint: disable=too-many-instance-attributes
         flow_type: str = "unknown",
         failure_reason: str = "unknown",
     ) -> None:
-        session_type = session_type_context.get()
         self.agent_platform_session_failure_counter.labels(
             flow_type=flow_type,
             failure_reason=failure_reason,
-            session_type=session_type or "unknown",
+            session_type=session_type_context.get(),
         ).inc()
 
     def count_agent_platform_session_abort(
         self,
         flow_type: str = "unknown",
     ) -> None:
-        session_type = session_type_context.get()
         self.agent_platform_session_abort_counter.labels(
             flow_type=flow_type,
-            session_type=session_type or "unknown",
+            session_type=session_type_context.get(),
         ).inc()
 
     def count_agent_platform_tool_failure(
