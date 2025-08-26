@@ -55,11 +55,13 @@ def _convert_struct_to_flow_config(
     flow_config_schema_version: str,
     flow_config_cls: Type[FlowConfigT],
 ) -> FlowConfigT:
-    if flow_config_schema_version not in _FLOW_BY_VERSIONS:
+    try:
+        _FLOW_BY_VERSIONS[flow_config_schema_version]
+    except KeyError:
         raise ValueError(
             f"Unsupported schema version: {flow_config_schema_version}. "
             f"Supported versions: {list(_FLOW_BY_VERSIONS.keys())}"
-        )
+        ) from None
     config_dict: Dict[str, Any] = MessageToDict(struct)
     config_dict["version"] = flow_config_schema_version
 
@@ -85,7 +87,7 @@ def resolve_workflow_class(
     Raises:
         ValueError: If workflow cannot be resolved or is invalid
     """
-    if flow_config is not None and flow_config_schema_version is not None:
+    if flow_config and flow_config_schema_version:
         try:
             flow_config_cls, flow_cls = _FLOW_BY_VERSIONS[flow_config_schema_version]
             config = _convert_struct_to_flow_config(
@@ -93,7 +95,9 @@ def resolve_workflow_class(
             )
             return partial(flow_cls, config=config)
         except Exception as e:
-            raise ValueError(f"Failed to create flow from FlowConfig protobuf: {e}")
+            raise ValueError(
+                f"Failed to create flow from FlowConfig protobuf: {e}"
+            ) from e
 
     if not workflow_definition:
         return software_development.Workflow  # for backwards compatibility
