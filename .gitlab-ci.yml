@@ -9,95 +9,11 @@ workflow:
 image: python:3.12.11
 
 stages:
-  - build
   - test
-  - deploy-review
-  - validate
-  - release
-  - ingest
-  - runway_staging
-  - runway_production
-  - deploy_pages
 
 variables:
   PIP_CACHE_DIR: "$CI_PROJECT_DIR/.cache/pip"
   POETRY_CACHE_DIR: "$CI_PROJECT_DIR/.cache/poetry"
-
-  DOCKER_VERSION: "20.10.23"
-  DOCKER_TLS_CERTDIR: "/certs"
-  DOCKER_MODEL_GATEWAY: "$CI_REGISTRY_IMAGE/model-gateway"
-  DOCKER_INGEST: "$CI_REGISTRY_IMAGE/ingest"
-  DOCKERHUB_MODEL_GATEWAY: "gitlab/model-gateway"
-
-  TARGET_IMAGE: "$DOCKER_MODEL_GATEWAY:$CI_COMMIT_SHORT_SHA"
-  INGEST_IMAGE: "$DOCKER_INGEST:$CI_COMMIT_SHORT_SHA"
-  SELF_HOSTED_TARGET_IMAGE: "$DOCKER_MODEL_GATEWAY/self-hosted:$CI_COMMIT_SHORT_SHA"
-  DOCKERHUB_MODEL_GATEWAY_IMAGE: "gitlab/model-gateway:$CI_COMMIT_TAG"
-  DOCKERHUB_MODEL_GATEWAY_SELF_HOSTED_IMAGE: "gitlab/model-gateway-self-hosted:$CI_COMMIT_SHORT_SHA"
-
-  DOCS_LINT_IMAGE: "registry.gitlab.com/gitlab-org/technical-writing/docs-gitlab-com/lint-markdown:alpine-3.21-vale-3.11.2-markdownlint2-0.17.2-lychee-0.18.1"
-
-  SAST_EXCLUDED_PATHS: "tests, tmp, api"
-  CS_IMAGE: $TARGET_IMAGE
-
-.if-merge-request-labels-pipeline-expedited: &if-merge-request-labels-pipeline-expedited
-  if: '$CI_MERGE_REQUEST_LABELS =~ /pipeline::expedited/'
-
-.if-commit-message-pipeline-expedited: &if-commit-message-pipeline-expedited
-  if: '$CI_COMMIT_MESSAGE =~ /pipeline_expedited:\s*true/'
-
-.skip-when-expedited-include: &skip-when-expedited-include
-  - <<: *if-merge-request-labels-pipeline-expedited
-    when: never
-  - <<: *if-commit-message-pipeline-expedited
-    when: never
-  - when: always
-
-include:
-  - local: .gitlab/ci/build.gitlab-ci.yml
-  - local: .gitlab/ci/lint.gitlab-ci.yml
-    rules: *skip-when-expedited-include
-  - local: .gitlab/ci/dependency-review.gitlab-ci.yml
-  - local: .gitlab/ci/test.gitlab-ci.yml
-    rules: *skip-when-expedited-include
-  - local: .gitlab/ci/performance.gitlab-ci.yml
-    rules: *skip-when-expedited-include
-  - local: .gitlab/ci/release.gitlab-ci.yml
-    rules: *skip-when-expedited-include
-  - local: .gitlab/ci/ingest.gitlab-ci.yml
-    rules: *skip-when-expedited-include
-  - template: Jobs/Container-Scanning.latest.gitlab-ci.yml
-  - template: Jobs/Dependency-Scanning.latest.gitlab-ci.yml
-  - template: Jobs/SAST.latest.gitlab-ci.yml
-  - template: Jobs/Secret-Detection.latest.gitlab-ci.yml
-
-  # Includes a base template for running kaniko easily
-  # see https://gitlab.com/gitlab-com/gl-infra/common-ci-tasks/-/blob/main/kaniko.md
-  - project: "gitlab-com/gl-infra/common-ci-tasks"
-    ref: v1.80.3 # renovate:managed
-    file: "kaniko.yml"
-
-  - project: "gitlab-com/gl-infra/platform/runway/runwayctl"
-    file: "ci-tasks/service-project/runway.yml"
-    inputs:
-      runway_service_id: ai-gateway
-      image: "$CI_REGISTRY_IMAGE/model-gateway:${CI_COMMIT_SHORT_SHA}"
-      runway_version: v3.84.2
-  - project: "gitlab-com/gl-infra/platform/runway/runwayctl"
-    file: "ci-tasks/service-project/runway.yml"
-    inputs:
-      runway_service_id: duo-workflow-svc
-      image: "$CI_REGISTRY_IMAGE/model-gateway:${CI_COMMIT_SHORT_SHA}"
-      runway_version: v3.84.2
-  - project: "gitlab-com/gl-infra/platform/runway/runwayctl"
-    file: "ci-tasks/service-project/runway.yml"
-    inputs:
-      runway_service_id: ai-gateway-custom
-      image: "$SELF_HOSTED_TARGET_IMAGE"
-      runway_version: v3.84.2
-  - component: ${CI_SERVER_FQDN}/gitlab-org/components/danger-review/danger-review@2.1.0
-    rules:
-      - if: $CI_SERVER_HOST == "gitlab.com"
 
 cache:
   key:
@@ -120,28 +36,17 @@ cache:
     - poetry export -f requirements.txt --output requirements.txt --without-hashes
     - poetry config --list
 
-.docker:
-  image: docker:${DOCKER_VERSION}
-  services:
-    - docker:${DOCKER_VERSION}-dind
-  variables:
-    REGISTRY_USER: "$CI_REGISTRY_USER"
-    REGISTRY_PASSWORD: "$CI_REGISTRY_PASSWORD"
-    REGISTRY: "$CI_REGISTRY"
-  before_script:
-    - docker login -u "$REGISTRY_USER" -p "$REGISTRY_PASSWORD" "$REGISTRY"
-
-pages:
-  stage: deploy_pages
+lint:
+  extends: .poetry
+  stage: test
   script:
-    - mkdir -p public
-    - python scripts/prompt_directory_json_builder.py
-  artifacts:
-    paths:
-      - public
-  rules:
-    - <<: *if-merge-request-labels-pipeline-expedited
-      when: never
-    - <<: *if-commit-message-pipeline-expedited
-      when: never
-    - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
+    - make lint-code
+    - poetry lock --no-cache
+    - git diff --exit-code
+  after_script:
+    - |
+      # Hint for fixing issues
+      MAGENTA=$(printf '\e[35m')
+      BOLD=$(printf '\e[1m')
+      RESET=$(printf '\e[0m')
+      echo "${MAGENTA}Run ${BOLD}make format${RESET}${MAGENTA} to fix formatting issues.${RESET}"
