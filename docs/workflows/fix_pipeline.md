@@ -11,7 +11,7 @@ This flow takes a URL for a failing GitLab CI/CD job URL as input and automatica
 
 ## How to Use
 
-note: This flow is currently in early development, and can only be triggered from an API call. It is run in remote execution, and it pushes the code and creates a merge request automatically.
+> **Note:** This flow is currently in early development, and can only be triggered from an API call. It is run in remote execution, and it pushes the code and creates a merge request automatically.
 
 1. Navigate to a failing job in a merge request, and note the job URL, the branch for the MR, and the project ID
 1. Execute the following `curl` command in your terminal:
