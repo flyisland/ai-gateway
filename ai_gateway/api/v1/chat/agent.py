@@ -3,6 +3,14 @@ from typing import Annotated, AsyncIterator, Optional, Union
 
 from dependency_injector.providers import Factory, FactoryAggregate
 from fastapi import APIRouter, Depends, HTTPException, Request, status
+from ai_gateway.api.csma_response import (
+    CSMAResponse, 
+    CSMAException, 
+    CSMAErrorCodes, 
+    CSMAErrorResponses,
+    csma_success,
+    csma_error
+)
 from gitlab_cloud_connector import GitLabUnitPrimitive
 
 from ai_gateway.api.auth_utils import StarletteUser, get_current_user
@@ -120,31 +128,40 @@ async def chat(
 
         if isinstance(completion, AsyncIterator):
             return await _handle_stream(completion)
-        return ChatResponse(
-            response=completion.text,
-            metadata=ChatResponseMetadata(
+        
+        # Create CSMA response data
+        response_data = {
+            "response": completion.text,
+            "metadata": ChatResponseMetadata(
                 provider=payload.provider,
                 model=payload.model.value if payload.model else None,
                 timestamp=int(time()),
-            ),
+            )
+        }
+        
+        # Return CSMA formatted response
+        return csma_success(
+            data=response_data,
+            message="Chat completion generated successfully",
+            service="ai-gateway"
         )
     except AnthropicAPIStatusError as ex:
         log_exception(ex)
-        raise HTTPException(
-            status_code=status.HTTP_502_BAD_GATEWAY,
-            detail="Anthropic API Status Error.",
+        raise CSMAErrorResponses.service_unavailable(
+            "Anthropic API Status Error",
+            details={"provider": "anthropic", "error_type": "status_error"}
         )
     except AnthropicAPITimeoutError as ex:
         log_exception(ex)
-        raise HTTPException(
-            status_code=status.HTTP_504_GATEWAY_TIMEOUT,
-            detail="Anthropic API Timeout Error.",
+        raise CSMAErrorResponses.timeout(
+            "Anthropic API Timeout Error",
+            details={"provider": "anthropic", "error_type": "timeout_error"}
         )
     except AnthropicAPIConnectionError as ex:
         log_exception(ex)
-        raise HTTPException(
-            status_code=status.HTTP_502_BAD_GATEWAY,
-            detail="Anthropic API Connection Error.",
+        raise CSMAErrorResponses.service_unavailable(
+            "Anthropic API Connection Error",
+            details={"provider": "anthropic", "error_type": "connection_error"}
         )
 
 
