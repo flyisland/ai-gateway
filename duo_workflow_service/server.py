@@ -3,6 +3,7 @@
 import asyncio
 import json
 import os
+from itertools import chain
 from typing import AsyncIterable, AsyncIterator, Optional
 
 import aiohttp
@@ -17,13 +18,15 @@ from gitlab_cloud_connector import (
     TokenAuthority,
     data_model,
 )
+from google.protobuf.struct_pb2 import Struct
 from grpc_reflection.v1alpha import reflection
 from langchain.globals import set_llm_cache
 from langchain_community.cache import SQLiteCache
+from langchain_core.utils.function_calling import convert_to_openai_tool
 
-from ai_gateway.config import Config
 from ai_gateway.container import ContainerApplication
 from contract import contract_pb2, contract_pb2_grpc
+from duo_workflow_service.components import tools_registry
 from duo_workflow_service.gitlab.connection_pool import connection_pool
 from duo_workflow_service.interceptors.authentication_interceptor import (
     AuthenticationInterceptor,
@@ -57,6 +60,7 @@ from duo_workflow_service.llm_factory import validate_llm_access
 from duo_workflow_service.monitoring import duo_workflow_metrics, setup_monitoring
 from duo_workflow_service.profiling import setup_profiling
 from duo_workflow_service.structured_logging import set_workflow_id, setup_logging
+from duo_workflow_service.tools.duo_base_tool import DuoBaseTool
 from duo_workflow_service.tracking import MonitoringContext, current_monitoring_context
 from duo_workflow_service.tracking.errors import log_exception
 from duo_workflow_service.tracking.sentry_error_tracking import setup_error_tracking
@@ -340,6 +344,27 @@ class DuoWorkflowService(contract_pb2_grpc.DuoWorkflowServicer):
         finally:
             await workflow.cleanup(workflow_id)
 
+    async def ListTools(
+        self, request: contract_pb2.ListToolsRequest, context: grpc.ServicerContext
+    ):
+        tools = set(
+            (
+                tools_registry._DEFAULT_TOOLS
+                + tools_registry._READ_ONLY_GITLAB_TOOLS
+                + list(chain.from_iterable(tools_registry._AGENT_PRIVILEGES.values()))
+            )
+        )
+        sorted_tools = sorted(tools, key=lambda tool_class: tool_class.__name__)
+        response = contract_pb2.ListToolsResponse()
+        for tool_cls in sorted_tools:
+            struct = Struct()
+            tool: DuoBaseTool = tool_cls()  # type: ignore[assignment]
+            tool_spec = convert_to_openai_tool(tool)
+            tool_spec["eval_prompts"] = tool.eval_prompts
+            struct.update(tool_spec)
+            response.tools.append(struct)
+        return response
+
     async def GenerateToken(
         self, request: contract_pb2.GenerateTokenRequest, context: grpc.ServicerContext
     ) -> contract_pb2.GenerateTokenResponse:
@@ -497,7 +522,7 @@ def choose_legacy_unit_primitive(
 def setup_container():
     container_application = ContainerApplication()
     container_application.wire(packages=CONTAINER_APPLICATION_PACKAGES)
-    container_application.config.from_dict(Config().model_dump())
+    # container_application.config.from_dict(Config().model_dump())
 
 
 def run():
