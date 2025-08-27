@@ -226,16 +226,18 @@ class WorkItemBaseTool(DuoBaseTool):
         type_id: str,
         input_kwargs: Dict[str, Any],
     ) -> str:
-        variables = {
+        query_variables = {
             "input": {
                 "namespacePath": namespace_path,
                 "workItemTypeId": type_id,
             }
         }
-        variables["input"].update(self._build_work_item_input_fields(input_kwargs))
+        query_variables["input"].update(
+            self._build_work_item_input_fields(input_kwargs)
+        )
 
         response = await self.gitlab_client.graphql(
-            CREATE_WORK_ITEM_MUTATION, variables
+            CREATE_WORK_ITEM_MUTATION, query_variables
         )
 
         if "errors" in response:
@@ -329,14 +331,14 @@ class WorkItemBaseTool(DuoBaseTool):
         """
         query, root_key = self._GET_WORK_ITEM_QUERIES[resolved.parent.type]
 
-        variables = {
+        query_variables = {
             "fullPath": resolved.parent.full_path,
             "iid": str(resolved.work_item_iid),
         }
 
-        response = await self.gitlab_client.graphql(query, variables)
+        response = await self.gitlab_client.graphql(query, query_variables)
 
-        if root_key not in response:
+        if not response.get(root_key):
             return {"error": f"No {root_key} found in response"}
 
         work_items = response.get(root_key, {}).get("workItems", {}).get("nodes", [])
@@ -451,7 +453,7 @@ class ListWorkItems(WorkItemBaseTool):
 
         query, root_key = self._LIST_WORK_ITEMS_QUERIES[resolved.type]
 
-        variables = {
+        query_variables = {
             "fullPath": resolved.full_path,
             "first": kwargs.get("first"),
             "after": kwargs.get("after"),
@@ -473,7 +475,7 @@ class ListWorkItems(WorkItemBaseTool):
             arg_key = key[0].lower() + key[1:]  # match Pydantic input
             value = kwargs.get(arg_key)
             if value is not None:
-                variables[key] = value
+                query_variables[key] = value
 
         warnings = []
 
@@ -491,7 +493,7 @@ class ListWorkItems(WorkItemBaseTool):
             ]
 
             if valid_types:
-                variables["types"] = valid_types
+                query_variables["types"] = valid_types
 
             if invalid_types:
                 warnings.append(
@@ -499,7 +501,7 @@ class ListWorkItems(WorkItemBaseTool):
                 )
 
         try:
-            response = await self.gitlab_client.graphql(query, variables)
+            response = await self.gitlab_client.graphql(query, query_variables)
 
             if root_key not in response:
                 return json.dumps({"error": f"No {root_key} found in response"})
@@ -564,8 +566,7 @@ class GetWorkItem(WorkItemBaseTool):
             return json.dumps({"error": resolved})
 
         try:
-            work_item = await self._get_work_item_data(resolved)
-            if work_item is None:
+            if (work_item := await self._get_work_item_data(resolved)) is None:
                 return json.dumps({"error": "Work item not found"})
 
             if work_item.get("error"):
@@ -630,13 +631,13 @@ class GetWorkItemNotes(WorkItemBaseTool):
 
         query, root_key = self._GET_WORK_ITEM_NOTES_QUERIES[resolved.parent.type]
 
-        variables = {
+        query_variables = {
             "fullPath": resolved.parent.full_path,
             "workItemIid": str(resolved.work_item_iid),
         }
 
         try:
-            response = await self.gitlab_client.graphql(query, variables)
+            response = await self.gitlab_client.graphql(query, query_variables)
             nodes = response.get(root_key, {}).get("workItems", {}).get("nodes", [])
 
             if not nodes:
@@ -818,8 +819,7 @@ class CreateWorkItemNote(WorkItemBaseTool):
             return json.dumps({"error": resolved})
 
         try:
-            result = await self._get_work_item_id(resolved)
-            if "error" in result:
+            if "error" in (result := await self._get_work_item_id(resolved)):
                 return json.dumps(result)
 
             note_input = {"noteableId": result["id"], "body": body}
