@@ -348,16 +348,15 @@ class DuoWorkflowService(contract_pb2_grpc.DuoWorkflowServicer):
     async def ListTools(
         self, request: contract_pb2.ListToolsRequest, context: grpc.ServicerContext
     ):
-        tools = set(
+        tool_classes = set(
             (
                 tools_registry._DEFAULT_TOOLS
                 + tools_registry._READ_ONLY_GITLAB_TOOLS
                 + list(chain.from_iterable(tools_registry._AGENT_PRIVILEGES.values()))
             )
         )
-        sorted_tools = sorted(tools, key=lambda tool_class: tool_class.__name__)
         response = contract_pb2.ListToolsResponse()
-        for tool_cls in sorted_tools:
+        for tool_cls in tool_classes:
             struct = Struct()
             tool: DuoBaseTool = tool_cls()  # type: ignore[assignment]
             tool_spec = convert_to_openai_tool(tool)
