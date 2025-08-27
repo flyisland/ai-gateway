@@ -15,7 +15,7 @@ The Flow Registry is currently in active development, but the high-level plan fo
 1. Add components required to replicate [existing flows](../workflows) using the Flow Registry. More information in [this epic](https://gitlab.com/groups/gitlab-org/duo-workflow/-/epics/1)
 1. Create an AI Catalog UI to allow internal teams to build and test their own Agent Flows
 
-In the meantime, it is possible to set up the Flow Registry locally, and create agent flows via YAML files. This guide will explain the details of how to do that.
+In the meantime, it is possible to set up the Flow Registry locally, and create agent flows via YAML files. This guide will explain the details of how to do that. But note that it can be quite time-intensive to do this setup and once the Flow Registry is ready this setup will no longer be required for those building flows.
 
 ## Quick Start
 
