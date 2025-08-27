@@ -2409,20 +2409,20 @@ referencing = ">=0.31.0"
 
 [[package]]
 name = "langchain"
-version = "0.3.25"
+version = "0.3.26"
 description = "Building applications with LLMs through composability"
 optional = false
 python-versions = ">=3.9"
 groups = ["main", "eval"]
 files = [
-    {file = "langchain-0.3.25-py3-none-any.whl", hash = "sha256:931f7d2d1eaf182f9f41c5e3272859cfe7f94fc1f7cef6b3e5a46024b4884c21"},
-    {file = "langchain-0.3.25.tar.gz", hash = "sha256:a1d72aa39546a23db08492d7228464af35c9ee83379945535ceef877340d2a3a"},
+    {file = "langchain-0.3.26-py3-none-any.whl", hash = "sha256:361bb2e61371024a8c473da9f9c55f4ee50f269c5ab43afdb2b1309cb7ac36cf"},
+    {file = "langchain-0.3.26.tar.gz", hash = "sha256:8ff034ee0556d3e45eff1f1e96d0d745ced57858414dba7171c8ebdbeb5580c9"},
 ]
 
 [package.dependencies]
-langchain-core = ">=0.3.58,<1.0.0"
+langchain-core = ">=0.3.66,<1.0.0"
 langchain-text-splitters = ">=0.3.8,<1.0.0"
-langsmith = ">=0.1.17,<0.4"
+langsmith = ">=0.1.17"
 pydantic = ">=2.7.4,<3.0.0"
 PyYAML = ">=5.3"
 requests = ">=2,<3"
@@ -2466,23 +2466,23 @@ pydantic = ">=2.7.4,<3.0.0"
 
 [[package]]
 name = "langchain-community"
-version = "0.3.25"
+version = "0.3.27"
 description = "Community contributed LangChain integrations."
 optional = false
 python-versions = ">=3.9"
 groups = ["main", "eval"]
 files = [
-    {file = "langchain_community-0.3.25-py3-none-any.whl", hash = "sha256:0d7f673d463019ab1aca4e50e750048214a7772efd2c8e1d59256739b8318f97"},
-    {file = "langchain_community-0.3.25.tar.gz", hash = "sha256:a536888a48b36184dee20df86d266827a01916397fb398af2088ab7c3dfee684"},
+    {file = "langchain_community-0.3.27-py3-none-any.whl", hash = "sha256:581f97b795f9633da738ea95da9cb78f8879b538090c9b7a68c0aed49c828f0d"},
+    {file = "langchain_community-0.3.27.tar.gz", hash = "sha256:e1037c3b9da0c6d10bf06e838b034eb741e016515c79ef8f3f16e53ead33d882"},
 ]
 
 [package.dependencies]
 aiohttp = ">=3.8.3,<4.0.0"
 dataclasses-json = ">=0.5.7,<0.7"
 httpx-sse = ">=0.4.0,<1.0.0"
-langchain = ">=0.3.25,<1.0.0"
-langchain-core = ">=0.3.65,<1.0.0"
-langsmith = ">=0.1.125,<0.4"
+langchain = ">=0.3.26,<1.0.0"
+langchain-core = ">=0.3.66,<1.0.0"
+langsmith = ">=0.1.125"
 numpy = {version = ">=1.26.2", markers = "python_version < \"3.13\""}
 pydantic-settings = ">=2.4.0,<3.0.0"
 PyYAML = ">=5.3"
