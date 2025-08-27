@@ -122,3 +122,49 @@ def strip_hidden_html_comments(
         return result
 
     return _apply_recursively(response, _strip_comments)
+
+
+def strip_mermaid_comments(
+        response: Union[str, Dict[str, Any], List[Any]],
+) -> Union[str, List[Union[str, Dict[str, Any]]]]:
+    """Strip comments from mermaid diagrams to prevent prompt injection.
+    
+    Removes mermaid comment lines (starting with %%) from within mermaid code blocks
+    while preserving the diagram structure.
+    
+    Args:
+        response: The response data to process
+        
+    Returns:
+        Response with mermaid comments removed
+    """
+
+    def _strip_mermaid_comments(text: str) -> str:
+        if not text or not isinstance(text, str):
+            return text
+
+        # Find and process mermaid code blocks
+        def process_mermaid_block(match):
+            block_content = match.group(0)
+
+            # Remove multi-line directive comments %%{ ... }%% (must be first to handle nested braces)
+            processed = re.sub(r'%%\{.*?\}%%', '', block_content, flags=re.DOTALL)
+
+            # Remove line comments that start with %% (handle both regular and escaped newlines)
+            processed = re.sub(r'(^|\\n)[ \t]*%%.*?(?=\\n|$)', r'\1', processed, flags=re.MULTILINE)
+
+            # Clean up extra blank lines
+            processed = re.sub(r'\\n\s*\\n\s*\\n', '\\n\\n', processed)
+            processed = re.sub(r'\n\s*\n\s*\n', '\n\n', processed)
+
+            return processed
+
+        # Process regular mermaid blocks (```mermaid ... ```)
+        text = re.sub(r'```\s*mermaid\b.*?```', process_mermaid_block, text, flags=re.DOTALL | re.IGNORECASE)
+
+        # Process escaped mermaid blocks from JSON (```\\nmermaid\\n ... ```)
+        text = re.sub(r'```\\n\s*mermaid\\b.*?```', process_mermaid_block, text, flags=re.DOTALL | re.IGNORECASE)
+
+        return text
+
+    return _apply_recursively(response, _strip_mermaid_comments)
