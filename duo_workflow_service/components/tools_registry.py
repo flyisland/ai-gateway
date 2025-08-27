@@ -101,7 +101,7 @@ _AGENT_PRIVILEGES: dict[str, list[Type[BaseTool]]] = {
         tools.ListDir,
         tools.FindFiles,
         tools.Grep,
-        # tools.Mkdir,
+        tools.Mkdir,
     ],
     "use_git": [
         tools.git.Command,
@@ -120,6 +120,7 @@ _AGENT_PRIVILEGES: dict[str, list[Type[BaseTool]]] = {
         tools.DismissVulnerability,
         tools.ConfirmVulnerability,
         tools.CreateWorkItem,
+        tools.CreateWorkItemNote,
         tools.LinkVulnerabilityToIssue,
         *_READ_ONLY_GITLAB_TOOLS,
     ],

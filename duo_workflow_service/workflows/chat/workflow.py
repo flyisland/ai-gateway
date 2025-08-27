@@ -94,6 +94,7 @@ CHAT_GITLAB_MUTATION_TOOLS = [
     "dismiss_vulnerability",
     "confirm_vulnerability",
     "create_work_item",
+    "create_work_item_note",
     "link_vulnerability_to_issue",
 ]
 
@@ -101,7 +102,7 @@ CHAT_GITLAB_MUTATION_TOOLS = [
 CHAT_MUTATION_TOOLS = [
     "create_file_with_contents",
     "edit_file",
-    # "mkdir",
+    "mkdir",
 ]
 
 RUN_COMMAND_TOOLS = ["run_command"]

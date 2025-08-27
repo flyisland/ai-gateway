@@ -93,7 +93,7 @@ EXECUTOR_TOOLS = [
     "edit_file",
     "find_files",
     "grep",
-    # "mkdir",
+    "mkdir",
     "add_new_task",
     "remove_task",
     "update_task_description",
@@ -115,6 +115,7 @@ EXECUTOR_TOOLS = [
     "list_work_items",
     "get_work_item_notes",
     "create_work_item",
+    "create_work_item_note",
 ]
 
 CONTEXT_BUILDER_TOOLS = [
