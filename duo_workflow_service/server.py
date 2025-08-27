@@ -24,6 +24,7 @@ from langchain.globals import set_llm_cache
 from langchain_community.cache import SQLiteCache
 from langchain_core.utils.function_calling import convert_to_openai_tool
 
+from ai_gateway.config import Config
 from ai_gateway.container import ContainerApplication
 from contract import contract_pb2, contract_pb2_grpc
 from duo_workflow_service.components import tools_registry
@@ -522,7 +523,7 @@ def choose_legacy_unit_primitive(
 def setup_container():
     container_application = ContainerApplication()
     container_application.wire(packages=CONTAINER_APPLICATION_PACKAGES)
-    # container_application.config.from_dict(Config().model_dump())
+    container_application.config.from_dict(Config().model_dump())
 
 
 def run():
