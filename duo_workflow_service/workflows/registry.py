@@ -91,7 +91,9 @@ def resolve_workflow_class(
         try:
             flow_config_cls, flow_cls = _FLOW_BY_VERSIONS[flow_config_schema_version]
             config = _convert_struct_to_flow_config(
-                flow_config, flow_config_schema_version, flow_config_cls
+                struct=flow_config,
+                flow_config_schema_version=flow_config_schema_version,
+                flow_config_cls=flow_config_cls,
             )
             return partial(flow_cls, config=config)
         except Exception as e:
