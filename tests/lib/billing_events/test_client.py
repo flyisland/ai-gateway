@@ -15,7 +15,7 @@ BASE_BILLING_CONTEXT_SCHEMA: Dict[str, Any] = {
     "realm": None,
     "timestamp": None,
     "instance_id": None,
-    "unique_instance_id": "",
+    "unique_instance_id": "instance-123456789abc",
     "host_name": None,
     "project_id": None,
     "namespace_id": None,
@@ -23,7 +23,7 @@ BASE_BILLING_CONTEXT_SCHEMA: Dict[str, Any] = {
     "global_user_id": None,
     "root_namespace_id": None,
     "correlation_id": None,
-    "seat_ids": ["TODO"],
+    "seat_ids": ["seat-user123"],
     "metadata": {},
 }
 
@@ -278,3 +278,47 @@ class TestBillingEventsClient:
         assert billing_data["metadata"] == {"workflow_type": "code_review"}
         assert billing_data["timestamp"] == "2023-12-01T10:00:00"
         assert billing_data["event_id"] == "12345678-1234-5678-9012-123456789012"
+
+    def test_billing_event_gitlab_context_integration(self, client, mock_dependencies):
+        """Test that GitLab context service provides correct billing context values."""
+        internal_context = EventContext(
+            environment="production",
+            realm="project",
+            instance_id="gitlab-instance-789",
+            host_name="gitlab.company.com",
+            project_id=123,
+            namespace_id=456,
+            global_user_id="user-789",
+            correlation_id="request-123",
+        )
+        current_event_context.set(internal_context)
+
+        client.track_billing_event(
+            event_type="ai_assist",
+            category=__name__,
+            unit_of_measure="requests",
+            quantity=5.0,
+            metadata={"feature": "code_suggestions"},
+        )
+
+        mock_dependencies["track"].assert_called_once()
+        event_init_args = mock_dependencies["structured_event_init"].call_args[1]
+        context = event_init_args["context"][0]
+        billing_data = context.data
+
+        # Verify GitLab context fields are populated
+        assert billing_data["seat_ids"] is not None
+        assert len(billing_data["seat_ids"]) > 0
+        assert billing_data["seat_ids"][0].startswith("seat-")
+        
+        assert billing_data["unique_instance_id"] is not None
+        assert billing_data["unique_instance_id"].startswith("instance-")
+        
+        # root_namespace_id should be the same as namespace_id when no hierarchy info available
+        assert billing_data["root_namespace_id"] == 456
+        
+        # Verify other fields are correctly mapped
+        assert billing_data["subject"] == "user-789"
+        assert billing_data["global_user_id"] == "user-789"
+        assert billing_data["namespace_id"] == 456
+        assert billing_data["project_id"] == 123

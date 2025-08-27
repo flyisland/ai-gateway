@@ -1,0 +1,627 @@
+openapi: 3.1.0
+info:
+  title: GitLab AI Gateway - CSMA Platform Integration
+  description: |
+    Production-ready AI Gateway service powering GitLab.com's AI features and CSMA Platform.
+    Provides multi-model AI support, agentic workflows, and enterprise-grade authentication.
+    
+    ## Core Capabilities
+    - **Multi-Model AI**: Anthropic Claude, OpenAI GPT, Vertex AI, Amazon Q
+    - **Agentic Workflows**: LangGraph-based automation with 6+ built-in workflows
+    - **Enterprise Auth**: GitLab OAuth2, JWT, rate limiting, abuse detection
+    - **Production Monitoring**: Prometheus metrics, structured logging, error tracking
+    - **CSMA Integration**: Customer success workflows and AI processing
+    
+    ## Integration Points
+    - **CSMA Platform**: Central AI infrastructure for all customer success services
+    - **Assessment Service**: AI-powered customer assessment analysis
+    - **Success Planning**: AI-driven success plan generation and optimization
+    - **Enablement Library**: AI-powered content recommendations
+    - **Vector Intelligence**: Qdrant integration for semantic search
+    
+  version: 2.0.0
+  contact:
+    name: GitLab AI Team
+    email: ai-team@gitlab.com
+  license:
+    name: MIT
+    url: https://opensource.org/licenses/MIT
+    
+servers:
+  - url: http://localhost:5052
+    description: Development server
+  - url: https://ai-gateway.gitlab.com
+    description: Production server
+    
+security:
+  - BearerAuth: []
+  - ApiKeyAuth: []
+
+paths:
+  # Health and Monitoring
+  /monitoring/healthz:
+    get:
+      summary: Health Check
+      description: Check AI Gateway health status
+      tags: [Monitoring]
+      responses:
+        '200':
+          description: Service health status
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    example: "healthy"
+                  timestamp:
+                    type: string
+                    format: date-time
+                    example: "2025-01-08T10:00:00Z"
+                  services:
+                    type: object
+                    properties:
+                      ai_models:
+                        type: string
+                        example: "connected"
+                      vector_store:
+                        type: string
+                        example: "connected"
+                      workflow_engine:
+                        type: string
+                        example: "running"
+
+  /monitoring/ready:
+    get:
+      summary: Readiness Check
+      description: Check if AI Gateway is ready to serve requests
+      tags: [Monitoring]
+      responses:
+        '200':
+          description: Service ready
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  ready:
+                    type: boolean
+                    example: true
+                  timestamp:
+                    type: string
+                    format: date-time
+
+  /monitoring/metrics:
+    get:
+      summary: Prometheus Metrics
+      description: Get Prometheus metrics for monitoring
+      tags: [Monitoring]
+      responses:
+        '200':
+          description: Prometheus metrics
+          content:
+            text/plain:
+              schema:
+                type: string
+
+  # AI Chat Endpoints
+  /v2/chat:
+    post:
+      summary: AI Chat Completion
+      description: Get AI chat completion for customer success scenarios
+      tags: [AI Chat]
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ChatRequest'
+      responses:
+        '200':
+          description: Chat completion response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ChatResponse'
+        '401':
+          description: Unauthorized
+        '429':
+          description: Rate limited
+
+  # Workflow Endpoints
+  /v4/workflow:
+    post:
+      summary: Execute Agentic Workflow
+      description: Execute customer success automation workflows
+      tags: [Workflows]
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/WorkflowRequest'
+      responses:
+        '200':
+          description: Workflow execution result
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/WorkflowResponse'
+        '400':
+          description: Invalid workflow request
+        '401':
+          description: Unauthorized
+
+  # Vector Operations
+  /v1/embeddings:
+    post:
+      summary: Generate Embeddings
+      description: Generate vector embeddings for customer success content
+      tags: [Vector Operations]
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/EmbeddingRequest'
+      responses:
+        '200':
+          description: Generated embeddings
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/EmbeddingResponse'
+
+  /v1/vector/search:
+    post:
+      summary: Vector Similarity Search
+      description: Search for similar customer success patterns
+      tags: [Vector Operations]
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/VectorSearchRequest'
+      responses:
+        '200':
+          description: Search results
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/VectorSearchResponse'
+
+  # CSMA-Specific Endpoints
+  /v1/csma/assessment/analyze:
+    post:
+      summary: Analyze Customer Assessment
+      description: AI-powered analysis of customer assessment data
+      tags: [CSMA]
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AssessmentAnalysisRequest'
+      responses:
+        '200':
+          description: Assessment analysis results
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AssessmentAnalysisResponse'
+
+  /v1/csma/success-plan/generate:
+    post:
+      summary: Generate Success Plan
+      description: AI-powered success plan generation
+      tags: [CSMA]
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SuccessPlanRequest'
+      responses:
+        '200':
+          description: Generated success plan
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SuccessPlanResponse'
+
+  /v1/csma/enablement/recommend:
+    post:
+      summary: Content Recommendations
+      description: AI-powered content recommendations for customer enablement
+      tags: [CSMA]
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/EnablementRequest'
+      responses:
+        '200':
+          description: Content recommendations
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/EnablementResponse'
+
+components:
+  schemas:
+    ChatRequest:
+      type: object
+      required: [messages, model]
+      properties:
+        messages:
+          type: array
+          items:
+            $ref: '#/components/schemas/Message'
+        model:
+          type: string
+          enum: [claude-3-sonnet, claude-3-opus, gpt-4, gpt-3.5-turbo]
+          example: "claude-3-sonnet"
+        max_tokens:
+          type: integer
+          minimum: 1
+          maximum: 4000
+          example: 1000
+        temperature:
+          type: number
+          minimum: 0
+          maximum: 2
+          example: 0.7
+
+    ChatResponse:
+      type: object
+      properties:
+        id:
+          type: string
+          example: "chat_123"
+        object:
+          type: string
+          example: "chat.completion"
+        created:
+          type: integer
+          example: 1640995200
+        model:
+          type: string
+          example: "claude-3-sonnet"
+        choices:
+          type: array
+          items:
+            $ref: '#/components/schemas/ChatChoice'
+        usage:
+          $ref: '#/components/schemas/Usage'
+
+    ChatChoice:
+      type: object
+      properties:
+        index:
+          type: integer
+          example: 0
+        message:
+          $ref: '#/components/schemas/Message'
+        finish_reason:
+          type: string
+          example: "stop"
+
+    Message:
+      type: object
+      required: [role, content]
+      properties:
+        role:
+          type: string
+          enum: [system, user, assistant]
+          example: "user"
+        content:
+          type: string
+          example: "Analyze this customer assessment data"
+
+    Usage:
+      type: object
+      properties:
+        prompt_tokens:
+          type: integer
+          example: 100
+        completion_tokens:
+          type: integer
+          example: 150
+        total_tokens:
+          type: integer
+          example: 250
+
+    WorkflowRequest:
+      type: object
+      required: [workflow_type, data]
+      properties:
+        workflow_type:
+          type: string
+          enum: [customer_assessment, success_planning, enablement_delivery, health_monitoring]
+          example: "customer_assessment"
+        data:
+          type: object
+          description: "Workflow-specific data"
+        options:
+          type: object
+          properties:
+            async_execution:
+              type: boolean
+              default: false
+            timeout:
+              type: integer
+              default: 300
+
+    WorkflowResponse:
+      type: object
+      properties:
+        workflow_id:
+          type: string
+          example: "wf_123"
+        status:
+          type: string
+          enum: [running, completed, failed]
+          example: "completed"
+        result:
+          type: object
+          description: "Workflow execution result"
+        execution_time:
+          type: number
+          example: 2.5
+
+    EmbeddingRequest:
+      type: object
+      required: [text]
+      properties:
+        text:
+          type: string
+          example: "Customer success assessment data"
+        model:
+          type: string
+          default: "text-embedding-ada-002"
+          example: "text-embedding-ada-002"
+
+    EmbeddingResponse:
+      type: object
+      properties:
+        data:
+          type: array
+          items:
+            type: object
+            properties:
+              embedding:
+                type: array
+                items:
+                  type: number
+                example: [0.1, 0.2, 0.3]
+              index:
+                type: integer
+                example: 0
+        model:
+          type: string
+          example: "text-embedding-ada-002"
+        usage:
+          $ref: '#/components/schemas/Usage'
+
+    VectorSearchRequest:
+      type: object
+      required: [query, collection]
+      properties:
+        query:
+          type: string
+          example: "customer onboarding best practices"
+        collection:
+          type: string
+          example: "customer_success_patterns"
+        top_k:
+          type: integer
+          default: 10
+          example: 5
+        threshold:
+          type: number
+          minimum: 0
+          maximum: 1
+          default: 0.7
+          example: 0.8
+
+    VectorSearchResponse:
+      type: object
+      properties:
+        results:
+          type: array
+          items:
+            type: object
+            properties:
+              id:
+                type: string
+                example: "doc_123"
+              score:
+                type: number
+                example: 0.95
+              content:
+                type: string
+                example: "Customer onboarding checklist"
+              metadata:
+                type: object
+                properties:
+                  category:
+                    type: string
+                    example: "onboarding"
+                  tags:
+                    type: array
+                    items:
+                      type: string
+                    example: ["beginner", "checklist"]
+
+    AssessmentAnalysisRequest:
+      type: object
+      required: [assessment_data]
+      properties:
+        assessment_data:
+          type: object
+          description: "Customer assessment data"
+        analysis_type:
+          type: string
+          enum: [comprehensive, quick, detailed]
+          default: "comprehensive"
+        include_recommendations:
+          type: boolean
+          default: true
+
+    AssessmentAnalysisResponse:
+      type: object
+      properties:
+        analysis_id:
+          type: string
+          example: "analysis_123"
+        insights:
+          type: array
+          items:
+            type: string
+          example: ["Customer shows high technical aptitude", "Risk level: Low"]
+        recommendations:
+          type: array
+          items:
+            type: string
+          example: ["Focus on advanced features", "Schedule technical review"]
+        confidence_score:
+          type: number
+          minimum: 0
+          maximum: 1
+          example: 0.92
+
+    SuccessPlanRequest:
+      type: object
+      required: [customer_profile, goals]
+      properties:
+        customer_profile:
+          type: object
+          description: "Customer profile information"
+        goals:
+          type: array
+          items:
+            type: string
+          example: ["Increase adoption", "Reduce churn risk"]
+        timeline:
+          type: string
+          enum: [30_days, 90_days, 180_days, 1_year]
+          default: "90_days"
+
+    SuccessPlanResponse:
+      type: object
+      properties:
+        plan_id:
+          type: string
+          example: "plan_123"
+        milestones:
+          type: array
+          items:
+            type: object
+            properties:
+              title:
+                type: string
+                example: "Technical onboarding"
+              description:
+                type: string
+                example: "Complete technical setup and training"
+              due_date:
+                type: string
+                format: date
+                example: "2025-02-15"
+              success_criteria:
+                type: array
+                items:
+                  type: string
+                example: ["All users trained", "Basic workflows configured"]
+
+    EnablementRequest:
+      type: object
+      required: [customer_context, learning_objectives]
+      properties:
+        customer_context:
+          type: object
+          description: "Customer context and current state"
+        learning_objectives:
+          type: array
+          items:
+            type: string
+          example: ["GitLab CI/CD basics", "Advanced workflows"]
+        content_type:
+          type: string
+          enum: [documentation, video, interactive, all]
+          default: "all"
+        difficulty_level:
+          type: string
+          enum: [beginner, intermediate, advanced]
+          default: "intermediate"
+
+    EnablementResponse:
+      type: object
+      properties:
+        recommendations:
+          type: array
+          items:
+            type: object
+            properties:
+              content_id:
+                type: string
+                example: "content_123"
+              title:
+                type: string
+                example: "GitLab CI/CD Fundamentals"
+              type:
+                type: string
+                example: "video"
+              difficulty:
+                type: string
+                example: "beginner"
+              estimated_time:
+                type: integer
+                example: 30
+              relevance_score:
+                type: number
+                minimum: 0
+                maximum: 1
+                example: 0.95
+
+  securitySchemes:
+    BearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: "JWT token from GitLab OAuth2 or local authentication"
+    
+    ApiKeyAuth:
+      type: apiKey
+      in: header
+      name: X-API-Key
+      description: "API key for service-to-service communication"
+
+tags:
+  - name: Monitoring
+    description: Health checks and monitoring endpoints
+  - name: AI Chat
+    description: AI chat completion endpoints
+  - name: Workflows
+    description: Agentic workflow execution
+  - name: Vector Operations
+    description: Vector embeddings and similarity search
+  - name: CSMA
+    description: Customer Success Management Architecture specific endpoints

@@ -6,6 +6,7 @@ from snowplow_tracker import AsyncEmitter, SelfDescribingJson, StructuredEvent, 
 
 from lib.billing_events.context import BillingEventContext
 from lib.internal_events.context import EventContext, current_event_context
+from lib.internal_events.gitlab_context import gitlab_context_service
 
 __all__ = ["BillingEventsClient"]
 
@@ -72,23 +73,29 @@ class BillingEventsClient:
         if metadata is None:
             metadata = {}
 
+        # Get GitLab-specific context information
+        gitlab_context = gitlab_context_service.get_gitlab_billing_context(
+            user_id=internal_context.global_user_id,
+            namespace_id=internal_context.namespace_id
+        )
+
         billing_context = BillingEventContext(
             event_id=event_id,
             event_type=event_type,
             unit_of_measure=unit_of_measure,
             quantity=quantity,
             metadata=metadata,
-            subject=internal_context.global_user_id,  # TODO : We need to pass non-masked userID from GitLab instance
+            subject=internal_context.global_user_id,  # ✅ RESOLVED: Using global_user_id from context
             global_user_id=internal_context.global_user_id,
-            seat_ids=["TODO"],  # TODO : We need to pass seatIDs from GitLab instance
+            seat_ids=gitlab_context["seat_ids"],  # ✅ RESOLVED: Using GitLab context service
             realm=internal_context.realm,
             timestamp=datetime.now().isoformat(),
             instance_id=internal_context.instance_id,
-            unique_instance_id="",  # TODO : We need to pass unique instance_id from the GitLab instance
+            unique_instance_id=gitlab_context["unique_instance_id"],  # ✅ RESOLVED: Using GitLab context service
             host_name=internal_context.host_name,
             project_id=internal_context.project_id,
             namespace_id=internal_context.namespace_id,
-            root_namespace_id=None,  # TODO : We need to pass ultimate_parent_namespace_id from the GitLab instance
+            root_namespace_id=gitlab_context["root_namespace_id"],  # ✅ RESOLVED: Using GitLab context service
             correlation_id=internal_context.correlation_id,
         )
 

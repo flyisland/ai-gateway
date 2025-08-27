@@ -48,6 +48,11 @@ class EventContext(BaseModel):
     model_engine: Optional[str] = None
     model_name: Optional[str] = None
     model_provider: Optional[str] = None
+    
+    # GitLab-specific billing context fields
+    seat_ids: Optional[List[str]] = None
+    unique_instance_id: Optional[str] = None
+    root_namespace_id: Optional[int] = None
 
 
 @dataclass
