@@ -150,13 +150,17 @@ def strip_mermaid_comments(
             # Remove multi-line directive comments %%{ ... }%% (must be first to handle nested braces)
             processed = re.sub(r"%%\{.*?\}%%", "", block_content, flags=re.DOTALL)
 
-            # Remove line comments that start with %% (handle both regular and escaped newlines)
+            # Remove line comments that start with %% (handle regular, escaped, and double-escaped newlines)
             processed = re.sub(
-                r"(^|\\n)[ \t]*%%.*?(?=\\n|$)", r"\1", processed, flags=re.MULTILINE
+                r"(^|\\+n)[ \t]*%%.*?(?=\\+n|$)", r"\1", processed, flags=re.MULTILINE
             )
 
-            # Clean up extra blank lines
-            processed = re.sub(r"\\n\s*\\n\s*\\n", "\\n\\n", processed)
+            # Clean up extra blank lines (handle both single and double escaping)
+            processed = re.sub(
+                r"\\+n\s*\\+n\s*\\+n",
+                lambda m: m.group(0)[: len(m.group(0)) // 3 * 2],
+                processed,
+            )
             processed = re.sub(r"\n\s*\n\s*\n", "\n\n", processed)
 
             return processed
@@ -169,9 +173,9 @@ def strip_mermaid_comments(
             flags=re.DOTALL | re.IGNORECASE,
         )
 
-        # Process escaped mermaid blocks from JSON (```\\nmermaid\\n ... ```)
+        # Process escaped mermaid blocks from JSON (```\\nmermaid\\n ... ``` and ```\\\\nmermaid\\\\n ... ```)
         text = re.sub(
-            r"```\\n\s*mermaid\\b.*?```",
+            r"```\\+n\s*mermaid\\b.*?```",
             process_mermaid_block,
             text,
             flags=re.DOTALL | re.IGNORECASE,
