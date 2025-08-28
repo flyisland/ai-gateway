@@ -1,0 +1,18 @@
+version: "experimental"
+environment: remote
+components:
+  - name: "create_code_review_started_note"
+    type: DeterministicStepComponent
+    inputs:
+      - from: "http://gdk.test:3000/gitlab-duo/test/-/merge_requests/1"
+        as: "url"
+        literal: true
+      - from: "Code review requested!"
+        as: "body"
+        literal: true
+    tool_name: "create_merge_request_note"
+routers:
+   - from: "create_code_review_started_note"
+     to: "end"
+flow:
+   entry_point: "create_code_review_started_note"
