@@ -47,13 +47,19 @@ async def user_access_token(
         Optional[str], Header()
     ] = None,  # This is the value of X_GITLAB_INSTANCE_ID_HEADER
 ):
-    if not current_user.can(
+    unit_primitives = [
         GitLabUnitPrimitive.COMPLETE_CODE,
-        disallowed_issuers=[CloudConnectorConfig().service_name],
-    ) and not current_user.can(
-        GitLabUnitPrimitive.DUO_AGENT_PLATFORM,
-        disallowed_issuers=[CloudConnectorConfig().service_name],
-    ):
+        GitLabUnitPrimitive.AI_GATEWAY_MODEL_PROVIDER_PROXY,
+    ]
+    scopes = [
+        unit_primitive
+        for unit_primitive in unit_primitives
+        if current_user.can(
+            unit_primitive, disallowed_issuers=[CloudConnectorConfig().service_name]
+        )
+    ]
+
+    if not scopes:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Unauthorized to create user access token",
@@ -81,12 +87,6 @@ async def user_access_token(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Missing X-Gitlab-Realm header",
         )
-
-    scopes = []
-    if current_user.can(GitLabUnitPrimitive.COMPLETE_CODE):
-        scopes.append(GitLabUnitPrimitive.COMPLETE_CODE)
-    if current_user.can(GitLabUnitPrimitive.DUO_AGENT_PLATFORM):
-        scopes.append(GitLabUnitPrimitive.DUO_AGENT_PLATFORM)
 
     try:
         token, expires_at = token_authority.encode(

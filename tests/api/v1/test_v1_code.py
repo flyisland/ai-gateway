@@ -64,7 +64,7 @@ def fast_api_router_fixture():
 
 @pytest.fixture(name="auth_user")
 def auth_user_fixture(request):
-    claims = UserClaims(scopes=["complete_code", "duo_agent_platform"])
+    claims = UserClaims(scopes=["complete_code", "ai_gateway_model_provider_proxy"])
     return CloudConnectorUser(authenticated=True, claims=claims)
 
 
@@ -120,7 +120,10 @@ def test_user_access_token_success(
     assert decoded_token["iat"] <= current_time_posix
     assert decoded_token["jti"]
     assert decoded_token["gitlab_realm"] == gitlab_realm
-    assert decoded_token["scopes"] == ["complete_code", "duo_agent_platform"]
+    assert decoded_token["scopes"] == [
+        "complete_code",
+        "ai_gateway_model_provider_proxy",
+    ]
     assert decoded_token["gitlab_instance_id"] == "1234"
     assert parsed_response["expires_at"] == decoded_token["exp"]
 
@@ -223,7 +226,7 @@ class TestUnauthorizedIssuer:
         return CloudConnectorUser(
             authenticated=True,
             claims=UserClaims(
-                scopes=["complete_code", "duo_agent_platform"],
+                scopes=["complete_code", "ai_gateway_model_provider_proxy"],
                 issuer="gitlab-ai-gateway",
             ),
         )
@@ -265,10 +268,10 @@ class TestCompleteCodePermission:
 class TestDuoAgentPlatformPermission:
     @pytest.fixture(name="auth_user")
     def auth_user_fixture(self):
-        claims = UserClaims(scopes=["duo_agent_platform"])
+        claims = UserClaims(scopes=["ai_gateway_model_provider_proxy"])
         return CloudConnectorUser(authenticated=True, claims=claims)
 
-    def test_user_access_token_with_duo_agent_platform(self, mock_client: TestClient):
+    def test_user_access_token_with_model_provider_proxy(self, mock_client: TestClient):
         headers = {
             "X-Gitlab-Global-User-Id": GLOBAL_USER_ID,
             "Authorization": "Bearer 12345",
@@ -284,7 +287,7 @@ class TestDuoAgentPlatformPermission:
 class TestBothPermissions:
     @pytest.fixture(name="auth_user")
     def auth_user_fixture(self):
-        claims = UserClaims(scopes=["complete_code", "duo_agent_platform"])
+        claims = UserClaims(scopes=["complete_code", "ai_gateway_model_provider_proxy"])
         return CloudConnectorUser(authenticated=True, claims=claims)
 
     def test_user_access_token_with_both_permissions(
@@ -310,7 +313,10 @@ class TestBothPermissions:
         )
 
         # Order might vary, so we use set comparison
-        assert set(decoded_token["scopes"]) == {"complete_code", "duo_agent_platform"}
+        assert set(decoded_token["scopes"]) == {
+            "complete_code",
+            "ai_gateway_model_provider_proxy",
+        }
 
 
 class TestNoPermissions:
