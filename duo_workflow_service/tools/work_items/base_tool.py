@@ -120,9 +120,6 @@ class WorkItemBaseTool(DuoBaseTool):
         if isinstance(parent, str):
             return parent
 
-        if not work_item_iid:
-            return "Must provide work_item_iid if no URL is given"
-
         return ResolvedWorkItem(parent=parent, work_item_iid=work_item_iid)
 
     async def _resolve_parent_path(
