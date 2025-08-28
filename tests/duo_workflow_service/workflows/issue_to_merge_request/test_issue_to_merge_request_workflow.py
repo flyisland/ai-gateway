@@ -6,8 +6,10 @@ from unittest.mock import ANY, AsyncMock, MagicMock, Mock, patch
 import pytest
 from gitlab_cloud_connector import CloudConnectorUser
 from langchain_core.messages import AIMessage, HumanMessage, SystemMessage
+from langchain_core.prompt_values import ChatPromptValue
 from langgraph.checkpoint.memory import MemorySaver
 
+from ai_gateway.models.mock import FakeModel
 from duo_workflow_service.agents.prompts import HANDOVER_TOOL_NAME
 from duo_workflow_service.entities import Plan, WorkflowStatusEnum
 from duo_workflow_service.gitlab.gitlab_api import Project
@@ -104,10 +106,15 @@ def agent_responses_fixture() -> list[dict[str, Any]]:
 
 
 @pytest.fixture(name="mock_agent")
-def mock_agent_fixture(agent_responses: list[dict[str, Any]]):
-    with patch(
-        "duo_workflow_service.workflows.issue_to_merge_request.workflow.Agent"
-    ) as mock:
+def mock_agent_fixture(
+    agent_responses: list[dict[str, Any]], duo_workflow_prompt_registry_enabled: bool
+):
+    if duo_workflow_prompt_registry_enabled:
+        factory = "ai_gateway.prompts.registry.LocalPromptRegistry.get_on_behalf"
+    else:
+        factory = "duo_workflow_service.workflows.issue_to_merge_request.workflow.Agent"
+
+    with patch(factory) as mock:
         mock.return_value.run.side_effect = agent_responses
         yield mock
 
@@ -145,11 +152,18 @@ def mock_chat_client_fixture():
 
 
 @pytest.fixture(name="mock_model_ainvoke")
-def mock_model_ainvoke_fixture(mock_chat_client):
+def mock_model_ainvoke_fixture(
+    duo_workflow_prompt_registry_enabled: bool, mock_chat_client: Mock
+):
     end_message = AIMessage("done")
 
-    mock_chat_client.ainvoke = AsyncMock(return_value=end_message)
-    yield mock_chat_client.ainvoke
+    if duo_workflow_prompt_registry_enabled:
+        with patch.object(FakeModel, "ainvoke") as mock:
+            mock.return_value = end_message
+            yield mock
+    else:
+        mock_chat_client.ainvoke = AsyncMock(return_value=end_message)
+        yield mock_chat_client.ainvoke
 
 
 @pytest.fixture(name="workflow_type")
@@ -181,6 +195,7 @@ def workflow_fixture(
 
 @pytest.mark.asyncio
 @pytest.mark.parametrize("offline_mode", [True])
+@pytest.mark.parametrize("duo_workflow_prompt_registry_enabled", [False, True])
 @patch("duo_workflow_service.workflows.abstract_workflow.UserInterface", autospec=True)
 async def test_workflow_run(
     mock_checkpoint_notifier,
@@ -248,6 +263,7 @@ async def test_workflow_run(
 
 
 @pytest.mark.asyncio
+@pytest.mark.parametrize("duo_workflow_prompt_registry_enabled", [False, True])
 async def test_workflow_run_when_exception(
     mock_git_lab_workflow_instance,
     mock_chat_client,
@@ -284,6 +300,7 @@ async def test_workflow_run_when_exception(
 
 
 @pytest.mark.asyncio
+@pytest.mark.parametrize("duo_workflow_prompt_registry_enabled", [False, True])
 @pytest.mark.usefixtures(
     "mock_gitlab_version",
     "mock_fetch_workflow_and_container_data",
@@ -298,6 +315,9 @@ async def test_messages_to_model(
     await workflow.run(goal)
 
     ainvoke_messages = mock_model_ainvoke.call_args.args[0]
+
+    if isinstance(ainvoke_messages, ChatPromptValue):
+        ainvoke_messages = ainvoke_messages.messages
 
     assert ainvoke_messages == [
         SystemMessage(
