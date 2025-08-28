@@ -8,7 +8,7 @@ components:
     inputs:
       - from: "context:goal"
         as: "job_url"
-    toolset: ["get_job_logs", "read_file", "find_files", "list_dir"]
+    toolset: ["get_job_logs", "read_files", "find_files", "list_dir"]
   - name: "fix_pipeline_create_plan"
     type: AgentComponent
     prompt_id: "fix_pipeline_create_plan"
@@ -29,7 +29,7 @@ components:
       - edit_file
       - find_files
       - mkdir
-      - read_file
+      - read_files
   - name: "fix_pipeline_git_add"
     type: DeterministicStepComponent
     inputs:

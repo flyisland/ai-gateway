@@ -84,49 +84,6 @@ def validate_duo_context_exclusions(file_path: str) -> None:
         return
 
 
-class ReadFileInput(BaseModel):
-    file_path: str = Field(description="the file_path to read the file from")
-
-
-class ReadFile(DuoBaseTool):
-    name: str = "read_file"
-    description: str = """Read the contents of a file.
-
-    IMPORTANT:
-    - When a task requires reading multiple files, include batches of tool calls in a single response
-    - Do not make separate responses for each file - group related files together
-
-    """
-    args_schema: Type[BaseModel] = ReadFileInput  # type: ignore
-    handle_tool_error: bool = True
-    eval_prompts: List[str] = [
-        "I need to read the content of the `readme.md`",
-        "Let me check if class `DuoBaseTool` exists in `./tools/base.py`",
-    ]
-
-    async def _arun(self, file_path: str) -> str:
-        # Check file exclusion policy
-        if not FileExclusionPolicy.is_allowed_for_project(self.project, file_path):
-            return FileExclusionPolicy.format_llm_exclusion_message([file_path])
-
-        # Check path security before proceeding
-        validate_duo_context_exclusions(file_path)
-
-        return await _execute_action(
-            self.metadata,  # type: ignore
-            contract_pb2.Action(runReadFile=contract_pb2.ReadFile(filepath=file_path)),
-        )
-
-    def format_display_message(
-        self, args: ReadFileInput, _tool_response: Any = None
-    ) -> str:
-        msg = "Read file"
-        if not FileExclusionPolicy.is_allowed_for_project(self.project, args.file_path):
-            msg += FileExclusionPolicy.format_user_exclusion_message([args.file_path])
-
-        return msg
-
-
 class ReadFilesInput(BaseModel):
     file_paths: list[str] = Field(description="List of file paths to read")
 
@@ -137,6 +94,10 @@ class ReadFiles(DuoBaseTool):
     """
     args_schema: Type[BaseModel] = ReadFilesInput  # type: ignore
     handle_tool_error: bool = True
+    eval_prompts: List[str] = [
+        "I need to read the content of the `readme.md` and `faq.md`",
+        "Let me check if class `DuoBaseTool` exists in `./tools/base.py`",
+    ]
 
     async def _arun(self, file_paths: list[str]) -> str:
         policy = FileExclusionPolicy(self.project)

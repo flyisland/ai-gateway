@@ -53,7 +53,6 @@ CHAT_READ_ONLY_TOOLS = [
     "gitlab_blob_search",
     "gitlab_merge_request_search",
     "gitlab_documentation_search",
-    "read_file",
     "read_files",
     "get_repository_file",
     "list_dir",

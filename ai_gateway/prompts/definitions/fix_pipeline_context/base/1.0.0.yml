@@ -25,7 +25,7 @@ prompt_template:
     Follow these steps:
     <context_building_steps>
       <context_building_step>Use the `get_job_logs` tool to retrieve errors in the job logs</context_building_step>
-      <context_building_step>Use the `find_files` tool to locate any GitLab CI/CD files and the `read_file` tool to examine the file contents</context_building_step>
+      <context_building_step>Use the `find_files` tool to locate any GitLab CI/CD files and the `read_files` tool to examine the file contents</context_building_step>
     </context_building_steps>
   placeholder: history
 params:

@@ -31,7 +31,7 @@ Analyze the security implications of this code.
 <response>
   I need to examine the code structure first.
   <tool_calls>
-    [{"name": "read_file", "args": {"path": "src/auth.py"}}]
+    [{"name": "read_files", "args": {"paths": ["src/auth.py"]}}]
   </tool_calls>
 </response>
 ```

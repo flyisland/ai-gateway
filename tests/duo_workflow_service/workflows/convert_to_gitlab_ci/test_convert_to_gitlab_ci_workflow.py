@@ -155,7 +155,9 @@ async def test_file_content_too_large(mock_token_counter, workflow_state, workfl
         MAX_SINGLE_MESSAGE_TOKENS + 1
     )
 
-    result = workflow._load_file_contents(["large file content"], workflow_state)
+    # Mock readFiles JSON response format
+    json_response = json.dumps({"test-file": {"content": "large file content"}})
+    result = workflow._load_file_contents([json_response], workflow_state)
 
     mock_token_counter.assert_called_once_with("ci_pipelines_manager_agent")
     mock_token_counter.return_value.count_string_content.assert_called_once_with(
@@ -164,6 +166,17 @@ async def test_file_content_too_large(mock_token_counter, workflow_state, workfl
     assert "File too large" in result["ui_chat_log"][0]["content"]
     assert "conversation_history" not in result
     assert "additional_context" not in result
+
+
+@pytest.mark.asyncio
+async def test_file_content_empty_response(workflow_state, workflow):
+    """Test that empty JSON response raises RuntimeError with appropriate message."""
+    json_response = json.dumps({})
+
+    with pytest.raises(
+        RuntimeError, match="Failed to load file contents: empty response"
+    ):
+        workflow._load_file_contents([json_response], workflow_state)
 
 
 @pytest.mark.asyncio
@@ -231,7 +244,7 @@ async def test_workflow_run(
 
     mock_run_tool_node_class.return_value.run.side_effect = [
         {
-            "file_contents": ["test string"],
+            "file_contents": ['{"test-file-path": {"content": "test string"}}'],
             "state": workflow_state,
             "ui_chat_log": [],
         },

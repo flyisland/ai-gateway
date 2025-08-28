@@ -55,7 +55,7 @@ def _router(state: WorkflowState) -> str:
 
     tool_name = tool_calls[0].get("name")
 
-    if tool_name == "read_file":
+    if tool_name == "read_files":
         return Routes.AGENT
 
     if tool_name == "ci_linter":
@@ -172,11 +172,27 @@ class Workflow(AbstractWorkflow):
         return graph.compile(checkpointer=checkpointer)
 
     def _load_file_contents(self, file_contents: list[str], state: WorkflowState):
-        content = file_contents[0]
-        if not file_contents or "Error running tool: unable to open file:" in content:
+        json_response = file_contents[0]
+        if not file_contents:
             raise RuntimeError(
                 "Failed to load file contents, ensure that file is present"
             )
+
+        try:
+            files_data = json.loads(json_response)
+        except json.JSONDecodeError:
+            raise RuntimeError("Failed to parse file contents response")
+
+        if not files_data:
+            raise RuntimeError("Failed to load file contents: empty response")
+
+        # Get the first file's content (assuming single file for this workflow)
+        file_info = list(files_data.values())[0]
+
+        if "error" in file_info:
+            raise RuntimeError(f"Failed to load file contents: {file_info['error']}")
+
+        content = file_info["content"]
 
         if (
             ApproximateTokenCounter(AGENT_NAME).count_string_content(content)
@@ -217,7 +233,7 @@ class Workflow(AbstractWorkflow):
 
     def _setup_translator_nodes(self, tools_registry: ToolsRegistry):
         translator_agent: Any
-        translation_tools = ["create_file_with_contents", "read_file", "ci_linter"]
+        translation_tools = ["create_file_with_contents", "read_files", "ci_linter"]
         agents_toolset = tools_registry.toolset(translation_tools)
 
         translator_agent = self._prompt_registry.get_on_behalf(
@@ -257,8 +273,8 @@ class Workflow(AbstractWorkflow):
         graph.add_node(
             "load_files",
             RunToolNode[WorkflowState](
-                tool=tools_registry.get("read_file"),  # type: ignore
-                input_parser=lambda _: [{"file_path": ci_config_file_path}],
+                tool=tools_registry.get("read_files"),  # type: ignore
+                input_parser=lambda _: [{"file_paths": [ci_config_file_path]}],
                 output_parser=self._load_file_contents,  # type: ignore
                 flow_type=self._workflow_type,
             ).run,
