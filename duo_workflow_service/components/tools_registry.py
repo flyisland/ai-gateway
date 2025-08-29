@@ -103,6 +103,8 @@ _AGENT_PRIVILEGES: dict[str, list[Type[BaseTool]]] = {
         tools.Grep,
         tools.Mkdir,
         tools.ExtractLinesFromText,
+        tools.RunTests,
+        tools.JsonParser,
     ],
     "use_git": [
         tools.git.Command,

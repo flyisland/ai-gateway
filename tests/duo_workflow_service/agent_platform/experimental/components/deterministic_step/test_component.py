@@ -156,6 +156,7 @@ def deterministic_step_component_fixture(
         internal_event_client=mock_internal_event_client,
         ui_log_events=ui_log_events,
         ui_role_as=ui_role_as,
+        output_mappings={"context:test": "key"},  # Add a default for testing
     )
 
 
@@ -266,6 +267,36 @@ class TestDeterministicStepComponentInitialization:
                 toolset=mock_toolset,
                 tool_name="test_tool",
             )
+
+    def test_initialization_with_output_mappings(
+        self, component_name, flow_id, flow_type, mock_toolset
+    ):
+        """Test that the component can be initialized with output_mappings."""
+        mappings = {"context:my_var": "result_key"}
+        component = DeterministicStepComponent(
+            name=component_name,
+            flow_id=flow_id,
+            flow_type=flow_type,
+            inputs=["context:user_input"],
+            tool_name="test_tool",
+            toolset=mock_toolset,
+            output_mappings=mappings,
+        )
+        assert component.output_mappings == mappings
+
+    def test_initialization_without_output_mappings(
+        self, component_name, flow_id, flow_type, mock_toolset
+    ):
+        """Test that output_mappings defaults to an empty dict if not provided."""
+        component = DeterministicStepComponent(
+            name=component_name,
+            flow_id=flow_id,
+            flow_type=flow_type,
+            inputs=["context:user_input"],
+            tool_name="test_tool",
+            toolset=mock_toolset,
+        )
+        assert component.output_mappings == {}
 
 
 class TestDeterministicStepComponentToolValidation:
@@ -506,6 +537,10 @@ class TestDeterministicStepComponentAttachNodes:
         assert node_call_kwargs["name"] == f"{component_name}#deterministic_step"
         assert node_call_kwargs["tool_name"] == tool_name
         assert node_call_kwargs["inputs"] == inputs
+        assert (
+            node_call_kwargs["output_mappings"]
+            == deterministic_step_component.output_mappings
+        )
         assert node_call_kwargs["flow_id"] == flow_id
         assert node_call_kwargs["flow_type"] == flow_type
         assert (

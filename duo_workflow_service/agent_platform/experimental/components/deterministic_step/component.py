@@ -65,6 +65,14 @@ class DeterministicStepComponent(BaseComponent):
     ui_log_events: list[UILogEventsDeterministicStep] = Field(default_factory=list)
     ui_role_as: Literal["tool"] = "tool"
 
+    output_mappings: dict[str, str] = Field(
+        default_factory=dict,
+        description="""
+        A mapping from a destination IOKey string to a path within the tool's result.
+        Example: {'context:my_var': 'key_in_result')"}
+        """,
+    )
+
     validated_tool: BaseTool = Field(init=False)
 
     @model_validator(mode="before")
@@ -153,6 +161,7 @@ class DeterministicStepComponent(BaseComponent):
             name=self.__entry_hook__(),
             tool_name=self.tool_name,
             inputs=self.inputs,
+            output_mappings=self.output_mappings,
             flow_id=self.flow_id,
             flow_type=self.flow_type,
             internal_event_client=self.internal_event_client,

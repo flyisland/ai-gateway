@@ -14,6 +14,7 @@ from .issue import *
 from .job import *
 from .mcp_tools import *
 from .merge_request import *
+from .parser import *
 from .pipeline import *
 from .planner import *
 from .previous_context import *
@@ -23,6 +24,7 @@ from .request_user_clarification import *
 from .search import *
 from .search_system import *
 from .security import *
+from .testing import *
 from .toolset import *
 from .user import *
 from .vulnerabilities.severity import *
