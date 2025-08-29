@@ -153,10 +153,15 @@ def mock_log_exception_fixture():
         yield mock
 
 
+@pytest.fixture(name="anthropic_env")
+def setup_anthropic_env(monkeypatch):
+    monkeypatch.setenv("ANTHROPIC_API_KEY", "test-key")
+
+
 @pytest.mark.asyncio
 @pytest.mark.parametrize("duo_workflow_prompt_registry_enabled", [False, True])
 async def test_translation_tools(
-    tools_registry_with_all_privileges, mock_checkpointer, workflow
+    anthropic_env, tools_registry_with_all_privileges, mock_checkpointer, workflow
 ):
     """Test that all tools used by the gitlab ci translator agent are available in the tools registry."""
 
