@@ -427,8 +427,7 @@ class WorkItemBaseTool(DuoBaseTool):
     ) -> str:
         description = input_kwargs.get("description")
         if description is not None:
-            error = validate_no_quick_actions(description, field="description")
-            if error:
+            if error := validate_no_quick_actions(description, field="description"):
                 return json.dumps({"error": error})
 
         type_id = await self._resolve_work_item_type_id(namespace_path, type_name)
