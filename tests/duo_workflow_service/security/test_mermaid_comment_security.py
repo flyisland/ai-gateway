@@ -273,3 +273,83 @@ sequenceDiagram
         assert (
             "B(Oops prompt injection)" in result
         )  # This is part of the diagram, not a comment
+
+    def test_unicode_whitespace_bypass_prevention(self):
+        """Test that Unicode whitespace characters don't bypass comment detection."""
+        # Non-breaking space (U+00A0)
+        test_input_nbsp = """```mermaid
+flowchart TD
+    A --> B
+\u00a0\u00a0%% Malicious comment with non-breaking spaces
+    B --> C
+```"""
+        result = strip_mermaid_comments(test_input_nbsp)
+        assert "Malicious comment" not in result
+        assert "A --> B" in result
+        assert "B --> C" in result
+
+        # Tab character mixed with other Unicode whitespace
+        test_input_mixed = """```mermaid
+flowchart TD
+    A --> B
+\u2003\t%% Comment with em space and tab
+    B --> C
+```"""
+        result = strip_mermaid_comments(test_input_mixed)
+        assert "Comment with em space" not in result
+        assert "A --> B" in result
+        assert "B --> C" in result
+
+        # Various Unicode whitespace characters
+        test_input_various = """```mermaid
+flowchart TD
+\u2000%% En quad space comment
+    A --> B
+\u2001%% Em quad space comment
+    B --> C
+\u2009%% Thin space comment
+    C --> D
+```"""
+        result = strip_mermaid_comments(test_input_various)
+        assert "En quad space" not in result
+        assert "Em quad space" not in result
+        assert "Thin space" not in result
+        assert "A --> B" in result
+        assert "B --> C" in result
+        assert "C --> D" in result
+
+    def test_cleanup_logic_edge_cases(self):
+        """Test that the cleanup logic handles edge cases without errors."""
+        # Test with multiple consecutive blank lines in different formats
+        test_input_regular = """```mermaid
+flowchart TD
+    %% Comment 1
+
+
+    A --> B
+
+
+
+    %% Comment 2
+    B --> C
+```"""
+        result = strip_mermaid_comments(test_input_regular)
+        assert "Comment 1" not in result
+        assert "Comment 2" not in result
+        assert "A --> B" in result
+        assert "B --> C" in result
+
+        # Test with escaped newlines
+        test_input_escaped = """```mermaid\\n\\nflowchart TD\\n%% Comment\\n\\n\\n    A --> B\\n\\n\\n\\n    B --> C\\n```"""
+        result = strip_mermaid_comments(test_input_escaped)
+        assert "Comment" not in result
+        assert "A --> B" in result
+        assert "B --> C" in result
+
+        # Test edge case that could potentially cause division issues in old code
+        test_input_minimal = """```mermaid
+%%
+A
+```"""
+        result = strip_mermaid_comments(test_input_minimal)
+        assert "A" in result

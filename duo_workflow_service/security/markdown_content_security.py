@@ -25,7 +25,7 @@ def _apply_recursively(response: Any, func: Callable[[str], str]) -> Any:
     elif response is None:
         return None
     else:
-        # Never allow unknown types to bypass filtering
+        # Reject unsupported types for security
         raise SecurityException(
             f"Unsupported type for security processing: {type(response).__name__}. "
             f"All data must be explicitly validated for security."
@@ -35,26 +35,20 @@ def _apply_recursively(response: Any, func: Callable[[str], str]) -> Any:
 def strip_hidden_html_comments(
     response: Union[str, Dict[str, Any], List[Any]],
 ) -> Union[str, List[Union[str, Dict[str, Any]]]]:
-    """Strip HTML comments using Bleach, leave everything else unchanged.
-
-    Uses Mozilla's Bleach library (https://github.com/mozilla/bleach) to safely
-    remove HTML comments while preserving all other content exactly as it was.
-    Other security measures (like dangerous tag encoding) are handled by other
-    functions in PromptSecurity.
+    """Strip HTML comments using Bleach library while preserving other content.
 
     Args:
         response: The response data to process
 
     Returns:
-        Response with HTML comments removed using Bleach, everything else unchanged
+        Response with HTML comments removed
     """
 
     def _strip_comments(text: str) -> str:
         if not text or not isinstance(text, str):
             return text
 
-        # Dangerous tags are already encoded as &lt;system&gt; etc. by encode_dangerous_tags
-        # This function focuses solely on removing HTML comments while preserving all other content
+        # Focus on HTML comment removal only
 
         # Early exit if no HTML comments are present in any format
         has_regular_comments = "<!--" in text
@@ -67,16 +61,13 @@ def strip_hidden_html_comments(
         if not has_regular_comments and not has_escaped_comments:
             return text
 
-        # Remove JSON-escaped HTML comments (e.g., from json.dumps serialization)
-        # Handles patterns like \\u003c!-- ... --\\u003e and \\\\u003c!-- ... --\\\\u003e
+        # Remove JSON-escaped HTML comments
         text = re.sub(r"\\+u003[cC]!--.*?--\\+u003[eE]", "", text, flags=re.DOTALL)
 
         # Remove backslash-escaped HTML comments
-        # Handles patterns like \\<!-- ... --\\>
         text = re.sub(r"\\+<!--.*?--\\+>", "", text, flags=re.DOTALL)
 
-        # Use Bleach to strip comments while preserving common HTML tags
-        # Extend Bleach's default allowed tags with commonly used HTML elements
+        # Configure Bleach with extended allowed tags
         allowed_tags = list(bleach.ALLOWED_TAGS) + [
             "div",
             "span",
@@ -98,7 +89,7 @@ def strip_hidden_html_comments(
             "tbody",
         ]
 
-        # Allow common attributes that tests expect
+        # Configure allowed attributes
         allowed_attributes = bleach.ALLOWED_ATTRIBUTES
         allowed_attributes.update(
             {
@@ -115,8 +106,7 @@ def strip_hidden_html_comments(
             strip=False,
         )
 
-        # After Bleach processing, handle any remaining malformed comment patterns
-        # that might have been escaped instead of removed
+        # Clean up any remaining escaped comment patterns
         result = re.sub(r"&lt;!--.*?--&gt;", "", result, flags=re.DOTALL)
 
         return result
@@ -147,21 +137,17 @@ def strip_mermaid_comments(
         def process_mermaid_block(match):
             block_content = match.group(0)
 
-            # Remove multi-line directive comments %%{ ... }%% (must be first to handle nested braces)
+            # Remove multi-line directive comments %%{ ... }%%
             processed = re.sub(r"%%\{.*?\}%%", "", block_content, flags=re.DOTALL)
 
-            # Remove line comments that start with %% (handle regular, escaped, and double-escaped newlines)
+            # Remove line comments starting with %%
             processed = re.sub(
-                r"(^|\\+n)[ \t]*%%.*?(?=\\+n|$)", r"\1", processed, flags=re.MULTILINE
+                r"(^|\\+n)\s*%%.*?(?=\\+n|$)", r"\1", processed, flags=re.MULTILINE
             )
 
-            # Clean up extra blank lines (handle both single and double escaping)
-            processed = re.sub(
-                r"\\+n\s*\\+n\s*\\+n",
-                lambda m: m.group(0)[: len(m.group(0)) // 3 * 2],
-                processed,
-            )
-            processed = re.sub(r"\n\s*\n\s*\n", "\n\n", processed)
+            # Clean up excessive blank lines
+            processed = re.sub(r"(\\+n\s*){3,}", r"\1\1", processed)
+            processed = re.sub(r"(\n\s*){3,}", "\n\n", processed)
 
             return processed
 
@@ -173,7 +159,7 @@ def strip_mermaid_comments(
             flags=re.DOTALL | re.IGNORECASE,
         )
 
-        # Process escaped mermaid blocks from JSON (```\\nmermaid\\n ... ``` and ```\\\\nmermaid\\\\n ... ```)
+        # Process JSON-escaped mermaid blocks
         text = re.sub(
             r"```\\+n\s*mermaid\\b.*?```",
             process_mermaid_block,
