@@ -1145,7 +1145,9 @@ async def test_created_status_with_no_checkpoint_succeeds(
     config: RunnableConfig = {"configurable": {}}
 
     # This should succeed and return START event
-    status_event, event_property = await gitlab_workflow._get_initial_status_event(config)
+    status_event, event_property = await gitlab_workflow._get_initial_status_event(
+        config
+    )
 
     assert status_event == WorkflowStatusEventEnum.START
     assert event_property == EventPropertyEnum.WORKFLOW_ID
@@ -1179,5 +1181,7 @@ async def test_created_status_with_existing_checkpoint_raises_error(
     with pytest.raises(UnsupportedStatusEvent) as exc_info:
         await gitlab_workflow._get_initial_status_event(config)
 
-    assert "Workflow with status 'created' should not have existing checkpoints" in str(exc_info.value)
+    assert "Workflow with status 'created' should not have existing checkpoints" in str(
+        exc_info.value
+    )
     assert f"Found checkpoint: {mock_checkpoint}" in str(exc_info.value)
