@@ -152,7 +152,8 @@ brew install grpcurl
 
 Run the following command to export all tool specifications:
 
-```shell
+` ` `shell
+# Replace hostname and port as needed for your environment
 # With jq (requires jq to be installed)
 grpcurl -plaintext -d '{}' gdk.test:50052 DuoWorkflow/ListTools | jq '.tools[] | {name: .function.name, description: .function.description}'
 
