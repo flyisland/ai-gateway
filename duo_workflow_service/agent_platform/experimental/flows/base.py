@@ -94,16 +94,14 @@ class Flow(AbstractWorkflow):
         )
         self._config = config
 
+        self._flow_prompt_registry = InMemoryPromptRegistry(prompt_registry)
         if self._config.prompts:
-            self._flow_prompt_registry = InMemoryPromptRegistry(prompt_registry)
             for prompt_config in self._config.prompts:
                 prompt_id = prompt_config["prompt_id"]
                 self._flow_prompt_registry.register_prompt(
                     prompt_id=prompt_id,
                     prompt_data=prompt_config,
                 )
-        else:
-            self._flow_prompt_registry = prompt_registry
 
     # pylint: enable=dangerous-default-value
 
