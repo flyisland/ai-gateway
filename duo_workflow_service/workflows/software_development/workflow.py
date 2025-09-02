@@ -20,17 +20,13 @@ from langgraph.graph import (  # pylint: disable=no-langgraph-langchain-imports
 
 from ai_gateway.model_metadata import current_model_metadata_context
 from duo_workflow_service.agents import (
-    Agent,
     AgentV2,
     HandoverAgent,
     PlanSupervisorAgent,
     PlanTerminatorAgent,
     ToolsExecutor,
 )
-from duo_workflow_service.agents.prompts import (
-    BUILD_CONTEXT_SYSTEM_MESSAGE,
-    HANDOVER_TOOL_NAME,
-)
+from duo_workflow_service.agents.prompts import HANDOVER_TOOL_NAME
 from duo_workflow_service.components import (
     PlanApprovalComponent,
     ToolsApprovalComponent,
@@ -49,10 +45,8 @@ from duo_workflow_service.entities import (
     WorkflowState,
     WorkflowStatusEnum,
 )
-from duo_workflow_service.llm_factory import create_chat_model
 from duo_workflow_service.tracking.errors import log_exception
 from duo_workflow_service.workflows.abstract_workflow import AbstractWorkflow
-from lib.feature_flags.context import FeatureFlag, is_feature_enabled
 
 # Constants
 QUEUE_MAX_SIZE = 1
@@ -367,39 +361,22 @@ class Workflow(AbstractWorkflow):
     ):
         context_builder_toolset = tools_registry.toolset(CONTEXT_BUILDER_TOOLS)
 
-        if is_feature_enabled(FeatureFlag.DUO_WORKFLOW_PROMPT_REGISTRY):
-            context_builder: AgentV2 = cast(
-                AgentV2,
-                self._prompt_registry.get_on_behalf(
-                    self._user,
-                    "workflow/context_builder",
-                    "^1.0.0",
-                    tools=context_builder_toolset.bindable,  # type: ignore[arg-type]
-                    workflow_id=self._workflow_id,
-                    workflow_type=self._workflow_type,
-                    http_client=self._http_client,
-                    model_metadata=current_model_metadata_context.get(),
-                ),
-            )
-        else:
-            context_builder = Agent(
-                goal=goal,
-                model=create_chat_model(
-                    max_tokens=MAX_TOKENS_TO_SAMPLE,
-                    config=self._model_config,
-                ),  # type: ignore
-                name="context_builder",
-                system_prompt=BUILD_CONTEXT_SYSTEM_MESSAGE.format(
-                    handover_tool_name=HANDOVER_TOOL_NAME,
-                    project_id=self._project["id"],  # type: ignore[index]
-                    project_name=self._project["name"],  # type: ignore[index]
-                    project_url=self._project["http_url_to_repo"],  # type: ignore[index]
-                ),
-                toolset=context_builder_toolset,
+        context_builder: AgentV2 = cast(
+            AgentV2,
+            self._prompt_registry.get_on_behalf(
+                self._user,
+                "workflow/context_builder",
+                "^1.0.0",
+                tools=context_builder_toolset.bindable,  # type: ignore[arg-type]
                 workflow_id=self._workflow_id,
-                http_client=self._http_client,
                 workflow_type=self._workflow_type,
-            )
+                http_client=self._http_client,
+                model_metadata=current_model_metadata_context.get(),
+                prompt_template_inputs={
+                    "goal": goal,
+                },
+            ),
+        )
 
         return {
             "agent": context_builder,
