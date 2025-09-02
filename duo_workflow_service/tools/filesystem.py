@@ -166,15 +166,15 @@ class ReadFiles(DuoBaseTool):
                 response = file_contents_result_action_response.response
                 if response:
                     log.info(f"response_length={len(response)}")
-                plainTextResponse = (
+                plain_text_response = (
                     file_contents_result_action_response.plainTextResponse
                 )
-                if plainTextResponse:
+                if plain_text_response:
                     log.info(
-                        f"plainTextResponse.response_length={len(plainTextResponse.response)}"
+                        f"plainTextResponse.response_length={len(plain_text_response.response)}"
                     )
-                    if plainTextResponse.error:
-                        log.info(f"plainTextResponse.error={plainTextResponse.error}")
+                    if plain_text_response.error:
+                        log.info(f"plainTextResponse.error={plain_text_response.error}")
 
                 return "Could not read files"
 
