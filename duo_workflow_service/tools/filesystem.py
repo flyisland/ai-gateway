@@ -3,11 +3,15 @@ from enum import IntEnum
 from typing import Any, List, Type
 
 import gitmatch
+import structlog
 from langchain.tools.base import ToolException
 from pydantic import BaseModel, Field
 
 from contract import contract_pb2
-from duo_workflow_service.executor.action import _execute_action
+from duo_workflow_service.executor.action import (
+    _execute_action,
+    _execute_action_and_get_action_response,
+)
 from duo_workflow_service.policies.file_exclusion_policy import (
     CONTEXT_EXCLUSION_MESSAGE,
     FileExclusionPolicy,
@@ -137,6 +141,7 @@ class ReadFiles(DuoBaseTool):
     async def _arun(self, file_paths: list[str]) -> str:
         policy = FileExclusionPolicy(self.project)
         file_paths, excluded_file_paths = policy.filter_allowed(file_paths)
+        log = structlog.stdlib.get_logger("workflow")
 
         for file_path in file_paths:
             validate_duo_context_exclusions(file_path)
@@ -144,14 +149,34 @@ class ReadFiles(DuoBaseTool):
         result_dict = {}
 
         if file_paths:
-            file_contents_result = await _execute_action(
-                self.metadata,  # type: ignore
-                contract_pb2.Action(
-                    runReadFiles=contract_pb2.ReadFiles(filepaths=file_paths)
-                ),
+            file_contents_result_action_response = (
+                await _execute_action_and_get_action_response(
+                    self.metadata,  # type: ignore
+                    contract_pb2.Action(
+                        runReadFiles=contract_pb2.ReadFiles(filepaths=file_paths)
+                    ),
+                )
             )
 
-            result_dict = json.loads(file_contents_result)
+            try:
+                file_contents_result = file_contents_result_action_response.response
+                result_dict = json.loads(file_contents_result)
+            except json.JSONDecodeError as e:
+                log.error(f"Could not read files: {e}")
+                response = file_contents_result_action_response.response
+                if response:
+                    log.info(f"response_length={len(response)}")
+                plainTextResponse = (
+                    file_contents_result_action_response.plainTextResponse
+                )
+                if plainTextResponse:
+                    log.info(
+                        f"plainTextResponse.response_length={len(plainTextResponse.response)}"
+                    )
+                    if plainTextResponse.error:
+                        log.info(f"plainTextResponse.error={plainTextResponse.error}")
+
+                return "Could not read files"
 
         # Add excluded files with error messages
         for path in excluded_file_paths:
