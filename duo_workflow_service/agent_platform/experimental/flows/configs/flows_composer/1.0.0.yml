@@ -1,0 +1,45 @@
+version: experimental
+environment: background # Environment represents target execution environment - chat or background
+components:
+  - name: "flow_designer"
+    type: AgentComponent
+    prompt_id: "flows_composer/designer"
+    prompt_version: "^1.0.0"
+    ui_log_events:
+      - "on_agent_final_answer"
+    # inputs: ["context:goal"] -- this is simple notation when there is no need to rename inputs to match prompt template
+    inputs:  #  -- this is advanced inputs format, when one needs to rename inputs to match prompt template
+      - from: "context:goal"
+        as: goal
+    toolset:
+      - "get_repository_file"
+      - "list_repository_tree"
+  - name: "flow_engineer"
+    type: AgentComponent
+    prompt_id: "flows_composer/engineer"
+    prompt_version: "^1.0.0"
+    ui_log_events:
+      - "on_agent_final_answer"
+    inputs:
+      - from: "context:flow_designer.final_answer"
+        as: specs 
+      - from: "context:goal"
+        as: goal
+    toolset:
+      - "get_repository_file"
+      - "list_repository_tree"
+      - "read_file"
+      - "list_dir"
+      - "find_files"
+      - "read_file"
+      - "grep"
+      - "create_file_with_contents"
+      - "edit_file"
+      - "mkdir"
+routers:
+  - from: "flow_designer"
+    to: "flow_engineer"
+  - from: "flow_engineer"
+    to: "end"
+flow:
+  entry_point: "flow_designer"
