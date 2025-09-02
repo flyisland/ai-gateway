@@ -158,6 +158,10 @@ class ReadFiles(DuoBaseTool):
                 )
             )
 
+            if not file_contents_result_action_response:
+                log.error("Received empty grpc response")
+                return "Could not read files"
+
             try:
                 file_contents_result = file_contents_result_action_response.response
                 result_dict = json.loads(file_contents_result)
