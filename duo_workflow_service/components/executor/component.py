@@ -7,7 +7,6 @@ from langgraph.graph import StateGraph
 
 from ai_gateway.model_metadata import current_model_metadata_context
 from duo_workflow_service.agents import (
-    Agent,
     AgentV2,
     HandoverAgent,
     PlanSupervisorAgent,
@@ -25,10 +24,7 @@ from duo_workflow_service.components.executor.prompts import (
 )
 from duo_workflow_service.entities import WorkflowState, WorkflowStatusEnum
 from duo_workflow_service.gitlab.gitlab_api import Project
-from duo_workflow_service.llm_factory import create_chat_model
-from duo_workflow_service.workflows.abstract_workflow import MAX_TOKENS_TO_SAMPLE
 from duo_workflow_service.workflows.type_definitions import OsInformationContext
-from lib.feature_flags.context import FeatureFlag, is_feature_enabled
 
 
 class Routes(StrEnum):
@@ -73,40 +69,23 @@ class ExecutorComponent(BaseComponent):
         next_node: str,
         approval_component: Optional[ToolsApprovalComponent],
     ):
-        if is_feature_enabled(FeatureFlag.DUO_WORKFLOW_PROMPT_REGISTRY):
-            agent_v2: AgentV2 = cast(
-                AgentV2,
-                self.prompt_registry.get_on_behalf(
-                    self.user,
-                    "workflow/executor",
-                    "^2.0.0",
-                    tools=self.executor_toolset.bindable,  # type: ignore[arg-type]
-                    workflow_id=self.workflow_id,
-                    workflow_type=self.workflow_type,
-                    http_client=self.http_client,
-                    model_metadata=current_model_metadata_context.get(),
-                ),
-            )
-            agent_v2.prompt_template_inputs.setdefault(
-                "agent_user_environment", {}
-            ).update(self.agent_user_environment)
-            graph.add_node("execution", agent_v2.run)
-        else:
-            base_model_executor = create_chat_model(
-                max_tokens=MAX_TOKENS_TO_SAMPLE,
-                config=self.model_config,
-            )
-            agent = Agent(
-                goal=self.goal,
-                model=base_model_executor,
-                name="executor",
-                system_prompt=self._format_system_prompt(),
-                toolset=self.executor_toolset,
+        agent_v2: AgentV2 = cast(
+            AgentV2,
+            self.prompt_registry.get_on_behalf(
+                self.user,
+                "workflow/executor",
+                "^2.0.0",
+                tools=self.executor_toolset.bindable,  # type: ignore[arg-type]
                 workflow_id=self.workflow_id,
-                http_client=self.http_client,
                 workflow_type=self.workflow_type,
-            )
-            graph.add_node("execution", agent.run)
+                http_client=self.http_client,
+                model_metadata=current_model_metadata_context.get(),
+            ),
+        )
+        agent_v2.prompt_template_inputs.setdefault("agent_user_environment", {}).update(
+            self.agent_user_environment
+        )
+        graph.add_node("execution", agent_v2.run)
 
         tools_executor = ToolsExecutor(
             tools_agent_name="executor",
