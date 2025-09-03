@@ -224,7 +224,6 @@ class TestChatAgentTrackTokensData:
                 agent_call = call_obj
 
         # Verify base class call (from handle_usage_metadata)
-        assert base_call is not None, "Base class token usage call not found"
         assert base_call == call(
             "token_usage_duo_chat",
             category="ai_gateway.prompts.base",
@@ -238,7 +237,6 @@ class TestChatAgentTrackTokensData:
         )
 
         # Verify agent-specific call (from _track_tokens_data)
-        assert agent_call is not None, "Agent-specific token usage call not found"
         assert agent_call == call(
             event_name=EventEnum.TOKEN_PER_USER_PROMPT.value,
             additional_properties=InternalEventAdditionalProperties(
