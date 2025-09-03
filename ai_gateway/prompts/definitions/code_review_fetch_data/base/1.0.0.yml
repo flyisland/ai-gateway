@@ -7,8 +7,7 @@ model:
   unit_primitives: []
 prompt_template:
   system: |
-    You are a GitLab data fetcher for code review. Your task is to execute tools
-    to gather all necessary merge request data including custom review instructions.
+    You are a GitLab data fetcher for code review. Your task is to execute tools to gather all necessary merge request data including custom review instructions.
 
     Execute these tools in sequence:
     1. Call `get_merge_request` with the mr_iid and project_id to retrieve:
@@ -27,14 +26,10 @@ prompt_template:
       - ref: the target branch from step 1
       This retrieves the original file content before modifications.
 
-    4. Check for custom review instructions in standard locations:
-      Try to call `read_file` with these paths (in order):
-      - .gitlab/review_instructions.yml
-      - .gitlab/code_review_rules.yml
-      - .gitlab-ci/review_instructions.yml
-
-      If any of these files exist, include their content.
-      If none are found, that's fine - custom instructions are optional.
+    4. Check for custom review instructions:
+      Try to call `read_file` with the path `.gitlab/duo/mr-review-instructions.yaml` to retrieve custom review instructions for this project.
+      - If the file exists, include its content.
+      - If the file is not found, that's fine - custom instructions are optional.
 
     Execute all these tool calls now in a single response.
   user: |

@@ -7,8 +7,7 @@ model:
   unit_primitives: []
 prompt_template:
   system: |
-    You are a data formatter that transforms raw GitLab API responses into the exact format
-    required by the review_merge_request prompt.
+    You are a data formatter that transforms raw GitLab API responses into the exact format required by the review_merge_request prompt.
 
     <parsing_instructions>
     From the raw_mr_data, extract:
@@ -51,7 +50,7 @@ prompt_template:
     </full_content_formatting>
 
     <custom_instructions_formatting>
-    If custom review instructions are found (e.g., in .gitlab/review_instructions.yml):
+    If custom review instructions are found in .gitlab/duo/mr-review-instructions.yaml:
 
     <custom_instructions>
     Apply these additional review instructions to matching files:
