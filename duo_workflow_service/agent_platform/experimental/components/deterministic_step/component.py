@@ -30,14 +30,25 @@ from lib.internal_events import InternalEventsClient
 
 @register_component(decorators=[inject])
 class DeterministicStepComponent(BaseComponent):
-    _tool_result_key: ClassVar[IOKeyTemplate] = IOKeyTemplate(
+    _tool_responses_key: ClassVar[IOKeyTemplate] = IOKeyTemplate(
         target="context",
-        subkeys=[IOKeyTemplate.COMPONENT_NAME_TEMPLATE, "tool_result"],
+        subkeys=[IOKeyTemplate.COMPONENT_NAME_TEMPLATE, "tool_responses"],
+    )
+    _tool_error_key: ClassVar[IOKeyTemplate] = IOKeyTemplate(
+        target="context",
+        subkeys=[IOKeyTemplate.COMPONENT_NAME_TEMPLATE, "error"],
+    )
+
+    _execution_result_key: ClassVar[IOKeyTemplate] = IOKeyTemplate(
+        target="context",
+        subkeys=[IOKeyTemplate.COMPONENT_NAME_TEMPLATE, "execution_result"],
     )
 
     _outputs: ClassVar[tuple[IOKeyTemplate, ...]] = (
         IOKeyTemplate(target="ui_chat_log"),
-        _tool_result_key,
+        _tool_responses_key,
+        _tool_error_key,
+        _execution_result_key,
     )
 
     internal_event_client: InternalEventsClient = Provide[
@@ -70,6 +81,15 @@ class DeterministicStepComponent(BaseComponent):
             internal_event_client=self.internal_event_client,
             ui_history=UIHistory(
                 events=self.ui_log_events, writer_class=UILogWriterDeterministicStep
+            ),
+            tool_responses_key=self._tool_responses_key.to_iokey(
+                {IOKeyTemplate.COMPONENT_NAME_TEMPLATE: self.name}
+            ),
+            tool_error_key=self._tool_error_key.to_iokey(
+                {IOKeyTemplate.COMPONENT_NAME_TEMPLATE: self.name}
+            ),
+            execution_result_key=self._execution_result_key.to_iokey(
+                {IOKeyTemplate.COMPONENT_NAME_TEMPLATE: self.name}
             ),
         )
 

@@ -1,4 +1,4 @@
-from typing import Any
+from typing import Any, Optional
 
 import structlog
 from langchain_core.tools import BaseTool
@@ -13,6 +13,7 @@ from duo_workflow_service.agent_platform.experimental.state import (
     FlowStateKeys,
     IOKey,
     get_vars_from_state,
+    merge_nested_dict,
 )
 from duo_workflow_service.agent_platform.experimental.ui_log import UIHistory
 from duo_workflow_service.monitoring import duo_workflow_metrics
@@ -39,6 +40,9 @@ class DeterministicStepNode:
         ui_history: UIHistory[
             UILogWriterDeterministicStep, UILogEventsDeterministicStep
         ],
+        tool_responses_key: Optional[IOKey] = None,
+        tool_error_key: Optional[IOKey] = None,
+        execution_result_key: Optional[IOKey] = None,
     ):
         self.name = name
         self._tool_name = tool_name
@@ -50,8 +54,12 @@ class DeterministicStepNode:
         self._internal_event_client = internal_event_client
         self._logger = structlog.stdlib.get_logger("agent_platform")
         self._ui_history = ui_history
+        self._tool_responses_key = tool_responses_key
+        self._tool_error_key = tool_error_key
+        self._execution_result_key = execution_result_key
 
     async def run(self, state: FlowState) -> dict:
+        response, err_format = None, None
         try:
             tool_call_args = get_vars_from_state(self._inputs, state)
 
@@ -73,10 +81,10 @@ class DeterministicStepNode:
                     f"Invalid response type for tool {self._tool_name}: {response}"
                 )
 
-            return {
+            result = {
                 **self._ui_history.pop_state_updates(),
                 FlowStateKeys.CONTEXT: {
-                    self._component_name: {"tool_result": response},
+                    self._component_name: response,
                 },
             }
 
@@ -101,12 +109,29 @@ class DeterministicStepNode:
                 event=UILogEventsDeterministicStep.ON_TOOL_EXECUTION_FAILED,
             )
 
-            return {
+            result = {
                 **self._ui_history.pop_state_updates(),
                 FlowStateKeys.CONTEXT: {
-                    self._component_name: {"tool_result": None, "error": err_format},
+                    self._component_name: err_format,
                 },
             }
+
+        if self._tool_responses_key:
+            tool_responses_dict = self._tool_responses_key.to_nested_dict(response)
+            result = merge_nested_dict(result, tool_responses_dict)
+
+        if self._tool_error_key:
+            tool_error_dict = self._tool_error_key.to_nested_dict(err_format)
+            result = merge_nested_dict(result, tool_error_dict)
+
+        if self._execution_result_key:
+            if err_format or not response:
+                status = "failed"
+            else:
+                status = "success"
+            status_dict = self._execution_result_key.to_nested_dict(status)
+            result = merge_nested_dict(result, status_dict)
+        return result
 
     async def _execute_tool(
         self, tool_call_args: dict[str, Any], tool: BaseTool

@@ -4,14 +4,13 @@ import pytest
 from langchain_core.tools import BaseTool
 from pydantic_core import ValidationError
 
-from duo_workflow_service.agent_platform.experimental.components.agent.ui_log import (
-    UILogEventsAgent,
-)
 from duo_workflow_service.agent_platform.experimental.components.deterministic_step.nodes.deterministic_step_node import (
     DeterministicStepNode,
 )
+from duo_workflow_service.agent_platform.experimental.components.deterministic_step.ui_log import (
+    UILogEventsDeterministicStep,
+)
 from duo_workflow_service.agent_platform.experimental.state import FlowStateKeys, IOKey
-from duo_workflow_service.security.prompt_security import SecurityException
 from lib.internal_events.event_enum import CategoryEnum, EventEnum
 
 
@@ -59,6 +58,17 @@ def mock_get_vars_from_state_fixture():
     ) as mock_get_vars:
         mock_get_vars.return_value = {"param": "value"}
         yield mock_get_vars
+
+
+@pytest.fixture(name="mock_merge_nested_dict")
+def mock_merge_nested_dict_fixture():
+    """Fixture for mocking merge_nested_dict."""
+    with patch(
+        "duo_workflow_service.agent_platform.experimental.components.deterministic_step.nodes.deterministic_step_node.merge_nested_dict"
+    ) as mock_merge:
+        # Make merge_nested_dict just combine the dicts
+        mock_merge.side_effect = lambda d1, d2: {**d1, **d2}
+        yield mock_merge
 
 
 @pytest.fixture(name="mock_tool")
@@ -150,6 +160,7 @@ def deterministic_step_node_fixture(
     mock_prompt_security,
     mock_logger,
     mock_get_vars_from_state,
+    mock_merge_nested_dict,
 ):
     """Fixture for DeterministicStepNode instance."""
     return DeterministicStepNode(
@@ -190,10 +201,8 @@ class TestDeterministicStepNode:
         # Verify result structure
         assert FlowStateKeys.CONTEXT in result
         assert component_name in result[FlowStateKeys.CONTEXT]
-        assert (
-            result[FlowStateKeys.CONTEXT][component_name]["tool_result"]
-            == "Sanitized response"
-        )
+        # Component name should directly contain the sanitized response
+        assert result[FlowStateKeys.CONTEXT][component_name] == "Sanitized response"
 
         # Verify tool execution was called
         mock_tool.arun.assert_called_once_with({"param": "value"})
@@ -209,7 +218,10 @@ class TestDeterministicStepNode:
         assert call_args[1]["tool"] == mock_tool
         assert call_args[1]["tool_call_args"] == {"param": "value"}
         assert call_args[1]["tool_response"] == "Sanitized response"
-        assert call_args[1]["event"] == UILogEventsAgent.ON_TOOL_EXECUTION_SUCCESS
+        assert (
+            call_args[1]["event"]
+            == UILogEventsDeterministicStep.ON_TOOL_EXECUTION_SUCCESS
+        )
 
         # Verify ui_history.pop_state_updates was called
         ui_history.pop_state_updates.assert_called_once()
@@ -233,17 +245,19 @@ class TestDeterministicStepNode:
         # Verify result structure with error
         assert FlowStateKeys.CONTEXT in result
         assert component_name in result[FlowStateKeys.CONTEXT]
-        assert result[FlowStateKeys.CONTEXT][component_name]["tool_result"] is None
+        # Component name should directly contain the error message
         assert (
-            "Tool test_tool not found"
-            in result[FlowStateKeys.CONTEXT][component_name]["error"]
+            "Tool test_tool not found" in result[FlowStateKeys.CONTEXT][component_name]
         )
 
         # Verify ui_history.log.error was called
         ui_history.log.error.assert_called_once()
         call_args = ui_history.log.error.call_args
         assert "Tool test_tool not found" in call_args[1]["error"]
-        assert call_args[1]["event"] == UILogEventsAgent.ON_TOOL_EXECUTION_FAILED
+        assert (
+            call_args[1]["event"]
+            == UILogEventsDeterministicStep.ON_TOOL_EXECUTION_FAILED
+        )
 
     @pytest.mark.asyncio
     async def test_run_type_error_handling(
@@ -273,8 +287,7 @@ class TestDeterministicStepNode:
         # Verify error message in result
         assert FlowStateKeys.CONTEXT in result
         assert component_name in result[FlowStateKeys.CONTEXT]
-        assert result[FlowStateKeys.CONTEXT][component_name]["tool_result"] is None
-        error_msg = result[FlowStateKeys.CONTEXT][component_name]["error"]
+        error_msg = result[FlowStateKeys.CONTEXT][component_name]
         assert "Tool test_tool execution failed due to wrong arguments" in error_msg
         assert "The schema is:" in error_msg
 
@@ -319,8 +332,7 @@ class TestDeterministicStepNode:
         # Verify error message in result
         assert FlowStateKeys.CONTEXT in result
         assert component_name in result[FlowStateKeys.CONTEXT]
-        assert result[FlowStateKeys.CONTEXT][component_name]["tool_result"] is None
-        error_msg = result[FlowStateKeys.CONTEXT][component_name]["error"]
+        error_msg = result[FlowStateKeys.CONTEXT][component_name]
         assert "raised validation error" in error_msg
 
         # Verify internal event tracking for failure
@@ -358,8 +370,7 @@ class TestDeterministicStepNode:
         # Verify error message in result
         assert FlowStateKeys.CONTEXT in result
         assert component_name in result[FlowStateKeys.CONTEXT]
-        assert result[FlowStateKeys.CONTEXT][component_name]["tool_result"] is None
-        error_msg = result[FlowStateKeys.CONTEXT][component_name]["error"]
+        error_msg = result[FlowStateKeys.CONTEXT][component_name]
         assert "Tool test_tool raised key error" in error_msg
 
         # Verify internal event tracking for failure
@@ -397,8 +408,7 @@ class TestDeterministicStepNode:
         # Verify error message in result
         assert FlowStateKeys.CONTEXT in result
         assert component_name in result[FlowStateKeys.CONTEXT]
-        assert result[FlowStateKeys.CONTEXT][component_name]["tool_result"] is None
-        error_msg = result[FlowStateKeys.CONTEXT][component_name]["error"]
+        error_msg = result[FlowStateKeys.CONTEXT][component_name]
         assert "Tool runtime exception due to Generic error" in error_msg
 
         # Verify internal event tracking for failure
@@ -412,6 +422,270 @@ class TestDeterministicStepNode:
             tool_name="test_tool",
             failure_reason="Exception",
         )
+
+
+class TestDeterministicStepNodeWithIOKeys:
+    """Test suite for DeterministicStepNode with IOKey parameters."""
+
+    @pytest.fixture(name="mock_io_key")
+    def mock_io_key_fixture(self):
+        """Fixture for mock IOKey."""
+        mock_key = Mock(spec=IOKey)
+        mock_key.to_nested_dict = Mock()
+        return mock_key
+
+    @pytest.mark.asyncio
+    async def test_run_with_tool_responses_key(
+        self,
+        component_name,
+        inputs,
+        mock_toolset,
+        flow_id,
+        flow_type,
+        mock_internal_event_client,
+        ui_history,
+        flow_state,
+        mock_tool,
+        mock_io_key,
+        mock_get_vars_from_state,
+        mock_tool_monitoring,
+        mock_prompt_security,
+        mock_logger,
+        mock_merge_nested_dict,
+    ):
+        """Test run with tool_responses_key parameter."""
+        # Setup mock for IOKey
+        mock_io_key.to_nested_dict.return_value = {
+            "custom": {"response": {"location": "Sanitized response"}}
+        }
+
+        # Create node with tool_responses_key
+        node = DeterministicStepNode(
+            name="test_node",
+            tool_name="test_tool",
+            component_name=component_name,
+            inputs=inputs,
+            toolset=mock_toolset,
+            flow_id=flow_id,
+            flow_type=flow_type,
+            internal_event_client=mock_internal_event_client,
+            ui_history=ui_history,
+            tool_responses_key=mock_io_key,
+        )
+
+        result = await node.run(flow_state)
+
+        # Verify IOKey.to_nested_dict was called with the response
+        mock_io_key.to_nested_dict.assert_called_once_with("Sanitized response")
+
+        # Verify result contains both component response and custom response location
+        assert result[FlowStateKeys.CONTEXT][component_name] == "Sanitized response"
+        assert result["custom"]["response"]["location"] == "Sanitized response"
+
+    @pytest.mark.asyncio
+    async def test_run_with_tool_error_key(
+        self,
+        component_name,
+        inputs,
+        mock_toolset,
+        flow_id,
+        flow_type,
+        mock_internal_event_client,
+        ui_history,
+        flow_state,
+        mock_tool,
+        mock_io_key,
+        mock_get_vars_from_state,
+        mock_tool_monitoring,
+        mock_prompt_security,
+        mock_logger,
+        mock_merge_nested_dict,
+    ):
+        """Test run with tool_error_key parameter when error occurs."""
+        # Setup mock for IOKey
+        mock_io_key.to_nested_dict.return_value = {
+            "custom": {"error": {"details": "Tool runtime exception due to Test error"}}
+        }
+
+        # Configure tool to raise exception
+        mock_tool.arun = AsyncMock(side_effect=Exception("Test error"))
+
+        # Create node with tool_error_key
+        node = DeterministicStepNode(
+            name="test_node",
+            tool_name="test_tool",
+            component_name=component_name,
+            inputs=inputs,
+            toolset=mock_toolset,
+            flow_id=flow_id,
+            flow_type=flow_type,
+            internal_event_client=mock_internal_event_client,
+            ui_history=ui_history,
+            tool_error_key=mock_io_key,
+        )
+
+        result = await node.run(flow_state)
+
+        # Verify IOKey.to_nested_dict was called with the error
+        mock_io_key.to_nested_dict.assert_called_once()
+        call_args = mock_io_key.to_nested_dict.call_args[0][0]
+        assert "Tool runtime exception due to Test error" in call_args
+
+        # Verify result contains both component error and custom error location
+        assert "Tool runtime exception" in result[FlowStateKeys.CONTEXT][component_name]
+        assert "Tool runtime exception" in result["custom"]["error"]["details"]
+
+    @pytest.mark.asyncio
+    async def test_run_with_execution_result_key_success(
+        self,
+        component_name,
+        inputs,
+        mock_toolset,
+        flow_id,
+        flow_type,
+        mock_internal_event_client,
+        ui_history,
+        flow_state,
+        mock_tool,
+        mock_io_key,
+        mock_get_vars_from_state,
+        mock_tool_monitoring,
+        mock_prompt_security,
+        mock_logger,
+        mock_merge_nested_dict,
+    ):
+        """Test run with execution_result_key parameter for successful execution."""
+        # Setup mock for IOKey
+        mock_io_key.to_nested_dict.return_value = {"execution": {"status": "success"}}
+
+        # Create node with execution_result_key
+        node = DeterministicStepNode(
+            name="test_node",
+            tool_name="test_tool",
+            component_name=component_name,
+            inputs=inputs,
+            toolset=mock_toolset,
+            flow_id=flow_id,
+            flow_type=flow_type,
+            internal_event_client=mock_internal_event_client,
+            ui_history=ui_history,
+            execution_result_key=mock_io_key,
+        )
+
+        result = await node.run(flow_state)
+
+        # Verify IOKey.to_nested_dict was called with "success"
+        mock_io_key.to_nested_dict.assert_called_once_with("success")
+
+        # Verify result contains execution status
+        assert result["execution"]["status"] == "success"
+
+    @pytest.mark.asyncio
+    async def test_run_with_execution_result_key_failure(
+        self,
+        component_name,
+        inputs,
+        mock_toolset,
+        flow_id,
+        flow_type,
+        mock_internal_event_client,
+        ui_history,
+        flow_state,
+        mock_tool,
+        mock_io_key,
+        mock_get_vars_from_state,
+        mock_tool_monitoring,
+        mock_prompt_security,
+        mock_logger,
+        mock_merge_nested_dict,
+    ):
+        """Test run with execution_result_key parameter for failed execution."""
+        # Setup mock for IOKey
+        mock_io_key.to_nested_dict.return_value = {"execution": {"status": "failed"}}
+
+        # Configure tool to raise exception
+        mock_tool.arun = AsyncMock(side_effect=Exception("Test error"))
+
+        # Create node with execution_result_key
+        node = DeterministicStepNode(
+            name="test_node",
+            tool_name="test_tool",
+            component_name=component_name,
+            inputs=inputs,
+            toolset=mock_toolset,
+            flow_id=flow_id,
+            flow_type=flow_type,
+            internal_event_client=mock_internal_event_client,
+            ui_history=ui_history,
+            execution_result_key=mock_io_key,
+        )
+
+        result = await node.run(flow_state)
+
+        # Verify IOKey.to_nested_dict was called with "failed"
+        mock_io_key.to_nested_dict.assert_called_once_with("failed")
+
+        # Verify result contains execution status
+        assert result["execution"]["status"] == "failed"
+
+    @pytest.mark.asyncio
+    async def test_run_with_all_io_keys(
+        self,
+        component_name,
+        inputs,
+        mock_toolset,
+        flow_id,
+        flow_type,
+        mock_internal_event_client,
+        ui_history,
+        flow_state,
+        mock_tool,
+        mock_get_vars_from_state,
+        mock_tool_monitoring,
+        mock_prompt_security,
+        mock_logger,
+        mock_merge_nested_dict,
+    ):
+        """Test run with all IOKey parameters configured."""
+        # Create separate mocks for each key
+        response_key = Mock(spec=IOKey)
+        response_key.to_nested_dict.return_value = {
+            "responses": {"tool": "Sanitized response"}
+        }
+
+        error_key = Mock(spec=IOKey)
+        error_key.to_nested_dict.return_value = {"errors": {"tool": None}}
+
+        status_key = Mock(spec=IOKey)
+        status_key.to_nested_dict.return_value = {"status": "success"}
+
+        # Create node with all keys
+        node = DeterministicStepNode(
+            name="test_node",
+            tool_name="test_tool",
+            component_name=component_name,
+            inputs=inputs,
+            toolset=mock_toolset,
+            flow_id=flow_id,
+            flow_type=flow_type,
+            internal_event_client=mock_internal_event_client,
+            ui_history=ui_history,
+            tool_responses_key=response_key,
+            tool_error_key=error_key,
+            execution_result_key=status_key,
+        )
+
+        result = await node.run(flow_state)
+
+        # Verify all keys were used
+        response_key.to_nested_dict.assert_called_once_with("Sanitized response")
+        error_key.to_nested_dict.assert_called_once_with(None)
+        status_key.to_nested_dict.assert_called_once_with("success")
+
+        # Verify result contains all custom locations
+        assert result["responses"]["tool"] == "Sanitized response"
+        assert result["errors"]["tool"] is None
+        assert result["status"] == "success"
 
 
 class TestDeterministicStepNodeMonitoring:
@@ -545,6 +819,7 @@ class TestDeterministicStepNodeEdgeCases:
         flow_state,
         mock_tool,
         mock_get_vars_from_state,
+        component_name,
     ):
         """Test TypeError formatting when tool has no args_schema."""
         # Configure tool with no schema
@@ -554,7 +829,7 @@ class TestDeterministicStepNodeEdgeCases:
         result = await deterministic_step_node.run(flow_state)
 
         # Verify error message mentions no arguments
-        error_msg = result[FlowStateKeys.CONTEXT]["test_component"]["error"]
+        error_msg = result[FlowStateKeys.CONTEXT][component_name]
         assert "The tool does not accept any argument" in error_msg
 
     @pytest.mark.asyncio
@@ -581,3 +856,55 @@ class TestDeterministicStepNodeEdgeCases:
         assert "ui_state" in result
         assert result["ui_state"] == {"key": "value"}
         assert FlowStateKeys.CONTEXT in result
+
+    @pytest.mark.asyncio
+    async def test_response_with_list_type(
+        self,
+        deterministic_step_node,
+        flow_state,
+        mock_tool,
+        component_name,
+        mock_get_vars_from_state,
+        mock_prompt_security,
+    ):
+        """Test that list responses are handled properly."""
+        # Configure tool to return a list
+        mock_tool.arun = AsyncMock(return_value=["item1", "item2"])
+        mock_prompt_security.apply_security_to_tool_response.return_value = [
+            "sanitized1",
+            "sanitized2",
+        ]
+
+        result = await deterministic_step_node.run(flow_state)
+
+        # Should handle list response successfully
+        assert FlowStateKeys.CONTEXT in result
+        assert component_name in result[FlowStateKeys.CONTEXT]
+        assert result[FlowStateKeys.CONTEXT][component_name] == [
+            "sanitized1",
+            "sanitized2",
+        ]
+
+    @pytest.mark.asyncio
+    async def test_response_with_dict_type(
+        self,
+        deterministic_step_node,
+        flow_state,
+        mock_tool,
+        component_name,
+        mock_get_vars_from_state,
+        mock_prompt_security,
+    ):
+        """Test that dict responses are handled properly."""
+        # Configure tool to return a dict
+        mock_tool.arun = AsyncMock(return_value={"key": "value"})
+        mock_prompt_security.apply_security_to_tool_response.return_value = {
+            "key": "sanitized"
+        }
+
+        result = await deterministic_step_node.run(flow_state)
+
+        # Should handle dict response successfully
+        assert FlowStateKeys.CONTEXT in result
+        assert component_name in result[FlowStateKeys.CONTEXT]
+        assert result[FlowStateKeys.CONTEXT][component_name] == {"key": "sanitized"}
