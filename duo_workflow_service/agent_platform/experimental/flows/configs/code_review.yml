@@ -3,7 +3,7 @@ environment: remote
 components:
   # Step 1: Fetch raw data from GitLab APIs
   - name: "fetch_mr_data"
-    type: OneOffComponent
+    type: AgentComponent
     prompt_id: "code_review_fetch_data"
     prompt_version: "^1.0.0"
     inputs:
@@ -16,11 +16,10 @@ components:
       - "list_merge_request_diffs"
       - "get_repository_file"
       - "read_file"
-    max_correction_attempts: 3
     ui_log_events:
-      - "on_tool_call_input"
       - "on_tool_execution_success"
       - "on_tool_execution_failed"
+      - "on_agent_final_answer"
 
   # Step 2: Format raw data into expected structure
   - name: "format_for_review"
@@ -28,7 +27,7 @@ components:
     prompt_id: "code_review_format"
     prompt_version: "^1.0.0"
     inputs:
-      - from: "context:fetch_mr_data.tool_responses"
+      - from: "context:fetch_mr_data.final_answer"
         as: "raw_mr_data"
     toolset: []
     ui_log_events:
