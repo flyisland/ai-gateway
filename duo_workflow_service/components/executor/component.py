@@ -69,6 +69,10 @@ class ExecutorComponent(BaseComponent):
             workflow_type=self.workflow_type,
             http_client=self.http_client,
             model_metadata=current_model_metadata_context.get(),
+            prompt_template_inputs={
+                "set_task_status_tool_name": "set_task_status",
+                "get_plan_tool_name": "get_plan",
+            },
         )
         agent.prompt_template_inputs.setdefault("agent_user_environment", {}).update(
             self.agent_user_environment

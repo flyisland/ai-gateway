@@ -141,8 +141,6 @@ class Agent(Prompt):
     def _prepare_input(self, state: DuoWorkflowStateType) -> dict:
         inputs = cast(dict, state)
         inputs["handover_tool_name"] = HandoverTool.tool_title
-        inputs["get_plan_tool_name"] = "get_plan"
-        inputs["set_task_status_tool_name"] = "set_task_status"
 
         return {**inputs, **self.prompt_template_inputs}
 

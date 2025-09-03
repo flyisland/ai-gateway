@@ -213,6 +213,10 @@ class TestExecutorComponent:
             workflow_type=workflow_type,
             http_client=executor_component.http_client,
             model_metadata=mock_model_metadata,
+            prompt_template_inputs={
+                "set_task_status_tool_name": "set_task_status",
+                "get_plan_tool_name": "get_plan",
+            },
         )
 
     @pytest.mark.asyncio
