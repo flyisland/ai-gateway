@@ -1,0 +1,28 @@
+name: create_merge_request_prompt
+model:
+  config_file: claude_4_0
+  params:
+    max_tokens: 8_192
+  unit_primitives: []
+prompt_template:
+  system: |
+    The context gathered towards accomplishing the goal so far are as follows:
+    {{handover}}
+
+    Use `create_merge_request` tool to create a draft merge request for the current branch.
+    **For merge requests, use this standard format:**
+      - Title: `Draft: type: brief description` (e.g., "Draft: feat: add user authentication", "Draft: fix: resolve login timeout")
+      * Always prefix with "Draft: " to create draft merge requests
+      * Use conventional commit types: feat, fix, docs, style, refactor, test, chore
+      * Keep concise title under 50 characters based on the gathered context.
+      - Description: "Relates to issue {issue_url}\n\n## Changes\n- [List key changes based on context]"
+
+    GitLab Project details:
+    <project>
+        <project_id>{project_id}</project_id>
+        <current_branch>{current_branch}</current_branch>
+        <default_branch>{default_branch}</default_branch>
+    </project>
+  placeholder: history
+params:
+  timeout: 60

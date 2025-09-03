@@ -1,0 +1,116 @@
+version: "experimental"
+environment: remote
+components:
+  - name: "build_context"
+    type: AgentComponent
+    prompt_id: "issue_to_mr_context"
+    prompt_version: "^1.0.0"
+    inputs:
+      - from: "context:goal"
+        as: "issue_url"
+      - from: "context:project_id"
+        as: "project_id"
+    toolset: [
+      "list_issues",
+      "get_issue",
+      "list_issue_notes",
+      "get_issue_note",
+      "get_job_logs",
+      "get_merge_request",
+      "get_project",
+      "get_pipeline_errors",
+      "list_all_merge_request_notes",
+      "list_merge_request_diffs",
+      "gitlab_issue_search",
+      "gitlab_merge_request_search",
+      "read_file",
+      "find_files",
+      "list_dir",
+      "grep",
+      "handover_tool",
+      "get_epic",
+      "list_epics",
+      "get_repository_file",
+      "list_epic_notes",
+      "get_epic_note",
+      "get_commit",
+      "list_commits",
+      "get_commit_comments",
+      "get_commit_diff",
+      "get_work_item",
+      "list_work_items",
+      "get_work_item_notes",
+      "create_merge_request",
+    ]
+  - name: "create_mr_component"
+    type: OneOffComponent
+    prompt_id: "create_merge_request"
+    prompt_version: "^1.0.0"
+    inputs:
+      - from: "context:build_context.final_answer"
+        as: "handover"
+      - from: "context:metadata:current_branch"
+        as: "current_branch"
+      - from: "context:metadata:default_branch"
+        as: "default_branch"
+    toolset: [ "create_merge_request" ]
+  - name: "planner"
+    type: OneOffComponent
+    prompt_id: "workflow/one_off_planner"
+    prompt_version: "^1.0.0"
+    inputs:
+      - from: "context:build_context.final_answer"
+        as: "handover"
+    toolset: ["create_plan_v2"]
+  - name: "execution"
+    type: AgentComponent
+    prompt_id: "issue_to_mr_executor"
+    prompt_version: "^1.0.0"
+    inputs:
+      - from: "context:planner.tool_responses"
+        as: "plan"
+      - from: "context:project_id"
+        as: "project_id"
+      - from: "context:project_http_url_to_repo"
+        as: "project_url"
+      - from: "context:inputs:os_information:content"
+        as: "os_information"
+    toolset: [
+      "list_issues",
+      "get_issue",
+      "list_issue_notes",
+      "get_issue_note",
+      "get_job_logs",
+      "get_merge_request",
+      "get_pipeline_errors",
+      "get_project",
+      "list_all_merge_request_notes",
+      "list_merge_request_diffs",
+      "gitlab_issue_search",
+      "gitlab_merge_request_search",
+      "read_file",
+      "create_file_with_contents",
+      "edit_file",
+      "find_files",
+      "grep",
+      "mkdir",
+      "handover_tool",
+      "get_epic",
+      "list_epics",
+      "get_repository_file",
+      "list_dir",
+      "list_epic_notes",
+      "get_epic_note",
+      "get_commit",
+    ]
+routers:
+  - from: "build_context"
+    to: "create_mr_component"
+  - from: "create_mr_component"
+    to: "planner"
+  - from: "planner"
+    to: "execution"
+  - from: "execution"
+    to: "end"
+flow:
+  entry_point: "build_context"
