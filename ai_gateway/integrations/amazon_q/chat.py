@@ -1,23 +1,69 @@
-from typing import Any, Dict, Iterator, List, Optional
+import hashlib
+from collections.abc import Iterator, Sequence
+from typing import Any, Callable, Dict, List, Optional, Union, cast
 
 from langchain_core.callbacks.manager import CallbackManagerForLLMRun
+from langchain_core.language_models import LanguageModelInput
 from langchain_core.language_models.chat_models import BaseChatModel
 from langchain_core.messages import (
     AIMessage,
     AIMessageChunk,
     BaseMessage,
+    ChatMessage,
     HumanMessage,
     SystemMessage,
+    ToolCallChunk,
+    ToolMessage,
 )
 from langchain_core.outputs import ChatGeneration, ChatGenerationChunk, ChatResult
+from langchain_core.runnables import Runnable
+from langchain_core.tools import BaseTool
+from litellm.types.llms.bedrock import ToolBlock as BedrockToolBlock
+from litellm.types.llms.bedrock import (
+    ToolInputSchemaBlock as BedrockToolInputSchemaBlock,
+)
+from litellm.types.llms.bedrock import ToolJsonSchemaBlock as BedrockToolJsonSchemaBlock
+from litellm.types.llms.bedrock import ToolSpecBlock as BedrockToolSpecBlock
 from pydantic import BaseModel
 
 from ai_gateway.api.auth_utils import StarletteUser
 from ai_gateway.integrations.amazon_q.client import AmazonQClientFactory
+from duo_workflow_service.tools import DuoBaseTool
 
 __all__ = [
     "ChatAmazonQ",
 ]
+
+
+def _convert_message_to_text(
+    message: BaseMessage,
+    human_prompt: str = "\n\nHuman:",
+    ai_prompt: str = "\n\nAssistant:",
+) -> str:
+    content = cast(str, message.content)
+    if isinstance(message, ChatMessage):
+        message_text = f"\n\n{message.role.capitalize()}: {content}"
+    elif isinstance(message, HumanMessage):
+        message_text = f"{human_prompt} {content}"
+    elif isinstance(message, AIMessage):
+        message_text = f"{ai_prompt} {content}"
+    elif isinstance(message, SystemMessage):
+        message_text = content
+    elif isinstance(message, ToolMessage):
+        message_text = content
+    else:
+        raise ValueError(f"Unknown type {message}")
+    return message_text
+
+
+def _get_hash_int(input_str: str) -> int:
+    """Hashes a string to a 64-bit integer."""
+    # Encode the string to bytes
+    hash_object = hashlib.sha256(input_str.encode("utf-8"))
+    # Get the hexadecimal representation
+    hex_digest = hash_object.hexdigest()
+    # Convert the hexadecimal string to an integer
+    return int(hex_digest, 16)
 
 
 class ReferenceSpan(BaseModel):
@@ -99,18 +145,44 @@ class ChatAmazonQ(BaseChatModel):
         stream = response["responseStream"]
 
         try:
-            for event in stream:
-                for key, value in event.items():
+            for all_events in stream:
+                for key, event in all_events.items():
                     if key == "assistantResponseEvent":
-                        content = value.get("content")
+                        content = event.get("content")
                         yield ChatGenerationChunk(
                             message=AIMessageChunk(content=content)
                         )
+                    if key == "toolUseEvent":
+                        yield from self._process_tool_use_event(event=all_events)
                     elif key == "codeReferenceEvent":
-                        yield from self._process_code_reference_event(event)
+                        yield from self._process_code_reference_event(all_events)
 
         finally:
             stream.close()
+
+    def _process_tool_use_event(self, event: Dict) -> Iterator[ChatGenerationChunk]:
+        inp = event.get("input")
+        index = _get_hash_int(event.get("toolUseId", ""))
+        if event.get("stop"):
+            tool_call_chunk = ToolCallChunk(
+                name=event.get("name"),
+                args=inp,
+                id=event.get("toolUseId"),
+                index=index,
+            )
+        else:
+            tool_call_chunk = ToolCallChunk(
+                name=None,
+                args=inp,
+                id=None,
+                index=index,
+            )
+        yield ChatGenerationChunk(
+            message=AIMessageChunk(
+                content="",
+                tool_call_chunks=[tool_call_chunk],
+            ),
+        )
 
     def _process_code_reference_event(
         self, event: Dict
@@ -183,6 +255,7 @@ class ChatAmazonQ(BaseChatModel):
         history: List[dict[str, str]],
         user: StarletteUser,
         role_arn: str,
+        tool_spec: Optional[List[dict[str, str]]] = None,
         **_kwargs,
     ):
         """Performs a `send_message` request to Q API.
@@ -195,6 +268,7 @@ class ChatAmazonQ(BaseChatModel):
                             with either {"userInputMessage": { "content" ... }} or {"assistantResponseMessage": {"content" ... }} formats.
             user (StarletteUser): The current user who performs the request.
             role_arn (str): The role arn of the identity provider.
+            tool_spec (list): A list of tool specs to send to the model provider.
             kwargs (dict): Optional arguments.
 
         Returns:
@@ -205,7 +279,11 @@ class ChatAmazonQ(BaseChatModel):
             role_arn=role_arn,
         )
 
-        return q_client.send_message(message=message, history=history)
+        return q_client.send_message(
+            message=message,
+            history=history,
+            tools=tool_spec,
+        )
 
     def _build_messages(
         self,
@@ -224,19 +302,7 @@ class ChatAmazonQ(BaseChatModel):
                 - history (list): A list of dictionaries representing user and assistant message history,
                     with either {"userInputMessage": { "content" ... }} or {"assistantResponseMessage": {"content" ... }} formats.
         """
-        input_messages = []
-        # Extract the system message to always send it as an input
-        if messages and isinstance(messages[0], SystemMessage):
-            input_messages.append(messages.pop(0))
-        # Support prompt definitions with assistant messages (like react prompts)
-        if len(messages) > 1 and isinstance(messages[-1], AIMessage):
-            assistant_message = messages.pop()
-            user_message = messages.pop()
-            input_messages.append(user_message)
-            input_messages.append(assistant_message)
-        # Support prompt definitions with system + user messages (like explain code prompts)
-        if messages and isinstance(messages[-1], HumanMessage):
-            input_messages.append(messages.pop())
+        messages = messages.copy()  # don't mutate the original list
 
         history = []
         for msg in messages:
@@ -249,11 +315,87 @@ class ChatAmazonQ(BaseChatModel):
 
         message = {
             "content": " ".join(
-                msg.content for msg in input_messages if isinstance(msg.content, str)
+                _convert_message_to_text(message) for message in messages
             )
         }
 
         return message, history
+
+    def _build_tool_spec(
+        self, tools: Optional[List[DuoBaseTool]] = None, **_kwargs: Any
+    ):
+        """
+        Amazon Q toolConfig looks like:
+        "tools": [
+            {
+                "toolSpecification": {
+                    "name": "top_song",
+                    "description": "Get the most popular song played on a radio station.",
+                    "inputSchema": {
+                        "json": {
+                            "type": "object",
+                            "properties": {
+                                "sign": {
+                                    "type": "string",
+                                    "description": "The call sign for the radio station for which you want the most popular song. Example calls signs are WZPZ, and WKRP."
+                                }
+                            },
+                            "required": [
+                                "sign"
+                            ]
+                        }
+                    }
+                }
+            }
+        ]
+        """
+        if not tools:
+            return None
+
+        tool_block_list: List[BedrockToolBlock] = []
+
+        for tool in tools:
+            # FIXME: for now, limit to single tool
+            if tool.name != "get_repository_file":
+                continue
+
+            parameters = tool.input_schema.model_json_schema()
+            tool_input_schema = BedrockToolInputSchemaBlock(
+                json=BedrockToolJsonSchemaBlock(
+                    type=parameters.get("type", ""),
+                    properties=parameters.get("properties", {}),
+                    required=parameters.get("required", []),
+                )
+            )
+            tool_spec = BedrockToolSpecBlock(
+                inputSchema=tool_input_schema,
+                name=tool.name,
+                description=tool.description,
+            )
+            tool_block = BedrockToolBlock(toolSpec=tool_spec)
+            # Amazon Q uses different spelling of spec field
+            tool_block["toolSpecification"] = tool_block.pop("toolSpec")
+            tool_block_list.append(tool_block)
+
+        return tool_block_list
+
+    def bind_tools(
+        self,
+        tools: Sequence[Union[Dict[str, Any], type, Callable, BaseTool]],  # noqa: UP006
+        *,
+        tool_choice: Optional[str] = None,
+        **kwargs: Any,
+    ) -> Runnable[LanguageModelInput, BaseMessage]:
+        """Bind tools to the model.
+
+        Args:
+            tools: Sequence of tools to bind to the model.
+            tool_choice: The tool to use. If "any" then any tool can be used.
+
+        Returns:
+            A Runnable that returns a message.
+        """
+        return self.bind(tools=tools, tool_choice=tool_choice, **kwargs)
 
     @property
     def _identifying_params(self) -> Dict[str, Any]:
