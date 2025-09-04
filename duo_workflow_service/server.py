@@ -28,6 +28,10 @@ from ai_gateway.config import Config
 from ai_gateway.container import ContainerApplication
 from contract import contract_pb2, contract_pb2_grpc
 from duo_workflow_service.components import tools_registry
+from duo_workflow_service.components.mcp_manager import (
+    initialize_mcp_manager,
+    shutdown_mcp_manager,
+)
 from duo_workflow_service.gitlab.connection_pool import connection_pool
 from duo_workflow_service.interceptors.authentication_interceptor import (
     AuthenticationInterceptor,
@@ -486,10 +490,25 @@ async def serve(port: int) -> None:
             reflection.SERVICE_NAME,
         )
         reflection.enable_server_reflection(service_names, server)
+
+        # Initialize MCP Manager
+        try:
+            await initialize_mcp_manager()
+        except Exception as e:
+            log.warning(
+                "Failed to initialize MCP Manager, continuing without MCP support",
+                error=str(e),
+            )
+
         log.info("Starting gRPC server on port %d", port)
         await server.start()
         log.info("Started server")
-        await server.wait_for_termination()
+
+        try:
+            await server.wait_for_termination()
+        finally:
+            # Gracefully shutdown MCP Manager
+            await shutdown_mcp_manager()
 
 
 def configure_cache() -> None:

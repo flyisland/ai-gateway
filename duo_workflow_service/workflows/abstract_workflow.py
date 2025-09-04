@@ -28,7 +28,7 @@ from duo_workflow_service.checkpointer.gitlab_workflow import (
     WorkflowStatusEventEnum,
 )
 from duo_workflow_service.checkpointer.notifier import UserInterface
-from duo_workflow_service.components import ToolsRegistry
+from duo_workflow_service.components import McpToolsRegistry, ToolsRegistry
 from duo_workflow_service.entities import DuoWorkflowStateType
 from duo_workflow_service.gitlab.events import get_event
 from duo_workflow_service.gitlab.gitlab_api import (
@@ -243,20 +243,34 @@ class AbstractWorkflow(ABC):
                 else None
             )
 
-            tools_registry = await ToolsRegistry.configure(
-                outbox=self._outbox,
-                inbox=self._inbox,
-                workflow_config=self._workflow_config,
-                gl_http_client=self._http_client,
-                project=self._project,
-                mcp_tools=(
-                    self._mcp_tools
-                    if self._workflow_config.get("mcp_enabled", False)
-                    else []
-                ),
-                user=user_for_registry,
-                language_server_version=self._language_server_version,
-            )
+            # Use MCP Tools Registry if MCP is enabled, otherwise use the original registry
+            if self._workflow_config.get("mcp_enabled", False):
+                self.log.info("Using MCP Tools Registry")
+                tools_registry = await McpToolsRegistry.configure(
+                    workflow_config=self._workflow_config,
+                    gl_http_client=self._http_client,
+                    outbox=self._outbox,
+                    inbox=self._inbox,
+                    project=self._project,
+                    user=user_for_registry,
+                    language_server_version=self._language_server_version,
+                )
+            else:
+                self.log.info("Using original Tools Registry")
+                tools_registry = await ToolsRegistry.configure(
+                    outbox=self._outbox,
+                    inbox=self._inbox,
+                    workflow_config=self._workflow_config,
+                    gl_http_client=self._http_client,
+                    project=self._project,
+                    mcp_tools=(
+                        self._mcp_tools
+                        if self._workflow_config.get("mcp_enabled", False)
+                        else []
+                    ),
+                    user=user_for_registry,
+                    language_server_version=self._language_server_version,
+                )
             checkpoint_notifier = UserInterface(
                 outbox=self._streaming_outbox, goal=goal
             )
