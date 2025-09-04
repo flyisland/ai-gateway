@@ -7,6 +7,7 @@ from duo_workflow_service.tracking.duo_workflow_metrics import (
     DuoWorkflowMetrics,
     SessionTypeEnum,
 )
+from duo_workflow_service.errors.error_handler import ModelErrorType
 from lib.internal_events import InternalEventAdditionalProperties, InternalEventsClient
 
 
@@ -75,13 +76,44 @@ class TestDuoWorkflowMetrics(unittest.TestCase):
         )
 
         with self.metrics.time_llm_request(
-            model="test_model", request_type="test_request"
+            model="test_model", request_type="test_request", 
+            http_status_code="200", overload_indicator="false"
         ):
             pass
 
         cast(
             MagicMock, self.metrics.llm_request_duration.labels
-        ).assert_called_once_with(model="test_model", request_type="test_request")
+        ).assert_called_once_with(
+            model="test_model", 
+            request_type="test_request",
+            http_status_code="200",
+            overload_indicator="false"
+        )
+        observe_mock.assert_called_once()
+
+    def test_time_llm_request_with_overload(self):
+        observe_mock = MagicMock()
+        labels_result_mock = MagicMock()
+        labels_result_mock.observe = observe_mock
+
+        cast(MagicMock, self.metrics.llm_request_duration.labels).return_value = (
+            labels_result_mock
+        )
+
+        with self.metrics.time_llm_request(
+            model="test_model", request_type="test_request", 
+            http_status_code=429, overload_indicator=True
+        ):
+            pass
+
+        cast(
+            MagicMock, self.metrics.llm_request_duration.labels
+        ).assert_called_once_with(
+            model="test_model", 
+            request_type="test_request",
+            http_status_code="429",
+            overload_indicator="true"
+        )
         observe_mock.assert_called_once()
 
     def test_time_tool_call(self):
@@ -196,10 +228,50 @@ class TestDuoWorkflowMetrics(unittest.TestCase):
                 "model": "test_model",
                 "request_type": "test_request",
                 "stop_reason": "other",
+                "http_status_code": "200",
+                "overload_indicator": "false",
             },
             model="test_model",
             request_type="test_request",
             stop_reason="test_reason",
+            http_status_code="200",
+            overload_indicator="false",
+        )
+
+    def test_llm_response_counter_with_overload(self):
+        self._assert_counter_called(
+            "llm_response_counter",
+            "count_llm_response",
+            {
+                "model": "test_model",
+                "request_type": "test_request",
+                "stop_reason": "other",
+                "http_status_code": "429",
+                "overload_indicator": "true",
+            },
+            model="test_model",
+            request_type="test_request",
+            stop_reason="test_reason",
+            http_status_code=429,
+            overload_indicator=True,
+        )
+
+    def test_llm_response_counter_with_error_status(self):
+        self._assert_counter_called(
+            "llm_response_counter",
+            "count_llm_response",
+            {
+                "model": "test_model",
+                "request_type": "test_request",
+                "stop_reason": "other",
+                "http_status_code": "500",
+                "overload_indicator": "false",
+            },
+            model="test_model",
+            request_type="test_request",
+            stop_reason="test_reason",
+            http_status_code=500,
+            overload_indicator=False,
         )
 
     def test_checkpoint_counter(self):
@@ -297,6 +369,61 @@ class TestDuoWorkflowMetrics(unittest.TestCase):
             {"flow_type": "test_flow_type"},
             flow_type="test_flow_type",
         )
+
+    def test_extract_status_code_from_response(self):
+        # Test with response object
+        response = MagicMock()
+        response.status_code = 200
+        self.assertEqual(DuoWorkflowMetrics._extract_status_code(response), "200")
+
+    def test_extract_status_code_from_exception(self):
+        # Test with exception that has response
+        exception = MagicMock()
+        exception.response = MagicMock()
+        exception.response.status_code = 429
+        self.assertEqual(DuoWorkflowMetrics._extract_status_code(exception), "429")
+
+    def test_extract_status_code_from_code_attribute(self):
+        # Test with object that has code attribute
+        obj = MagicMock()
+        obj.code = 500
+        self.assertEqual(DuoWorkflowMetrics._extract_status_code(obj), "500")
+
+    def test_extract_status_code_unknown(self):
+        # Test with object that has no status code
+        obj = MagicMock()
+        del obj.status_code
+        del obj.response
+        del obj.code
+        self.assertEqual(DuoWorkflowMetrics._extract_status_code(obj), "unknown")
+
+    def test_detect_overload_429_status(self):
+        # Test overload detection with 429 status code
+        response = MagicMock()
+        response.status_code = 429
+        self.assertEqual(DuoWorkflowMetrics._detect_overload(response), "true")
+
+    def test_detect_overload_error_type(self):
+        # Test overload detection with error type
+        response = MagicMock()
+        response.status_code = 200
+        self.assertEqual(
+            DuoWorkflowMetrics._detect_overload(response, ModelErrorType.OVERLOADED_ERROR), 
+            "true"
+        )
+
+    def test_detect_overload_message_keywords(self):
+        # Test overload detection with message keywords
+        exception = MagicMock()
+        exception.status_code = 200
+        exception.message = "Rate limit exceeded"
+        self.assertEqual(DuoWorkflowMetrics._detect_overload(exception), "true")
+
+    def test_detect_overload_false(self):
+        # Test no overload detection
+        response = MagicMock()
+        response.status_code = 200
+        self.assertEqual(DuoWorkflowMetrics._detect_overload(response), "false")
 
 
 if __name__ == "__main__":
