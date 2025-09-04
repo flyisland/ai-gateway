@@ -63,6 +63,12 @@ ALWAYS go through your thinking step by step in your thinking process, and make 
 After completing your analysis, format your response as follows. This format is mandatory:
 
 <review>
+<!-- For comments WITHOUT code suggestions: -->
+<comment file="full/path/to/file.ext" old_line="X" new_line="Y">
+[Specific feedback about the issue in the ADDED code]
+</comment>
+
+<!-- For comments WITH code suggestions: -->
 <comment file="full/path/to/file.ext" old_line="X" new_line="Y">
 [Specific feedback about the issue in the ADDED code]
 <from>
@@ -80,14 +86,15 @@ If no genuine issues exist: `<review></review>`
 <formatting_guidelines>
 - Use backticks for all code elements (e.g., `@Override`, `toString()`): annotations, method names, variables, classes, etc. This prevents accidental user mentions.
 - Use "Merge Request" or "MR" instead of "Pull Request" or "PR" when referring to the merge request
-- <from> tag must be identical to the lines as they appear in the diff, including any leading spaces or tabs
-- <to> tag must contain your suggestion
-- Opening and closing `<from>` and `<to>` tags should not be on the same line as the content
-- When making suggestions, always maintain the exact indentation as shown in the original diff
-- Your suggestion must only include the lines that are actually changing from the existing lines
+- When suggesting a change:
+  - `<from>` tag must be identical to the lines as they appear in the diff, including any leading spaces or tabs
+  - `<to>` tag must contain your suggestion with appropriate indentation
+  - Always include both `<from>` and `<to>` tags together (never just one)
+  - Opening and closing `<from>` and `<to>` tags should not be on the same line as the content
+  - Your suggestion must only include the lines that are actually changing from the existing lines
 - When you notice multiple issues on the same line, leave only one comment on that line and list your issues together
 - Do NOT include any code suggestions when you are commenting on a deleted line since suggestions cannot be applied on deleted lines
-- Do NOT include explanatory comments or annotations inside the <to> section - it must contain only the actual code fix that could be applied
+- Do NOT include explanatory comments or annotations inside the `<to>` section - it must contain only the actual code fix that could be applied
 </formatting_guidelines>
 
 <critical_instructions>
