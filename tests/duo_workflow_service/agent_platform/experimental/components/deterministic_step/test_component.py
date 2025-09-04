@@ -4,7 +4,7 @@ from unittest.mock import AsyncMock, Mock, patch
 
 import pytest
 from langchain.tools import BaseTool
-from pydantic import ValidationError
+from pydantic import BaseModel, ValidationError
 
 from duo_workflow_service.agent_platform.experimental.components.deterministic_step.component import (
     DeterministicStepComponent,
@@ -25,6 +25,7 @@ def mock_tool_fixture():
     tool = Mock(spec=BaseTool)
     tool.name = "test_tool"
     tool._arun = AsyncMock(return_value="tool_result")
+    tool.args_schema = None  # Default to no schema
     return tool
 
 
@@ -34,6 +35,9 @@ def mock_toolset_fixture(mock_tool):
     toolset = Mock(spec=Toolset)
     toolset.__getitem__ = Mock(return_value=mock_tool)
     toolset.__contains__ = Mock(return_value=True)
+    toolset.keys = Mock(
+        return_value=["test_tool", "example_tool"]
+    )  # Added keys() method
     return toolset
 
 
@@ -158,7 +162,6 @@ def mock_deterministic_step_node_cls_fixture(component_name):
         mock_node = Mock()
         mock_node.name = f"{component_name}#deterministic_step"
         mock_cls.return_value = mock_node
-
         yield mock_cls
 
 
@@ -219,6 +222,142 @@ class TestDeterministicStepComponentInitialization:
             )
 
 
+class TestDeterministicStepComponentToolValidation:
+    """Test suite for DeterministicStepComponent tool validation."""
+
+    def test_tool_not_found_in_toolset(self, component_name, flow_id, flow_type):
+        """Test that component raises error when tool is not found in toolset."""
+        mock_toolset = Mock(spec=Toolset)
+        mock_toolset.__contains__ = Mock(return_value=False)
+        mock_toolset.keys = Mock(return_value=["available_tool_1", "available_tool_2"])
+
+        with pytest.raises(
+            KeyError, match="Tool 'nonexistent_tool' not found in toolset"
+        ):
+            DeterministicStepComponent(
+                name=component_name,
+                flow_id=flow_id,
+                flow_type=flow_type,
+                inputs=["context:user_input"],
+                tool_name="nonexistent_tool",
+                toolset=mock_toolset,
+            )
+
+    def test_tool_validation_with_schema_success(
+        self, component_name, flow_id, flow_type
+    ):
+        """Test successful tool validation when tool has schema."""
+        # Create a mock tool with schema
+        mock_tool = Mock(spec=BaseTool)
+        mock_tool.name = "test_tool"
+
+        # Mock the args_schema
+        class MockSchema(BaseModel):
+            user_input: str
+            task_description: str
+
+        mock_tool.args_schema = MockSchema
+
+        # Create mock toolset
+        mock_toolset = Mock(spec=Toolset)
+        mock_toolset.__getitem__ = Mock(return_value=mock_tool)
+        mock_toolset.__contains__ = Mock(return_value=True)
+        mock_toolset.keys = Mock(return_value=["test_tool"])
+
+        # Create component with matching inputs
+        component = DeterministicStepComponent(
+            name=component_name,
+            flow_id=flow_id,
+            flow_type=flow_type,
+            inputs=["context:user_input", "context:task_description"],
+            tool_name="test_tool",
+            toolset=mock_toolset,
+        )
+
+        assert component.validated_tool == mock_tool
+
+    def test_tool_validation_missing_required_params(
+        self, component_name, flow_id, flow_type
+    ):
+        """Test tool validation fails when required parameters are missing."""
+        # Create a mock tool with schema
+        mock_tool = Mock(spec=BaseTool)
+        mock_tool.name = "test_tool"
+
+        # Mock the args_schema with required parameters
+        class MockSchema(BaseModel):
+            required_param: str
+            optional_param: str = "default"
+
+        mock_tool.args_schema = MockSchema
+
+        # Create mock toolset
+        mock_toolset = Mock(spec=Toolset)
+        mock_toolset.__getitem__ = Mock(return_value=mock_tool)
+        mock_toolset.__contains__ = Mock(return_value=True)
+        mock_toolset.keys = Mock(return_value=["test_tool"])
+
+        # Create component missing the required_param
+        with pytest.raises(
+            ValueError, match="Missing required parameters: \\['required_param'\\]"
+        ):
+            DeterministicStepComponent(
+                name=component_name,
+                flow_id=flow_id,
+                flow_type=flow_type,
+                inputs=["context:optional_param"],
+                tool_name="test_tool",
+                toolset=mock_toolset,
+            )
+
+    def test_tool_validation_unknown_params(self, component_name, flow_id, flow_type):
+        """Test tool validation fails when unknown parameters are provided."""
+        # Create a mock tool with schema
+        mock_tool = Mock(spec=BaseTool)
+        mock_tool.name = "test_tool"
+
+        # Mock the args_schema
+        class MockSchema(BaseModel):
+            valid_param: str
+
+        mock_tool.args_schema = MockSchema
+
+        # Create mock toolset
+        mock_toolset = Mock(spec=Toolset)
+        mock_toolset.__getitem__ = Mock(return_value=mock_tool)
+        mock_toolset.__contains__ = Mock(return_value=True)
+        mock_toolset.keys = Mock(return_value=["test_tool"])
+
+        # Create component with unknown parameter
+        with pytest.raises(
+            ValueError, match="Unknown parameters: \\['unknown_param'\\]"
+        ):
+            DeterministicStepComponent(
+                name=component_name,
+                flow_id=flow_id,
+                flow_type=flow_type,
+                inputs=["context:valid_param", "context:unknown_param"],
+                tool_name="test_tool",
+                toolset=mock_toolset,
+            )
+
+    def test_tool_validation_no_schema(
+        self, component_name, flow_id, flow_type, mock_toolset
+    ):
+        """Test tool validation passes when tool has no schema."""
+        # Tool with no schema should pass validation regardless of inputs
+        component = DeterministicStepComponent(
+            name=component_name,
+            flow_id=flow_id,
+            flow_type=flow_type,
+            inputs=["context:any_param", "context:another_param"],
+            tool_name="test_tool",
+            toolset=mock_toolset,
+        )
+
+        assert component.validated_tool is not None
+
+
 class TestDeterministicStepComponentEntryHook:
     """Test suite for DeterministicStepComponent entry hook."""
 
@@ -264,6 +403,12 @@ class TestDeterministicStepComponentAttachNodes:
         assert (
             node_call_kwargs["internal_event_client"]
             == deterministic_step_component.internal_event_client
+        )
+        # Verify validated_tool is passed
+        assert "validated_tool" in node_call_kwargs
+        assert (
+            node_call_kwargs["validated_tool"]
+            == deterministic_step_component.validated_tool
         )
 
         # Verify UI logging

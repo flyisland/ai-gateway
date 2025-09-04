@@ -1,8 +1,9 @@
-from typing import ClassVar, Literal
+from typing import ClassVar, Literal, Optional
 
 from dependency_injector.wiring import Provide, inject
+from langchain_core.tools import BaseTool
 from langgraph.graph import StateGraph
-from pydantic import Field
+from pydantic import Field, model_validator
 
 from ai_gateway.container import ContainerApplication
 from duo_workflow_service.agent_platform.experimental.components import (
@@ -38,12 +39,10 @@ class DeterministicStepComponent(BaseComponent):
         target="context",
         subkeys=[IOKeyTemplate.COMPONENT_NAME_TEMPLATE, "error"],
     )
-
     _execution_result_key: ClassVar[IOKeyTemplate] = IOKeyTemplate(
         target="context",
         subkeys=[IOKeyTemplate.COMPONENT_NAME_TEMPLATE, "execution_result"],
     )
-
     _outputs: ClassVar[tuple[IOKeyTemplate, ...]] = (
         IOKeyTemplate(target="ui_chat_log"),
         _tool_responses_key,
@@ -65,6 +64,68 @@ class DeterministicStepComponent(BaseComponent):
 
     ui_log_events: list[UILogEventsDeterministicStep] = Field(default_factory=list)
     ui_role_as: Literal["tool"] = "tool"
+
+    validated_tool: Optional[BaseTool] = Field(None, init=False)
+
+    @model_validator(mode="after")
+    def validate_tool_configuration(self) -> "DeterministicStepComponent":
+        # Validate that the tool exists
+        if self.tool_name not in self.toolset:
+            available_tools = list(self.toolset.keys())
+            raise KeyError(
+                f"Tool '{self.tool_name}' not found in toolset. "
+                f"Available tools: {available_tools}"
+            )
+
+        tool = self.toolset[self.tool_name]
+        self.validated_tool = tool
+
+        # Validate tool arguments against inputs if schema exists
+        if tool.args_schema:
+            error = self._validate_tool_arguments(tool)
+            if error:
+                schema = tool.args_schema.model_json_schema()  # type: ignore[union-attr]
+                raise ValueError(
+                    f"Tool '{self.tool_name}' configuration validation failed:\n"
+                    f"Error: {error}\n"
+                    f"Expected schema: {schema}"
+                )
+
+        return self
+
+    def _validate_tool_arguments(self, tool: BaseTool) -> str | None:
+        if not tool.args_schema:
+            return None
+
+        try:
+            # Get expected parameters from schema
+            schema = tool.args_schema.model_json_schema()  # type: ignore[union-attr]
+            expected_params = set(schema.get("properties", {}).keys())
+            required_params = set(schema.get("required", []))
+
+            # Extract configured parameter names
+            configured_params = set()
+            for input_key in self.inputs:
+                if input_key.alias:
+                    param_name = input_key.alias
+                elif hasattr(input_key, "subkeys") and input_key.subkeys:
+                    param_name = input_key.subkeys[-1]
+                else:
+                    param_name = str(input_key)
+                configured_params.add(param_name)
+
+            missing_required = required_params - configured_params
+            if missing_required:
+                return f"Missing required parameters: {sorted(missing_required)}"
+
+            unknown_params = configured_params - expected_params
+            if unknown_params:
+                return f"Unknown parameters: {sorted(unknown_params)}. Valid parameters are: {sorted(expected_params)}"
+
+            return None
+
+        except Exception as e:
+            return f"Validation error: {str(e)}"
 
     def __entry_hook__(self) -> str:
         return f"{self.name}#deterministic_step"
@@ -91,6 +152,7 @@ class DeterministicStepComponent(BaseComponent):
             execution_result_key=self._execution_result_key.to_iokey(
                 {IOKeyTemplate.COMPONENT_NAME_TEMPLATE: self.name}
             ),
+            validated_tool=self.validated_tool,
         )
 
         graph.add_node(self.__entry_hook__(), node.run)

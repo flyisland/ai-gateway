@@ -87,6 +87,7 @@ def mock_toolset_fixture(mock_tool):
     mock_toolset = Mock()
     mock_toolset.__contains__ = Mock(return_value=True)
     mock_toolset.__getitem__ = Mock(return_value=mock_tool)
+    mock_toolset.keys = Mock(return_value=["test_tool", "other_tool"])
     return mock_toolset
 
 
@@ -176,6 +177,95 @@ def deterministic_step_node_fixture(
     )
 
 
+class TestDeterministicStepNodeInitialization:
+    """Test suite for DeterministicStepNode initialization."""
+
+    def test_init_with_validated_tool(
+        self,
+        component_name,
+        inputs,
+        mock_toolset,
+        flow_id,
+        flow_type,
+        mock_internal_event_client,
+        ui_history,
+        mock_tool,
+    ):
+        """Test initialization with validated_tool parameter."""
+        node = DeterministicStepNode(
+            name="test_node",
+            tool_name="test_tool",
+            component_name=component_name,
+            inputs=inputs,
+            toolset=mock_toolset,
+            flow_id=flow_id,
+            flow_type=flow_type,
+            internal_event_client=mock_internal_event_client,
+            ui_history=ui_history,
+            validated_tool=mock_tool,
+        )
+
+        # Should use the provided validated_tool
+        assert node._validated_tool == mock_tool
+        # Should not attempt to get tool from toolset
+        mock_toolset.__getitem__.assert_not_called()
+
+    def test_init_without_validated_tool(
+        self,
+        component_name,
+        inputs,
+        mock_toolset,
+        flow_id,
+        flow_type,
+        mock_internal_event_client,
+        ui_history,
+        mock_tool,
+    ):
+        """Test initialization without validated_tool parameter."""
+        node = DeterministicStepNode(
+            name="test_node",
+            tool_name="test_tool",
+            component_name=component_name,
+            inputs=inputs,
+            toolset=mock_toolset,
+            flow_id=flow_id,
+            flow_type=flow_type,
+            internal_event_client=mock_internal_event_client,
+            ui_history=ui_history,
+        )
+
+        # Should get tool from toolset
+        mock_toolset.__getitem__.assert_called_once_with("test_tool")
+        assert node._validated_tool == mock_tool
+
+    def test_init_tool_not_found_and_no_validated_tool(
+        self,
+        component_name,
+        inputs,
+        flow_id,
+        flow_type,
+        mock_internal_event_client,
+        ui_history,
+    ):
+        """Test initialization raises error when tool not found and no validated_tool provided."""
+        mock_toolset = Mock()
+        mock_toolset.__contains__ = Mock(return_value=False)
+        mock_toolset.keys = Mock(return_value=["available_tool_1", "available_tool_2"])
+
+        with pytest.raises(KeyError, match="Tool 'missing_tool' not found in toolset"):
+            DeterministicStepNode(
+                name="test_node",
+                tool_name="missing_tool",
+                component_name=component_name,
+                inputs=inputs,
+                toolset=mock_toolset,
+                flow_id=flow_id,
+                flow_type=flow_type,
+                internal_event_client=mock_internal_event_client,
+                ui_history=ui_history,
+            )
+
+
 class TestDeterministicStepNode:
     """Test suite for DeterministicStepNode class focusing on the run method."""
 
@@ -227,37 +317,31 @@ class TestDeterministicStepNode:
         ui_history.pop_state_updates.assert_called_once()
 
     @pytest.mark.asyncio
-    async def test_run_tool_not_found(
+    async def test_run_with_invalid_response_type(
         self,
         deterministic_step_node,
         flow_state,
         component_name,
-        mock_toolset,
+        mock_tool,
         ui_history,
         mock_get_vars_from_state,
+        mock_prompt_security,
     ):
-        """Test run when tool is not found in toolset."""
-        # Configure toolset to not contain the tool
-        mock_toolset.__contains__ = Mock(return_value=False)
+        """Test run when tool returns invalid response type."""
+        # Configure tool to return an invalid type
+        mock_tool.arun = AsyncMock(return_value=12345)
+        mock_prompt_security.apply_security_to_tool_response.return_value = 12345
 
         result = await deterministic_step_node.run(flow_state)
 
         # Verify result structure with error
         assert FlowStateKeys.CONTEXT in result
         assert component_name in result[FlowStateKeys.CONTEXT]
-        # Component name should directly contain the error message
-        assert (
-            "Tool test_tool not found" in result[FlowStateKeys.CONTEXT][component_name]
-        )
+        error_msg = result[FlowStateKeys.CONTEXT][component_name]
+        assert "Invalid response type for tool test_tool" in error_msg
 
         # Verify ui_history.log.error was called
         ui_history.log.error.assert_called_once()
-        call_args = ui_history.log.error.call_args
-        assert "Tool test_tool not found" in call_args[1]["error"]
-        assert (
-            call_args[1]["event"]
-            == UILogEventsDeterministicStep.ON_TOOL_EXECUTION_FAILED
-        )
 
     @pytest.mark.asyncio
     async def test_run_type_error_handling(
@@ -345,44 +429,6 @@ class TestDeterministicStepNode:
             flow_type=flow_type.value,
             tool_name="test_tool",
             failure_reason="ValidationError",
-        )
-
-    @pytest.mark.asyncio
-    async def test_run_key_error_handling(
-        self,
-        deterministic_step_node,
-        flow_state,
-        component_name,
-        mock_toolset,
-        mock_internal_event_client,
-        ui_history,
-        mock_tool_monitoring,
-        flow_type,
-        mock_get_vars_from_state,
-    ):
-        """Test run handles KeyError during tool execution."""
-        # Configure toolset to raise KeyError
-        key_error = KeyError("missing_key")
-        mock_toolset.__getitem__ = Mock(side_effect=key_error)
-
-        result = await deterministic_step_node.run(flow_state)
-
-        # Verify error message in result
-        assert FlowStateKeys.CONTEXT in result
-        assert component_name in result[FlowStateKeys.CONTEXT]
-        error_msg = result[FlowStateKeys.CONTEXT][component_name]
-        assert "Tool test_tool raised key error" in error_msg
-
-        # Verify internal event tracking for failure
-        mock_internal_event_client.track_event.assert_called_once()
-        call_args = mock_internal_event_client.track_event.call_args
-        assert call_args[1]["event_name"] == EventEnum.WORKFLOW_TOOL_FAILURE.value
-
-        # Verify tool error metric was called
-        mock_tool_monitoring.count_agent_platform_tool_failure.assert_called_once_with(
-            flow_type=flow_type.value,
-            tool_name="test_tool",
-            failure_reason="KeyError",
         )
 
     @pytest.mark.asyncio

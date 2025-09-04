@@ -25,6 +25,7 @@ from lib.internal_events.event_enum import CategoryEnum, EventEnum, EventLabelEn
 __all__ = ["DeterministicStepNode"]
 
 
+# pylint: disable-next=too-many-instance-attributes
 class DeterministicStepNode:
     def __init__(
         self,
@@ -43,6 +44,7 @@ class DeterministicStepNode:
         tool_responses_key: Optional[IOKey] = None,
         tool_error_key: Optional[IOKey] = None,
         execution_result_key: Optional[IOKey] = None,
+        validated_tool: Optional[BaseTool] = None,
     ):
         self.name = name
         self._tool_name = tool_name
@@ -57,24 +59,28 @@ class DeterministicStepNode:
         self._tool_responses_key = tool_responses_key
         self._tool_error_key = tool_error_key
         self._execution_result_key = execution_result_key
+        self._validated_tool = validated_tool
+
+        if not self._validated_tool:
+            if tool_name not in toolset:
+                raise KeyError(
+                    f"Tool '{tool_name}' not found in toolset. "
+                    f"Available tools: {list(toolset.keys())}"
+                )
+            self._validated_tool = toolset[tool_name]
 
     async def run(self, state: FlowState) -> dict:
         response, err_format = None, None
+        tool = self._validated_tool
+        if not tool:
+            raise RuntimeError(f"Tool '{self._tool_name}' not found in toolset.")
+
         try:
             tool_call_args = get_vars_from_state(self._inputs, state)
 
-            if self._tool_name not in self._toolset:
-                raise KeyError(f"Tool {self._tool_name} not found")
-
-            tool = self._toolset[self._tool_name]
-            try:
-                response = await self._execute_tool(
-                    tool=tool, tool_call_args=tool_call_args
-                )
-            except TypeError as e:
-                # Catch the type error here so we can be sure that `tool` is defined
-                err_format = self._format_type_error_response(tool=tool, error=e)
-                raise TypeError(err_format)
+            response = await self._execute_tool(
+                tool=tool, tool_call_args=tool_call_args
+            )
 
             if not isinstance(response, (str, list, dict)):
                 raise ValueError(
@@ -90,10 +96,7 @@ class DeterministicStepNode:
 
         except Exception as e:
             if isinstance(e, TypeError):
-                # This should be handled and formatted already
-                err_format = str(e)
-            elif isinstance(e, KeyError):
-                err_format = self._format_key_error(tool_name=self._tool_name, error=e)
+                err_format = self._format_type_error_response(tool=tool, error=e)
             elif isinstance(e, ValidationError):
                 err_format = self._format_validation_error(
                     tool_name=self._tool_name, error=e
@@ -135,7 +138,7 @@ class DeterministicStepNode:
 
     async def _execute_tool(
         self, tool_call_args: dict[str, Any], tool: BaseTool
-    ) -> str | list[str | dict[str, Any]]:
+    ) -> str | Any:
         with duo_workflow_metrics.time_tool_call(
             tool_name=tool.name, flow_type=self._flow_type.value
         ):
@@ -219,21 +222,6 @@ class DeterministicStepNode:
             },
         )
         return f"Tool {tool_name} raised validation error {str(error)}"
-
-    def _format_key_error(
-        self,
-        tool_name: str,
-        error: KeyError,
-    ) -> str:
-        self._track_internal_event(
-            event_name=EventEnum.WORKFLOW_TOOL_FAILURE,
-            tool_name=tool_name,
-            extra={
-                "error": str(error),
-                "error_type": type(error).__name__,
-            },
-        )
-        return f"Tool {tool_name} raised key error {str(error)}"
 
     def _format_execution_error(
         self,
