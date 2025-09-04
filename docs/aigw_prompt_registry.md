@@ -22,7 +22,7 @@ The AI Gateway Prompts serve as structured templates that allow AI feature to se
 AI Gateway Prompts are defined as `.yml` files located in `prompts/definitions/` and specify parameters for different LLMs. Each configuration file includes:
 
 - **Model Parameters:** Specify LLM provider and configurations, including model name (or config_file name) and parameters such as `temperature`, `top_p`, `top_k`, `max_tokens`, and `stop`
-- **Prompt Templates:** Define prompt templates that support [Jinja expression](https://jinja.palletsprojects.com/en/stable/) for multiple roles such as `user` and `system`
+- **Prompt Templates:** Define prompt templates that support [Jinja expression](https://jinja.palletsprojects.com/en/stable/) for multiple roles such as `user` and `system`, plus optional `placeholder` for dynamic message injection
 - **Control Parameters:** Parameters such as `max_retries` and `timeout` to manage retries and session handling
 
 #### AI Gateway Model Configuration
@@ -52,6 +52,7 @@ LangChain and LiteLLM enable structured prompt construction and manage LLM inter
 - **Prompt Construction:**
   - The `Prompt` class uses Jinja to interpolate the prompt templates with the input arguments.
   - LangChain's `ChatPromptTemplate` is used to organize the messages and construct the prompt.
+  - Placeholder resolution occurs during this step, where MessagesPlaceholder objects are populated with runtime data (e.g., conversation history).
 - **Model Invocation:**
   - The `Prompt` class builds a process chain using LangChain, which includes the prompt and the model.
   - LiteLLM handles the interactions with the LLM providers, routing the prompt to the appropriate LLM provider based on the configuration.
@@ -99,27 +100,28 @@ Each prompt configuration file in `prompts/definitions/` requires the following 
 ```yaml
 name: <string>                    # Required. Unique identifier for the prompt
 model:
-  name: <string>                  # Optional. Model identifier (e.g. "claude-sonnet-4-20250514"). Either config_file or model identifier needs to be present
-  config_file: <string>           # Optional. Config identifier. Either config_file or model identifier needs to be present
-  params:
-     model_class_provider: litellm # Required. Provider interface
-     temperature: <float>          # Optional. 0.0-1.0. Controls randomness (default: 0.7)
-     top_p: <float>                # Optional. 0.0-1.0. Controls diversity (default: 1.0)
-     top_k: <integer>              # Optional. Token consideration limit (default: 40)
-     max_tokens: <integer>         # Optional. Maximum tokens to generate
-     stop: <string[]>              # Optional. Array of stopping sequences
+    name: <string>                  # Optional. Model identifier (e.g. "claude-sonnet-4-20250514"). Either config_file or model identifier needs to be present
+    config_file: <string>           # Optional. Config identifier. Either config_file or model identifier needs to be present
+    params:
+        model_class_provider: litellm # Required. Provider interface
+        temperature: <float>          # Optional. 0.0-1.0. Controls randomness (default: 0.7)
+        top_p: <float>                # Optional. 0.0-1.0. Controls diversity (default: 1.0)
+        top_k: <integer>              # Optional. Token consideration limit (default: 40)
+        max_tokens: <integer>         # Optional. Maximum tokens to generate
+        stop: <string[]>              # Optional. Array of stopping sequences
 
-unit_primitives:                  # Required. Features that can use this prompt
-  - duo_chat                      # For GitLab Duo chat conversations
-  # Additional primitives as needed
+unit_primitives: # Required. Features that can use this prompt
+    - duo_chat                      # For GitLab Duo chat conversations
+    # Additional primitives as needed
 
-prompt_template:                  # Required. Templates for model interaction
-  system: <string>                # Optional. System-level instructions (supports Jinja2)
-  user: <string>                  # Required. User message template (supports Jinja2)
+prompt_template: # Required. Templates for model interaction
+    system: <string>                # Optional. System-level instructions (supports Jinja2)
+    user: <string>                  # Required. User message template (supports Jinja2)
+    placeholder: <string>           # Optional. Creates MessagesPlaceholder for dynamic content (e.g., "history")
 
-params:                           # Required. Request handling parameters
-  timeout: <integer>              # Optional. Maximum response time in seconds (default: 30)
-  max_retries: <integer>          # Optional. Maximum retry attempts (default: 3)
+params: # Required. Request handling parameters
+    timeout: <integer>              # Optional. Maximum response time in seconds (default: 30)
+    max_retries: <integer>          # Optional. Maximum retry attempts (default: 3)
 ```
 
 #### Example Configuration
@@ -127,22 +129,32 @@ params:                           # Required. Request handling parameters
 ```yaml
 name: Code review prompt
 model:
-  name: claude-sonnet-4-20250514
-  params:
-     model_class_provider: litellm
-     temperature: 0.2
-     max_tokens: 1024
-     stop:
-        - "End"
+    name: claude-sonnet-4-20250514
+    params:
+        model_class_provider: litellm
+        temperature: 0.2
+        max_tokens: 1024
+        stop:
+            - "End"
 unit_primitives:
-  - duo_chat
+    - duo_chat
 prompt_template:
-  system: "You are a code review assistant. {{ context }}"
-  user: "Review this code: {{ code_diff }}"
+    system: "You are a code review assistant with access to previous conversations. {{ context }}"
+    user: "Review this code: {{ code_diff }}"
+    placeholder: history  # Injects conversation history for context
 params:
-  timeout: 120
-  max_retries: 3
+    timeout: 120
+    max_retries: 3
 ```
+
+### Message Placeholders
+
+The `placeholder` attribute enables dynamic message injection (e.g., conversation history) into prompt templates at runtime.
+
+- **Usage**: `placeholder: history` creates a LangChain `MessagesPlaceholder` that accepts lists of BaseMessage objects or message tuples
+- **Auto-populated**: Only `"history"` is automatically populated by workflow system with conversation data
+- **Custom names**: Other variable names require manual data provision at prompt invocation
+- **Data format**: Must be LangChain-compatible message objects, not arbitrary text
 
 ## 2. AI Gateway Prompt Registry Details
 
