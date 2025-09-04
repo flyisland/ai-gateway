@@ -5,7 +5,11 @@ from dependency_injector import containers
 from gitlab_cloud_connector import CloudConnectorUser, UserClaims, WrongUnitPrimitives
 from langchain_core.messages import AIMessage, HumanMessage, ToolMessage
 
-from ai_gateway.model_metadata import ModelMetadata, ModelSelectionMetadata
+from ai_gateway.model_metadata import (
+    ModelMetadata,
+    ModelSelectionMetadata,
+    current_model_metadata_context,
+)
 from contract import contract_pb2
 from duo_workflow_service.agents.chat_agent import ChatAgent
 from duo_workflow_service.checkpointer.gitlab_workflow import WorkflowStatusEventEnum
@@ -282,15 +286,10 @@ def test_are_tools_called_with_tool_use(workflow_with_project):
     "mock_git_lab_workflow_instance",
     "mock_fetch_workflow_and_container_data",
 )
-@patch("duo_workflow_service.workflows.chat.workflow.current_model_metadata_context")
 async def test_workflow_run(
-    mock_model_metadata_context,
     mock_checkpoint_notifier,
     workflow_with_project,
 ):
-    mock_model_metadata = MagicMock()
-    mock_model_metadata_context.get.return_value = mock_model_metadata
-
     mock_user_interface_instance = mock_checkpoint_notifier.return_value
     state = {"status": "Not Started", "ui_chat_log": []}
 
@@ -329,7 +328,7 @@ async def test_workflow_run(
             mock_get_on_behalf.assert_called_once()
             call_args = mock_get_on_behalf.call_args
 
-            assert call_args.kwargs["model_metadata"] == mock_model_metadata
+            assert call_args.kwargs["model_metadata"] is None
             assert call_args.kwargs["user"] == workflow._user
             assert call_args.kwargs["prompt_id"] == "chat/agent"
             assert call_args.kwargs["prompt_version"] == "^1.0.0"
@@ -817,13 +816,11 @@ async def test_workflow_with_approval_object():
         ),
     ],
 )
-@patch("duo_workflow_service.workflows.chat.workflow.current_model_metadata_context")
 @patch.object(Workflow, "_get_tools")
 @patch("duo_workflow_service.components.tools_registry.ToolsRegistry.toolset")
 async def test_workflow_model_selection(
     mock_toolset,
     mock_get_tools,
-    mock_model_metadata_context,
     feature_flags,
     model_metadata,
     expected_prompt_id,
@@ -834,7 +831,9 @@ async def test_workflow_model_selection(
     """Test that model selection works correctly with the GPT-5 feature flag."""
     # Setup
     current_feature_flag_context.set(set(feature_flags))
-    mock_model_metadata_context.get.return_value = model_metadata
+
+    if model_metadata:
+        current_model_metadata_context.set(model_metadata)
 
     mock_get_tools.return_value = ["list_issues", "get_issue"]
     mock_toolset.return_value.bindable = ["list_issues", "get_issue"]

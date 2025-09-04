@@ -981,16 +981,16 @@ def test_software_development_workflow_model_config(
 
 @pytest.mark.parametrize("duo_workflow_prompt_registry_enabled", [True])
 @patch(
-    "duo_workflow_service.workflows.software_development.workflow.current_model_metadata_context"
+    "duo_workflow_service.workflows.software_development.workflow.resolve_model_from_prompt_registry"
 )
 def test_context_builder_uses_model_metadata_when_prompt_registry_enabled(
-    mock_model_metadata_context,
+    mock_resolve_model_from_prompt_registry,
     tools_registry,
     workflow,
 ):
     """Test that model_metadata is passed to context builder when prompt registry is enabled."""
     mock_model_metadata = MagicMock()
-    mock_model_metadata_context.get.return_value = mock_model_metadata
+    mock_resolve_model_from_prompt_registry.return_value = mock_model_metadata
 
     mock_agent = MagicMock()
     with patch.object(

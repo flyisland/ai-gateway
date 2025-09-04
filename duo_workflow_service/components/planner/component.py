@@ -4,13 +4,15 @@ from typing import Any, Optional, cast
 from langchain_core.messages import AIMessage
 from langgraph.graph import StateGraph
 
-from ai_gateway.model_metadata import current_model_metadata_context
 from duo_workflow_service.agents import (
     Agent,
     AgentV2,
     HandoverAgent,
     PlanSupervisorAgent,
     ToolsExecutor,
+)
+from duo_workflow_service.agents.model_selection import (
+    resolve_model_from_prompt_registry,
 )
 from duo_workflow_service.components.base import BaseComponent
 from duo_workflow_service.components.human_approval.plan_approval import (
@@ -75,6 +77,8 @@ class PlannerComponent(BaseComponent):
     ):
         planner_toolset = self.planner_toolset
         if is_feature_enabled(FeatureFlag.DUO_WORKFLOW_PROMPT_REGISTRY):
+            model_metadata = resolve_model_from_prompt_registry(self.workflow_type)
+
             planner_v2: AgentV2 = cast(
                 AgentV2,
                 self.prompt_registry.get_on_behalf(
@@ -85,7 +89,7 @@ class PlannerComponent(BaseComponent):
                     workflow_id=self.workflow_id,
                     workflow_type=self.workflow_type,
                     http_client=self.http_client,
-                    model_metadata=current_model_metadata_context.get(),
+                    model_metadata=model_metadata,
                     prompt_template_inputs={
                         "executor_agent_tools": "\n".join(
                             [
