@@ -105,6 +105,7 @@ class AgentNode:
                     model=model_name,
                     request_type=request_type,
                     stop_reason=stop_reason,
+                    status_code="200",
                 )
 
                 if len(updates := self._final_answer_validate(completion)) > 0:

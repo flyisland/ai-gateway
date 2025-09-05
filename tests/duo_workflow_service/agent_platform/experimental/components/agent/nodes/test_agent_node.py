@@ -461,4 +461,5 @@ class TestAgentNodeMonitoring:
             model="claude-3-sonnet",
             request_type="test_component_completion",
             stop_reason="end_turn",
+            status_code="200",
         )

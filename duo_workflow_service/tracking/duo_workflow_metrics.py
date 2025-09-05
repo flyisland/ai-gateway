@@ -7,7 +7,6 @@ import structlog
 from prometheus_client import REGISTRY, Counter, Histogram
 
 from duo_workflow_service.llm_factory import AnthropicStopReason
-from duo_workflow_service.errors.error_handler import ModelErrorType
 
 session_type_context: ContextVar[Optional[str]] = ContextVar(
     "session_type", default="unknown"
@@ -55,8 +54,8 @@ class DuoWorkflowMetrics:  # pylint: disable=too-many-instance-attributes
 
         self.llm_request_duration = Histogram(
             "duo_workflow_llm_request_seconds",
-            "Duration of LLM requests in Duo Workflow with status code and overload indicator",
-            ["model", "request_type", "http_status_code", "overload_indicator"],
+            "Duration of LLM requests in Duo Workflow",
+            ["model", "request_type"],
             registry=registry,
             buckets=LLM_TIME_SCALE_BUCKETS,
         )
@@ -91,8 +90,15 @@ class DuoWorkflowMetrics:  # pylint: disable=too-many-instance-attributes
 
         self.llm_response_counter = Counter(
             "duo_workflow_llm_response_total",
-            "Response count of LLM calls in Duo Workflow with stop reason, status code, and overload indicator",
-            ["model", "request_type", "stop_reason", "http_status_code", "overload_indicator"],
+            "Response count of LLM calls in Duo Workflow with status code and error type",
+            [
+                "model",
+                "provider",
+                "request_type",
+                "stop_reason",
+                "status_code",
+                "error_type",
+            ],
             registry=registry,
         )
 
@@ -100,13 +106,6 @@ class DuoWorkflowMetrics:  # pylint: disable=too-many-instance-attributes
             "duo_workflow_checkpoint_total",
             "Count of checkpoint calls in Duo Workflow",
             ["endpoint", "status_code", "method"],
-            registry=registry,
-        )
-
-        self.model_completion_error_counter = Counter(
-            "duo_workflow_model_completion_errors_total",
-            "Model completion error count in Duo Workflow Service",
-            ["model", "provider", "http_status", "error_type"],
             registry=registry,
         )
 
@@ -174,17 +173,25 @@ class DuoWorkflowMetrics:  # pylint: disable=too-many-instance-attributes
         )
 
     def count_llm_response(
-        self, model="unknown", request_type="unknown", stop_reason="unknown", 
-        http_status_code="unknown", overload_indicator="false"
+        self,
+        model="unknown",
+        provider="unknown",
+        request_type="unknown",
+        stop_reason="unknown",
+        status_code="unknown",
+        error_type="unknown",
     ):
         self.llm_response_counter.labels(
             model=model,
+            provider=provider,
             request_type=request_type,
             stop_reason=(
-                stop_reason if stop_reason in ANTHROPIC_STOP_REASONS else "other"
+                stop_reason
+                if stop_reason in ANTHROPIC_STOP_REASONS or stop_reason == "error"
+                else "other"
             ),
-            http_status_code=str(http_status_code),
-            overload_indicator=str(overload_indicator).lower(),
+            status_code=status_code,
+            error_type=error_type,
         ).inc()
 
     def count_checkpoints(
@@ -197,20 +204,6 @@ class DuoWorkflowMetrics:  # pylint: disable=too-many-instance-attributes
             endpoint=endpoint,
             status_code=status_code,
             method=method,
-        ).inc()
-
-    def count_model_completion_errors(
-        self,
-        model="unknown",
-        provider="unknown",
-        http_status="unknown",
-        error_type="unknown",
-    ):
-        self.model_completion_error_counter.labels(
-            model=model,
-            provider=provider,
-            http_status=http_status,
-            error_type=error_type,
         ).inc()
 
     def count_agent_platform_session_start(
@@ -293,14 +286,15 @@ class DuoWorkflowMetrics:  # pylint: disable=too-many-instance-attributes
             flow_type=flow_type,
         ).inc()
 
-    def time_llm_request(self, model="unknown", request_type="unknown", 
-                        http_status_code="unknown", overload_indicator="false"):
+    def time_llm_request(
+        self,
+        model="unknown",
+        request_type="unknown",
+    ):
         return self._timer(
             lambda duration: self.llm_request_duration.labels(
-                model=model, 
+                model=model,
                 request_type=request_type,
-                http_status_code=str(http_status_code),
-                overload_indicator=str(overload_indicator).lower()
             ).observe(duration)
         )
 
@@ -356,34 +350,3 @@ class DuoWorkflowMetrics:  # pylint: disable=too-many-instance-attributes
             else:
                 log.warning("Timer was not started")
                 self.callback(0.0)
-
-    @staticmethod
-    def _extract_status_code(response_or_exception) -> str:
-        """Extract HTTP status code from response or exception."""
-        if hasattr(response_or_exception, 'status_code'):
-            return str(response_or_exception.status_code)
-        elif hasattr(response_or_exception, 'response') and hasattr(response_or_exception.response, 'status_code'):
-            return str(response_or_exception.response.status_code)
-        elif hasattr(response_or_exception, 'code'):
-            return str(response_or_exception.code)
-        return "unknown"
-
-    @staticmethod
-    def _detect_overload(response_or_exception, error_type=None) -> str:
-        """Detect if the response indicates an overload condition."""
-        # Check for 429 status code (Too Many Requests)
-        status_code = DuoWorkflowMetrics._extract_status_code(response_or_exception)
-        if status_code == "429":
-            return "true"
-        
-        # Check for overloaded error type
-        if error_type == ModelErrorType.OVERLOADED_ERROR:
-            return "true"
-        
-        # Check for overload-related error messages
-        if hasattr(response_or_exception, 'message'):
-            message = str(response_or_exception.message).lower()
-            if any(keyword in message for keyword in ['overload', 'rate limit', 'quota', 'throttle']):
-                return "true"
-        
-        return "false"
