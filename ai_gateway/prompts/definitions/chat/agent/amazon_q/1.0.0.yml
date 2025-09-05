@@ -3,7 +3,6 @@ name: Amazon Q Chat Agent
 model:
   config_file: amazon_q
   params:
-    # FIXME: confirm this number
     max_tokens: 20_480
 unit_primitives:
   - amazon_q_integration
