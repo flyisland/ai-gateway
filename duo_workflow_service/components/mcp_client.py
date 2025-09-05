@@ -146,14 +146,14 @@ class McpClient:
                 if is_notification:
                     logger.debug("Empty response for notification", method=method)
                     return {"jsonrpc": "2.0", "result": None}
-                else:
-                    logger.warning(
-                        "Empty response for non-notification method", method=method
-                    )
-                    raise McpError(
-                        code=McpErrorCode.PARSE_ERROR.value,
-                        message="Empty response from server",
-                    )
+
+                logger.warning(
+                    "Empty response for non-notification method", method=method
+                )
+                raise McpError(
+                    code=McpErrorCode.PARSE_ERROR.value,
+                    message="Empty response from server",
+                )
 
             try:
                 response_data = response.json()
@@ -168,15 +168,15 @@ class McpClient:
                         ],  # Log first 200 chars for debugging
                     )
                     return {"jsonrpc": "2.0", "result": None}
-                else:
-                    # For non-notifications, this is still an error
-                    logger.error(
-                        "JSON decode error in MCP response", error=str(e), method=method
-                    )
-                    raise McpError(
-                        code=McpErrorCode.PARSE_ERROR.value,
-                        message="Failed to parse JSON response",
-                    )
+
+                # For non-notifications, this is still an error
+                logger.error(
+                    "JSON decode error in MCP response", error=str(e), method=method
+                )
+                raise McpError(
+                    code=McpErrorCode.PARSE_ERROR.value,
+                    message="Failed to parse JSON response",
+                )
 
             # Check for JSON-RPC error
             if "error" in response_data:
@@ -343,13 +343,9 @@ class McpClientFactory:
 class McpClientError(Exception):
     """Base exception for MCP client errors."""
 
-    pass
-
 
 class McpConnectionError(McpClientError):
     """Error connecting to MCP server."""
-
-    pass
 
 
 class McpToolError(McpClientError):

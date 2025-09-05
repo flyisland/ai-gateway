@@ -19,7 +19,6 @@ from duo_workflow_service.components.mcp_client import (
     McpClientFactory,
     McpTool,
 )
-from duo_workflow_service.components.mcp_manager import get_mcp_manager
 from duo_workflow_service.components.tools_registry import (
     _DEFAULT_TOOLS,
     NO_OP_TOOLS,
@@ -146,7 +145,7 @@ class McpBaseTool(BaseTool):
             return f"Error executing {self.mcp_tool.name}: {str(e)}"
 
     def format_display_message(
-        self, arguments: dict[str, Any], tool_response: Any = None
+        self, arguments: dict[str, Any]
     ) -> str:
         """Format display message for the tool execution."""
         return f"Execute MCP tool {self.mcp_tool.name}: {arguments}"
