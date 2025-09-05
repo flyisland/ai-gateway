@@ -45,6 +45,22 @@ async def test_update_workflow_status(gitlab_status_updater):
 
 
 @pytest.mark.asyncio
+async def test_update_workflow_status_when_response_created(gitlab_status_updater):
+    # some self-managed instances are returning 201 for success
+    gitlab_status_updater._client.apatch = AsyncMock(
+        return_value=GitLabHttpResponse(
+            status_code=201, body={"workflow": {"id": 391, "status": 1}}
+        )
+    )
+
+    result = await gitlab_status_updater.update_workflow_status(
+        workflow_id="391", status_event="retry"
+    )
+
+    assert result is None
+
+
+@pytest.mark.asyncio
 async def test_update_workflow_status_when_response_error(gitlab_status_updater):
     gitlab_status_updater._client.apatch = AsyncMock(
         return_value={
