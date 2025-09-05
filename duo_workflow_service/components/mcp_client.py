@@ -11,8 +11,25 @@ from typing import Any, Optional
 
 import httpx
 import structlog
+from dotenv import find_dotenv
+from pydantic_settings import BaseSettings, SettingsConfigDict
 
 logger = structlog.get_logger(__name__)
+
+
+class McpConfig(BaseSettings):
+    model_config = SettingsConfigDict(
+        env_prefix="DUO_WORKFLOW_MCP__",
+        env_file=find_dotenv(),
+        env_file_encoding="utf-8",
+        extra="ignore",
+    )
+
+    enabled: bool = False
+    server_url: str = "https://gitlab.com/api/v4/mcp_server"
+    token: str = ""
+    timeout: float = 30.0
+    max_retries: int = 3
 
 
 class McpErrorCode(Enum):
@@ -318,9 +335,7 @@ class McpClientFactory:
     """Factory for creating MCP clients with different configurations."""
 
     @staticmethod
-    def create_user_client(
-        token: str, timeout: float = 30.0, max_retries: int = 3
-    ) -> McpClient:
+    def create_user_client(token: str) -> McpClient:
         """Create MCP client configured for user.
 
         Args:
@@ -331,11 +346,13 @@ class McpClientFactory:
         Returns:
             Configured MCP client
         """
+        config = McpConfig()
+
         return McpClient(
-            server_url="https://gitlab.com/api/v4/mcp_server",
+            server_url=config.server_url,
             token=token,
-            timeout=timeout,
-            max_retries=max_retries,
+            timeout=config.timeout,
+            max_retries=config.max_retries,
         )
 
 

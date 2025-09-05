@@ -11,7 +11,7 @@ from typing import Any, Optional, Type, Union
 import structlog
 from gitlab_cloud_connector import CloudConnectorUser
 from langchain.tools import BaseTool
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 from ai_gateway.code_suggestions.language_server import LanguageServerVersion
 from duo_workflow_service.components.mcp_client import (
@@ -35,6 +35,9 @@ logger = structlog.get_logger(__name__)
 class McpBaseTool(BaseTool):
     """Base class for MCP-backed tools."""
 
+    mcp_tool: McpTool
+    mcp_client: McpClient
+
     def __init__(
         self,
         mcp_tool: McpTool,
@@ -49,32 +52,43 @@ class McpBaseTool(BaseTool):
             mcp_client: MCP client instance
             metadata: Tool metadata for execution
         """
-        self.mcp_tool = mcp_tool
-        self.mcp_client = mcp_client
-        self.metadata = metadata
+        # Handle both dataclass (input_schema) and protobuf (inputSchema) versions
+        if hasattr(mcp_tool, "input_schema"):
+            input_schema = mcp_tool.input_schema
+        elif hasattr(mcp_tool, "inputSchema"):
+            input_schema = mcp_tool.inputSchema
+        else:
+            input_schema = {}
 
-        # Create args schema before calling super
-        args_schema = self._create_args_schema(mcp_tool.input_schema)
+        args_schema = self._create_args_schema(input_schema, mcp_tool.name)
 
         super().__init__(
             name=mcp_tool.name,
             description=mcp_tool.description,
             args_schema=args_schema,
+            mcp_tool=mcp_tool,
+            mcp_client=mcp_client,
+            metadata=metadata,
             **kwargs,
         )
 
     def _create_args_schema(
-        self, input_schema: dict[str, Any]
+        self, input_schema: Union[dict[str, Any], str], tool_name: str
     ) -> Optional[Type[BaseModel]]:
         """Create Pydantic model from JSON schema."""
         if not input_schema:
             return None
 
         try:
+            # Handle string JSON schema
+            if isinstance(input_schema, str):
+                input_schema = json.loads(input_schema)
+
             # Convert JSON schema to Pydantic model
-            # This is a simplified version - you might want to use a library like
+            # This is a simplified version - we might want to use a library like
             # pydantic-jsonschema for more complex schemas
-            fields = {}
+            annotations = {}
+            field_definitions = {}
             properties = input_schema.get("properties", {})
             required = input_schema.get("required", [])
 
@@ -82,16 +96,27 @@ class McpBaseTool(BaseTool):
                 field_type = self._json_type_to_python_type(
                     field_def.get("type", "string")
                 )
-                default = ... if field_name in required else None
-                fields[field_name] = (field_type, default)
 
-            if fields:
-                return type(f"{self.mcp_tool.name}Args", (BaseModel,), fields)
+                # Create proper type annotation
+                annotations[field_name] = field_type
+
+                # Create field definition with proper default
+                if field_name in required:
+                    # Required field - use Field with no default
+                    field_definitions[field_name] = Field(...)
+                else:
+                    # Optional field - use Field with None default
+                    field_definitions[field_name] = Field(default=None)
+
+            if annotations:
+                # Create class with proper annotations
+                class_dict = {"__annotations__": annotations, **field_definitions}
+                return type(f"{tool_name}Args", (BaseModel,), class_dict)
 
         except Exception as e:
             logger.warning(
                 "Failed to create args schema for MCP tool",
-                tool_name=self.mcp_tool.name,
+                tool_name=tool_name,
                 error=str(e),
             )
 
@@ -145,7 +170,7 @@ class McpBaseTool(BaseTool):
             return f"Error executing {self.mcp_tool.name}: {str(e)}"
 
     def format_display_message(
-        self, arguments: dict[str, Any]
+        self, arguments: dict[str, Any], _tool_response: Any = None
     ) -> str:
         """Format display message for the tool execution."""
         return f"Execute MCP tool {self.mcp_tool.name}: {arguments}"

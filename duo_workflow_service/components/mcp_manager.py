@@ -8,27 +8,10 @@ from contextlib import asynccontextmanager
 from typing import Optional
 
 import structlog
-from dotenv import find_dotenv
-from pydantic_settings import BaseSettings, SettingsConfigDict
 
-from duo_workflow_service.components.mcp_client import McpClient
+from duo_workflow_service.components.mcp_client import McpClient, McpConfig
 
 logger = structlog.get_logger(__name__)
-
-
-class McpConfig(BaseSettings):
-    model_config = SettingsConfigDict(
-        env_prefix="DUO_WORKFLOW_MCP__",
-        env_file=find_dotenv(),
-        env_file_encoding="utf-8",
-        extra="ignore",
-    )
-
-    enabled: bool = False
-    server_url: str = "https://gitlab.com/api/v4/mcp_server"
-    token: str = ""
-    timeout: float = 30.0
-    max_retries: int = 3
 
 
 class McpManager:
@@ -42,8 +25,8 @@ class McpManager:
     """
 
     def __init__(self):
-        self._client: McpClient = None
-        self._client_config: McpConfig = None
+        self._client: Optional[McpClient] = None
+        self._client_config: Optional[McpConfig] = None
         self._initialized = False
         self._shutdown = False
 
@@ -103,7 +86,7 @@ class McpManager:
             logger.warning("MCP Manager not initialized")
             return None
 
-        return self._clients.get()
+        return self._client
 
     def is_client_available(self) -> bool:
         """Check if a client is available and initialized."""
@@ -140,7 +123,7 @@ class McpManager:
                 del self._client
 
             # Reinitialize
-            await self._initialize_client(self._client_configs)
+            await self._initialize_client(self._client_config)
             logger.info("MCP client reconnected successfully")
             return True
 
@@ -156,7 +139,8 @@ class McpManager:
         logger.info("Shutting down MCP Manager")
         self._shutdown = True
 
-        self._client.close()
+        if self._client:
+            await self._client.close()
 
         logger.info("MCP Manager shutdown complete")
 
@@ -196,8 +180,8 @@ class McpManager:
             "initialized": self._initialized,
             "shutdown": self._shutdown,
             "client": {
-                "initialized": self._client.is_initialized(),
-                "endpoint": self._client.server_url,
+                "initialized": self._client.is_initialized() if self._client else False,
+                "endpoint": self._client.server_url if self._client else None,
             },
         }
 
