@@ -53,7 +53,7 @@ class McpToolResult:
 
 
 class McpClient:
-    """Client for communicating with GitLab MCP server.
+    """Client for communicating with MCP server.
 
     Provides methods to:
     - Initialize connection with the server
@@ -63,21 +63,20 @@ class McpClient:
     """
 
     def __init__(
-        self, base_url: str, token: str, timeout: float = 30.0, max_retries: int = 3
+        self, server_url: str, token: str, timeout: float = 30.0, max_retries: int = 3
     ):
         """Initialize MCP client.
 
         Args:
-            base_url: Base URL of the GitLab MCP server (e.g., "http://gdk.test:8080/api/v4")
-            token: GitLab Personal Access Token for authentication
+            server_url: URL of the MCP server
+            token: Access Token for authentication
             timeout: Request timeout in seconds
             max_retries: Maximum number of retries for failed requests
         """
-        self.base_url = base_url.rstrip("/")
+        self.server_url = server_url.rstrip("/")
         self.token = token
         self.timeout = timeout
         self.max_retries = max_retries
-        self.mcp_endpoint = f"{self.base_url}/mcp_server"
 
         self._client = httpx.AsyncClient(
             timeout=timeout,
@@ -136,7 +135,7 @@ class McpClient:
         logger.debug("Making MCP request", method=method, params=params)
 
         try:
-            response = await self._client.post(self.mcp_endpoint, json=request_data)
+            response = await self._client.post(self.server_url, json=request_data)
             response.raise_for_status()
 
             # Check if this is a notification method that may not return JSON
@@ -206,7 +205,7 @@ class McpClient:
         if self._initialized:
             return {"status": "already_initialized"}
 
-        logger.info("Initializing MCP client", endpoint=self.mcp_endpoint)
+        logger.info("Initializing MCP client", endpoint=self.server_url)
 
         try:
             # Initialize request
@@ -319,13 +318,12 @@ class McpClientFactory:
     """Factory for creating MCP clients with different configurations."""
 
     @staticmethod
-    def create_gitlab_client(
-        gitlab_host: str, token: str, timeout: float = 30.0, max_retries: int = 3
+    def create_user_client(
+        token: str, timeout: float = 30.0, max_retries: int = 3
     ) -> McpClient:
-        """Create MCP client configured for GitLab server.
+        """Create MCP client configured for user.
 
         Args:
-            gitlab_host: GitLab host URL
             token: GitLab Personal Access Token
             timeout: Request timeout
             max_retries: Maximum retries
@@ -333,14 +331,11 @@ class McpClientFactory:
         Returns:
             Configured MCP client
         """
-        # Ensure we have the API v4 base URL
-        if not gitlab_host.endswith("/api/v4"):
-            base_url = f"{gitlab_host.rstrip('/')}/api/v4"
-        else:
-            base_url = gitlab_host.rstrip("/")
-
         return McpClient(
-            base_url=base_url, token=token, timeout=timeout, max_retries=max_retries
+            server_url="https://gitlab.com/api/v4/mcp_server",
+            token=token,
+            timeout=timeout,
+            max_retries=max_retries,
         )
 
 

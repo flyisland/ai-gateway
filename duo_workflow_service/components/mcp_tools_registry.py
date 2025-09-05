@@ -302,52 +302,20 @@ class McpToolsRegistry:
             project=project,
         )
 
-        # Use MCP client from global manager if available, or create a new one
+        # We need to create a new client that is authenticated as the user
+        # who initilize the workflow.
         mcp_client = None
-        if workflow_config.get("mcp_enabled", False):
-            try:
-                # First try to get client from global MCP manager
-                mcp_manager = get_mcp_manager()
-                if mcp_manager.is_initialized():
-                    # Try to find matching client based on host
-                    gitlab_host = workflow_config.get("gitlab_host", "")
+        try:
+            # Extract the token from the GitLab client
+            # Only DirectGitLabHttpClient is supported
+            token = gl_http_client.gitlab_token
 
-                    # Look for a client that matches this GitLab host
-                    for client_name in mcp_manager.get_client_names():
-                        client = mcp_manager.get_client(client_name)
-                        if client and gitlab_host in client.mcp_endpoint:
-                            mcp_client = client
-                            logger.info(
-                                "Using MCP client from global manager",
-                                client_name=client_name,
-                            )
-                            break
+            mcp_client = McpClientFactory.create_user_client(token=token)
+            await mcp_client.initialize()
+            logger.info("Created new MCP client for workflow")
 
-                    # If no matching client found, use the default one
-                    if not mcp_client:
-                        mcp_client = mcp_manager.get_client("gitlab")
-                        if mcp_client:
-                            logger.info("Using default MCP client from global manager")
-
-                # Fallback: create a new client if manager doesn't have one
-                if not mcp_client:
-                    gitlab_host = workflow_config.get("gitlab_host", "")
-                    gitlab_token = workflow_config.get("gitlab_token", "")
-
-                    if gitlab_host and gitlab_token:
-                        mcp_client = McpClientFactory.create_gitlab_client(
-                            gitlab_host=gitlab_host, token=gitlab_token
-                        )
-                        await mcp_client.initialize()
-                        logger.info("Created new MCP client for workflow")
-                    else:
-                        logger.warning(
-                            "MCP enabled but missing gitlab_host or gitlab_token"
-                        )
-
-            except Exception as e:
-                logger.error("Failed to get/create MCP client", error=str(e))
-                # Continue without MCP client
+        except Exception as e:
+            logger.error("Failed to get/create MCP client", error=str(e))
 
         # Create registry instance
         registry = cls(

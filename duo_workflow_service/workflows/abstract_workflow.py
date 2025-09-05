@@ -244,7 +244,7 @@ class AbstractWorkflow(ABC):
             )
 
             # Use MCP Tools Registry if MCP is enabled, otherwise use the original registry
-            if self._workflow_config.get("mcp_enabled", False):
+            if self._workflow_config.get("mcp_enabled", True):
                 self.log.info("Using MCP Tools Registry")
                 tools_registry = await McpToolsRegistry.configure(
                     workflow_config=self._workflow_config,
