@@ -65,6 +65,8 @@ EXECUTOR_TOOLS = [
     "create_issue_note",
     "get_vulnerability_details",
     "create_merge_request_note",
+    "create_merge_request_draft_note",
+    "publish_merge_request_draft_notes",
     "list_issue_notes",
     "get_issue_note",
     "create_merge_request",
