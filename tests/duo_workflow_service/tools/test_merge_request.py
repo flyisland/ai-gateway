@@ -6,6 +6,8 @@ import pytest
 from duo_workflow_service.gitlab.gitlab_api import Project
 from duo_workflow_service.tools.merge_request import (
     CreateMergeRequest,
+    CreateMergeRequestDraftNote,
+    CreateMergeRequestDraftNoteInput,
     CreateMergeRequestInput,
     CreateMergeRequestNote,
     CreateMergeRequestNoteInput,
@@ -15,6 +17,7 @@ from duo_workflow_service.tools.merge_request import (
     ListMergeRequestDiffs,
     ListMergeRequestInput,
     MergeRequestResourceInput,
+    PublishMergeRequestDraftNotes,
     UpdateMergeRequest,
     UpdateMergeRequestInput,
 )
@@ -603,6 +606,61 @@ async def test_create_merge_request_note(gitlab_client_mock, metadata):
         path="/api/v4/projects/1/merge_requests/123/notes",
         body='{"body": "Test note"}',
     )
+
+
+@pytest.mark.asyncio
+async def test_create_merge_request_draft_note(gitlab_client_mock, metadata):
+    gitlab_client_mock.apost = AsyncMock(
+        return_value='{"id": 1, "body": "Test draft note"}'
+    )
+
+    tool = CreateMergeRequestDraftNote(metadata=metadata)
+
+    response = await tool._arun(
+        project_id=1, merge_request_iid=123, body="Test draft note"
+    )
+
+    expected_response = json.dumps(
+        {
+            "status": "success",
+            "body": "Test draft note",
+            "response": '{"id": 1, "body": "Test draft note"}',
+        }
+    )
+    assert response == expected_response
+
+    gitlab_client_mock.apost.assert_called_once_with(
+        path="/api/v4/projects/1/merge_requests/123/draft_notes",
+        body='{"body": "Test draft note"}',
+    )
+
+
+@pytest.mark.parametrize(
+    "input_data,expected_message",
+    [
+        (
+            CreateMergeRequestDraftNoteInput(
+                project_id=42,
+                merge_request_iid=123,
+                body="This is a draft note on the merge request",
+            ),
+            "Add draft note to merge request !123 in project 42",
+        ),
+        (
+            CreateMergeRequestDraftNoteInput(
+                url="https://gitlab.com/namespace/project/-/merge_requests/42",
+                body="This is a draft note on the merge request",
+            ),
+            "Add draft note to merge request https://gitlab.com/namespace/project/-/merge_requests/42",
+        ),
+    ],
+)
+def test_create_merge_request_draft_note_format_display_message(
+    input_data, expected_message
+):
+    tool = CreateMergeRequestDraftNote(description="Create merge request draft note")
+    message = tool.format_display_message(input_data)
+    assert message == expected_message
 
 
 @pytest.mark.asyncio
@@ -1505,5 +1563,55 @@ async def test_list_merge_request_exception(gitlab_client_mock, metadata):
 )
 def test_list_merge_request_format_display_message(input_data, expected_message):
     tool = ListMergeRequest(description="List merge requests")
+    message = tool.format_display_message(input_data)
+    assert message == expected_message
+
+
+@pytest.mark.asyncio
+async def test_publish_merge_request_draft_notes(gitlab_client_mock, metadata):
+    gitlab_client_mock.apost = AsyncMock(return_value='{"id": 1}')
+
+    tool = PublishMergeRequestDraftNotes(metadata=metadata)
+
+    response = await tool._arun(project_id=1, merge_request_iid=123)
+
+    expected_response = json.dumps(
+        {
+            "status": "success",
+            "response": '{"id": 1}',
+        }
+    )
+    assert response == expected_response
+
+    gitlab_client_mock.apost.assert_called_once_with(
+        path="/api/v4/projects/1/merge_requests/123/draft_notes/bulk_publish",
+        body="{}",
+    )
+
+
+@pytest.mark.parametrize(
+    "input_data,expected_message",
+    [
+        (
+            MergeRequestResourceInput(
+                project_id=42,
+                merge_request_iid=123,
+            ),
+            "Publish draft notes on merge request !123 in project 42",
+        ),
+        (
+            MergeRequestResourceInput(
+                url="https://gitlab.com/namespace/project/-/merge_requests/42",
+            ),
+            "Publish draft notes on merge request https://gitlab.com/namespace/project/-/merge_requests/42",
+        ),
+    ],
+)
+def test_publish_merge_request_draft_notes_format_display_message(
+    input_data, expected_message
+):
+    tool = PublishMergeRequestDraftNotes(
+        description="Publish merge request draft notes"
+    )
     message = tool.format_display_message(input_data)
     assert message == expected_message

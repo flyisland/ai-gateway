@@ -735,4 +735,4 @@ For example:
     ) -> str:
         if args.url:
             return f"Publish draft notes on merge request {args.url}"
-        return f"Publish draft notes to merge request !{args.merge_request_iid} in project {args.project_id}"
+        return f"Publish draft notes on merge request !{args.merge_request_iid} in project {args.project_id}"
