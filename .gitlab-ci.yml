@@ -3,6 +3,7 @@ workflow:
   rules:
     - if: $CI_PIPELINE_SOURCE == "merge_request_event"
     - if: $CI_PIPELINE_SOURCE == "schedule"
+    - if: $CI_PIPELINE_SOURCE == "web"
     - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
     - if: $CI_COMMIT_TAG
 
@@ -96,13 +97,14 @@ include:
       runway_service_id: duo-workflow-svc
       image: "$CI_REGISTRY_IMAGE/model-gateway:${CI_COMMIT_SHORT_SHA}"
       runway_version: v3.96.1
-  # - project: "gitlab-com/gl-infra/platform/runway/runwayctl"
-  #   file: "ci-tasks/service-project/runway.yml"
-  #   inputs:
-  #     runway_service_id: dws-loadtest
-  #     image: "$CI_REGISTRY_IMAGE/model-gateway:${CI_COMMIT_SHORT_SHA}"
-  #     runway_version: v3.96.1
-  #   when: manual
+  - project: "gitlab-com/gl-infra/platform/runway/runwayctl"
+    file: "ci-tasks/service-project/runway.yml"
+    inputs:
+      runway_service_id: dws-loadtest
+      image: "$CI_REGISTRY_IMAGE/model-gateway:${CI_COMMIT_SHORT_SHA}"
+      runway_version: v3.96.1
+    rules:
+      - if: $DEPLOY_DWS_LOADTEST == "true"
   - project: "gitlab-com/gl-infra/platform/runway/runwayctl"
     file: "ci-tasks/service-project/runway.yml"
     inputs:
