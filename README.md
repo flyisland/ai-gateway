@@ -317,6 +317,17 @@ Important MRs:
 - [Using the `ai-gateway-custom`'s URL as the AI Gateway endpoint for staging-ref](https://gitlab.com/gitlab-org/quality/gitlab-environment-toolkit-configs/staging-ref/-/merge_requests/190)
 - [Add `ai-gateway-custom` to Runway Provisioner](https://gitlab.com/gitlab-com/gl-infra/platform/runway/provisioner/-/merge_requests/399)
 
+### For load testing
+
+Duo Workflow Service is also deployed to [Runway](https://about.gitlab.com/handbook/engineering/infrastructure/platforms/tools/runway/)
+as a load test environment, at `https://dws-loadtest.runway.gitlab.net`
+
+It is deployed **manually** before load tests are executed. It can be deployed by starting a new pipeline with the `DEPLOY_DWS_LOADTEST` variable set to `true`:
+
+- [pipelines/new?ref=main&var[DEPLOY_DWS_LOADTEST]=true](https://gitlab.com/gitlab-org/modelops/applied-ml/code-suggestions/ai-assist/-/pipelines/new?ref=main&var[DEPLOY_DWS_LOADTEST]=true)
+
+### Deployment resources
+
 For more information and assistance, please check out:
 
 - [Runway - Handbook](https://about.gitlab.com/handbook/engineering/infrastructure/platforms/tools/runway/).
