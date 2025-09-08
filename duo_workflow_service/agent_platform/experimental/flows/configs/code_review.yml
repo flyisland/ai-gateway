@@ -44,6 +44,48 @@ components:
       - from: "context:current_date"
         as: "current_date"
     toolset: []
+    ui_log_events:
+      - "on_agent_final_answer"
+
+  # Step 4: Process review comments for posting
+  - name: "process_comments"
+    type: AgentComponent
+    prompt_id: "code_review_process_comments"
+    prompt_version: "^1.0.0"
+    inputs:
+      - from: "context:perform_code_review.final_answer"
+        as: "review_output"
+      - from: "context:fetch_mr_data.final_answer"
+        as: "diff_data"
+      - from: "context:project_id"
+        as: "project_id"
+    toolset: []
+    ui_log_events:
+      - "on_agent_final_answer"
+
+ # Step 5: Post comments to the merge request
+  - name: "post_comments"
+    type: AgentComponent
+    prompt_id: "code_review_post_comments"
+    prompt_version: "^1.0.0"
+    inputs:
+      - from: "context:process_comments.final_answer"
+        as: "processed_comments"
+      - from: "context:project_id"
+        as: "project_id"
+      - from: "context:goal"
+        as: "mr_iid"
+      - from: "context:fetch_mr_data.final_answer"
+        as: "mr_data"
+    toolset:
+      - "create_merge_request_note"
+      - "create_merge_request_draft_note"
+      - "publish_merge_request_draft_notes"
+      - "get_merge_request"
+    ui_log_events:
+      - "on_tool_execution_success"
+      - "on_tool_execution_failed"
+      - "on_agent_final_answer"
 
 routers:
   - from: "fetch_mr_data"
@@ -51,6 +93,10 @@ routers:
   - from: "format_for_review"
     to: "perform_code_review"
   - from: "perform_code_review"
+    to: "process_comments"
+  - from: "process_comments"
+    to: "post_comments"
+  - from: "post_comments"
     to: "end"
 
 flow:
