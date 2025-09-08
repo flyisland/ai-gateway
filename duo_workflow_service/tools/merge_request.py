@@ -619,7 +619,7 @@ For example:
 
 
 class CreateMergeRequestDraftNoteInput(MergeRequestResourceInput):
-    body: str = Field(
+    note: str = Field(
         description="The content of a draft note. Limited to 1,000,000 characters."
     )
 
@@ -634,22 +634,22 @@ start with a backslash. Examples include /merge, /approve, /close, etc.
 {MERGE_REQUEST_IDENTIFICATION_DESCRIPTION}
 
 For example:
-- Given project_id 13, merge_request_iid 9, and body "This is a comment", the tool call would be:
-    create_merge_request_draft_note(project_id=13, merge_request_iid=9, body="This is a comment")
-- Given the URL https://gitlab.com/namespace/project/-/merge_requests/103 and body "This is a comment", the tool call would be:
-    create_merge_request_draft_note(url="https://gitlab.com/namespace/project/-/merge_requests/103", body="This is a comment")
+- Given project_id 13, merge_request_iid 9, and note "This is a comment", the tool call would be:
+    create_merge_request_draft_note(project_id=13, merge_request_iid=9, note="This is a comment")
+- Given the URL https://gitlab.com/namespace/project/-/merge_requests/103 and note "This is a comment", the tool call would be:
+    create_merge_request_draft_note(url="https://gitlab.com/namespace/project/-/merge_requests/103", note="This is a comment")
 
-The body parameter is always required.
+The note parameter is always required.
 """
     args_schema: Type[BaseModel] = CreateMergeRequestDraftNoteInput  # type: ignore
 
     unit_primitive: GitLabUnitPrimitive = GitLabUnitPrimitive.ASK_MERGE_REQUEST
 
-    def _contains_quick_action(self, body: str) -> bool:
+    def _contains_quick_action(self, note: str) -> bool:
         quick_action_pattern = r"(?m)^/[a-zA-Z]+"
-        return bool(re.search(quick_action_pattern, body))
+        return bool(re.search(quick_action_pattern, note))
 
-    async def _arun(self, body: str, **kwargs: Any) -> str:
+    async def _arun(self, note: str, **kwargs: Any) -> str:
         url = kwargs.pop("url", None)
         project_id = kwargs.pop("project_id", None)
         merge_request_iid = kwargs.pop("merge_request_iid", None)
@@ -660,7 +660,7 @@ The body parameter is always required.
 
         if validation_result.errors:
             return json.dumps({"error": "; ".join(validation_result.errors)})
-        if self._contains_quick_action(body):
+        if self._contains_quick_action(note):
             return json.dumps(
                 {
                     "status": "error",
@@ -676,11 +676,11 @@ They are commands that are on their own line and start with a backslash. Example
                 f"{validation_result.merge_request_iid}/draft_notes",
                 body=json.dumps(
                     {
-                        "body": body,
+                        "note": note,
                     },
                 ),
             )
-            return json.dumps({"status": "success", "body": body, "response": response})
+            return json.dumps({"status": "success", "note": note, "response": response})
         except Exception as e:
             return json.dumps({"error": str(e)})
 

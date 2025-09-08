@@ -611,27 +611,27 @@ async def test_create_merge_request_note(gitlab_client_mock, metadata):
 @pytest.mark.asyncio
 async def test_create_merge_request_draft_note(gitlab_client_mock, metadata):
     gitlab_client_mock.apost = AsyncMock(
-        return_value='{"id": 1, "body": "Test draft note"}'
+        return_value='{"id": 1, "note": "Test draft note"}'
     )
 
     tool = CreateMergeRequestDraftNote(metadata=metadata)
 
     response = await tool._arun(
-        project_id=1, merge_request_iid=123, body="Test draft note"
+        project_id=1, merge_request_iid=123, note="Test draft note"
     )
 
     expected_response = json.dumps(
         {
             "status": "success",
-            "body": "Test draft note",
-            "response": '{"id": 1, "body": "Test draft note"}',
+            "note": "Test draft note",
+            "response": '{"id": 1, "note": "Test draft note"}',
         }
     )
     assert response == expected_response
 
     gitlab_client_mock.apost.assert_called_once_with(
         path="/api/v4/projects/1/merge_requests/123/draft_notes",
-        body='{"body": "Test draft note"}',
+        body='{"note": "Test draft note"}',
     )
 
 
@@ -642,14 +642,14 @@ async def test_create_merge_request_draft_note(gitlab_client_mock, metadata):
             CreateMergeRequestDraftNoteInput(
                 project_id=42,
                 merge_request_iid=123,
-                body="This is a draft note on the merge request",
+                note="This is a draft note on the merge request",
             ),
             "Add draft note to merge request !123 in project 42",
         ),
         (
             CreateMergeRequestDraftNoteInput(
                 url="https://gitlab.com/namespace/project/-/merge_requests/42",
-                body="This is a draft note on the merge request",
+                note="This is a draft note on the merge request",
             ),
             "Add draft note to merge request https://gitlab.com/namespace/project/-/merge_requests/42",
         ),
