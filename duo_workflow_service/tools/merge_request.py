@@ -616,3 +616,123 @@ For example:
         if args.url:
             return f"Update merge request {args.url}"
         return f"Update merge request !{args.merge_request_iid} in project {args.project_id}"
+
+
+class CreateMergeRequestDraftNoteInput(MergeRequestResourceInput):
+    note: str = Field(
+        description="The content of a draft note. Limited to 1,000,000 characters."
+    )
+
+
+class CreateMergeRequestDraftNote(DuoBaseTool):
+    name: str = "create_merge_request_draft_note"
+    # pylint: disable=line-too-long
+    description: str = f"""Create a draft note (comment) on a merge request. You are NOT allowed to ever use a GitLab quick action in a merge request note.
+Quick actions are text-based shortcuts for common GitLab actions. They are commands that are on their own line and
+start with a backslash. Examples include /merge, /approve, /close, etc.
+
+{MERGE_REQUEST_IDENTIFICATION_DESCRIPTION}
+
+For example:
+- Given project_id 13, merge_request_iid 9, and note "This is a comment", the tool call would be:
+    create_merge_request_draft_note(project_id=13, merge_request_iid=9, note="This is a comment")
+- Given the URL https://gitlab.com/namespace/project/-/merge_requests/103 and note "This is a comment", the tool call would be:
+    create_merge_request_draft_note(url="https://gitlab.com/namespace/project/-/merge_requests/103", note="This is a comment")
+
+The note parameter is always required.
+"""
+    args_schema: Type[BaseModel] = CreateMergeRequestDraftNoteInput  # type: ignore
+
+    unit_primitive: GitLabUnitPrimitive = GitLabUnitPrimitive.ASK_MERGE_REQUEST
+
+    def _contains_quick_action(self, note: str) -> bool:
+        quick_action_pattern = r"(?m)^/[a-zA-Z]+"
+        return bool(re.search(quick_action_pattern, note))
+
+    async def _arun(self, note: str, **kwargs: Any) -> str:
+        url = kwargs.pop("url", None)
+        project_id = kwargs.pop("project_id", None)
+        merge_request_iid = kwargs.pop("merge_request_iid", None)
+
+        validation_result = self._validate_merge_request_url(
+            url, project_id, merge_request_iid
+        )
+
+        if validation_result.errors:
+            return json.dumps({"error": "; ".join(validation_result.errors)})
+        if self._contains_quick_action(note):
+            return json.dumps(
+                {
+                    "status": "error",
+                    # pylint: disable=line-too-long
+                    "message": """Draft notes containing GitLab quick actions are not allowed. Quick actions are text-based shortcuts for common GitLab actions.
+They are commands that are on their own line and start with a backslash. Examples include /merge, /approve, /close, etc.""",
+                }
+            )
+
+        try:
+            response = await self.gitlab_client.apost(
+                path=f"/api/v4/projects/{validation_result.project_id}/merge_requests/"
+                f"{validation_result.merge_request_iid}/draft_notes",
+                body=json.dumps(
+                    {
+                        "note": note,
+                    },
+                ),
+            )
+            return json.dumps({"status": "success", "note": note, "response": response})
+        except Exception as e:
+            return json.dumps({"error": str(e)})
+
+    def format_display_message(
+        self, args: CreateMergeRequestDraftNoteInput, _tool_response: Any = None
+    ) -> str:
+        if args.url:
+            return f"Add draft note to merge request {args.url}"
+        return f"Add draft note to merge request !{args.merge_request_iid} in project {args.project_id}"
+
+
+class PublishMergeRequestDraftNotes(DuoBaseTool):
+    name: str = "publish_merge_request_draft_notes"
+    # pylint: disable=line-too-long
+    description: str = f"""Publish all existing draft notes (comments) on a merge request that belongs to the authenticated user.
+
+{MERGE_REQUEST_IDENTIFICATION_DESCRIPTION}
+
+For example:
+- Given project_id 13 and merge_request_iid 9, the tool call would be:
+    publish_merge_request_draft_notes(project_id=13, merge_request_iid=9)
+- Given the URL https://gitlab.com/namespace/project/-/merge_requests/103, the tool call would be:
+    publish_merge_request_draft_notes(url="https://gitlab.com/namespace/project/-/merge_requests/103")
+"""
+    args_schema: Type[BaseModel] = MergeRequestResourceInput  # type: ignore
+
+    unit_primitive: GitLabUnitPrimitive = GitLabUnitPrimitive.ASK_MERGE_REQUEST
+
+    async def _arun(self, **kwargs: Any) -> str:
+        url = kwargs.pop("url", None)
+        project_id = kwargs.pop("project_id", None)
+        merge_request_iid = kwargs.pop("merge_request_iid", None)
+
+        validation_result = self._validate_merge_request_url(
+            url, project_id, merge_request_iid
+        )
+
+        if validation_result.errors:
+            return json.dumps({"error": "; ".join(validation_result.errors)})
+        try:
+            response = await self.gitlab_client.apost(
+                path=f"/api/v4/projects/{validation_result.project_id}/merge_requests/"
+                f"{validation_result.merge_request_iid}/draft_notes/bulk_publish",
+                body=json.dumps({}),
+            )
+            return json.dumps({"status": "success", "response": response})
+        except Exception as e:
+            return json.dumps({"error": str(e)})
+
+    def format_display_message(
+        self, args: MergeRequestResourceInput, _tool_response: Any = None
+    ) -> str:
+        if args.url:
+            return f"Publish draft notes on merge request {args.url}"
+        return f"Publish draft notes on merge request !{args.merge_request_iid} in project {args.project_id}"
