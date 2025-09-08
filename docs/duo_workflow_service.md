@@ -274,33 +274,6 @@ that modified gRPC tracing configuration.
 We use GitLab Internal event tracking to track workflow events. See [internal_events](docs/internal_events.md) for
 details.
 
-### LLM Metrics and Monitoring
-
-The service provides comprehensive metrics for monitoring LLM performance:
-
-#### Metrics Exposed
-
-- **Request Duration**: `duo_workflow_llm_request_seconds` tracks the time taken for LLM requests
-- **Response Counts**: `duo_workflow_llm_response_total` counts LLM responses by outcome
-- **Error Tracking**: Automatic detection of overload conditions and HTTP status codes
-- **Overload Detection**: Identifies rate limiting, quota exhaustion, and service overload
-
-#### Labels and Dimensions
-
-All LLM metrics include the following labels for detailed analysis:
-- `model`: The specific LLM model used
-- `request_type`: The type of request made to the LLM
-- `http_status_code`: HTTP response status from the LLM provider
-- `overload_indicator`: Boolean indicating if overload conditions were detected
-- `stop_reason`: (response counter only) Why the LLM stopped generating
-
-#### Integration with Monitoring
-
-- Metrics are automatically exposed via Prometheus endpoint
-- Grafana dashboards provide visualization of LLM performance
-- Sentry error tracking filters out handled errors to reduce noise
-- Dashboard definitions are maintained in the runbooks repository
-
 ## Testing with SWE Bench
 
 For any changes that you think will have a markedly positive impact on Duo Workflow's ability to independently solve
