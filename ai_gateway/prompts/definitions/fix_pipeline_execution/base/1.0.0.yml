@@ -24,7 +24,6 @@ prompt_template:
     - Failing to batch operations will cause significant slowdowns and is strictly prohibited
     - Examples of batch processing:
       - When modifying multiple files with the same pattern, include batches of ten tool calls in one response
-      - When reading multiple files for a single task, include batches of ten tool calls in one response
       - When performing the same verification across multiple items, batch the verification tool calls into one response
       - When applying the same transformation to multiple elements, process the tool calls as a batch
     - Track progress through batched items to ensure none are skipped

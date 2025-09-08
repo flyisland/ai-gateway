@@ -17,8 +17,6 @@ from duo_workflow_service.tools.filesystem import (  # Mkdir,
     ListDirInput,
     Mkdir,
     MkdirInput,
-    ReadFile,
-    ReadFileInput,
     ReadFiles,
     ReadFilesInput,
     WriteFile,
@@ -69,29 +67,6 @@ def metadata_with_project(mock_project):
     )
 
     return {"outbox": mock_outbox, "inbox": mock_inbox, "project": mock_project}
-
-
-@pytest.mark.asyncio
-async def test_read_file(metadata_with_project):
-    tool = ReadFile(description="Read file content")
-    tool.metadata = metadata_with_project
-    path = "./somepath"
-
-    response = await tool._arun(path)
-
-    assert response == "test contents"
-
-    metadata_with_project["outbox"].put.assert_called_once()
-    action = metadata_with_project["outbox"].put.call_args[0][0]
-    assert action.runReadFile.filepath == path
-
-
-@pytest.mark.asyncio
-async def test_read_file_not_implemented_error():
-    tool = ReadFile(description="Read file content")
-
-    with pytest.raises(NotImplementedError):
-        tool._run("./main.py")
 
 
 @pytest.mark.asyncio
@@ -352,16 +327,6 @@ class TestEditFile:
             await EditFile(description="Edit file content")._arun(path, "old", "new")
 
 
-class TestReadFile:
-    @pytest.mark.asyncio
-    @pytest.mark.parametrize(
-        "path", [*SENSITIVE_DIRECTORIES, *SENSITIVE_FILES, *SUSPICIOUS_PATHS]
-    )
-    async def test_read_file_rejects_excluded_paths(self, path):
-        with pytest.raises(ToolException, match="Access denied"):
-            await ReadFile(description="Read file content")._arun(path)
-
-
 class TestReadFiles:
     @pytest.mark.asyncio
     async def test_read_files_with_mixed_valid_invalid_paths(self):
@@ -587,18 +552,6 @@ class TestWriteFile:
             )
 
 
-def test_read_file_format_display_message(mock_project):
-    tool = ReadFile(description="Read file description")
-    tool.metadata = {"project": mock_project}
-
-    input_data = ReadFileInput(file_path="./src/main.py")
-
-    message = tool.format_display_message(input_data)
-
-    expected_message = "Read file"
-    assert message == expected_message
-
-
 def test_write_file_format_display_message(mock_project):
     tool = WriteFile(description="Write file description")
     tool.metadata = {"project": mock_project}
@@ -819,17 +772,6 @@ class TestFileExclusionPolicy:
         )
 
     @pytest.mark.asyncio
-    async def test_read_file_with_exclusion_policy(self, project_with_exclusions):
-        """Test ReadFile tool respects FileExclusionPolicy."""
-        tool = ReadFile(description="Read file content")
-        tool.metadata = {"project": project_with_exclusions}
-
-        # Test excluded file
-        result = await tool._arun("file.secret")
-        expected = FileExclusionPolicy.format_llm_exclusion_message(["file.secret"])
-        assert result == expected
-
-    @pytest.mark.asyncio
     async def test_write_file_with_exclusion_policy(self, project_with_exclusions):
         """Test WriteFile tool respects FileExclusionPolicy."""
         tool = WriteFile(description="Write file content")
@@ -910,26 +852,6 @@ class TestFileExclusionPolicy:
         # Should only include allowed files
         expected_files = ["file1.txt", "config/private/allowed.txt"]
         assert result == "\n".join(expected_files)
-
-    def test_read_file_format_display_message_with_exclusion(
-        self, project_with_exclusions
-    ):
-        """Test ReadFile format_display_message includes exclusion message."""
-        tool = ReadFile(description="Read file description")
-        tool.metadata = {"project": project_with_exclusions}
-
-        # Test excluded file
-        input_data = ReadFileInput(file_path="file.secret")
-        message = tool.format_display_message(input_data)
-        expected = "Read file" + FileExclusionPolicy.format_user_exclusion_message(
-            ["file.secret"]
-        )
-        assert message == expected
-
-        # Test allowed file
-        input_data = ReadFileInput(file_path="file.txt")
-        message = tool.format_display_message(input_data)
-        assert message == "Read file"
 
     def test_write_file_format_display_message_with_exclusion(
         self, project_with_exclusions

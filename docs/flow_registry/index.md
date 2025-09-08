@@ -41,7 +41,7 @@ requests.
         prompt_id: "your_prompt_id"
         prompt_version: "^1.0.0"
         inputs: ["context:goal"]
-        toolset: ["read_file", "create_file_with_contents"]
+        toolset: ["read_files", "create_file_with_contents"]
    routers:
       - from: "my_agent"
         to: "end"
@@ -312,7 +312,7 @@ Each tool is a Python class that the agent calls to perform specific actions.
 
 Here are some examples:
 
-- **read_file**: Read contents of a file
+- **read_files**: Read contents of files
 - **create_file_with_contents**: Create a new file with specified content
 - **edit_file**: Modify an existing file
 - **list_dir**: List directory contents
@@ -387,7 +387,7 @@ components:
       prompt_version: "^1.0.0"
       inputs: [ "context:goal" ]
       toolset:
-          - "read_file"
+          - "read_files"
           - "list_dir"
           - "find_files"
           - "create_file_with_contents"
@@ -483,7 +483,7 @@ components:
           - "context:goal"
           - from: "context:user_approval.approval"
             as: "user_decision"
-      toolset: [ "read_file", "edit_file" ]
+      toolset: [ "read_files", "edit_file" ]
 ```
 
 #### Usage Patterns
@@ -635,7 +635,7 @@ components:
           - from: "context:goal"
             as: "target_file"
       toolset:
-          - "read_file"
+          - "read_files"
       max_correction_attempts: 2
       ui_log_events:
           - "on_tool_call_input"
@@ -720,7 +720,7 @@ components:
       prompt_id: "code_analysis"
       prompt_version: "^1.0.0"
       inputs: [ "context:goal" ]
-      toolset: [ "read_file", "list_dir", "find_files" ]
+      toolset: [ "read_files", "list_dir", "find_files" ]
       ui_log_events: [ "on_agent_final_answer", "on_tool_execution_success" ]
 
     - name: "approval_request"
@@ -776,7 +776,7 @@ components:
       prompt_id: "chat_assistant"
       prompt_version: "^1.0.0"
       inputs: [ "context:goal" ]
-      toolset: [ "read_file", "list_dir", "create_file_with_contents" ]
+      toolset: [ "read_files", "list_dir", "create_file_with_contents" ]
       ui_log_events: [ "on_agent_final_answer", "on_tool_execution_success" ]
 
     - name: "user_input"
@@ -810,7 +810,7 @@ components:
       prompt_id: "decision_analysis"
       prompt_version: "^1.0.0"
       inputs: [ "context:goal" ]
-      toolset: [ "read_file", "find_files" ]
+      toolset: [ "read_files", "find_files" ]
       ui_log_events: [ "on_agent_final_answer" ]
 
     - name: "user_clarification"
@@ -869,7 +869,7 @@ components:
           - from: "context:goal"
             as: "goal"
       toolset:
-          - "read_file"
+          - "read_files"
           - "list_dir"
           - "grep"
 
