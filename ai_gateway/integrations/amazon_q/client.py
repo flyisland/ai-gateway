@@ -1,4 +1,4 @@
-from typing import List
+from typing import List, Optional
 
 import boto3
 from botocore.exceptions import ClientError
@@ -7,6 +7,9 @@ from q_developer_boto3 import boto3 as q_boto3
 
 from ai_gateway.api.auth_utils import StarletteUser
 from ai_gateway.auth.glgo import GlgoAuthority
+from ai_gateway.auth.glgo import (
+    cloud_connector_token as cloud_connector_token_context_var,
+)
 from ai_gateway.integrations.amazon_q.errors import (
     AccessDeniedExceptionReason,
     AWSException,
@@ -56,9 +59,10 @@ class AmazonQClientFactory:
             )
 
         try:
+            cloud_connector_token: str = cloud_connector_token_context_var.get()
             token = self.glgo_authority.token(
                 user_id=user_id,
-                cloud_connector_token=current_user.cloud_connector_token,
+                cloud_connector_token=cloud_connector_token,
             )
             request_log.info("Obtained Glgo token", source=__name__, user_id=user_id)
             return token
@@ -153,11 +157,17 @@ class AmazonQClient:
             raise ex
 
     @raise_aws_errors
-    def send_message(self, message: str, history: List[dict[str, str]]):
+    def send_message(
+        self,
+        message: dict[str, str],
+        history: List[dict[str, str]],
+        tools: Optional[List[dict[str, str]]] = None,
+    ):
         return self.client.send_message(
             message=message,
             conversationId="conversation_id",
             history=history,
+            tools=tools,
         )
 
     @raise_aws_errors
