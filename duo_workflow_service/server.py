@@ -51,6 +51,10 @@ from duo_workflow_service.interceptors.language_server_version_interceptor impor
     LanguageServerVersionInterceptor,
     language_server_version,
 )
+from duo_workflow_service.interceptors.message_size_interceptor import (
+    MAX_MESSAGE_SIZE,
+    MessageSizeInterceptor,
+)
 from duo_workflow_service.interceptors.model_metadata_interceptor import (
     ModelMetadataInterceptor,
 )
@@ -145,7 +149,7 @@ class DuoWorkflowService(contract_pb2_grpc.DuoWorkflowServicer):
     async def ExecuteWorkflow(
         self,
         request_iterator: AsyncIterable[contract_pb2.ClientEvent],
-        context: grpc.ServicerContext,
+        context: grpc.aio.ServicerContext,
         internal_event_client: InternalEventsClient = Provide[
             ContainerApplication.internal_event.client
         ],
@@ -153,9 +157,22 @@ class DuoWorkflowService(contract_pb2_grpc.DuoWorkflowServicer):
         user: CloudConnectorUser = current_user_context_var.get()
 
         # Fetch the start workflow call
-        start_workflow_request: contract_pb2.ClientEvent = await anext(
-            aiter(request_iterator)
-        )
+        try:
+            start_workflow_request: contract_pb2.ClientEvent = await anext(
+                aiter(request_iterator)
+            )
+        except StopAsyncIteration as err:
+            log_exception(
+                err,
+                extra={
+                    "source": __name__,
+                    "context": "Failed to receive start workflow message - possible size violation or empty stream",
+                },
+            )
+            await context.abort(
+                grpc.StatusCode.INVALID_ARGUMENT, "No valid start message received"
+            )
+            return
 
         workflow_definition = start_workflow_request.startRequest.workflowDefinition
         unit_primitive = choose_unit_primitive(workflow_definition)
@@ -477,6 +494,14 @@ async def serve(port: int) -> None:
             ("grpc.http2.min_ping_interval_without_data_ms", 10 * 1000),
             ("grpc.keepalive_permit_without_calls", 1),
             ("grpc.so_reuseport", 0),
+            (
+                "grpc.max_receive_message_length",
+                MAX_MESSAGE_SIZE + 20 * 1024 * 1024,
+            ),  # MAX_MESSAGE_SIZE + 20MiB for fallback (interceptor enforces 4MiB exactly)
+            (
+                "grpc.max_send_message_length",
+                MAX_MESSAGE_SIZE + 20 * 1024 * 1024,
+            ),  # MAX_MESSAGE_SIZE + 20MiB for fallback (interceptor enforces 4MiB exactly)
         ]
 
         server = grpc.aio.server(
@@ -487,6 +512,7 @@ async def serve(port: int) -> None:
                 InternalEventsInterceptor(),
                 ModelMetadataInterceptor(),
                 MonitoringInterceptor(),
+                MessageSizeInterceptor(),
                 LanguageServerVersionInterceptor(),
                 GitLabVersionInterceptor(),
             ],
