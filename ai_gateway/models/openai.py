@@ -1,5 +1,5 @@
 from enum import StrEnum
-from typing import Any, AsyncIterator, Callable, Optional, Union
+from typing import Any, AsyncIterator, Callable, Union, cast
 
 import httpx
 import structlog
@@ -66,7 +66,10 @@ class KindOpenAIModel(StrEnum):
 
 
 class OpenAIModel(TextGenModelBase):
-    """This class uses the legacy Completions API from OpenAI. Modern GPT models should use OpenAIChatModel."""
+    """This class uses the legacy Completions API from OpenAI.
+
+    Modern GPT models should use OpenAIChatModel.
+    """
 
     OPTS_CLIENT = {
         "max_retries": 1,
@@ -117,11 +120,12 @@ class OpenAIModel(TextGenModelBase):
     async def generate(
         self,
         prefix: str,
-        suffix: Optional[str] = "",
+        suffix: str = "",
         stream: bool = False,
-        temperature: Optional[float] = None,
-        max_output_tokens: Optional[int] = None,
-        top_p: Optional[float] = None,
+        temperature: float = 0.2,
+        max_output_tokens: int = 16,
+        top_p: float = 0.95,
+        top_k: int = 40,
         **kwargs: Any,
     ) -> Union[
         TextGenModelOutput, list[TextGenModelOutput], AsyncIterator[TextGenModelChunk]
@@ -157,7 +161,9 @@ class OpenAIModel(TextGenModelBase):
                 return self._handle_stream(suggestion, watcher.finish)
 
         completion_text = (
-            getattr(suggestion.choices[0], "text", "") if suggestion.choices else ""
+            getattr(suggestion.choices[0], "text", "")
+            if hasattr(suggestion, "choices") and suggestion.choices
+            else ""
         )
         return TextGenModelOutput(
             text=completion_text,
@@ -250,9 +256,10 @@ class OpenAIChatModel(ChatModelBase):
         self,
         messages: list[Message],
         stream: bool = False,
-        temperature: Optional[float] = None,
-        max_output_tokens: Optional[int] = None,
-        top_p: Optional[float] = None,
+        temperature: float = 0.2,
+        max_output_tokens: int = 16,
+        top_p: float = 0.95,
+        top_k: int = 40,
         **kwargs: Any,
     ) -> Union[TextGenModelOutput, AsyncIterator[TextGenModelChunk]]:
 
@@ -273,7 +280,7 @@ class OpenAIChatModel(ChatModelBase):
             try:
                 suggestion = await self.client.chat.completions.create(
                     model=self.metadata.name,
-                    messages=model_messages,
+                    messages=cast(Any, model_messages),
                     stream=stream,
                     **opts,
                 )
@@ -343,7 +350,7 @@ class OpenAIChatModel(ChatModelBase):
         return cls(client, model_name=kind_model.value, **kwargs)
 
 
-def _build_model_messages(messages: list[Message]) -> list[dict]:
+def _build_model_messages(messages: list[Message]) -> list[dict[str, Any]]:
     model_messages = []
 
     for message in messages:
@@ -359,6 +366,6 @@ def _build_model_messages(messages: list[Message]) -> list[dict]:
 
 def _obtain_opts(default_opts: dict, **kwargs: Any) -> dict:
     return {
-        opt_name: kwargs.pop(opt_name, opt_value) or opt_value
+        opt_name: kwargs.get(opt_name, opt_value) or opt_value
         for opt_name, opt_value in default_opts.items()
     }

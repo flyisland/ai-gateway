@@ -212,7 +212,7 @@ async def test_missing_api_key(
             )
         )
 
-    assert excinfo.value.status_code == status.HTTP_400_BAD_REQUEST
+    assert excinfo.value.status_code == status.HTTP_500_INTERNAL_SERVER_ERROR
     assert excinfo.value.detail == "API key not found"
 
 

@@ -54,10 +54,18 @@ class OpenAIProxyClient(BaseProxyClient):
 
     def _update_headers_to_upstream(self, headers_to_upstream: typing.Any) -> None:
         try:
+            api_key = os.environ["OPENAI_API_KEY"]
+            if not api_key:
+                raise fastapi.HTTPException(
+                    status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                    detail="Server configuration error: API key not set",
+                )
+
             headers_to_upstream["Authorization"] = (
                 f"Bearer {os.environ['OPENAI_API_KEY']}"
             )
         except KeyError:
             raise fastapi.HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST, detail="API key not found"
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail="API key not found",
             )

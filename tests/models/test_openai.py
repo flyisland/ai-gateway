@@ -56,10 +56,11 @@ class TestOpenAIModel:
         elif exception_class == APITimeoutError:
             exception_instance = APITimeoutError(request=Mock())
         else:
-            exception_instance = exception_class("test error")
+            raise ValueError(f"Unexpected exception class: {exception_class}")
 
         model = OpenAIModel(client_mock, model_name=KindOpenAIModel.GPT_5.value)
-        model.client.completions.create = AsyncMock(side_effect=exception_instance)
+        create_mock = AsyncMock(side_effect=exception_instance)
+        setattr(model.client.completions, "create", create_mock)
 
         with pytest.raises(api_error_class):
             await model.generate("test prefix")
@@ -113,6 +114,41 @@ class TestOpenAIModel:
         assert isinstance(result, TextGenModelOutput)
         assert result.text == ""
 
+    @pytest.mark.asyncio
+    async def test_openai_model_streaming_success(self):
+        client_mock = Mock(spec=AsyncOpenAI)
+
+        # Mock streaming response chunks
+        async def mock_stream():
+            choice_mock1 = Mock(spec=CompletionChoice)
+            choice_mock1.text = "chunk1"
+
+            completion_mock1 = Mock(spec=Completion)
+            completion_mock1.choices = [choice_mock1]
+
+            yield completion_mock1
+
+            # Second chunk
+            choice_mock2 = Mock(spec=CompletionChoice)
+            choice_mock2.text = "chunk2"
+
+            completion_mock2 = Mock(spec=Completion)
+            completion_mock2.choices = [choice_mock2]
+
+            yield completion_mock2
+
+        model = OpenAIModel(client_mock, model_name=KindOpenAIModel.GPT_5.value)
+        model.client.completions.create = AsyncMock(return_value=mock_stream())
+
+        result = await model.generate("test prefix", stream=True)
+
+        # Collect streaming results
+        chunks = []
+        async for chunk in result:
+            chunks.append(chunk.text)
+
+        assert chunks == ["chunk1", "chunk2"]
+
 
 class TestOpenAIChatModel:
     @pytest.mark.parametrize(
@@ -145,10 +181,11 @@ class TestOpenAIChatModel:
         elif exception_class == APITimeoutError:
             exception_instance = APITimeoutError(request=Mock())
         else:
-            exception_instance = exception_class("test error")
+            raise ValueError(f"Unexpected exception class: {exception_class}")
 
         model = OpenAIChatModel(client_mock, model_name=KindOpenAIModel.GPT_5.value)
-        model.client.chat.completions.create = AsyncMock(side_effect=exception_instance)
+        create_mock = AsyncMock(side_effect=exception_instance)
+        setattr(model.client.chat.completions, "create", create_mock)
 
         messages = [Message(role=Role.USER, content="Hello")]
 
