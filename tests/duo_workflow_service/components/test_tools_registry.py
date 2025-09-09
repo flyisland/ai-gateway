@@ -20,6 +20,9 @@ from duo_workflow_service.tools.mcp_tools import (
 from duo_workflow_service.tools.vulnerabilities.get_vulnerability_details import (
     GetVulnerabilityDetails,
 )
+from duo_workflow_service.tools.compliance_frameworks.list_compliance_frameworks import (
+    ListComplianceFrameworks,
+)
 from duo_workflow_service.tools.work_item import (
     GetWorkItem,
     GetWorkItemNotes,
@@ -125,6 +128,7 @@ _outbox = MagicMock(spec=asyncio.Queue)
                 "list_project_audit_events",
                 "get_current_user",
                 "get_vulnerability_details",
+                "list_compliance_frameworks",
             },
         ),
         (
@@ -190,6 +194,7 @@ _outbox = MagicMock(spec=asyncio.Queue)
                 "create_work_item_note",
                 "link_vulnerability_to_issue",
                 "get_vulnerability_details",
+                "list_compliance_frameworks",
                 "revert_to_detected_vulnerability",
             },
         ),
@@ -238,6 +243,8 @@ _outbox = MagicMock(spec=asyncio.Queue)
         "read_write_files_privileges",
     ],
 )
+
+
 def test_registry_initialization(tool_metadata, config, expected_tools_set):
     registry = ToolsRegistry(
         enabled_tools=config,
@@ -245,7 +252,12 @@ def test_registry_initialization(tool_metadata, config, expected_tools_set):
         tool_metadata=tool_metadata,
         mcp_tools=None,
     )
-
+    
+    # Add this debug line
+    print(f"Config: {config}")
+    print(f"Actual tools: {set(registry._enabled_tools.keys())}")
+    print(f"Expected tools: {expected_tools_set}")
+    
     assert set(registry._enabled_tools.keys()) == expected_tools_set
 
 
@@ -351,6 +363,7 @@ def test_registry_initialization_initialises_tools_with_correct_attributes(
             metadata=tool_metadata
         ),
         "get_vulnerability_details": GetVulnerabilityDetails(metadata=tool_metadata),
+        "list_compliance_frameworks": ListComplianceFrameworks(metadata=tool_metadata),
         "revert_to_detected_vulnerability": tools.RevertToDetectedVulnerability(
             metadata=tool_metadata
         ),

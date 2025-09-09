@@ -14,6 +14,12 @@ from duo_workflow_service.tools.duo_base_tool import DuoBaseTool
 from duo_workflow_service.tools.vulnerabilities.get_vulnerability_details import (
     GetVulnerabilityDetails,
 )
+from duo_workflow_service.tools.compliance_frameworks.list_compliance_frameworks import (
+    ListComplianceFrameworks,
+)
+from duo_workflow_service.tools.compliance_frameworks.get_compliance_framework_details import (
+    GetComplianceFrameworkDetails,
+)
 from lib.feature_flags import FeatureFlag, is_feature_enabled
 
 
@@ -88,6 +94,8 @@ _READ_ONLY_GITLAB_TOOLS: list[Type[BaseTool]] = [
     tools.ListProjectAuditEvents,
     tools.GetCurrentUser,
     GetVulnerabilityDetails,
+    ListComplianceFrameworks,
+    GetComplianceFrameworkDetails,
 ]
 
 _RUN_MCP_TOOLS_PRIVILEGE = "run_mcp_tools"

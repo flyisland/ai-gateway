@@ -71,6 +71,8 @@ EXECUTOR_TOOLS = [
     "confirm_vulnerability",
     "create_issue_note",
     "get_vulnerability_details",
+    "list_compliance_frameworks",
+    "get_compliance_framework_details",
     "create_merge_request_note",
     "list_issue_notes",
     "get_issue_note",
