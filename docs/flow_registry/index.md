@@ -195,6 +195,26 @@ inputs:
 This will set the value of the input variable `file_path` to be `file.txt`, rather than interpreting the input source as
 a path.
 
+### Additional Context
+
+Additional Context can be passed to the Flow, but these fields must be defined in the YAML file in [jsonschema](https://python-jsonschema.readthedocs.io/) format:
+
+```yaml
+additional_context_schema: |
+  {
+    "type": "object",
+    "properties": {
+      "merge_request_url": {
+        "type": "string"
+      },
+      "source_branch": {
+        "type": "string"
+      }
+    },
+    "additionalProperties": false
+  }
+```
+
 ### Output
 
 Output management handles the automatic production and storage of component results.
