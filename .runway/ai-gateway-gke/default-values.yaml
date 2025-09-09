@@ -53,3 +53,7 @@ spec:
           enabled: true
         internal_load_balancer:
           enabled: false
+      ingress:
+        hosts:
+          - duo.aws.gitlab.com
+          - duo.aws.staging.gitlab.com
