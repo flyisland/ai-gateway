@@ -1,0 +1,46 @@
+pipeline {
+    agent any
+
+    stages {
+        stage('Build') {
+            steps {
+                echo 'Building the application...'
+                echo 'Compiling source code'
+                echo 'Build completed successfully!'
+                sh 'cat Jenkinsfile' // Display the content of the Jenkinsfile
+                sh 'sleep 2' // Small delay to simulate work
+            }
+        }
+
+        stage('Test') {
+            steps {
+                echo 'Running tests...'
+                echo 'Unit tests passed'
+                echo 'Integration tests passed'
+                echo 'All tests completed successfully!'
+                sh 'sleep 3' // Small delay to simulate work
+            }
+        }
+
+        stage('Deploy') {
+            steps {
+                echo 'Deploying to staging environment...'
+                echo 'Deployment in progress...'
+                sh 'sleep 2' // Small delay to simulate work
+                echo 'Application deployed successfully!'
+            }
+        }
+    }
+
+    post {
+        success {
+            echo 'Pipeline executed successfully!'
+        }
+        failure {
+            echo 'Pipeline execution failed!'
+        }
+        always {
+            echo 'This will always run, regardless of build status'
+        }
+    }
+}
