@@ -22,6 +22,7 @@ from duo_workflow_service.workflows.abstract_workflow import (
 )
 
 current_directory = Path(__file__).parent
+# tgao 3 list of workflows
 _WORKFLOWS: list[TypeWorkflow] = [
     software_development.Workflow,
     convert_to_gitlab_ci.Workflow,
@@ -38,6 +39,7 @@ _WORKFLOWS_LOOKUP = {
     f"{Path(inspect.getfile(workflow_cls)).relative_to(current_directory).parent.with_suffix('')}": workflow_cls
     for workflow_cls in _WORKFLOWS
 }
+# tgao workflows lookup
 
 FlowFactory: TypeAlias = Callable[..., AbstractWorkflow]
 
@@ -71,6 +73,7 @@ def resolve_workflow_class(
     flow_config: Optional[struct_pb2.Struct] = None,
     flow_config_schema_version: Optional[str] = None,
 ) -> FlowFactory:
+    # tgao 5 resolve workflow class
     """Resolve a workflow class based on definition or FlowConfig protobuf.
 
     Args:

@@ -118,6 +118,7 @@ class Workflow(AbstractWorkflow):
     _agent: ChatAgent
 
     def _are_tools_called(self, state: ChatWorkflowState) -> Routes:
+        # are chat tools called
         if state["status"] in [WorkflowStatusEnum.CANCELLED, WorkflowStatusEnum.ERROR]:
             return Routes.STOP
 
@@ -215,6 +216,7 @@ class Workflow(AbstractWorkflow):
         tools_registry: ToolsRegistry,
         checkpointer: BaseCheckpointSaver,
     ):
+        # tgao workflow compile
         self.log.info(
             "ChatWorkflow._compile: Starting chat workflow compilation",
             workflow_id=self._workflow_id,

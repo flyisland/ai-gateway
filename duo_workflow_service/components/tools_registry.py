@@ -135,6 +135,7 @@ _AGENT_PRIVILEGES: dict[str, list[Type[BaseTool]]] = {
 }
 
 
+# tgao tool registry
 class ToolsRegistry:
     _enabled_tools: dict[str, Union[BaseTool, Type[BaseModel]]]
     _preapproved_tool_names: set[str]
@@ -190,6 +191,8 @@ class ToolsRegistry:
         user: Optional[CloudConnectorUser] = None,
         language_server_version: Optional[LanguageServerVersion] = None,
     ):
+        # tgao 0
+        # import pdb;pdb.set_trace()
         tools_for_agent_privileges = _AGENT_PRIVILEGES
 
         # Always enable mcp tools until it's reliably passed by clients as an agent privilege

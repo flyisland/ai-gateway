@@ -150,6 +150,9 @@ class DuoWorkflowService(contract_pb2_grpc.DuoWorkflowServicer):
             ContainerApplication.internal_event.client
         ],
     ) -> AsyncIterator[contract_pb2.Action]:
+        # tgao
+        # import pdb;pdb.set_trace()
+        print("tgao 1")
         user: CloudConnectorUser = current_user_context_var.get()
 
         # Fetch the start workflow call
@@ -234,6 +237,7 @@ class DuoWorkflowService(contract_pb2_grpc.DuoWorkflowServicer):
             start_workflow_request.startRequest.flowConfigSchemaVersion or None
         )
 
+        # tgao 100
         workflow_class: FlowFactory = resolve_workflow_class(
             workflow_definition, flow_config, flow_config_schema_version
         )
@@ -260,8 +264,11 @@ class DuoWorkflowService(contract_pb2_grpc.DuoWorkflowServicer):
 
         async def send_events():
             while not workflow.is_done:
+                # import pdb;pdb.set_trace()
                 streaming_action = workflow.get_from_streaming_outbox()
                 if isinstance(streaming_action, contract_pb2.Action):
+                    print("tgao2")
+                    print(streaming_action)
                     yield streaming_action
 
                     if (
@@ -274,26 +281,31 @@ class DuoWorkflowService(contract_pb2_grpc.DuoWorkflowServicer):
                         continue
 
                 action = await workflow.get_from_outbox()
-
+                print("tgao3")
+                print(action)
                 if action is None:
                     continue
-
+                print("tgao4")
+                print(action)
                 if isinstance(action, contract_pb2.Action):
                     log.info(
                         "Read action from the egress queue",
                         requestID=action.requestID,
                         action_class=action.WhichOneof("action"),
                     )
-
+                print("tgao5")
+                print(action)
                 yield action
 
                 event: contract_pb2.ClientEvent | None = await next_non_heartbeat_event(
                     request_iterator
                 )
-
+                print("tgao6")
+                print(event)
                 if event is None:
                     break
-
+                print("tgao7")
+                print(event)
                 workflow.add_to_inbox(event)
                 if isinstance(event, contract_pb2.ClientEvent) and event.actionResponse:
                     log.info(
@@ -475,6 +487,7 @@ async def serve(port: int) -> None:
             ],
             options=server_options,
         )
+        # tgao 100
         contract_pb2_grpc.add_DuoWorkflowServicer_to_server(
             DuoWorkflowService(), server
         )
