@@ -67,33 +67,40 @@ class DeterministicStepComponent(BaseComponent):
 
     validated_tool: Optional[BaseTool] = Field(None, init=False)
 
-    @model_validator(mode="after")
-    def validate_tool_configuration(self) -> "DeterministicStepComponent":
-        # Validate that the tool exists
-        if self.tool_name not in self.toolset:
-            available_tools = list(self.toolset.keys())
-            raise KeyError(
-                f"Tool '{self.tool_name}' not found in toolset. "
-                f"Available tools: {available_tools}"
-            )
+    @model_validator(mode="before")
+    @classmethod
+    def validate_tool_configuration(cls, data: Any) -> dict[str, Any]:
+        if isinstance(data, dict):
+            tool_name = data.get("tool_name")
+            toolset = data.get("toolset")
+            inputs = data.get("inputs", [])
+            
+            if tool_name and toolset:
+                # Validate that the tool exists
+                if tool_name not in toolset:
+                    available_tools = list(toolset.keys())
+                    raise KeyError(
+                        f"Tool '{tool_name}' not found in toolset. "
+                        f"Available tools: {available_tools}"
+                    )
 
-        tool = self.toolset[self.tool_name]
-        self.validated_tool = tool
+                tool = toolset[tool_name]
+                data["validated_tool"] = tool
 
-        # Validate tool arguments against inputs if schema exists
-        if tool.args_schema:
-            error = self._validate_tool_arguments(tool)
-            if error:
-                schema = tool.args_schema.model_json_schema()  # type: ignore[union-attr]
-                raise ValueError(
-                    f"Tool '{self.tool_name}' configuration validation failed:\n"
-                    f"Error: {error}\n"
-                    f"Expected schema: {schema}"
-                )
+            if tool.args_schema:
+                error = cls._validate_tool_arguments(tool, inputs)  # Pass inputs as parameter
+                if error:
+                    schema = tool.args_schema.model_json_schema()  # type: ignore[union-attr]
+                    raise ValueError(
+                        f"Tool '{tool_name}' configuration validation failed:\n"
+                        f"Error: {error}\n"
+                        f"Expected schema: {schema}"
+                    )
 
-        return self
+        return # Return the modified data dict
 
-    def _validate_tool_arguments(self, tool: BaseTool) -> str | None:
+    @classmethod
+    def _validate_tool_arguments(self, tool: BaseTool, inputs: list)  -> str | None:
         if not tool.args_schema:
             return None
 
@@ -105,7 +112,7 @@ class DeterministicStepComponent(BaseComponent):
 
             # Extract configured parameter names
             configured_params = set()
-            for input_key in self.inputs:
+            for input_key in inputs:
                 if input_key.alias:
                     param_name = input_key.alias
                 elif hasattr(input_key, "subkeys") and input_key.subkeys:
