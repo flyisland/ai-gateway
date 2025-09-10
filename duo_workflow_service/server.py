@@ -21,7 +21,7 @@ from google.protobuf.struct_pb2 import Struct
 from grpc_reflection.v1alpha import reflection
 from langchain.globals import set_llm_cache
 from langchain_community.cache import SQLiteCache
-from langchain_core.utils.function_calling import convert_to_openai_tool
+from langchain_core.utils.function_calling import convert_to_openai_function
 
 from ai_gateway.config import Config
 from ai_gateway.container import ContainerApplication
@@ -354,7 +354,7 @@ class DuoWorkflowService(contract_pb2_grpc.DuoWorkflowServicer):
         for tool_cls in get_all_op_tools():
             tool = cast(DuoBaseTool, tool_cls())
             spec_struct = Struct()
-            spec_struct.update(convert_to_openai_tool(tool))
+            spec_struct.update(convert_to_openai_function(function=tool, strict=True))
             response.tools.append(spec_struct)
 
             for prompt in tool.eval_prompts or []:
