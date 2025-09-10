@@ -363,7 +363,7 @@ class DuoWorkflowService(contract_pb2_grpc.DuoWorkflowServicer):
             spec_struct = Struct()
             tool: DuoBaseTool = tool_cls()  # type: ignore[assignment]
             spec_struct.update(convert_to_openai_tool(tool))
-            response.tool_specs.append(spec_struct)
+            response.tools.append(spec_struct)
 
             for prompt in tool.eval_prompts or []:
                 struct = Struct()
