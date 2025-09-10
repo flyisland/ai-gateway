@@ -1,5 +1,6 @@
 import json
 
+from duo_workflow_service.executor.action import HTTPConnectionError
 from duo_workflow_service.gitlab.http_client import GitlabHttpClient, GitLabHttpResponse
 
 
@@ -29,13 +30,19 @@ class GitLabStatusUpdater:
 
         Raises:
             Exception: If the update request fails.
+            HTTPConnectionError: If HTTP connection fails.
         """
-        result = await self._client.apatch(
-            path=f"{self.workflow_api_path}/{workflow_id}",
-            body=json.dumps({"status_event": status_event}),
-            parse_json=True,
-            use_http_response=True,
-        )
+        try:
+            result = await self._client.apatch(
+                path=f"{self.workflow_api_path}/{workflow_id}",
+                body=json.dumps({"status_event": status_event}),
+                parse_json=True,
+                use_http_response=True,
+            )
+        except HTTPConnectionError as e:
+            raise Exception(
+                f"Failed to update workflow status due to connection error: {e}"
+            ) from e
 
         if not isinstance(result, GitLabHttpResponse):
             raise Exception(
