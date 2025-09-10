@@ -169,11 +169,11 @@ async def test_list_tools(
     service = DuoWorkflowService()
     response = await service.ListTools(contract_pb2.ListToolsRequest(), mock_context)
     assert isinstance(response, contract_pb2.ListToolsResponse)
-    assert len(response.tool_specs) == 3
+    assert len(response.tools) == 3
     assert mock_convert_to_openai_tool.called
 
     actual_sorted = sorted(
-        [MessageToDict(tool) for tool in response.tool_specs],
+        [MessageToDict(tool) for tool in response.tools],
         key=lambda x: x.get("function", {}).get("name", ""),
     )
     expected_sorted = sorted(
