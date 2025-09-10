@@ -120,7 +120,7 @@ class Prompt(RunnableBinding[Input, Output]):
 
         super().__init__(
             name=config.name,
-            model_engine=config.model.params.custom_llm_provider or model_provider,
+            model_engine=config.model.params.model_engine,
             model_provider=model_provider,
             model=model,
             unit_primitives=config.unit_primitives,

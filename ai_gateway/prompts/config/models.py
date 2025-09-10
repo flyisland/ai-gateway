@@ -31,7 +31,10 @@ class BaseModelParams(BaseModel):
     max_tokens: int | None = None
     max_retries: int | None = 1
     model_class_provider: str | None = None
-    custom_llm_provider: str | None = None
+
+    @property
+    def model_engine(self) -> str | None:
+        return self.model_class_provider
 
 
 class ChatLiteLLMParams(BaseModelParams):
@@ -39,6 +42,10 @@ class ChatLiteLLMParams(BaseModelParams):
     custom_llm_provider: str | None = None
     """Easily switch to huggingface, replicate, together ai, sagemaker, etc.
     Example - https://litellm.vercel.app/docs/providers/vllm#batch-completion"""
+
+    @property
+    def model_engine(self) -> str | None:
+        return self.custom_llm_provider or super().model_engine
 
 
 class ChatAnthropicParams(BaseModelParams):
