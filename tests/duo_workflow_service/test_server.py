@@ -113,15 +113,11 @@ def test_run(custom_models_enabled, should_validate_llm):
 
 
 @pytest.mark.asyncio
-@patch("duo_workflow_service.server.tools_registry._DEFAULT_TOOLS")
-@patch("duo_workflow_service.server.tools_registry._READ_ONLY_GITLAB_TOOLS")
-@patch("duo_workflow_service.server.tools_registry._AGENT_PRIVILEGES")
+@patch("duo_workflow_service.server.get_all_op_tools")
 @patch("duo_workflow_service.server.convert_to_openai_tool")
 async def test_list_tools(
     mock_convert_to_openai_tool,
-    mock_agent_privileges,
-    mock_readonly_tools,
-    mock_default_tools,
+    mock_get_all_op_tools,
 ):
     ## avoid duplicated mock tool with the same tool name
     _tool_class_cache = {}
@@ -153,16 +149,13 @@ async def test_list_tools(
             },
         }
 
-    mock_default_tools.__add__.return_value = [create_mock_tool(name="tool1")]
-    mock_readonly_tools.__add__.return_value = [
-        create_mock_tool(name="tool2", eval_prompts=["prompt2"])
-    ]
-    mock_agent_privileges.values.return_value = [
-        [
-            create_mock_tool(name="tool1"),
-            create_mock_tool(name="tool2", eval_prompts=["prompt2"]),
-        ],
-        [create_mock_tool(name="tool3")],
+    mock_get_all_op_tools.return_value = [
+        create_mock_tool(
+            name="tool1",
+            eval_prompts=["Example user prompt 1", "Example user prompt 2"],
+        ),
+        create_mock_tool(name="tool2"),
+        create_mock_tool(name="tool3"),
     ]
     mock_convert_to_openai_tool.side_effect = mock_convert_side_effect
     mock_context = MagicMock(spec=grpc.ServicerContext)
