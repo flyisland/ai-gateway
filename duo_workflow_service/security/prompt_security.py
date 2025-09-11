@@ -39,10 +39,47 @@ def sanitize_html_content(
         if not text or not isinstance(text, str):
             return text
 
+        # Preserve markdown code blocks by temporarily replacing them
+        import re
+        code_blocks = []
+        placeholder_pattern = "___CODE_BLOCK_PLACEHOLDER_{}___ "
+        
+        # Match markdown code blocks (```...```)
+        def code_block_replacer(match):
+            code_blocks.append(match.group(0))
+            return placeholder_pattern.format(len(code_blocks) - 1)
+        
+        # Temporarily replace code blocks
+        text_with_placeholders = re.sub(r'```[\s\S]*?```', code_block_replacer, text)
+
         allowed_tags = [
-            "b", "i", "u", "strong", "em", "br", "p", "span", "div",
-            "h1", "h2", "h3", "h4", "h5", "h6", "ul", "ol", "li",
-            "a", "img", "code", "pre", "blockquote", "table", "tr", "td", "th"
+            "b",
+            "i",
+            "u",
+            "strong",
+            "em",
+            "br",
+            "p",
+            "span",
+            "div",
+            "h1",
+            "h2",
+            "h3",
+            "h4",
+            "h5",
+            "h6",
+            "ul",
+            "ol",
+            "li",
+            "a",
+            "img",
+            "code",
+            "pre",
+            "blockquote",
+            "table",
+            "tr",
+            "td",
+            "th",
         ]
 
         allowed_attributes = {
@@ -53,12 +90,17 @@ def sanitize_html_content(
         }
 
         cleaned = bleach.clean(
-            text,
+            text_with_placeholders,
             tags=allowed_tags,
             attributes=allowed_attributes,
             strip=True,
             strip_comments=True,
         )
+
+        # Restore code blocks
+        for i, code_block in enumerate(code_blocks):
+            placeholder = placeholder_pattern.format(i)
+            cleaned = cleaned.replace(placeholder, code_block)
 
         return cleaned
 
