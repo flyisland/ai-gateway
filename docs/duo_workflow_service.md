@@ -153,7 +153,7 @@ brew install grpcurl
 Run the following command to export all tool specifications:
 
 ```shell
-grpcurl -plaintext -d '{}' gdk.test:50052 DuoWorkflow/ListTools | jq '.tools[] | {name: .function.name, description: .function.description}'
+grpcurl -plaintext -d '{}' gdk.test:50052 DuoWorkflow/ListTools | jq '.tools[] | {name: .name, description: .description}'
 ```
 
 This command will:
