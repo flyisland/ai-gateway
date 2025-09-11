@@ -215,6 +215,12 @@ additional_context_schema: |
   }
 ```
 
+When making the call to the Service API, this schema is currently only applied to the `agent_user_environment` Category (to pass Unit Primitive checks). For example, the schema would be applied to the `Context` field below:
+
+```json
+"additional_context": [{"Category": "agent_user_environment", "Content": "{'merge_request_url': 'www.example.com', 'source_branch': 'testbranch'}"}]
+```
+
 ### Output
 
 Output management handles the automatic production and storage of component results.

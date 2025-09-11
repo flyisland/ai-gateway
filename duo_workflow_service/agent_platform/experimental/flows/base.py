@@ -140,25 +140,26 @@ class Flow(AbstractWorkflow):
         processed_additional_context = {}
 
         for item in additional_context:
-            if item.category == "agent_user_environment":
-                if not self._config.additional_context_schema:
-                    raise ValueError(
-                        "agent_user_environment was provided, but no additional_context_schema specified"
-                    )
-                try:
-                    content_json = json.loads(item.content)  # type: ignore[arg-type]
-                    jsonschema.validate(
-                        content_json, json.loads(self._config.additional_context_schema)
-                    )
-                    processed_additional_context[item.category] = content_json
-                except jsonschema.ValidationError:
-                    raise ValueError(
-                        f"Additional Context item {item.content} does not match specified schema"
-                    )
-                except json.JSONDecodeError as e:
-                    raise ValueError(f"Invalid JSON in Additional Context item, {e}")
-            else:
+            if item.category != "agent_user_environment":
                 processed_additional_context[item.category] = item.content
+                continue
+
+            if not self._config.additional_context_schema:
+                raise ValueError(
+                    "agent_user_environment was provided, but no additional_context_schema specified"
+                )
+            try:
+                content_json = json.loads(item.content)  # type: ignore[arg-type]
+                jsonschema.validate(
+                    content_json, json.loads(self._config.additional_context_schema)
+                )
+                processed_additional_context[item.category] = content_json
+            except jsonschema.ValidationError:
+                raise ValueError(
+                    f"Additional Context item {item.content} does not match specified schema"
+                )
+            except json.JSONDecodeError as e:
+                raise ValueError(f"Invalid JSON in Additional Context item, {e}")
 
         return processed_additional_context
 
