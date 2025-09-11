@@ -204,17 +204,17 @@ class PromptSecurity:
                         PromptSecurity.TOOL_SPECIFIC_FUNCTIONS[tool_name]
                     )
 
-                secured_string = response
+                secured_response = response
                 for func in all_functions:
                     try:
-                        secured_string = func(secured_string)
+                        secured_response = func(secured_response)
                     except SecurityException:
                         raise
                     except Exception as e:
                         raise SecurityException(
                             f"Security function {func.__name__} failed for tool '{tool_name}': {str(e)}"
                         ) from e
-                return secured_string
+                return secured_response
         else:
             parsed_response = response
             is_json_input = False
