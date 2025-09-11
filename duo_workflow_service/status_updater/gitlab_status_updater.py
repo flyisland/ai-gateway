@@ -2,6 +2,7 @@ import json
 
 from duo_workflow_service.executor.action import HTTPConnectionError
 from duo_workflow_service.gitlab.http_client import GitlabHttpClient, GitLabHttpResponse
+from duo_workflow_service.tracking.errors import log_exception
 
 
 class UnsupportedStatusEvent(Exception):
@@ -40,9 +41,8 @@ class GitLabStatusUpdater:
                 use_http_response=True,
             )
         except HTTPConnectionError as e:
-            raise Exception(
-                f"Failed to update workflow status due to connection error: {e}"
-            ) from e
+            log_exception(e)
+            raise
 
         if not isinstance(result, GitLabHttpResponse):
             raise Exception(

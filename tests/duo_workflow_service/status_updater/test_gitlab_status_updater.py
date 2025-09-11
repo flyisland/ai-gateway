@@ -68,9 +68,7 @@ async def test_update_workflow_status_http_connection_error(gitlab_status_update
         side_effect=HTTPConnectionError("Connection refused")
     )
 
-    with pytest.raises(
-        Exception, match="Failed to update workflow status due to connection error"
-    ):
+    with pytest.raises(Exception, match="Connection refused"):
         await gitlab_status_updater.update_workflow_status(
             workflow_id="391", status_event="start"
         )

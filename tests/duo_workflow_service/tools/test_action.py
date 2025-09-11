@@ -10,34 +10,33 @@ from duo_workflow_service.executor.action import (
 )
 
 
-@pytest.mark.asyncio
-async def test_execute_action_success():
-    outbox: asyncio.Queue = asyncio.Queue()
-    inbox: asyncio.Queue = asyncio.Queue()
-    metadata = {"outbox": outbox, "inbox": inbox}
+@pytest.fixture
+def metadata():
+    outbox = asyncio.Queue()
+    inbox = asyncio.Queue()
+    return {"outbox": outbox, "inbox": inbox}
 
+
+@pytest.mark.asyncio
+async def test_execute_action_success(metadata):
     action = contract_pb2.Action()
     expected_response = "expected_response"
     client_event = contract_pb2.ClientEvent()
     client_event.actionResponse.response = expected_response
 
-    await inbox.put(client_event)
+    await metadata["inbox"].put(client_event)
 
     response = await _execute_action(metadata, action)
 
-    put_action = await outbox.get()
-    outbox.task_done()
+    put_action = await metadata["outbox"].get()
+    metadata["outbox"].task_done()
     assert put_action == action
     assert response == expected_response
-    assert inbox.empty()
+    assert metadata["inbox"].empty()
 
 
 @pytest.mark.asyncio
-async def test_execute_action_empty_inbox():
-    outbox: asyncio.Queue = asyncio.Queue()
-    inbox: asyncio.Queue = asyncio.Queue()
-    metadata = {"outbox": outbox, "inbox": inbox}
-
+async def test_execute_action_empty_inbox(metadata):
     action = contract_pb2.Action()
 
     with pytest.raises(asyncio.TimeoutError):
@@ -45,11 +44,7 @@ async def test_execute_action_empty_inbox():
 
 
 @pytest.mark.asyncio
-async def test_execute_action_and_get_http_response_success():
-    outbox: asyncio.Queue = asyncio.Queue()
-    inbox: asyncio.Queue = asyncio.Queue()
-    metadata = {"outbox": outbox, "inbox": inbox}
-
+async def test_execute_action_and_get_http_response_success(metadata):
     action = contract_pb2.Action()
     client_event = contract_pb2.ClientEvent()
     client_event.actionResponse.response = "success"
@@ -59,24 +54,20 @@ async def test_execute_action_and_get_http_response_success():
     client_event.actionResponse.httpResponse.body = '{"result": "ok"}'
     client_event.actionResponse.httpResponse.error = ""
 
-    await inbox.put(client_event)
+    await metadata["inbox"].put(client_event)
 
     response = await _execute_action_and_get_http_response(metadata, action)
 
-    put_action = await outbox.get()
-    outbox.task_done()
+    put_action = await metadata["outbox"].get()
+    metadata["outbox"].task_done()
     assert put_action == action
     assert response.response == "success"
     assert response.httpResponse.statusCode == 200
-    assert inbox.empty()
+    assert metadata["inbox"].empty()
 
 
 @pytest.mark.asyncio
-async def test_execute_action_and_get_http_response_connection_error():
-    outbox: asyncio.Queue = asyncio.Queue()
-    inbox: asyncio.Queue = asyncio.Queue()
-    metadata = {"outbox": outbox, "inbox": inbox}
-
+async def test_execute_action_and_get_http_response_connection_error(metadata):
     action = contract_pb2.Action()
     client_event = contract_pb2.ClientEvent()
     client_event.actionResponse.response = "failed"
@@ -84,39 +75,14 @@ async def test_execute_action_and_get_http_response_connection_error():
     # Create httpResponse with error
     client_event.actionResponse.httpResponse.error = "Connection refused"
 
-    await inbox.put(client_event)
+    await metadata["inbox"].put(client_event)
 
     with pytest.raises(
         HTTPConnectionError, match="HTTP connection failed: Connection refused"
     ):
         await _execute_action_and_get_http_response(metadata, action)
 
-    put_action = await outbox.get()
-    outbox.task_done()
+    put_action = await metadata["outbox"].get()
+    metadata["outbox"].task_done()
     assert put_action == action
-    assert inbox.empty()
-
-
-@pytest.mark.asyncio
-async def test_execute_action_and_get_http_response_no_error():
-    outbox: asyncio.Queue = asyncio.Queue()
-    inbox: asyncio.Queue = asyncio.Queue()
-    metadata = {"outbox": outbox, "inbox": inbox}
-
-    action = contract_pb2.Action()
-    client_event = contract_pb2.ClientEvent()
-    client_event.actionResponse.response = "success"
-
-    # HTTP response with no error (empty string)
-    client_event.actionResponse.httpResponse.statusCode = 200
-    client_event.actionResponse.httpResponse.body = '{"result": "ok"}'
-
-    await inbox.put(client_event)
-
-    response = await _execute_action_and_get_http_response(metadata, action)
-
-    put_action = await outbox.get()
-    outbox.task_done()
-    assert put_action == action
-    assert response.response == "success"
-    assert inbox.empty()
+    assert metadata["inbox"].empty()
