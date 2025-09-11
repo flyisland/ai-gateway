@@ -201,12 +201,12 @@ class ListToolsRequest(_message.Message):
     def __init__(self) -> None: ...
 
 class ListToolsResponse(_message.Message):
-    __slots__ = ("tool_specs", "eval_dataset")
-    TOOL_SPECS_FIELD_NUMBER: _ClassVar[int]
+    __slots__ = ("tools", "eval_dataset")
+    TOOLS_FIELD_NUMBER: _ClassVar[int]
     EVAL_DATASET_FIELD_NUMBER: _ClassVar[int]
-    tool_specs: _containers.RepeatedCompositeFieldContainer[_struct_pb2.Struct]
+    tools: _containers.RepeatedCompositeFieldContainer[_struct_pb2.Struct]
     eval_dataset: _containers.RepeatedCompositeFieldContainer[_struct_pb2.Struct]
-    def __init__(self, tool_specs: _Optional[_Iterable[_Union[_struct_pb2.Struct, _Mapping]]] = ..., eval_dataset: _Optional[_Iterable[_Union[_struct_pb2.Struct, _Mapping]]] = ...) -> None: ...
+    def __init__(self, tools: _Optional[_Iterable[_Union[_struct_pb2.Struct, _Mapping]]] = ..., eval_dataset: _Optional[_Iterable[_Union[_struct_pb2.Struct, _Mapping]]] = ...) -> None: ...
 
 class NewCheckpoint(_message.Message):
     __slots__ = ("status", "checkpoint", "goal", "errors")

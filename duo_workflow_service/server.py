@@ -350,13 +350,13 @@ class DuoWorkflowService(contract_pb2_grpc.DuoWorkflowServicer):
         self, request: contract_pb2.ListToolsRequest, context: grpc.ServicerContext
     ):
         log.info("Listing all available tools")
-        response = contract_pb2.ListToolsResponse(tool_specs=[], eval_dataset=[])
+        response = contract_pb2.ListToolsResponse()
 
         for tool_cls in get_all_op_tools():
             tool = cast(DuoBaseTool, tool_cls())
             spec_struct = Struct()
             spec_struct.update(convert_to_openai_function(function=tool, strict=True))
-            response.tool_specs.append(spec_struct)
+            response.tools.append(spec_struct)
 
             for config in tool.routing_eval_config or []:
                 struct = Struct()

@@ -141,7 +141,7 @@ export interface ListToolsRequest {
 }
 
 export interface ListToolsResponse {
-  toolSpecs: { [key: string]: any }[];
+  tools: { [key: string]: any }[];
   evalDataset: { [key: string]: any }[];
 }
 
@@ -2073,12 +2073,12 @@ export const ListToolsRequest: MessageFns<ListToolsRequest> = {
 };
 
 function createBaseListToolsResponse(): ListToolsResponse {
-  return { toolSpecs: [], evalDataset: [] };
+  return { tools: [], evalDataset: [] };
 }
 
 export const ListToolsResponse: MessageFns<ListToolsResponse> = {
   encode(message: ListToolsResponse, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
-    for (const v of message.toolSpecs) {
+    for (const v of message.tools) {
       Struct.encode(Struct.wrap(v!), writer.uint32(10).fork()).join();
     }
     for (const v of message.evalDataset) {
@@ -2099,7 +2099,7 @@ export const ListToolsResponse: MessageFns<ListToolsResponse> = {
             break;
           }
 
-          message.toolSpecs.push(Struct.unwrap(Struct.decode(reader, reader.uint32())));
+          message.tools.push(Struct.unwrap(Struct.decode(reader, reader.uint32())));
           continue;
         }
         case 2: {
@@ -2121,15 +2121,15 @@ export const ListToolsResponse: MessageFns<ListToolsResponse> = {
 
   fromJSON(object: any): ListToolsResponse {
     return {
-      toolSpecs: globalThis.Array.isArray(object?.toolSpecs) ? [...object.toolSpecs] : [],
+      tools: globalThis.Array.isArray(object?.tools) ? [...object.tools] : [],
       evalDataset: globalThis.Array.isArray(object?.evalDataset) ? [...object.evalDataset] : [],
     };
   },
 
   toJSON(message: ListToolsResponse): unknown {
     const obj: any = {};
-    if (message.toolSpecs?.length) {
-      obj.toolSpecs = message.toolSpecs;
+    if (message.tools?.length) {
+      obj.tools = message.tools;
     }
     if (message.evalDataset?.length) {
       obj.evalDataset = message.evalDataset;
@@ -2142,7 +2142,7 @@ export const ListToolsResponse: MessageFns<ListToolsResponse> = {
   },
   fromPartial<I extends Exact<DeepPartial<ListToolsResponse>, I>>(object: I): ListToolsResponse {
     const message = createBaseListToolsResponse();
-    message.toolSpecs = object.toolSpecs?.map((e) => e) || [];
+    message.tools = object.tools?.map((e) => e) || [];
     message.evalDataset = object.evalDataset?.map((e) => e) || [];
     return message;
   },
