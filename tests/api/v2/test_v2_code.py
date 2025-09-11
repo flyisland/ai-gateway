@@ -2117,7 +2117,6 @@ class TestCodeGenerations:
 
         assert response.status_code == want_status
         assert mock_code_bison.called == want_vertex_called
-        # assert mock_llm_chat.called == want_litellm_called
         assert mock_anthropic_chat.called == want_anthropic_chat_called
         assert mock_agent_model.called == bool(prompt_id)
 
