@@ -461,7 +461,7 @@ class TestSanitizeHtmlContent:
         assert sanitize_html_content(45.67) == 45.67
         assert sanitize_html_content(True) is True
         assert sanitize_html_content(False) is False
-        
+
     def test_unsupported_types_raise_exception(self):
         """Test that truly unsupported types raise SecurityException."""
         from duo_workflow_service.security.exceptions import SecurityException
@@ -479,8 +479,8 @@ class TestSanitizeHtmlContent:
         result = sanitize_html_content('<div onclick="alert(1)">content</div>')
         assert "onclick" not in result
         assert "<div>content</div>" in result
-        
+
         # Even if it looks like code syntax, HTML is still sanitized
-        result = sanitize_html_content('```html\n<script>alert(1)</script>\n```')
+        result = sanitize_html_content("```html\n<script>alert(1)</script>\n```")
         assert "script" not in result
         assert "alert(1)" in result  # Content preserved, tags removed

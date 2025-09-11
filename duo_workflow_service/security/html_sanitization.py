@@ -10,14 +10,14 @@ from duo_workflow_service.security.markdown_content_security import _apply_recur
 
 def _sanitize_string(text: str) -> str:
     """Sanitize HTML content using allowlist approach.
-    
+
     Also recursively processes nested JSON strings that may contain HTML.
     """
     if not text or not isinstance(text, str):
         return text
 
     # Check if this string is itself a JSON string containing more data
-    if text.strip().startswith('{') and text.strip().endswith('}'):
+    if text.strip().startswith("{") and text.strip().endswith("}"):
         try:
             # This string might be a nested JSON - try to parse and sanitize recursively
             nested_data = json.loads(text)
