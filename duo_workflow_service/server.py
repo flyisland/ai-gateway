@@ -164,28 +164,12 @@ class DuoWorkflowService(contract_pb2_grpc.DuoWorkflowServicer):
 
         monitoring_context: MonitoringContext = current_monitoring_context.get()
 
-        await self.authorize_additional_context(
-            current_user=user,
-            client_event=start_workflow_request,
-            context=context,
-            internal_event_client=internal_event_client,
-        )
-
         workflow_id = start_workflow_request.startRequest.workflowID
         set_workflow_id(workflow_id)
         log.info("Starting workflow %s", clean_start_request(start_workflow_request))
         workflow_type = string_to_category_enum(workflow_definition)
         duo_workflow_metrics.count_agent_platform_receive_start_counter(
             flow_type=workflow_type
-        )
-        internal_event_client.track_event(
-            event_name=EventEnum.RECEIVE_START_REQUEST.value,
-            additional_properties=InternalEventAdditionalProperties(
-                label=EventLabelEnum.WORKFLOW_RECEIVE_START_REQUEST_LABEL.value,
-                property=EventPropertyEnum.WORKFLOW_ID.value,
-                value=workflow_id,
-            ),
-            category=workflow_type.value,
         )
 
         goal = start_workflow_request.startRequest.goal
