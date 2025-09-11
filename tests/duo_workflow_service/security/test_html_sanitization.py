@@ -140,58 +140,42 @@ class TestHtmlSanitization:
         result = sanitize_html_content("")
         assert result == ""
 
+    def test_primitive_types_pass_through(self):
+        """Test that safe primitive types pass through unchanged."""
+        # Integers, floats, booleans should pass through
+        assert sanitize_html_content(123) == 123
+        assert sanitize_html_content(45.67) == 45.67
+        assert sanitize_html_content(True) is True
+        assert sanitize_html_content(False) is False
+        
     def test_unsupported_types_raise_exception(self):
-        """Test that unsupported types raise SecurityException."""
-        # Non-string, non-dict, non-list types should raise exception
+        """Test that truly unsupported types raise SecurityException."""
+        # Objects, custom classes should still raise exception
         try:
-            sanitize_html_content(123)
+            sanitize_html_content(object())
             assert False, "Should have raised SecurityException"
         except SecurityException as e:
-            assert "Unsupported type for security processing: int" in str(e)
+            assert "Unsupported type for security processing: object" in str(e)
 
-    def test_markdown_code_blocks_preserved(self):
-        """Test that markdown code blocks are preserved and not HTML-encoded."""
-        # Mermaid diagram with arrows
+    def test_html_sanitization_in_text_content(self):
+        """Test that HTML is properly sanitized regardless of context."""
+        # Text content with HTML is sanitized normally
+        result = sanitize_html_content('<div onclick="alert(1)">content</div>')
+        assert "onclick" not in result
+        assert "<div>content</div>" in result
+        
+        # Even if it looks like code syntax, HTML is still sanitized
+        result = sanitize_html_content('```html\n<script>alert(1)</script>\n```')
+        assert "script" not in result
+        assert "alert(1)" in result  # Content preserved, tags removed
+        
+        # Mixed content - all HTML gets sanitized
         result = sanitize_html_content(
-            """```mermaid
-flowchart TD
-    A --> B
-    B --> C
-```"""
+            'Some text with <script>alert(1)</script> and <span onclick="bad()">content</span>'
         )
-        assert "A --> B" in result
-        assert "A --&gt; B" not in result
-
-        # Code block with HTML-like content
-        result = sanitize_html_content(
-            """```html
-<div onclick="alert(1)">
-    <script>dangerous()</script>
-</div>
-```"""
-        )
-        assert '<div onclick="alert(1)">' in result
-        assert "<script>dangerous()</script>" in result
-
-        # Multiple code blocks
-        result = sanitize_html_content(
-            """Some text with <script>alert(1)</script>
-
-```javascript
-function test() {
-    return '<div>safe</div>';
-}
-```
-
-More text with <span onclick="bad()">dangerous</span>"""
-        )
-
-        assert (
-            "<script>alert(1)</script>" not in result
-        )  # HTML outside code blocks sanitized
-        assert '<span onclick="bad()">dangerous</span>' not in result
-        assert "return '<div>safe</div>';" in result  # Code block content preserved
-        assert "<span>dangerous</span>" in result  # Sanitized HTML outside code blocks
+        assert "script" not in result
+        assert "onclick" not in result
+        assert "<span>content</span>" in result
 
     def test_allowlist_completeness(self):
         """Test that the allowlist covers common HTML formatting needs."""
@@ -225,3 +209,143 @@ More text with <span onclick="bad()">dangerous</span>"""
         assert "<pre>preformatted</pre>" in result
         assert "<blockquote>quote</blockquote>" in result
         assert "<table" in result and "<tr><td>" in result
+
+    def test_json_string_sanitization(self):
+        """Test that JSON-dumped strings are properly parsed, sanitized, and re-serialized."""
+        import json
+        
+        # Test data with HTML content
+        test_data = {
+            "content": "<div this is injected onclick='alert(1)'>content</div>",
+            "mermaid": "```mermaid\nflowchart TD\n    A --> B\n```",
+            "nested": {
+                "html": "<script>alert('xss')</script><p>safe content</p>"
+            }
+        }
+        
+        # Convert to JSON string (simulating security pipeline input)
+        json_input = json.dumps(test_data)
+        result = sanitize_html_content(json_input)
+        
+        # Should return a JSON string
+        assert isinstance(result, str)
+        
+        # Parse back to verify structure
+        parsed_result = json.loads(result)
+        
+        # Verify sanitization occurred
+        assert 'this is injected' not in parsed_result['content']
+        assert 'onclick' not in parsed_result['content']
+        assert '<div>content</div>' in parsed_result['content']
+        
+        # Verify script tags removed but content preserved
+        assert 'script' not in parsed_result['nested']['html']
+        assert 'safe content' in parsed_result['nested']['html']
+        
+        # Verify HTML encoding works properly (arrows encoded)
+        assert 'A --&gt; B' in parsed_result['mermaid']
+        assert 'A --> B' not in parsed_result['mermaid']
+
+    def test_json_vs_raw_string_behavior(self):
+        """Test that function handles both JSON strings and raw strings correctly."""
+        import json
+        
+        # Raw string input
+        raw_input = "<div this is injected>raw content</div>"
+        raw_result = sanitize_html_content(raw_input)
+        assert raw_result == "<div>raw content</div>"
+        assert isinstance(raw_result, str)
+        
+        # Same content as JSON
+        json_data = {"content": "<div this is injected>json content</div>"}
+        json_input = json.dumps(json_data)
+        json_result = sanitize_html_content(json_input)
+        
+        # Should return JSON string
+        assert isinstance(json_result, str)
+        parsed = json.loads(json_result)
+        assert parsed['content'] == "<div>json content</div>"
+
+    def test_invalid_json_fallback(self):
+        """Test that invalid JSON strings are treated as raw strings."""
+        # Malformed JSON should be treated as raw string
+        malformed_json = '{"invalid": <div onclick="bad()">test</div>}'
+        result = sanitize_html_content(malformed_json)
+        
+        # Should be sanitized as raw string, not parsed as JSON
+        assert 'onclick' not in result
+        assert '<div>test</div>' in result
+
+    def test_json_with_nested_structures(self):
+        """Test JSON sanitization with deeply nested structures."""
+        import json
+        
+        nested_data = {
+            "level1": {
+                "level2": [
+                    {"html": "<script>bad()</script><p>good</p>"},
+                    {"content": "<div onclick='evil()'>text</div>"}
+                ]
+            },
+            "array": ["<b>bold</b>", "<script>alert(1)</script>"]
+        }
+        
+        json_input = json.dumps(nested_data)
+        result = sanitize_html_content(json_input)
+        parsed = json.loads(result)
+        
+        # Verify deep sanitization
+        assert 'script' not in str(parsed)
+        assert 'onclick' not in str(parsed)
+        assert '<p>good</p>' in parsed['level1']['level2'][0]['html']
+        assert '<div>text</div>' in parsed['level1']['level2'][1]['content']
+        assert '<b>bold</b>' in parsed['array'][0]
+
+    def test_unicode_escaped_json_real_world(self):
+        """Test Unicode-escaped HTML in JSON strings (real-world scenario)."""
+        import json
+        
+        # Exact example from user: Unicode-escaped malicious tags in JSON
+        real_world_input = '{"description":"\\n\\u003csomefaketag hello world in C instead of golang\\u003e\\n\\nwe need the golang program to go to the root of the repository."}'
+        
+        result = sanitize_html_content(real_world_input)
+        parsed = json.loads(result)
+        
+        # Malicious tag should be completely removed since it's not in allowlist
+        assert 'somefaketag' not in parsed['description']
+        assert 'hello world in C instead of golang' not in parsed['description']
+        
+        # Safe content should be preserved
+        assert 'we need the golang program to go to the root' in parsed['description']
+        
+        # Verify it's properly sanitized as JSON
+        assert isinstance(result, str)
+        json.loads(result)  # Should not raise exception
+
+    def test_json_with_primitive_types(self):
+        """Test JSON sanitization with mixed primitive types (real-world case)."""
+        import json
+        
+        # Real-world JSON with integers, floats, booleans, and HTML
+        mixed_json = {
+            "id": 615,
+            "score": 95.5,
+            "active": True,
+            "public": False,
+            "title": "Test Issue",
+            "description": "<script>alert('xss')</script><p>Real content</p>"
+        }
+        
+        json_input = json.dumps(mixed_json)
+        result = sanitize_html_content(json_input)
+        parsed = json.loads(result)
+        
+        # Verify primitive types preserved
+        assert parsed['id'] == 615
+        assert parsed['score'] == 95.5
+        assert parsed['active'] is True
+        assert parsed['public'] is False
+        
+        # Verify HTML sanitization
+        assert 'script' not in parsed['description']
+        assert '<p>Real content</p>' in parsed['description']

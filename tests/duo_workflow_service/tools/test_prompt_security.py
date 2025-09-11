@@ -454,57 +454,33 @@ class TestSanitizeHtmlContent:
         result = sanitize_html_content("")
         assert result == ""
 
+    def test_primitive_types_pass_through(self):
+        """Test that safe primitive types pass through unchanged."""
+        # Integers, floats, booleans should pass through
+        assert sanitize_html_content(123) == 123
+        assert sanitize_html_content(45.67) == 45.67
+        assert sanitize_html_content(True) is True
+        assert sanitize_html_content(False) is False
+        
     def test_unsupported_types_raise_exception(self):
-        """Test that unsupported types raise SecurityException."""
+        """Test that truly unsupported types raise SecurityException."""
         from duo_workflow_service.security.exceptions import SecurityException
 
-        # Non-string, non-dict, non-list types should raise exception
+        # Objects, custom classes should still raise exception
         try:
-            sanitize_html_content(123)
+            sanitize_html_content(object())
             assert False, "Should have raised SecurityException"
         except SecurityException as e:
-            assert "Unsupported type for security processing: int" in str(e)
+            assert "Unsupported type for security processing: object" in str(e)
 
-    def test_markdown_code_blocks_preserved(self):
-        """Test that markdown code blocks are preserved and not HTML-encoded."""
-        # Mermaid diagram with arrows
-        result = sanitize_html_content(
-            """```mermaid
-flowchart TD
-    A --> B
-    B --> C
-```"""
-        )
-        assert "A --> B" in result
-        assert "A --&gt; B" not in result
-
-        # Code block with HTML-like content
-        result = sanitize_html_content(
-            """```html
-<div onclick="alert(1)">
-    <script>dangerous()</script>
-</div>
-```"""
-        )
-        assert '<div onclick="alert(1)">' in result
-        assert "<script>dangerous()</script>" in result
-
-        # Multiple code blocks
-        result = sanitize_html_content(
-            """Some text with <script>alert(1)</script>
-
-```javascript
-function test() {
-    return '<div>safe</div>';
-}
-```
-
-More text with <span onclick="bad()">dangerous</span>"""
-        )
-
-        assert (
-            "<script>alert(1)</script>" not in result
-        )  # HTML outside code blocks sanitized
-        assert '<span onclick="bad()">dangerous</span>' not in result
-        assert "return '<div>safe</div>';" in result  # Code block content preserved
-        assert "<span>dangerous</span>" in result  # Sanitized HTML outside code blocks
+    def test_html_sanitization_in_text_content(self):
+        """Test that HTML is properly sanitized regardless of context."""
+        # Text content with HTML is sanitized normally
+        result = sanitize_html_content('<div onclick="alert(1)">content</div>')
+        assert "onclick" not in result
+        assert "<div>content</div>" in result
+        
+        # Even if it looks like code syntax, HTML is still sanitized
+        result = sanitize_html_content('```html\n<script>alert(1)</script>\n```')
+        assert "script" not in result
+        assert "alert(1)" in result  # Content preserved, tags removed
