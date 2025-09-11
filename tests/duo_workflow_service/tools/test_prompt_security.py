@@ -468,25 +468,30 @@ class TestSanitizeHtmlContent:
     def test_markdown_code_blocks_preserved(self):
         """Test that markdown code blocks are preserved and not HTML-encoded."""
         # Mermaid diagram with arrows
-        result = sanitize_html_content("""```mermaid
+        result = sanitize_html_content(
+            """```mermaid
 flowchart TD
     A --> B
     B --> C
-```""")
+```"""
+        )
         assert "A --> B" in result
         assert "A --&gt; B" not in result
 
         # Code block with HTML-like content
-        result = sanitize_html_content("""```html
+        result = sanitize_html_content(
+            """```html
 <div onclick="alert(1)">
     <script>dangerous()</script>
 </div>
-```""")
+```"""
+        )
         assert '<div onclick="alert(1)">' in result
-        assert '<script>dangerous()</script>' in result
+        assert "<script>dangerous()</script>" in result
 
         # Multiple code blocks
-        result = sanitize_html_content("""Some text with <script>alert(1)</script>
+        result = sanitize_html_content(
+            """Some text with <script>alert(1)</script>
 
 ```javascript
 function test() {
@@ -494,9 +499,12 @@ function test() {
 }
 ```
 
-More text with <span onclick="bad()">dangerous</span>""")
-        
-        assert '<script>alert(1)</script>' not in result  # HTML outside code blocks sanitized
+More text with <span onclick="bad()">dangerous</span>"""
+        )
+
+        assert (
+            "<script>alert(1)</script>" not in result
+        )  # HTML outside code blocks sanitized
         assert '<span onclick="bad()">dangerous</span>' not in result
         assert "return '<div>safe</div>';" in result  # Code block content preserved
-        assert '<span>dangerous</span>' in result  # Sanitized HTML outside code blocks
+        assert "<span>dangerous</span>" in result  # Sanitized HTML outside code blocks

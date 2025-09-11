@@ -41,16 +41,17 @@ def sanitize_html_content(
 
         # Preserve markdown code blocks by temporarily replacing them
         import re
+
         code_blocks = []
         placeholder_pattern = "___CODE_BLOCK_PLACEHOLDER_{}___ "
-        
+
         # Match markdown code blocks (```...```)
         def code_block_replacer(match):
             code_blocks.append(match.group(0))
             return placeholder_pattern.format(len(code_blocks) - 1)
-        
+
         # Temporarily replace code blocks
-        text_with_placeholders = re.sub(r'```[\s\S]*?```', code_block_replacer, text)
+        text_with_placeholders = re.sub(r"```[\s\S]*?```", code_block_replacer, text)
 
         allowed_tags = [
             "b",
