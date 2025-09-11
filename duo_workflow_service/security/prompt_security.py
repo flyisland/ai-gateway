@@ -1,4 +1,5 @@
 # flake8: noqa: W605
+import json
 import re
 import sys
 from pathlib import Path
@@ -76,8 +77,7 @@ def encode_dangerous_tags(
     if isinstance(processed, dict):
         return [processed]
 
-    # Type assertion: processed is guaranteed to be str or list after security processing
-    return processed  # type: ignore[no-any-return]
+    return processed
 
 
 def strip_hidden_unicode_tags(
@@ -193,11 +193,22 @@ class PromptSecurity:
         Raises:
             SecurityException: If any security validation fails
         """
+        if isinstance(response, str):
+            try:
+                parsed_response = json.loads(response)
+                is_json_input = True
+            except json.JSONDecodeError:
+                parsed_response = response
+                is_json_input = False
+        else:
+            parsed_response = response
+            is_json_input = False
+
         all_functions = list(PromptSecurity.DEFAULT_SECURITY_FUNCTIONS)
         if tool_name in PromptSecurity.TOOL_SPECIFIC_FUNCTIONS:
             all_functions.extend(PromptSecurity.TOOL_SPECIFIC_FUNCTIONS[tool_name])
 
-        secured_response = response
+        secured_response = parsed_response
         for func in all_functions:
             try:
                 secured_response = func(secured_response)
@@ -210,5 +221,7 @@ class PromptSecurity:
                     f"Security function {func.__name__} failed for tool '{tool_name}': {str(e)}"
                 ) from e
 
-        # Type assertion: security functions guarantee proper return type
-        return secured_response  # type: ignore[return-value]
+        if is_json_input:
+            return json.dumps(secured_response)
+        else:
+            return secured_response  # type: ignore[return-value]

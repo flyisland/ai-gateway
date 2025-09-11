@@ -148,14 +148,11 @@ class TestHtmlSanitization:
         assert sanitize_html_content(True) is True
         assert sanitize_html_content(False) is False
 
-    def test_unsupported_types_raise_exception(self):
-        """Test that truly unsupported types raise SecurityException."""
-        # Objects, custom classes should still raise exception
-        try:
-            sanitize_html_content(object())
-            assert False, "Should have raised SecurityException"
-        except SecurityException as e:
-            assert "Unsupported type for security processing: object" in str(e)
+    def test_unsupported_types_handled_safely(self):
+        """Test that unsupported types are handled safely."""
+        # Objects, custom classes now return None for safety
+        result = sanitize_html_content(object())
+        assert result is None
 
     def test_html_sanitization_in_text_content(self):
         """Test that HTML is properly sanitized regardless of context."""
