@@ -182,20 +182,23 @@ async def test_list_tools(
     )
     expected_specs = [
         {
-            "description": f"{tool_name} description",
-            "parameters": {
-                "type": "object",
-                "required": ["arg1"],
-                "properties": {
-                    "arg1": {
-                        "description": "description for arg1",
-                        "type": "string",
-                    }
+            "type": "function",
+            "function": {
+                "strict": True,
+                "parameters": {
+                    "properties": {
+                        "arg1": {
+                            "description": "description for arg1",
+                            "type": "string",
+                        }
+                    },
+                    "type": "object",
+                    "additionalProperties": False,
+                    "required": ["arg1"],
                 },
-                "additionalProperties": False,
+                "description": f"{tool_name} description",
+                "name": tool_name,
             },
-            "name": tool_name,
-            "strict": True,
         }
         for tool_name in ["tool1", "tool2", "tool3"]
     ]
