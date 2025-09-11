@@ -123,21 +123,7 @@ class DuoWorkflowService(contract_pb2_grpc.DuoWorkflowServicer):
         context: grpc.ServicerContext,
         internal_event_client: InternalEventsClient,
     ):
-        if client_event.startRequest.additional_context:
-            for additional_context in client_event.startRequest.additional_context:
-                unit_primitive = GitLabUnitPrimitive[
-                    f"include_{additional_context.category}_context".upper()
-                ]
-                if current_user.can(unit_primitive):
-                    internal_event_client.track_event(
-                        event_name=f"request_{unit_primitive}",
-                        category=__name__,
-                    )
-                else:
-                    await context.abort(
-                        grpc.StatusCode.PERMISSION_DENIED,
-                        f"Unauthorized to access {unit_primitive}",
-                    )
+        return
 
     # pylint: disable=invalid-overridden-method
     # pylint: disable=too-many-statements
