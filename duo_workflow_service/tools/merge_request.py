@@ -616,3 +616,234 @@ For example:
         if args.url:
             return f"Update merge request {args.url}"
         return f"Update merge request !{args.merge_request_iid} in project {args.project_id}"
+
+class PositionInput(BaseModel):
+   base_sha: str = Field(description="The base SHA from diff_refs")
+   start_sha: str = Field(description="The start SHA from diff_refs")
+   head_sha: str = Field(description="The head SHA from diff_refs")
+   position_type: str = Field(default="text", description="Position type, typically 'text'")
+   old_path: str = Field(description="The old file path")
+   new_path: str = Field(description="The new file path")
+   old_line: Optional[int] = Field(default=None, description="The old line number")
+   new_line: Optional[int] = Field(default=None, description="The new line number")
+   ignore_whitespace_change: bool = Field(default=False, description="Whether to ignore whitespace changes")
+
+class CreateMergeRequestDraftNoteInput(MergeRequestResourceInput):
+   note: str = Field(
+       description="The content of a draft note. Limited to 1,000,000 characters."
+   )
+   position: Optional[PositionInput] = Field(
+       default=None,
+       description="Position information for line-specific comments. If provided, the comment will be attached to a specific line in the diff."
+   )
+
+class CreateMergeRequestDraftNote(DuoBaseTool):
+   name: str = "create_merge_request_draft_note"
+   description: str = f"""Create a draft note (comment) on a merge request. You are NOT allowed to ever use a GitLab quick action in a merge request note.
+Quick actions are text-based shortcuts for common GitLab actions. They are commands that are on their own line and
+start with a backslash. Examples include /merge, /approve, /close, etc.
+{MERGE_REQUEST_IDENTIFICATION_DESCRIPTION}
+
+This tool supports both general merge request comments and line-specific comments:
+- For general comments, only provide the note parameter
+- For line-specific comments, provide both note and position parameters
+
+For example:
+- General comment: create_merge_request_draft_note(project_id=13, merge_request_iid=9, note="This is a comment")
+- Line-specific comment: create_merge_request_draft_note(
+   project_id=13,
+   merge_request_iid=9,
+   note="This line needs attention",
+   position={{
+       "base_sha": "abc123",
+       "start_sha": "def456",
+       "head_sha": "ghi789",
+       "position_type": "text",
+       "old_path": "file.py",
+       "new_path": "file.py",
+       "old_line": 10,
+       "new_line": 12,
+       "ignore_whitespace_change: false
+   }}
+)
+- URL-based: create_merge_request_draft_note(url="https://gitlab.com/namespace/project/-/merge_requests/103", note="This is a comment")
+
+The body parameter is always required. The position parameter is optional and used for line-specific comments.
+"""
+   args_schema: Type[BaseModel] = CreateMergeRequestDraftNoteInput
+   unit_primitive: GitLabUnitPrimitive = GitLabUnitPrimitive.ASK_MERGE_REQUEST
+
+   def _contains_quick_action(self, note: str) -> bool:
+       quick_action_pattern = r"(?m)^/[a-zA-Z]+"
+       return bool(re.search(quick_action_pattern, note))
+
+   async def _arun(self, note: str, position: Optional[PositionInput] = None, **kwargs: Any) -> str:
+       url = kwargs.pop("url", None)
+       project_id = kwargs.pop("project_id", None)
+       merge_request_iid = kwargs.pop("merge_request_iid", None)
+
+       validation_result = self._validate_merge_request_url(
+           url, project_id, merge_request_iid
+       )
+       if validation_result.errors:
+           return json.dumps({"error": "; ".join(validation_result.errors)})
+
+       if self._contains_quick_action(note):
+           return json.dumps({
+               "status": "error",
+               "message": "Draft notes containing GitLab quick actions are not allowed.",
+           })
+
+       try:
+           # Build request data as JSON (matching Rails API structure)
+           request_data = {"note": note}
+
+           if position:
+               # Position as nested hash (matching Rails API expectations)
+               position_data = {
+                   "base_sha": position.base_sha,
+                   "start_sha": position.start_sha,
+                   "head_sha": position.head_sha,
+                   "position_type": position.position_type,
+                   "old_path": position.old_path,
+                   "new_path": position.new_path,
+                   "ignore_whitespace_change": position.ignore_whitespace_change,
+               }
+               if position.old_line is not None:
+                   position_data["old_line"] = position.old_line
+               if position.new_line is not None:
+                   position_data["new_line"] = position.new_line
+
+               request_data["position"] = position_data
+
+           response = await self.gitlab_client.apost(
+               path=f"/api/v4/projects/{validation_result.project_id}/merge_requests/{validation_result.merge_request_iid}/draft_notes",
+               body=json.dumps(request_data),
+           )
+
+           # STRICT error detection - NO fallbacks
+           if isinstance(response, str):
+               return json.dumps({
+                   "error": f"Draft note creation failed: {response}",
+                   "raw_response": response
+               })
+
+           if isinstance(response, dict):
+               if "status" in response and response["status"] >= 400:
+                   return json.dumps({
+                       "error": f"Draft note creation failed with HTTP {response['status']}: {response.get('message', response.get('error', 'Unknown error'))}",
+                       "status_code": response["status"],
+                       "response": response
+                   })
+
+               if "error" in response:
+                   return json.dumps({
+                       "error": f"Draft note creation failed: {response['error']}",
+                       "response": response
+                   })
+
+               if "id" in response:
+                   return json.dumps({
+                       "status": "success",
+                       "draft_note_id": response["id"],
+                       "note": note,
+                       "position": position.model_dump() if position else None,
+                       "response": response
+                   })
+               else:
+                   return json.dumps({
+                       "error": "Draft note creation failed: API response missing draft note ID",
+                       "response": response
+                   })
+           else:
+               return json.dumps({
+                   "error": f"Draft note creation failed: unexpected response type {type(response).__name__}",
+                   "response": response
+               })
+
+       except Exception as e:
+           return json.dumps({
+               "error": f"Draft note creation failed with exception: {str(e)}",
+               "exception_type": type(e).__name__
+           })
+
+   def format_display_message(
+       self, args: CreateMergeRequestDraftNoteInput, tool_response: Any = None
+   ) -> str:
+       base_message = ""
+       if args.url:
+           base_message = f"Add draft note to merge request {args.url}"
+       else:
+           base_message = f"Add draft note to merge request !{args.merge_request_iid} in project {args.project_id}"
+
+       if args.position:
+           base_message += f" (line-specific comment on {args.position.new_path})"
+
+       return base_message
+
+class PublishMergeRequestDraftNotes(DuoBaseTool):
+   name: str = "publish_merge_request_draft_notes"
+   description: str = f"""Publish all existing draft notes (comments) on a merge request that belongs to the authenticated user.
+{MERGE_REQUEST_IDENTIFICATION_DESCRIPTION}
+
+For example:
+- Given project_id 13 and merge_request_iid 9, the tool call would be:
+   publish_merge_request_draft_notes(project_id=13, merge_request_iid=9)
+- Given the URL https://gitlab.com/namespace/project/-/merge_requests/103, the tool call would be:
+   publish_merge_request_draft_notes(url="https://gitlab.com/namespace/project/-/merge_requests/103")
+"""
+   args_schema: Type[BaseModel] = MergeRequestResourceInput
+   unit_primitive: GitLabUnitPrimitive = GitLabUnitPrimitive.ASK_MERGE_REQUEST
+
+   async def _arun(self, **kwargs: Any) -> str:
+       url = kwargs.pop("url", None)
+       project_id = kwargs.pop("project_id", None)
+       merge_request_iid = kwargs.pop("merge_request_iid", None)
+
+       validation_result = self._validate_merge_request_url(
+           url, project_id, merge_request_iid
+       )
+       if validation_result.errors:
+           return json.dumps({"error": "; ".join(validation_result.errors)})
+
+       try:
+           response = await self.gitlab_client.apost(
+               path=f"/api/v4/projects/{validation_result.project_id}/merge_requests/"
+               f"{validation_result.merge_request_iid}/draft_notes/bulk_publish",
+               body=json.dumps({}),
+           )
+
+           if isinstance(response, str):
+               return json.dumps({
+                   "error": f"Draft notes publishing failed: {response}",
+                   "raw_response": response
+               })
+
+           if isinstance(response, dict):
+               if "status" in response and response["status"] >= 400:
+                   return json.dumps({
+                       "error": f"Draft notes publishing failed with HTTP {response['status']}: {response.get('message', response.get('error', 'Unknown error'))}",
+                       "status_code": response["status"],
+                       "response": response
+                   })
+
+               if "error" in response:
+                   return json.dumps({
+                       "error": f"Draft notes publishing failed: {response['error']}",
+                       "response": response
+                   })
+
+           return json.dumps({"status": "success", "response": response})
+
+       except Exception as e:
+           return json.dumps({
+               "error": f"Draft notes publishing failed with exception: {str(e)}",
+               "exception_type": type(e).__name__
+           })
+
+   def format_display_message(
+       self, args: MergeRequestResourceInput, tool_response: Any = None
+   ) -> str:
+       if args.url:
+           return f"Publish draft notes on merge request {args.url}"
+       return f"Publish draft notes on merge request !{args.merge_request_iid} in project {args.project_id}"
