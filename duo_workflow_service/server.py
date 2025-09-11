@@ -270,6 +270,8 @@ class DuoWorkflowService(contract_pb2_grpc.DuoWorkflowServicer):
 
                     yield streaming_action
 
+                    workflow.mark_streaming_outbox_done()
+
                     log.info(
                         "Sent an outgoing streaming action",
                         requestID=streaming_action.requestID,

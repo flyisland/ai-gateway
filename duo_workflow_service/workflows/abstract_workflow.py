@@ -181,7 +181,6 @@ class AbstractWorkflow(ABC):
     def get_from_streaming_outbox(self):
         try:
             item = self._streaming_outbox.get_nowait()
-            self._streaming_outbox.task_done()
             return item
         except asyncio.QueueEmpty:
             return None
@@ -309,6 +308,9 @@ class AbstractWorkflow(ABC):
                 return Command(resume=event)
             case _:
                 return None
+
+    def mark_streaming_outbox_done(self):
+        self._streaming_outbox.task_done()
 
     @abstractmethod
     def get_workflow_state(self, goal: str) -> DuoWorkflowStateType:
