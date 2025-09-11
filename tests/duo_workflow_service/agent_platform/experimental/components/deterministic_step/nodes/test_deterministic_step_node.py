@@ -152,7 +152,7 @@ def flow_state_fixture():
 def deterministic_step_node_fixture(
     component_name,
     inputs,
-    mock_toolset,
+    mock_tool,
     flow_id,
     flow_type,
     mock_internal_event_client,
@@ -169,7 +169,7 @@ def deterministic_step_node_fixture(
         tool_name="test_tool",
         component_name=component_name,
         inputs=inputs,
-        toolset=mock_toolset,
+        validated_tool=mock_tool,
         flow_id=flow_id,
         flow_type=flow_type,
         internal_event_client=mock_internal_event_client,
@@ -197,7 +197,6 @@ class TestDeterministicStepNodeInitialization:
             tool_name="test_tool",
             component_name=component_name,
             inputs=inputs,
-            toolset=mock_toolset,
             flow_id=flow_id,
             flow_type=flow_type,
             internal_event_client=mock_internal_event_client,
@@ -210,35 +209,33 @@ class TestDeterministicStepNodeInitialization:
         # Should not attempt to get tool from toolset
         mock_toolset.__getitem__.assert_not_called()
 
-    def test_init_without_validated_tool(
+    def test_init_uses_validated_tool(
         self,
         component_name,
         inputs,
-        mock_toolset,
         flow_id,
         flow_type,
         mock_internal_event_client,
         ui_history,
         mock_tool,
     ):
-        """Test initialization without validated_tool parameter."""
+        """Test initialization uses provided validated_tool parameter."""
         node = DeterministicStepNode(
             name="test_node",
             tool_name="test_tool",
             component_name=component_name,
             inputs=inputs,
-            toolset=mock_toolset,
+            validated_tool=mock_tool,
             flow_id=flow_id,
             flow_type=flow_type,
             internal_event_client=mock_internal_event_client,
             ui_history=ui_history,
         )
 
-        # Should get tool from toolset
-        mock_toolset.__getitem__.assert_called_once_with("test_tool")
+        # Should use the provided validated_tool directly
         assert node._validated_tool == mock_tool
 
-    def test_init_tool_not_found_and_no_validated_tool(
+    def test_init_requires_validated_tool(
         self,
         component_name,
         inputs,
@@ -247,18 +244,19 @@ class TestDeterministicStepNodeInitialization:
         mock_internal_event_client,
         ui_history,
     ):
-        """Test initialization raises error when tool not found and no validated_tool provided."""
-        mock_toolset = Mock()
-        mock_toolset.__contains__ = Mock(return_value=False)
-        mock_toolset.keys = Mock(return_value=["available_tool_1", "available_tool_2"])
-
-        with pytest.raises(KeyError, match="Tool 'missing_tool' not found in toolset"):
+        """Test initialization requires validated_tool parameter."""
+        # This test verifies that validated_tool is required
+        # (The actual validation happens in the component, not the node)
+        with pytest.raises(
+            TypeError,
+            match="missing 1 required keyword-only argument: 'validated_tool'",
+        ):
             DeterministicStepNode(
                 name="test_node",
-                tool_name="missing_tool",
+                tool_name="test_tool",
                 component_name=component_name,
                 inputs=inputs,
-                toolset=mock_toolset,
+                # validated_tool is missing
                 flow_id=flow_id,
                 flow_type=flow_type,
                 internal_event_client=mock_internal_event_client,
@@ -511,7 +509,7 @@ class TestDeterministicStepNodeWithIOKeys:
             tool_name="test_tool",
             component_name=component_name,
             inputs=inputs,
-            toolset=mock_toolset,
+            validated_tool=mock_tool,
             flow_id=flow_id,
             flow_type=flow_type,
             internal_event_client=mock_internal_event_client,
@@ -562,7 +560,7 @@ class TestDeterministicStepNodeWithIOKeys:
             tool_name="test_tool",
             component_name=component_name,
             inputs=inputs,
-            toolset=mock_toolset,
+            validated_tool=mock_tool,
             flow_id=flow_id,
             flow_type=flow_type,
             internal_event_client=mock_internal_event_client,
@@ -610,7 +608,7 @@ class TestDeterministicStepNodeWithIOKeys:
             tool_name="test_tool",
             component_name=component_name,
             inputs=inputs,
-            toolset=mock_toolset,
+            validated_tool=mock_tool,
             flow_id=flow_id,
             flow_type=flow_type,
             internal_event_client=mock_internal_event_client,
@@ -658,7 +656,7 @@ class TestDeterministicStepNodeWithIOKeys:
             tool_name="test_tool",
             component_name=component_name,
             inputs=inputs,
-            toolset=mock_toolset,
+            validated_tool=mock_tool,
             flow_id=flow_id,
             flow_type=flow_type,
             internal_event_client=mock_internal_event_client,
@@ -711,7 +709,7 @@ class TestDeterministicStepNodeWithIOKeys:
             tool_name="test_tool",
             component_name=component_name,
             inputs=inputs,
-            toolset=mock_toolset,
+            validated_tool=mock_tool,
             flow_id=flow_id,
             flow_type=flow_type,
             internal_event_client=mock_internal_event_client,

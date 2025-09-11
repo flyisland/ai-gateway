@@ -1,4 +1,4 @@
-from typing import ClassVar, Literal, Optional
+from typing import Any, ClassVar, Literal
 
 from dependency_injector.wiring import Provide, inject
 from langchain_core.tools import BaseTool
@@ -20,7 +20,7 @@ from duo_workflow_service.agent_platform.experimental.components.deterministic_s
     UILogEventsDeterministicStep,
     UILogWriterDeterministicStep,
 )
-from duo_workflow_service.agent_platform.experimental.state import IOKeyTemplate
+from duo_workflow_service.agent_platform.experimental.state import IOKey, IOKeyTemplate
 from duo_workflow_service.agent_platform.experimental.ui_log import UIHistory
 from duo_workflow_service.tools.toolset import Toolset
 
@@ -65,7 +65,7 @@ class DeterministicStepComponent(BaseComponent):
     ui_log_events: list[UILogEventsDeterministicStep] = Field(default_factory=list)
     ui_role_as: Literal["tool"] = "tool"
 
-    validated_tool: Optional[BaseTool] = Field(None, init=False)
+    validated_tool: BaseTool = Field(init=False)
 
     @model_validator(mode="before")
     @classmethod
@@ -73,22 +73,27 @@ class DeterministicStepComponent(BaseComponent):
         if isinstance(data, dict):
             tool_name = data.get("tool_name")
             toolset = data.get("toolset")
-            inputs = data.get("inputs", [])
-            
-            if tool_name and toolset:
-                # Validate that the tool exists
-                if tool_name not in toolset:
-                    available_tools = list(toolset.keys())
-                    raise KeyError(
-                        f"Tool '{tool_name}' not found in toolset. "
-                        f"Available tools: {available_tools}"
-                    )
 
-                tool = toolset[tool_name]
-                data["validated_tool"] = tool
+            raw_inputs = data.get("inputs", [])
+            inputs = IOKey.parse_keys(raw_inputs)
+
+            if not tool_name:
+                raise ValueError("tool_name is required")
+
+            if not toolset:
+                raise ValueError("toolset is required")
+
+            if tool_name not in toolset:
+                available_tools = list(toolset.keys())
+                raise KeyError(
+                    f"Tool '{tool_name}' not found in toolset. "
+                    f"Available tools: {available_tools}"
+                )
+
+            tool = toolset[tool_name]
 
             if tool.args_schema:
-                error = cls._validate_tool_arguments(tool, inputs)  # Pass inputs as parameter
+                error = cls._validate_tool_arguments(tool, inputs)
                 if error:
                     schema = tool.args_schema.model_json_schema()  # type: ignore[union-attr]
                     raise ValueError(
@@ -97,10 +102,14 @@ class DeterministicStepComponent(BaseComponent):
                         f"Expected schema: {schema}"
                     )
 
-        return # Return the modified data dict
+            data["validated_tool"] = tool
+
+        return data
 
     @classmethod
-    def _validate_tool_arguments(self, tool: BaseTool, inputs: list)  -> str | None:
+    def _validate_tool_arguments(
+        cls, tool: BaseTool, inputs: list[IOKey]
+    ) -> str | None:
         if not tool.args_schema:
             return None
 
@@ -115,16 +124,18 @@ class DeterministicStepComponent(BaseComponent):
             for input_key in inputs:
                 if input_key.alias:
                     param_name = input_key.alias
-                elif hasattr(input_key, "subkeys") and input_key.subkeys:
+                elif input_key.subkeys:
                     param_name = input_key.subkeys[-1]
                 else:
                     param_name = str(input_key)
                 configured_params.add(param_name)
 
+            # Check for missing required parameters
             missing_required = required_params - configured_params
             if missing_required:
                 return f"Missing required parameters: {sorted(missing_required)}"
 
+            # Check for unknown parameters
             unknown_params = configured_params - expected_params
             if unknown_params:
                 return f"Unknown parameters: {sorted(unknown_params)}. Valid parameters are: {sorted(expected_params)}"
@@ -143,7 +154,6 @@ class DeterministicStepComponent(BaseComponent):
             tool_name=self.tool_name,
             component_name=self.name,
             inputs=self.inputs,
-            toolset=self.toolset,
             flow_id=self.flow_id,
             flow_type=self.flow_type,
             internal_event_client=self.internal_event_client,

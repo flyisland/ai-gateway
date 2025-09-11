@@ -18,7 +18,6 @@ from duo_workflow_service.agent_platform.experimental.state import (
 from duo_workflow_service.agent_platform.experimental.ui_log import UIHistory
 from duo_workflow_service.monitoring import duo_workflow_metrics
 from duo_workflow_service.security.prompt_security import PromptSecurity
-from duo_workflow_service.tools.toolset import Toolset
 from lib.internal_events import InternalEventAdditionalProperties, InternalEventsClient
 from lib.internal_events.event_enum import CategoryEnum, EventEnum, EventLabelEnum
 
@@ -34,7 +33,6 @@ class DeterministicStepNode:
         tool_name: str,
         component_name: str,
         inputs: list[IOKey],
-        toolset: Toolset,
         flow_id: str,
         flow_type: CategoryEnum,
         internal_event_client: InternalEventsClient,
@@ -44,13 +42,12 @@ class DeterministicStepNode:
         tool_responses_key: Optional[IOKey] = None,
         tool_error_key: Optional[IOKey] = None,
         execution_result_key: Optional[IOKey] = None,
-        validated_tool: Optional[BaseTool] = None,
+        validated_tool: BaseTool,
     ):
         self.name = name
         self._tool_name = tool_name
         self._component_name = component_name
         self._inputs = inputs
-        self._toolset = toolset
         self._flow_id = flow_id
         self._flow_type = flow_type
         self._internal_event_client = internal_event_client
@@ -61,19 +58,9 @@ class DeterministicStepNode:
         self._execution_result_key = execution_result_key
         self._validated_tool = validated_tool
 
-        if not self._validated_tool:
-            if tool_name not in toolset:
-                raise KeyError(
-                    f"Tool '{tool_name}' not found in toolset. "
-                    f"Available tools: {list(toolset.keys())}"
-                )
-            self._validated_tool = toolset[tool_name]
-
     async def run(self, state: FlowState) -> dict:
         response, err_format = None, None
         tool = self._validated_tool
-        if not tool:
-            raise RuntimeError(f"Tool '{self._tool_name}' not found in toolset.")
 
         try:
             tool_call_args = get_vars_from_state(self._inputs, state)

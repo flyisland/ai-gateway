@@ -140,6 +140,12 @@ def deterministic_step_component_fixture(
     mock_internal_event_client,
 ):
     """Fixture for DeterministicStepComponent instance."""
+    mock_tool = Mock(spec=BaseTool)
+    mock_tool.name = tool_name
+    mock_tool.args_schema = None
+    mock_toolset.__getitem__ = Mock(return_value=mock_tool)
+    mock_toolset.__contains__ = Mock(return_value=True)
+
     return DeterministicStepComponent(
         name=component_name,
         flow_id=flow_id,
@@ -185,7 +191,7 @@ class TestDeterministicStepComponentInitialization:
     ):
         """Test that component validates input targets correctly."""
         # This should succeed without raising an exception
-        DeterministicStepComponent(
+        component = DeterministicStepComponent(
             name=component_name,
             flow_id=flow_id,
             flow_type=flow_type,
@@ -193,6 +199,7 @@ class TestDeterministicStepComponentInitialization:
             toolset=mock_toolset,
             tool_name="test_tool",
         )
+        assert component.validated_tool is not None
 
     @pytest.mark.parametrize(
         "input_output",
@@ -357,6 +364,30 @@ class TestDeterministicStepComponentToolValidation:
 
         assert component.validated_tool is not None
 
+    def test_missing_tool_name(self, component_name, flow_id, flow_type, mock_toolset):
+        """Test that validation fails when tool_name is missing."""
+        with pytest.raises(ValidationError, match="tool_name is required"):
+            DeterministicStepComponent(
+                name=component_name,
+                flow_id=flow_id,
+                flow_type=flow_type,
+                inputs=["context:user_input"],
+                toolset=mock_toolset,
+                # tool_name is missing
+            )
+
+    def test_missing_toolset(self, component_name, flow_id, flow_type):
+        """Test that validation fails when toolset is missing."""
+        with pytest.raises(ValidationError, match="toolset is required"):
+            DeterministicStepComponent(
+                name=component_name,
+                flow_id=flow_id,
+                flow_type=flow_type,
+                inputs=["context:user_input"],
+                tool_name="test_tool",
+                # toolset is missing
+            )
+
 
 class TestDeterministicStepComponentEntryHook:
     """Test suite for DeterministicStepComponent entry hook."""
@@ -383,7 +414,6 @@ class TestDeterministicStepComponentAttachNodes:
         flow_type,
         inputs,
         tool_name,
-        mock_toolset,
         ui_log_events,
     ):
         """Test that node is created with correct parameters."""
@@ -397,15 +427,14 @@ class TestDeterministicStepComponentAttachNodes:
         assert node_call_kwargs["tool_name"] == tool_name
         assert node_call_kwargs["component_name"] == component_name
         assert node_call_kwargs["inputs"] == inputs
-        assert node_call_kwargs["toolset"] == mock_toolset
         assert node_call_kwargs["flow_id"] == flow_id
         assert node_call_kwargs["flow_type"] == flow_type
         assert (
             node_call_kwargs["internal_event_client"]
             == deterministic_step_component.internal_event_client
         )
-        # Verify validated_tool is passed
         assert "validated_tool" in node_call_kwargs
+        assert node_call_kwargs["validated_tool"] is not None
         assert (
             node_call_kwargs["validated_tool"]
             == deterministic_step_component.validated_tool
@@ -539,3 +568,24 @@ class TestDeterministicStepComponentIntegration:
             # ui_log_events not provided, should use default empty list
         )
         assert component.ui_log_events == []
+        assert component.validated_tool is not None
+
+    def test_validated_tool_is_always_set(
+        self,
+        component_name,
+        flow_id,
+        flow_type,
+        mock_toolset,
+    ):
+        """Test that validated_tool is always set after component creation."""
+        component = DeterministicStepComponent(
+            name=component_name,
+            flow_id=flow_id,
+            flow_type=flow_type,
+            inputs=["context:user_input"],
+            tool_name="test_tool",
+            toolset=mock_toolset,
+        )
+
+        assert component.validated_tool is not None
+        assert component.validated_tool == mock_toolset.__getitem__.return_value
