@@ -14,7 +14,6 @@ from ai_gateway.async_dependency_resolver import (
     get_internal_event_client,
     get_openai_proxy_client,
 )
-from ai_gateway.models.base import KindModelProvider
 from ai_gateway.proxy.clients import OpenAIProxyClient
 from lib.internal_events import InternalEventsClient
 
@@ -27,7 +26,7 @@ log = structlog.stdlib.get_logger("proxy")
 router = APIRouter()
 
 
-@router.post(f"/{KindModelProvider.OPENAI.value}" + "/{path:path}")
+@router.post("/openai" + "/{path:path}")
 @authorize_with_unit_primitive_header()
 @feature_categories(EXTENDED_FEATURE_CATEGORIES_FOR_PROXY_ENDPOINTS)
 async def openai(

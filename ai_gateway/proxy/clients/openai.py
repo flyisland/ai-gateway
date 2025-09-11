@@ -4,8 +4,6 @@ import typing
 import fastapi
 from fastapi import status
 
-from ai_gateway.models.base import KindModelProvider
-from ai_gateway.models.openai import KindOpenAIModel
 from ai_gateway.proxy.clients.base import BaseProxyClient
 
 
@@ -23,7 +21,11 @@ class OpenAIProxyClient(BaseProxyClient):
         "user-agent",
     ]
 
+    ALLOWED_UPSTREAM_MODELS = ["gpt-5"]
+
     ALLOWED_HEADERS_TO_DOWNSTREAM = ["content-type"]
+
+    PROVIDER_NAME = "openai"
 
     def _allowed_upstream_paths(self) -> list[str]:
         return OpenAIProxyClient.ALLOWED_UPSTREAM_PATHS
@@ -35,10 +37,10 @@ class OpenAIProxyClient(BaseProxyClient):
         return OpenAIProxyClient.ALLOWED_HEADERS_TO_DOWNSTREAM
 
     def _allowed_upstream_models(self):
-        return [el.value for el in KindOpenAIModel]
+        return OpenAIProxyClient.ALLOWED_UPSTREAM_MODELS
 
     def _upstream_service(self):
-        return KindModelProvider.OPENAI.value
+        return OpenAIProxyClient.PROVIDER_NAME
 
     def _extract_model_name(self, upstream_path: str, json_body: typing.Any) -> str:
         try:
