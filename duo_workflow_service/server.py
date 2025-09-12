@@ -203,12 +203,36 @@ class DuoWorkflowService(contract_pb2_grpc.DuoWorkflowServicer):
         if event_context is not None:
             extra_context.update(
                 {
-                    "instance_id": event_context.instance_id,
-                    "host_name": event_context.host_name,
-                    "realm": event_context.realm,
-                    "is_gitlab_team_member": event_context.is_gitlab_team_member,
-                    "global_user_id": event_context.global_user_id,
-                    "correlation_id": event_context.correlation_id,
+                    "instance_id": (
+                        str(event_context.instance_id)
+                        if event_context.instance_id is not None
+                        else "None"
+                    ),
+                    "host_name": (
+                        str(event_context.host_name)
+                        if event_context.host_name is not None
+                        else "None"
+                    ),
+                    "realm": (
+                        str(event_context.realm)
+                        if event_context.realm is not None
+                        else "None"
+                    ),
+                    "is_gitlab_team_member": (
+                        str(event_context.is_gitlab_team_member)
+                        if event_context.is_gitlab_team_member is not None
+                        else "None"
+                    ),
+                    "global_user_id": (
+                        str(event_context.global_user_id)
+                        if event_context.global_user_id is not None
+                        else "None"
+                    ),
+                    "correlation_id": (
+                        str(event_context.correlation_id)
+                        if event_context.correlation_id is not None
+                        else "None"
+                    ),
                 }
             )
         else:
