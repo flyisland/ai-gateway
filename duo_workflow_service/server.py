@@ -69,7 +69,7 @@ from duo_workflow_service.workflows.abstract_workflow import AbstractWorkflow
 from duo_workflow_service.workflows.registry import FlowFactory, resolve_workflow_class
 from duo_workflow_service.workflows.type_definitions import AdditionalContext
 from lib.internal_events import InternalEventsClient
-from lib.internal_events.context import InternalEventAdditionalProperties
+from lib.internal_events.context import InternalEventAdditionalProperties, current_event_context
 from lib.internal_events.event_enum import (
     CategoryEnum,
     EventEnum,
@@ -187,7 +187,25 @@ class DuoWorkflowService(contract_pb2_grpc.DuoWorkflowServicer):
 
         workflow_id = start_workflow_request.startRequest.workflowID
         set_workflow_id(workflow_id)
-        log.info("Starting workflow %s", clean_start_request(start_workflow_request))
+
+        # Get event context for enhanced logging
+        event_context = current_event_context.get()
+
+        # Enhanced logging with additional context
+        log.info(
+            "Starting workflow %s",
+            clean_start_request(start_workflow_request),
+            extra={
+                "workflow_id": workflow_id,
+                "workflow_definition": workflow_definition,
+                "instance_id": event_context.instance_id,
+                "host_name": event_context.host_name,
+                "realm": event_context.realm,
+                "is_gitlab_team_member": event_context.is_gitlab_team_member,
+                "global_user_id": event_context.global_user_id,
+                "correlation_id": event_context.correlation_id,
+            }
+        )
         workflow_type = string_to_category_enum(workflow_definition)
         duo_workflow_metrics.count_agent_platform_receive_start_counter(
             flow_type=workflow_type

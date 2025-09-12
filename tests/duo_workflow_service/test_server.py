@@ -883,3 +883,92 @@ async def test_execute_workflow_tracks_receive_start_request_internal_event(
         ),
         category=CategoryEnum.WORKFLOW_SOFTWARE_DEVELOPMENT.value,
     )
+
+
+@pytest.mark.asyncio
+@patch("duo_workflow_service.server.log")
+@patch("duo_workflow_service.server.current_event_context")
+@patch("duo_workflow_service.server.AbstractWorkflow")
+@patch("duo_workflow_service.server.resolve_workflow_class")
+async def test_execute_workflow_enhanced_logging_with_context(
+    mock_resolve_workflow,
+    mock_abstract_workflow_class,
+    mock_current_event_context,
+    mock_log,
+):
+    """Test that the enhanced logging includes additional context fields from event context."""
+    from lib.internal_events.context import EventContext
+
+    # Setup mocks
+    mock_workflow = mock_abstract_workflow_class.return_value
+    mock_workflow.is_done = True
+    mock_workflow.run = AsyncMock()
+    mock_workflow.cleanup = AsyncMock()
+    mock_resolve_workflow.return_value = mock_abstract_workflow_class
+
+    # Setup event context with test data
+    test_event_context = EventContext(
+        instance_id="test-instance-123",
+        host_name="gitlab.example.com",
+        realm="saas",
+        is_gitlab_team_member=True,
+        global_user_id="user-456",
+        correlation_id="corr-789",
+    )
+    mock_current_event_context.get.return_value = test_event_context
+
+    async def mock_request_iterator() -> AsyncIterable[contract_pb2.ClientEvent]:
+        yield contract_pb2.ClientEvent(
+            startRequest=contract_pb2.StartWorkflowRequest(
+                workflowID="test-workflow-123",
+                workflowDefinition="software_development",
+            )
+        )
+
+    # Setup user and context
+    user = CloudConnectorUser(authenticated=True, is_debug=True)
+    current_user.set(user)
+    mock_context = MagicMock(spec=grpc.ServicerContext)
+    mock_context.invocation_metadata.return_value = []
+
+    # Setup servicer
+    servicer = DuoWorkflowService()
+
+    # Execute the test
+    mock_internal_event_client = create_mock_internal_event_client()
+    result = servicer.ExecuteWorkflow(
+        mock_request_iterator(),
+        mock_context,
+        internal_event_client=mock_internal_event_client,
+    )
+
+    # Consume the async iterator to trigger the logging
+    with pytest.raises(StopAsyncIteration):
+        await anext(result)
+
+    # Verify the enhanced logging was called with expected context
+    mock_log.info.assert_called()
+    log_calls = mock_log.info.call_args_list
+
+    # Find the "Starting workflow" log call
+    starting_workflow_call = None
+    for call in log_calls:
+        if len(call[0]) > 0 and "Starting workflow" in call[0][0]:
+            starting_workflow_call = call
+            break
+
+    assert starting_workflow_call is not None, "Starting workflow log call not found"
+
+    # Verify the extra context fields were included
+    call_kwargs = starting_workflow_call[1]
+    assert "extra" in call_kwargs
+    extra_fields = call_kwargs["extra"]
+
+    assert extra_fields["workflow_id"] == "test-workflow-123"
+    assert extra_fields["workflow_definition"] == "software_development"
+    assert extra_fields["instance_id"] == "test-instance-123"
+    assert extra_fields["host_name"] == "gitlab.example.com"
+    assert extra_fields["realm"] == "saas"
+    assert extra_fields["is_gitlab_team_member"] is True
+    assert extra_fields["global_user_id"] == "user-456"
+    assert extra_fields["correlation_id"] == "corr-789"
