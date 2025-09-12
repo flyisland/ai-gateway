@@ -182,9 +182,7 @@ async def test_list_tools(
     )
     expected_specs = [
         {
-            "type": "function",
             "function": {
-                "strict": True,
                 "parameters": {
                     "properties": {
                         "arg1": {
@@ -192,13 +190,13 @@ async def test_list_tools(
                             "type": "string",
                         }
                     },
-                    "type": "object",
-                    "additionalProperties": False,
                     "required": ["arg1"],
+                    "type": "object",
                 },
                 "description": f"{tool_name} description",
                 "name": tool_name,
             },
+            "type": "function",
         }
         for tool_name in ["tool1", "tool2", "tool3"]
     ]
@@ -208,6 +206,7 @@ async def test_list_tools(
     actual_eval_dataset = [MessageToDict(item) for item in response.eval_dataset]
     assert actual_eval_dataset == [
         {
+            "tool_name": "tool1",
             "user_prompt": "Example user prompt 1",
             "input_rules": [
                 {
@@ -217,6 +216,7 @@ async def test_list_tools(
             ],
         },
         {
+            "tool_name": "tool1",
             "user_prompt": "Example user prompt 2",
             "input_rules": None,
         },
