@@ -1026,8 +1026,11 @@ async def test_execute_workflow_enhanced_logging_without_context(
         await anext(result)
 
     # Verify the debug log was called for missing context
-    debug_calls = [call for call in mock_log.debug.call_args_list
-                   if len(call[0]) > 0 and "Event context not available" in call[0][0]]
+    debug_calls = [
+        call
+        for call in mock_log.debug.call_args_list
+        if len(call[0]) > 0 and "Event context not available" in call[0][0]
+    ]
     assert len(debug_calls) == 1, "Debug log for missing event context not found"
 
     # Verify the enhanced logging was called with basic context only

@@ -201,14 +201,16 @@ class DuoWorkflowService(contract_pb2_grpc.DuoWorkflowServicer):
         }
 
         if event_context is not None:
-            extra_context.update({
-                "instance_id": event_context.instance_id,
-                "host_name": event_context.host_name,
-                "realm": event_context.realm,
-                "is_gitlab_team_member": event_context.is_gitlab_team_member,
-                "global_user_id": event_context.global_user_id,
-                "correlation_id": event_context.correlation_id,
-            })
+            extra_context.update(
+                {
+                    "instance_id": event_context.instance_id,
+                    "host_name": event_context.host_name,
+                    "realm": event_context.realm,
+                    "is_gitlab_team_member": event_context.is_gitlab_team_member,
+                    "global_user_id": event_context.global_user_id,
+                    "correlation_id": event_context.correlation_id,
+                }
+            )
         else:
             log.debug("Event context not available for enhanced logging")
 
