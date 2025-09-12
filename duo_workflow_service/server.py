@@ -3,8 +3,7 @@
 import asyncio
 import json
 import os
-from itertools import chain
-from typing import AsyncIterable, AsyncIterator, Optional
+from typing import AsyncIterable, AsyncIterator, Optional, cast
 
 import aiohttp
 import grpc
@@ -27,7 +26,7 @@ from langchain_core.utils.function_calling import convert_to_openai_tool
 from ai_gateway.config import Config
 from ai_gateway.container import ContainerApplication
 from contract import contract_pb2, contract_pb2_grpc
-from duo_workflow_service.components import tools_registry
+from duo_workflow_service.components.tools_registry import get_all_op_tools
 from duo_workflow_service.gitlab.connection_pool import connection_pool
 from duo_workflow_service.interceptors.authentication_interceptor import (
     AuthenticationInterceptor,
@@ -369,23 +368,17 @@ class DuoWorkflowService(contract_pb2_grpc.DuoWorkflowServicer):
         self, request: contract_pb2.ListToolsRequest, context: grpc.ServicerContext
     ):
         log.info("Listing all available tools")
-        tool_classes = set(
-            (
-                tools_registry._DEFAULT_TOOLS
-                + tools_registry._READ_ONLY_GITLAB_TOOLS
-                + list(chain.from_iterable(tools_registry._AGENT_PRIVILEGES.values()))
-            )
-        )
         response = contract_pb2.ListToolsResponse()
-        for tool_cls in tool_classes:
+
+        for tool_cls in get_all_op_tools():
+            tool = cast(DuoBaseTool, tool_cls())
             spec_struct = Struct()
-            tool: DuoBaseTool = tool_cls()  # type: ignore[assignment]
-            spec_struct.update(convert_to_openai_tool(tool))
+            spec_struct.update(convert_to_openai_tool(tool=tool))
             response.tools.append(spec_struct)
 
-            for prompt in tool.eval_prompts or []:
+            for config in tool.routing_eval_config or []:
                 struct = Struct()
-                struct.update({"prompt": prompt})
+                struct.update({"tool_name": tool.name, **config.model_dump()})
                 response.eval_dataset.append(struct)
 
         return response

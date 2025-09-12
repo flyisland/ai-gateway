@@ -18,6 +18,7 @@ from google.protobuf import struct_pb2
 from google.protobuf.json_format import MessageToDict
 from langchain.globals import get_llm_cache
 from langchain_community.cache import SQLiteCache
+from pydantic import BaseModel, Field
 
 from contract import contract_pb2
 from duo_workflow_service.interceptors.authentication_interceptor import current_user
@@ -31,6 +32,7 @@ from duo_workflow_service.server import (
     string_to_category_enum,
 )
 from duo_workflow_service.tools.duo_base_tool import DuoBaseTool
+from duo_workflow_service.tools.routing_eval import schema as re_schema
 from lib.internal_events.context import InternalEventAdditionalProperties
 from lib.internal_events.event_enum import (
     CategoryEnum,
@@ -113,23 +115,22 @@ def test_run(custom_models_enabled, should_validate_llm):
 
 
 @pytest.mark.asyncio
-@patch("duo_workflow_service.server.tools_registry._DEFAULT_TOOLS")
-@patch("duo_workflow_service.server.tools_registry._READ_ONLY_GITLAB_TOOLS")
-@patch("duo_workflow_service.server.tools_registry._AGENT_PRIVILEGES")
-@patch("duo_workflow_service.server.convert_to_openai_tool")
+@patch("duo_workflow_service.server.get_all_op_tools")
 async def test_list_tools(
-    mock_convert_to_openai_tool,
-    mock_agent_privileges,
-    mock_readonly_tools,
-    mock_default_tools,
+    mock_get_all_op_tools,
 ):
     ## avoid duplicated mock tool with the same tool name
     _tool_class_cache = {}
 
-    def create_mock_tool(name: str, eval_prompts: Optional[List[str]] = None):
+    def create_mock_tool(
+        name: str, configs: Optional[List[re_schema.RoutingEvalConfig]] = None
+    ):
         cache_key = name
         if cache_key in _tool_class_cache:
             return _tool_class_cache[cache_key]
+
+        class MockToolInput(BaseModel):
+            arg1: str = Field(description="description for arg1")
 
         class MockTool(DuoBaseTool):
 
@@ -137,63 +138,89 @@ async def test_list_tools(
                 super().__init__(
                     name=name,
                     description=f"{name} description",
-                    eval_prompts=eval_prompts,
+                    routing_eval_config=configs,
+                    args_schema=MockToolInput,
                 )
 
         _tool_class_cache[cache_key] = MockTool
         return MockTool
 
-    def mock_convert_side_effect(tool):
-        tool_name = tool.name
-        return {
-            "type": "function",
-            "function": {
-                "name": tool_name,
-                "description": f"{tool_name} description",
-            },
-        }
+    mock_get_all_op_tools.return_value = [
+        create_mock_tool(
+            name="tool1",
+            configs=[
+                re_schema.RoutingEvalConfig(
+                    user_prompt="Example user prompt 1",
+                    input_rules=[
+                        re_schema.InputRule(
+                            arg_name="arg1",
+                            rule=re_schema.Rule(
+                                operator=re_schema.OperatorEnum.EQUALS, value=""
+                            ),
+                        )
+                    ],
+                ),
+                re_schema.RoutingEvalConfig(
+                    user_prompt="Example user prompt 2", input_rules=None
+                ),
+            ],
+        ),
+        create_mock_tool(name="tool2"),
+        create_mock_tool(name="tool3"),
+    ]
 
-    mock_default_tools.__add__.return_value = [create_mock_tool(name="tool1")]
-    mock_readonly_tools.__add__.return_value = [
-        create_mock_tool(name="tool2", eval_prompts=["prompt2"])
-    ]
-    mock_agent_privileges.values.return_value = [
-        [
-            create_mock_tool(name="tool1"),
-            create_mock_tool(name="tool2", eval_prompts=["prompt2"]),
-        ],
-        [create_mock_tool(name="tool3")],
-    ]
-    mock_convert_to_openai_tool.side_effect = mock_convert_side_effect
     mock_context = MagicMock(spec=grpc.ServicerContext)
     service = DuoWorkflowService()
     response = await service.ListTools(contract_pb2.ListToolsRequest(), mock_context)
     assert isinstance(response, contract_pb2.ListToolsResponse)
     assert len(response.tools) == 3
-    assert mock_convert_to_openai_tool.called
+    assert len(response.eval_dataset) == 2
 
-    actual_sorted = sorted(
+    actual_specs = sorted(
         [MessageToDict(tool) for tool in response.tools],
-        key=lambda x: x.get("function", {}).get("name", ""),
+        key=lambda x: x.get("name", ""),
     )
-    expected_sorted = sorted(
-        [
-            {
-                "type": "function",
-                "function": {"description": "tool1 description", "name": "tool1"},
+    expected_specs = [
+        {
+            "function": {
+                "parameters": {
+                    "properties": {
+                        "arg1": {
+                            "description": "description for arg1",
+                            "type": "string",
+                        }
+                    },
+                    "required": ["arg1"],
+                    "type": "object",
+                },
+                "description": f"{tool_name} description",
+                "name": tool_name,
             },
-            {
-                "type": "function",
-                "function": {"description": "tool2 description", "name": "tool2"},
-            },
-            {
-                "type": "function",
-                "function": {"description": "tool3 description", "name": "tool3"},
-            },
-        ],
-        key=lambda x: x.get("function", {}).get("name", ""),
-    )
-    assert actual_sorted == expected_sorted
+            "type": "function",
+        }
+        for tool_name in ["tool1", "tool2", "tool3"]
+    ]
+
+    assert actual_specs == expected_specs
+
+    actual_eval_dataset = [MessageToDict(item) for item in response.eval_dataset]
+    assert actual_eval_dataset == [
+        {
+            "tool_name": "tool1",
+            "user_prompt": "Example user prompt 1",
+            "input_rules": [
+                {
+                    "rule": {"operator": "equals", "value": ""},
+                    "arg_name": "arg1",
+                }
+            ],
+        },
+        {
+            "tool_name": "tool1",
+            "user_prompt": "Example user prompt 2",
+            "input_rules": None,
+        },
+    ]
 
 
 @pytest.mark.asyncio
@@ -751,10 +778,7 @@ async def test_next_non_heartbeat_event():
             actionResponse=contract_pb2.ActionResponse(response="the response")
         )
 
-    with patch("duo_workflow_service.server.log") as mock_log:
-        result = await next_non_heartbeat_event(mock_request_iterator())
-        mock_log.info.assert_called()
-
+    result = await next_non_heartbeat_event(mock_request_iterator())
     assert result.actionResponse.response == "the response"
     assert not result.HasField("heartbeat")
 

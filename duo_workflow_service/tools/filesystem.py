@@ -17,6 +17,7 @@ from duo_workflow_service.policies.file_exclusion_policy import (
     FileExclusionPolicy,
 )
 from duo_workflow_service.tools.duo_base_tool import DuoBaseTool
+from duo_workflow_service.tools.routing_eval import schema as re_schema
 
 # Security denylist of sensitive directories and files that should not be accessed
 DEFAULT_CONTEXT_EXCLUSIONS = gitmatch.compile(
@@ -99,9 +100,22 @@ class ReadFile(DuoBaseTool):
     """
     args_schema: Type[BaseModel] = ReadFileInput  # type: ignore
     handle_tool_error: bool = True
-    eval_prompts: List[str] = [
-        "I need to read the content of the `readme.md`",
-        "Let me check if class `DuoBaseTool` exists in `./tools/base.py`",
+    routing_eval_config: List[re_schema.RoutingEvalConfig] = [
+        re_schema.RoutingEvalConfig(
+            user_prompt="I need to read the content of the `readme.md`",
+            input_rules=None,
+        ),
+        re_schema.RoutingEvalConfig(
+            user_prompt="Check if class `DuoBaseTool` exists in `./tools/base.py`",
+            input_rules=[
+                re_schema.InputRule(
+                    arg_name="file_path",
+                    rule=re_schema.Rule(
+                        operator=re_schema.OperatorEnum.EQUALS, value="./tools/base.py"
+                    ),
+                )
+            ],
+        ),
     ]
 
     async def _arun(self, file_path: str) -> str:
