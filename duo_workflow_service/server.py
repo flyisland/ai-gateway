@@ -194,20 +194,29 @@ class DuoWorkflowService(contract_pb2_grpc.DuoWorkflowServicer):
         # Get event context for enhanced logging
         event_context = current_event_context.get()
 
-        # Enhanced logging with additional context
-        log.info(
-            "Starting workflow %s",
-            clean_start_request(start_workflow_request),
-            extra={
-                "workflow_id": workflow_id,
-                "workflow_definition": workflow_definition,
+        # Build extra logging context with safe attribute access
+        extra_context = {
+            "workflow_id": workflow_id,
+            "workflow_definition": workflow_definition,
+        }
+
+        if event_context is not None:
+            extra_context.update({
                 "instance_id": event_context.instance_id,
                 "host_name": event_context.host_name,
                 "realm": event_context.realm,
                 "is_gitlab_team_member": event_context.is_gitlab_team_member,
                 "global_user_id": event_context.global_user_id,
                 "correlation_id": event_context.correlation_id,
-            },
+            })
+        else:
+            log.debug("Event context not available for enhanced logging")
+
+        # Enhanced logging with additional context
+        log.info(
+            "Starting workflow %s",
+            clean_start_request(start_workflow_request),
+            extra=extra_context,
         )
         workflow_type = string_to_category_enum(workflow_definition)
         duo_workflow_metrics.count_agent_platform_receive_start_counter(
