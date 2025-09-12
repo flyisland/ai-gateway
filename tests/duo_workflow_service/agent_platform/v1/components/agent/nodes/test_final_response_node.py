@@ -12,10 +12,7 @@ from duo_workflow_service.agent_platform.v1.components.agent.nodes.final_respons
 from duo_workflow_service.agent_platform.v1.components.agent.ui_log import (
     UILogEventsAgent,
 )
-from duo_workflow_service.agent_platform.v1.state import (
-    FlowState,
-    FlowStateKeys,
-)
+from duo_workflow_service.agent_platform.v1.state import FlowState, FlowStateKeys
 from duo_workflow_service.entities.state import WorkflowStatusEnum
 
 

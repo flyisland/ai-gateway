@@ -4,13 +4,8 @@ import pytest
 from langgraph.graph import StateGraph
 from pydantic import ValidationError
 
-from duo_workflow_service.agent_platform.v1.components.base import (
-    BaseComponent,
-)
-from duo_workflow_service.agent_platform.v1.routers.router import (
-    BaseRouter,
-    Router,
-)
+from duo_workflow_service.agent_platform.v1.components.base import BaseComponent
+from duo_workflow_service.agent_platform.v1.routers.router import BaseRouter, Router
 from duo_workflow_service.agent_platform.v1.state import FlowState, IOKey
 
 

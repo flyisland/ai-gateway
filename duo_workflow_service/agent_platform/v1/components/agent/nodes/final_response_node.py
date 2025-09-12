@@ -14,10 +14,7 @@ from duo_workflow_service.agent_platform.v1.state import (
     IOKey,
     create_nested_dict,
 )
-from duo_workflow_service.agent_platform.v1.ui_log import (
-    DefaultUILogWriter,
-    UIHistory,
-)
+from duo_workflow_service.agent_platform.v1.ui_log import DefaultUILogWriter, UIHistory
 
 __all__ = ["FinalResponseNode"]
 

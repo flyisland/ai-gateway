@@ -10,13 +10,8 @@ from duo_workflow_service.agent_platform.v1.components.base import (
     BaseComponent,
     EndComponent,
 )
-from duo_workflow_service.agent_platform.v1.flows.base import (
-    Flow,
-    UserDecision,
-)
-from duo_workflow_service.agent_platform.v1.flows.flow_config import (
-    FlowConfig,
-)
+from duo_workflow_service.agent_platform.v1.flows.base import Flow, UserDecision
+from duo_workflow_service.agent_platform.v1.flows.flow_config import FlowConfig
 from duo_workflow_service.agent_platform.v1.routers.router import Router
 from duo_workflow_service.agent_platform.v1.state.base import FlowEventType
 from duo_workflow_service.checkpointer.gitlab_workflow import WorkflowStatusEventEnum

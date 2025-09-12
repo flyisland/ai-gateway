@@ -1,9 +1,7 @@
 from collections.abc import Mapping
 from typing import Callable, Optional, Self, Sequence, TypeAlias
 
-from duo_workflow_service.agent_platform.v1.components.base import (
-    BaseComponent,
-)
+from duo_workflow_service.agent_platform.v1.components.base import BaseComponent
 
 __all__ = ["ComponentRegistry", "register_component"]
 

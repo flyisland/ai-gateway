@@ -9,11 +9,7 @@ from duo_workflow_service.agent_platform.v1.components.base import (
     EndComponent,
     RouterProtocol,
 )
-from duo_workflow_service.agent_platform.v1.state import (
-    FlowState,
-    IOKey,
-    IOKeyTemplate,
-)
+from duo_workflow_service.agent_platform.v1.state import FlowState, IOKey, IOKeyTemplate
 from duo_workflow_service.entities.state import WorkflowStatusEnum
 from lib.internal_events.event_enum import CategoryEnum
 

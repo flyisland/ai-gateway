@@ -9,10 +9,7 @@ from duo_workflow_service.agent_platform.v1.components.agent.ui_log import (
     UILogEventsAgent,
     UILogWriterAgentTools,
 )
-from duo_workflow_service.agent_platform.v1.state import (
-    FlowState,
-    FlowStateKeys,
-)
+from duo_workflow_service.agent_platform.v1.state import FlowState, FlowStateKeys
 from duo_workflow_service.agent_platform.v1.ui_log import UIHistory
 from duo_workflow_service.monitoring import duo_workflow_metrics
 from duo_workflow_service.security.prompt_security import (

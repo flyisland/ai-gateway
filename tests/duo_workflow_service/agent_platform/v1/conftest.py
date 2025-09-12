@@ -2,9 +2,7 @@ from unittest.mock import patch
 
 import pytest
 
-from duo_workflow_service.agent_platform.v1.components import (
-    ComponentRegistry,
-)
+from duo_workflow_service.agent_platform.v1.components import ComponentRegistry
 
 
 @pytest.fixture
