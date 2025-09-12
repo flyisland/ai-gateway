@@ -456,7 +456,9 @@ async def next_non_heartbeat_event(
             return None
 
         if event.HasField("heartbeat"):
-            log.info("Skipping heartbeat event", event_type=event.WhichOneof("response"))
+            log.info(
+                "Skipping heartbeat event", event_type=event.WhichOneof("response")
+            )
         else:
             return event
 
