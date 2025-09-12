@@ -1,7 +1,7 @@
 from enum import Enum
-from typing import Any, Dict, List, Optional, Union
+from typing import Any, List, Optional
 
-from pydantic import BaseModel, field_validator
+from pydantic import BaseModel, ConfigDict, field_validator
 
 
 class OperatorEnum(str, Enum):
@@ -25,8 +25,10 @@ class Rule(BaseModel):
     It should define an operator and the value to compare against.
     """
 
+    model_config = ConfigDict(extra="forbid")
+
     operator: OperatorEnum
-    value: Union[str, int, float, bool, List[Any], Dict[str, Any]]
+    value: Any
 
     @field_validator("value")
     @classmethod
@@ -85,10 +87,14 @@ class Rule(BaseModel):
 class InputRule(BaseModel):
     """Single tool input rule for tool routing validation."""
 
+    model_config = ConfigDict(extra="forbid")
+
     arg_name: str
     rule: Rule
 
 
 class RoutingEvalConfig(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
     user_prompt: str
     input_rules: Optional[List[InputRule]] = None
