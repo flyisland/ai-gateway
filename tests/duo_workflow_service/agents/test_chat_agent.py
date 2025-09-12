@@ -678,8 +678,9 @@ class TestChatAgentToolCallMessageOrdering:
             )
 
     @pytest.mark.asyncio
-    async def test_handle_wrong_messages_order_missing_conversation_history_key(self, chat_agent):
-        """Test that _handle_wrong_messages_order_for_tool_execution handles missing agent key gracefully."""
+    async def test_handle_wrong_messages_order_missing_conversation_history_key(
+        self, chat_agent
+    ):
         input_missing_agent_key = {
             "conversation_history": {},  # Empty - no "Chat Agent" key
             "plan": {"steps": []},
@@ -699,7 +700,6 @@ class TestChatAgentToolCallMessageOrdering:
             # This should not raise a KeyError
             result = await chat_agent.run(input_missing_agent_key)
 
-            # Verify the method completed successfully
             assert result["status"] == WorkflowStatusEnum.INPUT_REQUIRED
             mock_ainvoke.assert_called_once()
 
