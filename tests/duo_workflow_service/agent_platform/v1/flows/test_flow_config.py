@@ -32,7 +32,7 @@ class TestFlowConfig:
                 }
             ],
             "routers": [{"from": "agent", "to": "end"}],
-            "environment": "remote",
+            "environment": "ambient",
             "version": "v1",
         }
 
@@ -42,7 +42,7 @@ class TestFlowConfig:
         assert len(config.components) == 1
         assert config.components[0]["name"] == "agent"
         assert len(config.routers) == 1
-        assert config.environment == "remote"
+        assert config.environment == "ambient"
         assert config.version == "v1"
 
     def test_flowconfig_creation_missing_required_fields(self):
@@ -68,7 +68,7 @@ class TestFlowConfig:
                 }
             ],
             "routers": [{"from": "test_agent", "to": "end"}],
-            "environment": "local",
+            "environment": "chat",
             "version": "v1",
         }
 
@@ -81,7 +81,7 @@ class TestFlowConfig:
             config = FlowConfig.from_yaml_config("config")
 
         assert config.flow["entry_point"] == "test_agent"
-        assert config.environment == "local"
+        assert config.environment == "chat"
         assert config.version == "v1"
 
     def test_flowconfig_from_yaml_config_file_not_found(self):
@@ -150,7 +150,7 @@ class TestFlowConfig:
                 }
             ],
             "routers": [{"from": "test_agent", "to": "end"}],
-            "environment": "local",
+            "environment": "chat-partial",
             "version": "v1",
         }
 

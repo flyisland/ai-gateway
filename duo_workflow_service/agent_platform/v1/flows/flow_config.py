@@ -1,9 +1,10 @@
 from pathlib import Path
-from typing import Callable, ClassVar, Optional, Self
+from typing import Callable, ClassVar, Literal, Optional, Self
 
 import yaml
 from pydantic import BaseModel
 
+from ai_gateway.prompts.config.base import InMemoryPromptConfig
 from duo_workflow_service.agent_platform.v1.components import (
     BaseComponent,
     ComponentRegistry,
@@ -30,9 +31,9 @@ class FlowConfig(BaseModel):
     flow: dict
     components: list[dict]
     routers: list[dict]
-    environment: str
-    version: str
-    prompts: Optional[list[dict]] = None
+    environment: Literal["ambient", "chat", "chat-partial"]
+    version: Literal["v1"]
+    prompts: Optional[list[InMemoryPromptConfig]] = None
 
     @classmethod
     def from_yaml_config(cls, path: str) -> Self:
