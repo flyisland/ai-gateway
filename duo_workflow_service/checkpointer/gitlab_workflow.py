@@ -209,7 +209,7 @@ class GitLabWorkflow(BaseCheckpointSaver[Any], AbstractAsyncContextManager[Any])
             additional_properties=additional_properties,
         )
 
-        self._logger.info("Tracking Internal event %s", event_name.value)
+        self._logger.info("Tracking Internal event", event_name=event_name.value)
         self._internal_event_client.track_event(
             event_name=event_name.value,
             additional_properties=additional_properties,
