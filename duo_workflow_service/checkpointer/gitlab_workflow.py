@@ -307,7 +307,7 @@ class GitLabWorkflow(BaseCheckpointSaver[Any], AbstractAsyncContextManager[Any])
         except UnsupportedStatusEvent as e:
             reject_properties = InternalEventAdditionalProperties(
                 label=EventLabelEnum.WORKFLOW_REJECT_LABEL.value,
-                property=type(e).__name__,
+                property=repr(e),
                 value=self._workflow_id,
             )
             self._logger.info(f"Additional properties: {reject_properties}")
