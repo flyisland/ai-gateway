@@ -45,6 +45,7 @@ __all__ = [
     "Output",
     "BasePromptRegistry",
     "jinja2_formatter",
+    "prompt_template_to_messages",
 ]
 
 Input = TypeVar("Input")
@@ -78,6 +79,15 @@ def jinja2_formatter(template: str, /, **kwargs: Any) -> str:
 
 # Override LangChain's jinja2 formatter so we can specify a loader with access to all our templates
 DEFAULT_FORMATTER_MAPPING["jinja2"] = jinja2_formatter
+
+
+def prompt_template_to_messages(
+    tpl: dict[str, str],
+) -> Sequence[MessageLikeRepresentation]:
+    return [
+        MessagesPlaceholder(content) if role == "placeholder" else (role, content)
+        for role, content in tpl.items()
+    ]
 
 
 class PromptLoggingHandler(BaseCallbackHandler):
@@ -334,22 +344,11 @@ class Prompt(RunnableBinding[Input, Output]):
 
         return config
 
-    # Assume that the prompt template keys map to roles. Subclasses can
-    # override this method to implement more complex logic.
-    @staticmethod
-    def _prompt_template_to_messages(
-        tpl: dict[str, str],
-    ) -> Sequence[MessageLikeRepresentation]:
-        return [
-            MessagesPlaceholder(content) if role == "placeholder" else (role, content)
-            for role, content in tpl.items()
-        ]
-
     @classmethod
     def _build_prompt_template(
         cls, config: PromptConfig
     ) -> Runnable[Input, PromptValue]:
-        messages = cls._prompt_template_to_messages(config.prompt_template)
+        messages = prompt_template_to_messages(config.prompt_template)
 
         return cast(
             Runnable[Input, PromptValue],
