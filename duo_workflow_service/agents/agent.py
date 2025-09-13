@@ -9,7 +9,7 @@ from langchain_core.prompts import ChatPromptTemplate
 from langchain_core.prompts.chat import MessageLikeRepresentation
 from langchain_core.runnables import Runnable, RunnableConfig
 
-from ai_gateway.prompts import Prompt
+from ai_gateway.prompts import Prompt, prompt_template_to_messages
 from ai_gateway.prompts.config.base import PromptConfig
 from duo_workflow_service.entities.event import WorkflowEvent, WorkflowEventType
 from duo_workflow_service.entities.state import (
@@ -75,7 +75,7 @@ class Agent(Prompt):
     def _build_prompt_template(
         cls, config: PromptConfig
     ) -> Runnable[dict, PromptValue]:
-        messages = cls._prompt_template_to_messages(config.prompt_template)
+        messages = prompt_template_to_messages(config.prompt_template)
 
         return AgentPromptTemplate(agent_name=config.name, preamble_messages=messages)
 
