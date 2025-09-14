@@ -59,7 +59,7 @@ class DeterministicStepNode:
         self._validated_tool = validated_tool
 
     async def run(self, state: FlowState) -> dict:
-        response, err_format = None, None
+        response, err_format, status = None, None, None
         tool = self._validated_tool
 
         try:
@@ -74,14 +74,18 @@ class DeterministicStepNode:
                     f"Invalid response type for tool {self._tool_name}: {response}"
                 )
 
+            status = "success"
+
             result = {
                 **self._ui_history.pop_state_updates(),
-                FlowStateKeys.CONTEXT: {
-                    self._component_name: response,
-                },
+                **IOKey(
+                    target=FlowStateKeys.CONTEXT, subkeys=[self._component_name]
+                ).to_nested_dict(response),
             }
 
         except Exception as e:
+            status = "failed"
+
             if isinstance(e, TypeError):
                 err_format = self._format_type_error_response(tool=tool, error=e)
             elif isinstance(e, ValidationError):
@@ -101,9 +105,9 @@ class DeterministicStepNode:
 
             result = {
                 **self._ui_history.pop_state_updates(),
-                FlowStateKeys.CONTEXT: {
-                    self._component_name: err_format,
-                },
+                **IOKey(
+                    target=FlowStateKeys.CONTEXT, subkeys=[self._component_name]
+                ).to_nested_dict(err_format),
             }
 
         if self._tool_responses_key:
@@ -115,12 +119,9 @@ class DeterministicStepNode:
             result = merge_nested_dict(result, tool_error_dict)
 
         if self._execution_result_key:
-            if err_format or not response:
-                status = "failed"
-            else:
-                status = "success"
             status_dict = self._execution_result_key.to_nested_dict(status)
             result = merge_nested_dict(result, status_dict)
+
         return result
 
     async def _execute_tool(
