@@ -11,7 +11,7 @@ from langchain_core.messages import (
 )
 from langchain_core.output_parsers.string import StrOutputParser
 from langchain_core.prompt_values import ChatPromptValue, PromptValue
-from langchain_core.runnables import Runnable, RunnableConfig
+from langchain_core.runnables import Runnable, RunnableBinding, RunnableConfig
 
 from ai_gateway.prompts import Prompt, jinja2_formatter
 from ai_gateway.prompts.config.base import PromptConfig
@@ -41,8 +41,8 @@ log = structlog.stdlib.get_logger("chat_agent")
 
 
 class ChatAgentPromptTemplate(Runnable[ChatWorkflowState, PromptValue]):
-    def __init__(self, prompt_template: dict[str, str]):
-        self.prompt_template = prompt_template
+    def __init__(self, config: PromptConfig):
+        self.prompt_template = config.prompt_template
 
     def invoke(
         self,
@@ -130,13 +130,13 @@ class ChatAgentPromptTemplate(Runnable[ChatWorkflowState, PromptValue]):
         return ChatPromptValue(messages=messages)
 
 
-class ChatAgent(Prompt[ChatWorkflowState, BaseMessage]):
+class ChatAgent(RunnableBinding[ChatWorkflowState, BaseMessage]):
     tools_registry: Optional[ToolsRegistry] = None
+    prompt: Prompt
     prompt_runnable: Prompt | None = None
 
-    @classmethod
-    def _build_prompt_template(cls, config: PromptConfig) -> Runnable:
-        return ChatAgentPromptTemplate(config.prompt_template)
+    def __init__(self, prompt: Prompt) -> None:
+        super().__init__(prompt=prompt, bound=prompt)  # type: ignore[call-arg] # mypy checks only the immediate parent
 
     def _get_approvals(
         self, message: AIMessage, preapproved_tools: List[str]
@@ -178,11 +178,11 @@ class ChatAgent(Prompt[ChatWorkflowState, BaseMessage]):
         # Expected to be refactored in:
         # - https://gitlab.com/gitlab-org/modelops/applied-ml/code-suggestions/ai-assist/-/issues/1461
         if (
-            self.name in input["conversation_history"]
-            and len(input["conversation_history"][self.name]) > 1
+            self.prompt.name in input["conversation_history"]
+            and len(input["conversation_history"][self.prompt.name]) > 1
         ):
-            tool_call_message = input["conversation_history"][self.name][-2]
-            user_message = input["conversation_history"][self.name][-1]
+            tool_call_message = input["conversation_history"][self.prompt.name][-2]
+            user_message = input["conversation_history"][self.prompt.name][-1]
 
             if (
                 isinstance(tool_call_message, AIMessage)
@@ -197,7 +197,7 @@ class ChatAgent(Prompt[ChatWorkflowState, BaseMessage]):
                     for tool_call in getattr(tool_call_message, "tool_calls", [])
                 ]
 
-                input["conversation_history"][self.name][-2:] = [
+                input["conversation_history"][self.prompt.name][-2:] = [
                     tool_call_message,
                     *messages,
                     user_message,
@@ -206,7 +206,7 @@ class ChatAgent(Prompt[ChatWorkflowState, BaseMessage]):
     def _handle_approval_rejection(
         self, input: ChatWorkflowState, approval_state: ApprovalStateRejection
     ) -> list[BaseMessage]:
-        last_message = input["conversation_history"][self.name][-1]
+        last_message = input["conversation_history"][self.prompt.name][-1]
 
         # An empty text box for tool cancellation results in a 'null' message. Converting to None
         # todo: remove this line once we have fixed the frontend to return None instead of 'null'
@@ -230,14 +230,16 @@ class ChatAgent(Prompt[ChatWorkflowState, BaseMessage]):
         ]
 
         # update history
-        input["conversation_history"][self.name].extend(messages)
+        input["conversation_history"][self.prompt.name].extend(messages)
         return messages
 
     async def _get_agent_response(self, input: ChatWorkflowState) -> BaseMessage:
         is_anthropic_model = self.model_provider == ModelClassProvider.ANTHROPIC
 
         if self.prompt_runnable:
-            conversation_history = input["conversation_history"].get(self.name, [])
+            conversation_history = input["conversation_history"].get(
+                self.prompt.name, []
+            )
             variables = {
                 "goal": input["goal"],
                 "project": input["project"],
@@ -253,7 +255,7 @@ class ChatAgent(Prompt[ChatWorkflowState, BaseMessage]):
 
         return await super().ainvoke(
             input=input,
-            agent_name=self.name,
+            agent_name=self.prompt.name,
             is_anthropic_model=is_anthropic_model,
         )
 
@@ -278,7 +280,7 @@ class ChatAgent(Prompt[ChatWorkflowState, BaseMessage]):
         )
 
         return {
-            "conversation_history": {self.name: [agent_response]},
+            "conversation_history": {self.prompt.name: [agent_response]},
             "status": WorkflowStatusEnum.INPUT_REQUIRED,
             "ui_chat_log": [ui_chat_log],
         }
@@ -287,7 +289,7 @@ class ChatAgent(Prompt[ChatWorkflowState, BaseMessage]):
         self, agent_response: AIMessage, input: ChatWorkflowState
     ) -> Dict[str, Any]:
         result: Dict[str, Any] = {
-            "conversation_history": {self.name: [agent_response]},
+            "conversation_history": {self.prompt.name: [agent_response]},
             "status": WorkflowStatusEnum.EXECUTION,
         }
 
@@ -322,7 +324,7 @@ class ChatAgent(Prompt[ChatWorkflowState, BaseMessage]):
         )
 
         return {
-            "conversation_history": {self.name: [error_message]},
+            "conversation_history": {self.prompt.name: [error_message]},
             "status": WorkflowStatusEnum.INPUT_REQUIRED,
             "ui_chat_log": [ui_chat_log],
         }
@@ -360,20 +362,20 @@ class ChatAgent(Prompt[ChatWorkflowState, BaseMessage]):
             return self._create_error_response(error)
 
     def _track_tokens_data(self, message: AIMessage):
-        if not self.internal_event_client:
+        if not self.prompt.internal_event_client:
             return
 
         usage_metadata = message.usage_metadata if message.usage_metadata else {}  # type: ignore[typeddict-item]
 
         additional_properties = InternalEventAdditionalProperties(
-            label=self.name,
+            label=self.prompt.name,
             property=EventPropertyEnum.WORKFLOW_ID.value,
             value=_workflow_id.get(),
             input_tokens=usage_metadata.get("input_tokens"),
             output_tokens=usage_metadata.get("output_tokens"),
             total_tokens=usage_metadata.get("total_tokens"),
         )
-        self.internal_event_client.track_event(
+        self.prompt.internal_event_client.track_event(
             event_name=EventEnum.TOKEN_PER_USER_PROMPT.value,
             additional_properties=additional_properties,
             category=CategoryEnum.WORKFLOW_CHAT.value,

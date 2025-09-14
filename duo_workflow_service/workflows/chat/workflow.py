@@ -206,7 +206,9 @@ class Workflow(AbstractWorkflow):
         if state["status"] == WorkflowStatusEnum.TOOL_CALL_APPROVAL_REQUIRED:
             return Routes.STOP
 
-        history: List[BaseMessage] = state["conversation_history"][self._agent.name]
+        history: List[BaseMessage] = state["conversation_history"][
+            self._agent.prompt.name
+        ]
         last_message = history[-1]
         if isinstance(last_message, AIMessage) and len(last_message.tool_calls) > 0:
             return Routes.TOOL_USE
@@ -238,7 +240,7 @@ class Workflow(AbstractWorkflow):
         return ChatWorkflowState(
             plan={"steps": []},
             status=WorkflowStatusEnum.NOT_STARTED,
-            conversation_history={self._agent.name: conversation_history},
+            conversation_history={self._agent.prompt.name: conversation_history},
             ui_chat_log=[initial_ui_chat_log],
             last_human_input=None,
             goal=goal,
@@ -271,7 +273,7 @@ class Workflow(AbstractWorkflow):
                         )
                     case _:
                         state_update["conversation_history"] = {
-                            self._agent.name: [
+                            self._agent.prompt.name: [
                                 HumanMessage(
                                     content=goal,
                                     additional_kwargs={
@@ -342,7 +344,7 @@ class Workflow(AbstractWorkflow):
                 preapproved_tools=self._preapproved_tools,
             )
 
-        self._agent: ChatAgent = self._prompt_registry.get_on_behalf(  # type: ignore[assignment]
+        prompt = self._prompt_registry.get_on_behalf(  # type: ignore[assignment]
             user=self._user,
             prompt_id=self._prompt_id,
             prompt_version=self._prompt_version,
@@ -350,11 +352,12 @@ class Workflow(AbstractWorkflow):
             internal_event_category=__name__,
             tools=agents_toolset.bindable,  # type: ignore[arg-type]
         )
+        self._agent = ChatAgent(prompt=prompt)
         self._agent.tools_registry = tools_registry
         self._agent.prompt_runnable = prompt_runnable
 
         tools_runner = ToolsExecutor(
-            tools_agent_name=self._agent.name,
+            tools_agent_name=self._agent.prompt.name,
             toolset=agents_toolset,
             workflow_id=self._workflow_id,
             workflow_type=self._workflow_type,

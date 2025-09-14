@@ -12,6 +12,7 @@ from langchain_core.prompt_values import ChatPromptValue
 
 from ai_gateway.container import ContainerApplication
 from ai_gateway.models.agentic_mock import AgenticFakeModel
+from ai_gateway.prompts import Prompt
 from ai_gateway.prompts.registry import LocalPromptRegistry
 from duo_workflow_service.agents.chat_agent import ChatAgent, ChatAgentPromptTemplate
 from duo_workflow_service.components.tools_registry import ToolsRegistry
@@ -27,6 +28,59 @@ from duo_workflow_service.gitlab.gitlab_instance_info_service import GitLabInsta
 from duo_workflow_service.gitlab.gitlab_service_context import GitLabServiceContext
 from lib.internal_events import InternalEventAdditionalProperties
 from lib.internal_events.event_enum import CategoryEnum, EventEnum, EventPropertyEnum
+
+PROMPT_TEMPLATE_WITH_SPLIT_SYSTEM = {
+    "system_static": """You are GitLab Duo Chat, an AI coding assistant.
+
+<core_mission>
+Your primary role is collaborative programming.
+</core_mission>""",
+    "system_dynamic": """<context>
+The current date is {{ current_date }}. The current time is {{ current_time }}. The user's timezone is
+{{ current_timezone }}.
+{%- if project %}
+Here is the project information for the current GitLab project the USER is working on:
+<project>
+<project_id>{{ project.id }}</project_id>
+<project_name>{{ project.name }}</project_name>
+<project_url>{{ project.web_url }}</project_url>
+</project>
+{%- endif %}
+</context>""",
+    "user": "{{ message.content }}",
+}
+
+PROMPT_TEMPLATE_WITH_GITLAB_INFO = {
+    "system_static": """You are GitLab Duo Chat, an AI coding assistant.
+
+<gitlab_instance_info>
+<gitlab_instance_type>{{ gitlab_instance_type }}</gitlab_instance_type>
+<gitlab_instance_url>{{ gitlab_instance_url }}</gitlab_instance_url>
+<gitlab_instance_version>{{ gitlab_instance_version }}</gitlab_instance_version>
+</gitlab_instance_info>
+
+<core_mission>
+Your primary role is collaborative programming.
+</core_mission>""",
+    "system_dynamic": """<context>
+The current date is {{ current_date }}.
+{%- if project %}
+<project>
+<project_id>{{ project.id }}</project_id>
+<project_name>{{ project.name }}</project_name>
+<project_url>{{ project.web_url }}</project_url>
+</project>
+{%- endif %}
+{%- if namespace %}
+<namespace>
+<namespace_id>{{ namespace.id }}</namespace_id>
+<namespace_name>{{ namespace.name }}</namespace_name>
+<namespace_url>{{ namespace.web_url }}</namespace_url>
+</namespace>
+{%- endif %}
+</context>""",
+    "user": "{{ message.content }}",
+}
 
 
 @pytest.fixture(name="mock_datetime")
@@ -52,11 +106,14 @@ def prompt_name_fixture():
     return "Chat Agent"
 
 
+@pytest.fixture(name="prompt_template_factory")
+def promtp_template_factory_fixture():
+    return ChatAgentPromptTemplate
+
+
 @pytest.fixture(name="chat_agent")
-def chat_agent_fixture(model_factory, prompt_config, model_metadata):
-    yield ChatAgent(
-        model_factory=model_factory, config=prompt_config, model_metadata=model_metadata
-    )
+def chat_agent_fixture(prompt: Prompt):
+    yield ChatAgent(prompt=prompt)
 
 
 @pytest.fixture(autouse=True)
@@ -124,7 +181,7 @@ async def test_template_with_project(
         exclusion_rules=None,
     )
 
-    chat_agent: ChatAgent = prompt_registry.get_on_behalf(  # type: ignore[assignment]
+    prompt = prompt_registry.get_on_behalf(  # type: ignore[assignment]
         user=user,
         prompt_id="chat/agent",
         prompt_version="^1.0.0",
@@ -132,8 +189,9 @@ async def test_template_with_project(
         internal_event_category=__name__,
         tools=None,
     )
+    chat_agent = ChatAgent(prompt=prompt)
 
-    result: Any = await chat_agent.prompt_tpl.ainvoke(input, agent_name=chat_agent.name)
+    result: Any = await chat_agent.prompt_tpl.ainvoke(input, agent_name=prompt.name)
 
     assert isinstance(result.messages[1], SystemMessage)
     assert "<project_id>1</project_id>" in result.messages[1].content
@@ -160,7 +218,7 @@ async def test_template_with_namespace(
         web_url="https://gitlab.com/gitlab-org",
         description="awesome organization",
     )
-    chat_agent: ChatAgent = prompt_registry.get_on_behalf(  # type: ignore[assignment]
+    prompt = prompt_registry.get_on_behalf(  # type: ignore[assignment]
         user=user,
         prompt_id="chat/agent",
         prompt_version="^1.0.0",
@@ -168,8 +226,9 @@ async def test_template_with_namespace(
         internal_event_category=__name__,
         tools=None,
     )
+    chat_agent = ChatAgent(prompt=prompt)
 
-    result: Any = await chat_agent.prompt_tpl.ainvoke(input, agent_name=chat_agent.name)
+    result: Any = await chat_agent.prompt_tpl.ainvoke(input, agent_name=prompt.name)
 
     assert isinstance(result.messages[1], SystemMessage)
     assert "<project>" not in result.messages[1].content
@@ -198,7 +257,7 @@ class TestChatAgentTrackTokensData:
     async def test_track_tokens_data(
         self, chat_agent, input, internal_event_client: Mock
     ):
-        chat_agent.internal_event_client = internal_event_client
+        chat_agent.prompt.internal_event_client = internal_event_client
 
         if hasattr(chat_agent.model, "usage_metadata"):
             chat_agent.model.usage_metadata = UsageMetadata(
@@ -254,30 +313,6 @@ class TestChatAgentTrackTokensData:
 
 
 class TestChatAgentPromptTemplate:
-    @pytest.fixture(name="prompt_template_with_split_system")
-    def prompt_template_with_split_system_fixture(self):
-        """Prompt template with both system_static and system_dynamic parts."""
-        return {
-            "system_static": """You are GitLab Duo Chat, an AI coding assistant.
-
-<core_mission>
-Your primary role is collaborative programming.
-</core_mission>""",
-            "system_dynamic": """<context>
-The current date is {{ current_date }}. The current time is {{ current_time }}. The user's timezone is
-{{ current_timezone }}.
-{%- if project %}
-Here is the project information for the current GitLab project the USER is working on:
-<project>
-<project_id>{{ project.id }}</project_id>
-<project_name>{{ project.name }}</project_name>
-<project_url>{{ project.web_url }}</project_url>
-</project>
-{%- endif %}
-</context>""",
-            "user": "{{ message.content }}",
-        }
-
     @pytest.fixture(name="chat_workflow_state")
     def chat_workflow_state_fixture(self):
         """Sample chat workflow state for testing."""
@@ -297,14 +332,15 @@ Here is the project information for the current GitLab project the USER is worki
             approval=None,
         )
 
+    @pytest.mark.parametrize("prompt_template", [PROMPT_TEMPLATE_WITH_SPLIT_SYSTEM])
     def test_split_system_prompts_create_separate_messages(
         self,
-        prompt_template_with_split_system,
+        prompt_config,
         chat_workflow_state,
         mock_datetime,
     ):
         """Test that system_static and system_dynamic create separate system messages."""
-        template = ChatAgentPromptTemplate(prompt_template_with_split_system)
+        template = ChatAgentPromptTemplate(prompt_config)
 
         # Test without GitLab context (should use fallback values)
         result = template.invoke(
@@ -350,7 +386,8 @@ Here is the project information for the current GitLab project the USER is worki
         user_message = messages[2]
         assert isinstance(user_message, HumanMessage)
 
-    def test_system_prompts_without_project(self, prompt_template_with_split_system):
+    @pytest.mark.parametrize("prompt_template", [PROMPT_TEMPLATE_WITH_SPLIT_SYSTEM])
+    def test_system_prompts_without_project(self, prompt_config):
         """Test system prompts when no project is provided."""
         state_without_project = ChatWorkflowState(
             plan={"steps": []},
@@ -362,7 +399,7 @@ Here is the project information for the current GitLab project the USER is worki
             approval=None,
         )
 
-        template = ChatAgentPromptTemplate(prompt_template_with_split_system)
+        template = ChatAgentPromptTemplate(prompt_config)
 
         result = template.invoke(
             state_without_project, agent_name="test_agent", is_anthropic_model=False
@@ -382,14 +419,15 @@ Here is the project information for the current GitLab project the USER is worki
         assert "<project>" not in dynamic_system_message.content
         assert "project_id" not in dynamic_system_message.content
 
+    @pytest.mark.parametrize("prompt_template", [PROMPT_TEMPLATE_WITH_SPLIT_SYSTEM])
     def test_jinja2_variable_resolution(
         self,
-        prompt_template_with_split_system,
+        prompt_config,
         chat_workflow_state,
         mock_datetime,
     ):
         """Test that Jinja2 variables are properly resolved in both static and dynamic parts."""
-        template = ChatAgentPromptTemplate(prompt_template_with_split_system)
+        template = ChatAgentPromptTemplate(prompt_config)
 
         result = template.invoke(
             chat_workflow_state, agent_name="test_agent", is_anthropic_model=False
@@ -427,7 +465,8 @@ Here is the project information for the current GitLab project the USER is worki
         assert "123" in dynamic_content
         assert "https://gitlab.com/test/project" in dynamic_content
 
-    def test_conversation_history_processing(self, prompt_template_with_split_system):
+    @pytest.mark.parametrize("prompt_template", [PROMPT_TEMPLATE_WITH_SPLIT_SYSTEM])
+    def test_conversation_history_processing(self, prompt_config):
         """Test that conversation history is properly processed."""
         state_with_history = ChatWorkflowState(
             plan={"steps": []},
@@ -444,7 +483,7 @@ Here is the project information for the current GitLab project the USER is worki
             approval=None,
         )
 
-        template = ChatAgentPromptTemplate(prompt_template_with_split_system)
+        template = ChatAgentPromptTemplate(prompt_config)
 
         result = template.invoke(
             state_with_history, agent_name="test_agent", is_anthropic_model=False
@@ -461,12 +500,13 @@ Here is the project information for the current GitLab project the USER is worki
         assert messages[2].content == "First message"
         assert messages[3].content == "Second message"
 
+    @pytest.mark.parametrize("prompt_template", [PROMPT_TEMPLATE_WITH_SPLIT_SYSTEM])
     def test_anthropic_cache_control_enabled(
         self,
-        prompt_template_with_split_system,
+        prompt_config,
         chat_workflow_state,
     ):
-        template = ChatAgentPromptTemplate(prompt_template_with_split_system)
+        template = ChatAgentPromptTemplate(prompt_config)
 
         result = template.invoke(
             chat_workflow_state, agent_name="test_agent", is_anthropic_model=True
@@ -499,13 +539,14 @@ Here is the project information for the current GitLab project the USER is worki
         assert isinstance(dynamic_system_message, SystemMessage)
         assert isinstance(dynamic_system_message.content, str)
 
+    @pytest.mark.parametrize("prompt_template", [PROMPT_TEMPLATE_WITH_SPLIT_SYSTEM])
     def test_anthropic_cache_control_disabled(
         self,
-        prompt_template_with_split_system,
+        prompt_config,
         chat_workflow_state,
     ):
         """Test that cache_control is NOT added when model is not Anthropic."""
-        template = ChatAgentPromptTemplate(prompt_template_with_split_system)
+        template = ChatAgentPromptTemplate(prompt_config)
 
         result = template.invoke(
             chat_workflow_state, agent_name="test_agent", is_anthropic_model=False
@@ -519,13 +560,14 @@ Here is the project information for the current GitLab project the USER is worki
         assert isinstance(static_system_message.content, str)
         assert "GitLab Duo Chat" in static_system_message.content
 
+    @pytest.mark.parametrize("prompt_template", [PROMPT_TEMPLATE_WITH_SPLIT_SYSTEM])
     def test_cache_control_only_applied_to_static_system_message(
         self,
-        prompt_template_with_split_system,
+        prompt_config,
         chat_workflow_state,
         mock_datetime,
     ):
-        template = ChatAgentPromptTemplate(prompt_template_with_split_system)
+        template = ChatAgentPromptTemplate(prompt_config)
 
         result = template.invoke(
             chat_workflow_state, agent_name="test_agent", is_anthropic_model=True
@@ -737,41 +779,6 @@ async def test_chat_agent_api_error_handling(chat_agent, input):
 class TestChatAgentGitLabInstanceInfo:
     """Test GitLab instance info integration with ChatAgent static prompt."""
 
-    @pytest.fixture(name="prompt_template_with_gitlab_info")
-    def prompt_template_with_gitlab_info_fixture(self):
-        """Prompt template that includes GitLab instance info in static system prompt."""
-        return {
-            "system_static": """You are GitLab Duo Chat, an AI coding assistant.
-
-<gitlab_instance_info>
-<gitlab_instance_type>{{ gitlab_instance_type }}</gitlab_instance_type>
-<gitlab_instance_url>{{ gitlab_instance_url }}</gitlab_instance_url>
-<gitlab_instance_version>{{ gitlab_instance_version }}</gitlab_instance_version>
-</gitlab_instance_info>
-
-<core_mission>
-Your primary role is collaborative programming.
-</core_mission>""",
-            "system_dynamic": """<context>
-The current date is {{ current_date }}.
-{%- if project %}
-<project>
-<project_id>{{ project.id }}</project_id>
-<project_name>{{ project.name }}</project_name>
-<project_url>{{ project.web_url }}</project_url>
-</project>
-{%- endif %}
-{%- if namespace %}
-<namespace>
-<namespace_id>{{ namespace.id }}</namespace_id>
-<namespace_name>{{ namespace.name }}</namespace_name>
-<namespace_url>{{ namespace.web_url }}</namespace_url>
-</namespace>
-{%- endif %}
-</context>""",
-            "user": "{{ message.content }}",
-        }
-
     @pytest.fixture(name="input_with_project")
     def input_with_project_fixture(self):
         """Input with project data."""
@@ -795,11 +802,12 @@ The current date is {{ current_date }}.
             approval=None,
         )
 
+    @pytest.mark.parametrize("prompt_template", [PROMPT_TEMPLATE_WITH_GITLAB_INFO])
     def test_static_prompt_contains_gitlab_instance_info(
-        self, prompt_template_with_gitlab_info, input_with_project
+        self, prompt_config, input_with_project
     ):
         """Test static prompt contains correct GitLab instance info from context."""
-        template = ChatAgentPromptTemplate(prompt_template_with_gitlab_info)
+        template = ChatAgentPromptTemplate(prompt_config)
 
         # Mock the GitLab instance info service
         mock_gitlab_service = Mock()
@@ -848,11 +856,12 @@ The current date is {{ current_date }}.
             input_with_project["project"], input_with_project["namespace"]
         )
 
+    @pytest.mark.parametrize("prompt_template", [PROMPT_TEMPLATE_WITH_GITLAB_INFO])
     def test_static_prompt_without_gitlab_context(
-        self, prompt_template_with_gitlab_info, input_with_project
+        self, prompt_config, input_with_project
     ):
         """Test static prompt handles missing GitLab context gracefully."""
-        template = ChatAgentPromptTemplate(prompt_template_with_gitlab_info)
+        template = ChatAgentPromptTemplate(prompt_config)
 
         # Call template without GitLab context
         result = template.invoke(
@@ -883,19 +892,20 @@ The current date is {{ current_date }}.
 
 @pytest.mark.asyncio
 async def test_agentic_fake_model_bypasses_tool_approval(
-    prompt_config, model_metadata, input
+    prompt_config, model_metadata, prompt_template_factory, input
 ):
     def agentic_model_factory(
         *, model: str, **kwargs
     ):  # pylint: disable=unused-argument
         return AgenticFakeModel()
 
-    chat_agent = ChatAgent(
+    prompt = Prompt(
         model_factory=agentic_model_factory,
         config=prompt_config,
         model_metadata=model_metadata,
+        prompt_template_factory=prompt_template_factory,
     )
-
+    chat_agent = ChatAgent(prompt=prompt)
     chat_agent.tools_registry = Mock(spec=ToolsRegistry)
     chat_agent.tools_registry.approval_required.return_value = True
 
