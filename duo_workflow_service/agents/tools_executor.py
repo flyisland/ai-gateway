@@ -386,7 +386,13 @@ class ToolsExecutor:
             status=status,
             correlation_id=None,
             tool_info=(
-                ToolInfo(name=tool_name, args=tool_args, tool_response=tool_response)
+                (
+                    ToolInfo(
+                        name=tool_name, args=tool_args, tool_response=tool_response
+                    )
+                    if tool_response is not None
+                    else ToolInfo(name=tool_name, args=tool_args)
+                )
                 if tool_name not in _ACTION_HANDLERS
                 else None
             ),
