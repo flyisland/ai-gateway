@@ -334,18 +334,6 @@ def test_resolve_workflow_class_with_chat_flow_config_multiple_prompts():
             "duo_workflow_service.workflows.registry._FLOW_BY_VERSIONS",
             {"experimental": (mock_flow_config_cls, Mock())},
         ),
-        patch(
-            "duo_workflow_service.workflows.registry.MessageToDict",
-            return_value={
-                "version": "experimental",
-                "environment": CHAT_AGENT_COMPONENT_ENVIRONMENT,
-                "components": [{"type": "AgentComponent"}],
-                "prompts": [
-                    {"prompt_id": "prompt1", "content": "test prompt 1"},
-                    {"prompt_id": "prompt2", "content": "test prompt 2"},
-                ],
-            },
-        ),
     ):
         with pytest.raises(
             ValueError,
@@ -381,15 +369,6 @@ def test_resolve_workflow_class_with_chat_flow_config_both_prompts_and_version()
         patch(
             "duo_workflow_service.workflows.registry._FLOW_BY_VERSIONS",
             {"experimental": (mock_flow_config_cls, Mock())},
-        ),
-        patch(
-            "duo_workflow_service.workflows.registry.MessageToDict",
-            return_value={
-                "version": "experimental",
-                "environment": CHAT_AGENT_COMPONENT_ENVIRONMENT,
-                "components": [{"type": "AgentComponent", "prompt_version": "v1.0"}],
-                "prompts": [{"prompt_id": "prompt1", "content": "test prompt"}],
-            },
         ),
     ):
         with pytest.raises(
