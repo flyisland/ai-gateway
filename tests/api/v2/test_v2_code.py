@@ -1563,13 +1563,13 @@ class TestGitLabModelProvider:
 
         with (
             patch(
-                "ai_gateway.model_selection.ModelSelectionConfig.get_model_for_feature"
+                "ai_gateway.model_selection.ModelSelectionConfig.get_models_for_feature"
             ) as mock_get_model,
             patch(
                 "ai_gateway.api.v2.code.completions._execute_code_completion"
             ) as mock_execute,
         ):
-            mock_get_model.return_value = test_model
+            mock_get_model.return_value = [test_model]
             mock_execute.return_value = [mock_suggestion]
 
             # Test case when model_identifier is empty
@@ -1631,13 +1631,13 @@ class TestGitLabModelProvider:
 
         with (
             patch(
-                "ai_gateway.model_selection.ModelSelectionConfig.get_model_for_feature"
+                "ai_gateway.model_selection.ModelSelectionConfig.get_models_for_feature"
             ) as mock_get_model,
             patch(
                 "ai_gateway.api.v2.code.completions._execute_code_completion"
             ) as mock_execute,
         ):
-            mock_get_model.return_value = test_model
+            mock_get_model.return_value = [test_model]
             mock_execute.return_value = [mock_suggestion]
 
             response = mock_client.post(

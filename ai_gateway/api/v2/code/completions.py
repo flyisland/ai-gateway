@@ -55,7 +55,7 @@ from ai_gateway.code_suggestions.processing.base import ModelEngineOutput
 from ai_gateway.code_suggestions.processing.ops import lang_from_filename
 from ai_gateway.config import Config
 from ai_gateway.instrumentators.base import TelemetryInstrumentator
-from ai_gateway.model_metadata import ModelMetadata, create_model_metadata
+from ai_gateway.model_metadata import TypeModelMetadata, create_model_metadata
 from ai_gateway.models import KindModelProvider
 from ai_gateway.models.base import TokensConsumptionMetadata
 from ai_gateway.prompts import BasePromptRegistry
@@ -560,6 +560,11 @@ def _build_code_completions(
             }
         )
 
+        # Workaround until Code Completions is completely migrated to the Prompt Registry.
+        # See https://gitlab.com/gitlab-org/modelops/applied-ml/code-suggestions/ai-assist/-/issues/906
+        if isinstance(model_metadata, list):
+            model_metadata = model_metadata[0]
+
         payload.model_name = model_metadata.identifier
         payload.model_provider = model_metadata.provider
         kwargs = {}
@@ -670,7 +675,7 @@ def _resolve_code_completions_vertex_codestral(
 
 
 def _resolve_agent_code_completions(
-    model_metadata: ModelMetadata,
+    model_metadata: TypeModelMetadata | list[TypeModelMetadata],
     current_user: StarletteUser,
     prompt_registry: BasePromptRegistry,
     completions_agent_factory: Factory[CodeCompletions],

@@ -29,9 +29,7 @@ class ModelMetadataInterceptor(grpc.aio.ServerInterceptor):
                 metadata.get(self.X_GITLAB_AGENT_PLATFORM_MODEL_METADATA, "")
             )
 
-            model_metadata = create_model_metadata(data)
-            if model_metadata:
-                model_metadata.add_user(current_user_context_var.get())
+            model_metadata = create_model_metadata(data, current_user_context_var.get())
             current_model_metadata_context.set(model_metadata)
 
         except json.JSONDecodeError:

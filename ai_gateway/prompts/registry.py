@@ -284,11 +284,10 @@ class LocalPromptRegistry(BasePromptRegistry):
 
         return resolved_version, versions[resolved_version]
 
-    def _default_model_metadata(
-        self, prompt_id: str, resolved_prompt_version: str
-    ) -> TypeModelMetadata | None:
+    def _default_model_metadata(self, prompt_id: str, prompt_version) -> TypeModelMetadata | list[TypeModelMetadata] | None:
         # For backwards compatibility with client code that doesn't send model_metadata and would've used the model from
         # the `base` prompt, create model metadata from know version mappings or the feature setting default
+        _, resolved_prompt_version, _ = self._resolve_prompt_version(self, prompt_id, prompt_version, [])
         if identifier := LEGACY_MODEL_MAPPING.get(prompt_id, {}).get(
             resolved_prompt_version, None
         ):
@@ -303,17 +302,8 @@ class LocalPromptRegistry(BasePromptRegistry):
             }
         )
 
-    def get(
-        self,
-        prompt_id: str,
-        prompt_version: str,
-        model_metadata: Optional[TypeModelMetadata] = None,
-        tools: Optional[List[BaseTool]] = None,
-        tool_choice: Optional[str] = None,  # auto, any, <tool name>. By default, auto.
-        **kwargs: Any,
-    ) -> Prompt:
+    def _resolve_prompt_version(self, prompt_id: str, prompt_version: str, family: list[str]) -> tuple[PromptRegistered, str, PromptConfig]:
         try:
-            family = model_metadata.family if model_metadata else []
             prompt_path = self._resolve_id(prompt_id, family)
 
             log.info("Resolved prompt id", prompt_id=prompt_id, prompt_path=prompt_path)
@@ -327,11 +317,15 @@ class LocalPromptRegistry(BasePromptRegistry):
         resolved_prompt_version, config = self._get_prompt_config(
             prompt_registered.versions, prompt_version
         )
-        if not model_metadata:
-            model_metadata = self._default_model_metadata(
-                prompt_id, resolved_prompt_version
-            )
 
+        return prompt_registered, resolved_prompt_version, config
+
+    def _build_prompt(self, prompt_id: str, prompt_version: str, model_metadata: Optional[TypeModelMetadata], tools: Optional[List[BaseTool]], tool_choice: Optional[str], **kwargs: Any):
+        prompt_registered, _, config = self._resolve_prompt_version(
+            prompt_id,
+            prompt_version,
+            model_metadata.family if model_metadata else []
+        )
         model_class_provider = config.model.params.model_class_provider
         model_factory = self.model_factories.get(model_class_provider, None)
 
@@ -362,6 +356,41 @@ class LocalPromptRegistry(BasePromptRegistry):
             disable_streaming=self.disable_streaming,
             tools=tools,
             tool_choice=tool_choice,
+            **kwargs,
+        )
+
+    def get(
+        self,
+        prompt_id: str,
+        prompt_version: str,
+        model_metadata: Optional[TypeModelMetadata | list[TypeModelMetadata]] = None,
+        tools: Optional[List[BaseTool]] = None,
+        tool_choice: Optional[str] = None,  # auto, any, <tool name>. By default, auto.
+        **kwargs: Any,
+    ) -> Prompt:
+        if not model_metadata:
+            model_metadata = self._default_model_metadata(prompt_id, prompt_version)
+
+        if isinstance(model_metadata, list):
+            prompt = [
+                self._build_prompt(
+                    prompt_id,
+                    prompt_version,
+                    item,
+                    tools,
+                    tool_choice,
+                    **kwargs,
+                )
+                for item in model_metadata
+            ]
+            return RunnableLoadBalancer(runnables=prompt)
+
+        return self._build_prompt(
+            prompt_id,
+            prompt_version,
+            model_metadata,
+            tools,
+            tool_choice,
             **kwargs,
         )
 

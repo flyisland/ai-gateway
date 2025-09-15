@@ -11,17 +11,14 @@ from ai_gateway.model_selection import ModelSelectionConfig
 class BaseModelMetadata(BaseModel):
     llm_definition_params: dict[str, Any] = {}
     family: list[str] = []
-
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-        self._user = None
+    user: StarletteUser | None = None
 
     @abstractmethod
     def to_params(self) -> Dict[str, Any]:
         pass
 
     def add_user(self, user: StarletteUser):
-        self._user = user
+        self.user = user
 
 
 class AmazonQModelMetadata(BaseModelMetadata):
@@ -32,7 +29,7 @@ class AmazonQModelMetadata(BaseModelMetadata):
     def to_params(self) -> Dict[str, Any]:
         return {
             "role_arn": self.role_arn,
-            "user": self._user,
+            "user": self.user,
         }
 
 
@@ -80,7 +77,9 @@ class ModelMetadata(BaseModelMetadata):
 TypeModelMetadata = AmazonQModelMetadata | ModelMetadata
 
 
-def create_model_metadata(data: dict[str, Any] | None) -> Optional[TypeModelMetadata]:
+def create_model_metadata(
+    data: dict[str, Any] | None, user: StarletteUser | None = None
+) -> Optional[TypeModelMetadata | list[TypeModelMetadata]]:
     if not data or "provider" not in data:
         return None
 
@@ -91,11 +90,12 @@ def create_model_metadata(data: dict[str, Any] | None) -> Optional[TypeModelMeta
         return AmazonQModelMetadata(
             llm_definition_params=llm_definition.params.copy(),
             family=llm_definition.family,
+            user=user,
             **data,
         )
 
     if name := data.get("name"):
-        llm_definition = configs.get_model(name)
+        llm_definitions = [configs.get_model(name)]
     else:
         # When there's no name it means we're in presence of a GitLab-provider metadata, which may pass a
         # "feature_setting" or "identifier" to deduce the model from them. These values are not expected in the rest
@@ -105,23 +105,30 @@ def create_model_metadata(data: dict[str, Any] | None) -> Optional[TypeModelMeta
         identifier = data.pop("identifier", None)
 
         if identifier:
-            llm_definition = configs.get_model(identifier)
+            llm_definitions = [configs.get_model(identifier)]
         elif feature_setting:
-            llm_definition = configs.get_model_for_feature(feature_setting)
+            llm_definitions = configs.get_models_for_feature(feature_setting)
         else:
             raise ValueError(
                 "Argument error: either identifier or feature_setting must be present."
             )
 
-        data["name"] = llm_definition.gitlab_identifier
+    model_metadata_list = [
+        ModelMetadata(
+            llm_definition_params=llm_definition.params.copy(),
+            family=llm_definition.family,
+            user=user,
+            name=llm_definition.gitlab_identifier
+            **data,
+        )
+        for llm_definition in llm_definitions
+    ]
 
-    return ModelMetadata(
-        llm_definition_params=llm_definition.params.copy(),
-        family=llm_definition.family,
-        **data,
+    return (
+        model_metadata_list if len(model_metadata_list) > 1 else model_metadata_list[0]
     )
 
 
-current_model_metadata_context: ContextVar[Optional[TypeModelMetadata]] = ContextVar(
+current_model_metadata_context: ContextVar[Optional[TypeModelMetadata | list[TypeModelMetadata]]] = ContextVar(
     "current_model_metadata_context", default=None
 )

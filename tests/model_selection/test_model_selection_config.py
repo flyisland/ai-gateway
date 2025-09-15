@@ -130,17 +130,19 @@ def test_get_model_missing_key(selection_config):
         selection_config.get_model("non-existing-model")
 
 
-def test_get_model_for_feature(selection_config):
-    assert selection_config.get_model_for_feature("test_config") == LLMDefinition(
-        name="Model One",
-        gitlab_identifier="gitlab-model-1",
-        params={"model": "provider-model-1", "param1": "value1"},
-    )
+def test_get_models_for_feature(selection_config):
+    assert selection_config.get_models_for_feature("test_config") == [
+        LLMDefinition(
+            name="Model One",
+            gitlab_identifier="gitlab-model-1",
+            params={"model": "provider-model-1", "param1": "value1"},
+        )
+    ]
 
 
-def test_get_model_for_feature_no_feature(selection_config):
+def test_get_models_for_feature_no_feature(selection_config):
     with pytest.raises(ValueError, match="Invalid feature setting: random-feature"):
-        selection_config.get_model_for_feature("random-feature")
+        selection_config.get_models_for_feature("random-feature")
 
 
 @pytest.mark.usefixtures("mock_fs")

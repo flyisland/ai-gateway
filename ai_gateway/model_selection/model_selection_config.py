@@ -23,7 +23,7 @@ class LLMDefinition(BaseModel):
 class UnitPrimitiveConfig(BaseModel):
     feature_setting: str
     unit_primitives: list[GitLabUnitPrimitive]
-    default_model: str
+    default_models: list[str]
     selectable_models: list[str] = []
     beta_models: list[str] = []
 
@@ -78,22 +78,20 @@ class ModelSelectionConfig:
 
         for unit_primitive_config in unit_primitive_configs:
             ids = chain(
-                [unit_primitive_config.default_model],
+                unit_primitive_config.default_models,
                 unit_primitive_config.selectable_models,
                 unit_primitive_config.beta_models,
             )
 
             errors.update(model_id for model_id in ids if model_id not in models_ids)
 
-            # Validate that the default model is also included in selectable_models
-            if (
-                unit_primitive_config.default_model
-                not in unit_primitive_config.selectable_models
-            ):
-                default_model_not_selectable_errors.append(
-                    f"Feature '{unit_primitive_config.feature_setting}' has default model "
-                    f"'{unit_primitive_config.default_model}' that is not in selectable_models."
-                )
+            for default_model in unit_primitive_config.default_models:
+                # Validate that each default model is also included in selectable_models
+                if default_model not in unit_primitive_config.selectable_models:
+                    default_model_not_selectable_errors.append(
+                        f"Feature '{unit_primitive_config.feature_setting}' has default model "
+                        f"'{default_model}' that is not in selectable_models."
+                    )
 
         error_messages = []
         if errors:
@@ -122,11 +120,11 @@ class ModelSelectionConfig:
             return model
         raise ValueError(f"Invalid model identifier: {model_id}")
 
-    def get_model_for_feature(self, feature_setting_name: str) -> LLMDefinition:
+    def get_models_for_feature(self, feature_setting_name: str) -> list[LLMDefinition]:
         if feature_setting := self.get_unit_primitive_config_map().get(
             feature_setting_name, None
         ):
-            return self.get_model(feature_setting.default_model)
+            return [self.get_model(model) for model in feature_setting.default_models]
         raise ValueError(f"Invalid feature setting: {feature_setting_name}")
 
 
