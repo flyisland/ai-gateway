@@ -127,6 +127,17 @@ models:
       temperature: 0.0
       max_tokens: 4_096
 
+  - name: "Claude Sonnet 4.0 - Bedrock"
+    gitlab_identifier: "claude_sonnet_4_20250514_bedrock"
+    family:
+      - bedrock
+    params:
+      model: bedrock/us.anthropic.claude-sonnet-4-20250514-v1:0
+      custom_llm_provider: bedrock
+      temperature: 0.0
+      max_tokens: 4_096
+      max_retries: 1
+
   - name: "General"
     gitlab_identifier: "general" # For backwards compatibility with requests asking for [prompt_id]/general
     family:

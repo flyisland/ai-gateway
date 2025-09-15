@@ -1,0 +1,13 @@
+---
+name: Claude Vertex Generate Commit Message
+model:
+  params:
+    model_class_provider: litellm
+unit_primitives:
+  - generate_commit_message
+prompt_template:
+  system: |
+    {% include 'generate_commit_message/system/1.0.0.jinja' %}
+  user: |
+    {% include 'generate_commit_message/user/1.0.0.jinja' %}
+params:
