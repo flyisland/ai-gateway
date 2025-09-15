@@ -152,7 +152,6 @@ class DeterministicStepComponent(BaseComponent):
         node = DeterministicStepNode(
             name=self.__entry_hook__(),
             tool_name=self.tool_name,
-            component_name=self.name,
             inputs=self.inputs,
             flow_id=self.flow_id,
             flow_type=self.flow_type,

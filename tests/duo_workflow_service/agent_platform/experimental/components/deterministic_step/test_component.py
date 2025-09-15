@@ -425,7 +425,6 @@ class TestDeterministicStepComponentAttachNodes:
 
         assert node_call_kwargs["name"] == f"{component_name}#deterministic_step"
         assert node_call_kwargs["tool_name"] == tool_name
-        assert node_call_kwargs["component_name"] == component_name
         assert node_call_kwargs["inputs"] == inputs
         assert node_call_kwargs["flow_id"] == flow_id
         assert node_call_kwargs["flow_type"] == flow_type

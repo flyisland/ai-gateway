@@ -1,4 +1,4 @@
-from typing import Any, Optional
+from typing import Any
 
 import structlog
 from langchain_core.tools import BaseTool
@@ -10,7 +10,6 @@ from duo_workflow_service.agent_platform.experimental.components.deterministic_s
 )
 from duo_workflow_service.agent_platform.experimental.state import (
     FlowState,
-    FlowStateKeys,
     IOKey,
     get_vars_from_state,
     merge_nested_dict,
@@ -24,6 +23,10 @@ from lib.internal_events.event_enum import CategoryEnum, EventEnum, EventLabelEn
 __all__ = ["DeterministicStepNode"]
 
 
+TOOL_EXECUTION_STATUS_SUCCESS = "success"
+TOOL_EXECUTION_STATUS_FAILED = "failed"
+
+
 # pylint: disable-next=too-many-instance-attributes
 class DeterministicStepNode:
     def __init__(
@@ -31,7 +34,6 @@ class DeterministicStepNode:
         *,
         name: str,
         tool_name: str,
-        component_name: str,
         inputs: list[IOKey],
         flow_id: str,
         flow_type: CategoryEnum,
@@ -39,14 +41,13 @@ class DeterministicStepNode:
         ui_history: UIHistory[
             UILogWriterDeterministicStep, UILogEventsDeterministicStep
         ],
-        tool_responses_key: Optional[IOKey] = None,
-        tool_error_key: Optional[IOKey] = None,
-        execution_result_key: Optional[IOKey] = None,
+        tool_responses_key: IOKey,
+        tool_error_key: IOKey,
+        execution_result_key: IOKey,
         validated_tool: BaseTool,
     ):
         self.name = name
         self._tool_name = tool_name
-        self._component_name = component_name
         self._inputs = inputs
         self._flow_id = flow_id
         self._flow_type = flow_type
@@ -60,13 +61,12 @@ class DeterministicStepNode:
 
     async def run(self, state: FlowState) -> dict:
         response, err_format, status = None, None, None
-        tool = self._validated_tool
 
         try:
             tool_call_args = get_vars_from_state(self._inputs, state)
 
             response = await self._execute_tool(
-                tool=tool, tool_call_args=tool_call_args
+                tool=self._validated_tool, tool_call_args=tool_call_args
             )
 
             if not isinstance(response, (str, list, dict)):
@@ -74,20 +74,15 @@ class DeterministicStepNode:
                     f"Invalid response type for tool {self._tool_name}: {response}"
                 )
 
-            status = "success"
-
-            result = {
-                **self._ui_history.pop_state_updates(),
-                **IOKey(
-                    target=FlowStateKeys.CONTEXT, subkeys=[self._component_name]
-                ).to_nested_dict(response),
-            }
+            status = TOOL_EXECUTION_STATUS_SUCCESS
 
         except Exception as e:
-            status = "failed"
+            status = TOOL_EXECUTION_STATUS_FAILED
 
             if isinstance(e, TypeError):
-                err_format = self._format_type_error_response(tool=tool, error=e)
+                err_format = self._format_type_error_response(
+                    tool=self._validated_tool, error=e
+                )
             elif isinstance(e, ValidationError):
                 err_format = self._format_validation_error(
                     tool_name=self._tool_name, error=e
@@ -103,24 +98,18 @@ class DeterministicStepNode:
                 event=UILogEventsDeterministicStep.ON_TOOL_EXECUTION_FAILED,
             )
 
-            result = {
-                **self._ui_history.pop_state_updates(),
-                **IOKey(
-                    target=FlowStateKeys.CONTEXT, subkeys=[self._component_name]
-                ).to_nested_dict(err_format),
-            }
-
-        if self._tool_responses_key:
-            tool_responses_dict = self._tool_responses_key.to_nested_dict(response)
-            result = merge_nested_dict(result, tool_responses_dict)
-
-        if self._tool_error_key:
-            tool_error_dict = self._tool_error_key.to_nested_dict(err_format)
-            result = merge_nested_dict(result, tool_error_dict)
-
-        if self._execution_result_key:
-            status_dict = self._execution_result_key.to_nested_dict(status)
-            result = merge_nested_dict(result, status_dict)
+        result = {
+            **self._ui_history.pop_state_updates(),
+        }
+        result = merge_nested_dict(
+            result, self._tool_responses_key.to_nested_dict(response)
+        )
+        result = merge_nested_dict(
+            result, self._tool_error_key.to_nested_dict(err_format)
+        )
+        result = merge_nested_dict(
+            result, self._execution_result_key.to_nested_dict(status)
+        )
 
         return result
 
