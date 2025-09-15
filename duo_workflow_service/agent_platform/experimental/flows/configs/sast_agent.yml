@@ -1,20 +1,55 @@
 version: "experimental"
 environment: remote
 components:
-  - name: "sast_vulnerability_details_agent"
-    type: OneOffComponent
-    prompt_id: "sast_vulnerability_details_agent_prompt"
-    prompt_version: "^1.0.0"
+  - name: "sast_vulnerability_details_component"
+    type: DeterministicStepComponent
     inputs:
       - from: "context:goal"
         as: vulnerability_id
+    tool_name: "get_vulnerability_details"
+    ui_log_events:
+      - "on_tool_execution_success"
+      - "on_tool_execution_failed"
+  - name: "sast_vulnerability_source_file_component"
+    type: OneOffComponent
+    prompt_id: "sast_vulnerability_details_agent_prompt"
+    prompt_version: "1.1.0"
+    inputs:
+      - from: "context:sast_vulnerability_details_component.tool_result"
+        as: vulnerability_details_json
     toolset:
-      - "read_file"
       - "get_repository_file"
-      - "list_repository_tree"
-      - "find_files"
-      - "get_vulnerability_details"
+    max_correction_attempts: 3
+    ui_log_events:
+      - "on_tool_execution_success"
+      - "on_tool_execution_failed"
+  - name: "sast_vulnerability_lines_component"
+    type: OneOffComponent
+    prompt_id: "sast_vulnerability_details_agent_prompt"
+    prompt_version: "1.2.0"
+    inputs:
+      - from: "context:sast_vulnerability_details_component.tool_result"
+        as: vulnerability_details_json
+      - from: "context:sast_vulnerability_source_file_component.tool_responses"
+        as: vulnerability_source_code
+    toolset:
       - "extract_lines_from_text"
+    max_correction_attempts: 3
+    ui_log_events:
+      - "on_tool_execution_success"
+      - "on_tool_execution_failed"
+  - name: "sast_vulnerability_report_component"
+    type: OneOffComponent
+    prompt_id: "sast_vulnerability_details_agent_prompt"
+    prompt_version: "1.3.0"
+    inputs:
+      - from: "context:sast_vulnerability_details_component.tool_result"
+        as: vulnerability_details_json
+      - from: "context:sast_vulnerability_lines_component.tool_responses"
+        as: vulnerable_lines
+      - from: "context:sast_vulnerability_source_file_component.tool_responses"
+        as: vulnerability_source_code
+    toolset:
       - "create_file_with_contents"
     max_correction_attempts: 3
     ui_log_events:
@@ -25,9 +60,9 @@ components:
     prompt_id: "sast_fp_detection_agent_prompt"
     prompt_version: "^1.0.0"
     inputs:
-      - from: "context:sast_vulnerability_details_agent.execution_result"
+      - from: "context:sast_vulnerability_report_component.execution_result"
         as: execution_status
-      - from: "context:sast_vulnerability_details_agent.tool_responses"
+      - from: "context:sast_vulnerability_report_component.tool_calls"
         as: vulnerability_details
     toolset:
       - "read_file"
@@ -40,9 +75,15 @@ components:
       - "on_tool_execution_success"
       - "on_tool_execution_failed"
 routers:
-  - from: "sast_vulnerability_details_agent"
+  - from: "sast_vulnerability_details_component"
+    to: "sast_vulnerability_source_file_component"
+  - from: "sast_vulnerability_source_file_component"
+    to: "sast_vulnerability_lines_component"
+  - from: "sast_vulnerability_lines_component"
+    to: "sast_vulnerability_report_component"
+  - from: "sast_vulnerability_report_component"
     to: "sast_fp_detection_agent"
   - from: "sast_fp_detection_agent"
     to: "end"
 flow:
-  entry_point: "sast_vulnerability_details_agent"
+  entry_point: "sast_vulnerability_details_component"
