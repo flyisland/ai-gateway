@@ -171,6 +171,45 @@ def mock_deterministic_step_node_cls_fixture(component_name):
         yield mock_cls
 
 
+@pytest.fixture(name="toolset_with_schema_tool")
+def toolset_with_schema_tool_fixture():
+    """Fixture for toolset containing a tool with args_schema."""
+
+    class MockSchema(BaseModel):
+        required_param: str
+        optional_param: str = "default"
+
+    mock_tool = Mock(spec=BaseTool)
+    mock_tool.name = "schema_tool"
+    mock_tool.args_schema = MockSchema
+
+    toolset = Mock(spec=Toolset)
+    toolset.__getitem__ = Mock(return_value=mock_tool)
+    toolset.__contains__ = Mock(return_value=True)
+    toolset.keys = Mock(return_value=["schema_tool"])
+
+    return toolset
+
+
+@pytest.fixture(name="toolset_with_no_args_tool")
+def toolset_with_no_args_tool_fixture():
+    """Fixture for toolset containing a tool that takes no arguments."""
+
+    class NoArgsSchema(BaseModel):
+        pass  # No fields means no arguments
+
+    mock_tool = Mock(spec=BaseTool)
+    mock_tool.name = "no_args_tool"
+    mock_tool.args_schema = NoArgsSchema
+
+    toolset = Mock(spec=Toolset)
+    toolset.__getitem__ = Mock(return_value=mock_tool)
+    toolset.__contains__ = Mock(return_value=True)
+    toolset.keys = Mock(return_value=["no_args_tool"])
+
+    return toolset
+
+
 class TestDeterministicStepComponentInitialization:
     """Test suite for DeterministicStepComponent initialization."""
 
@@ -251,59 +290,28 @@ class TestDeterministicStepComponentToolValidation:
             )
 
     def test_tool_validation_with_schema_success(
-        self, component_name, flow_id, flow_type
+        self, component_name, flow_id, flow_type, toolset_with_schema_tool
     ):
         """Test successful tool validation when tool has schema."""
-        # Create a mock tool with schema
-        mock_tool = Mock(spec=BaseTool)
-        mock_tool.name = "test_tool"
-
-        # Mock the args_schema
-        class MockSchema(BaseModel):
-            user_input: str
-            task_description: str
-
-        mock_tool.args_schema = MockSchema
-
-        # Create mock toolset
-        mock_toolset = Mock(spec=Toolset)
-        mock_toolset.__getitem__ = Mock(return_value=mock_tool)
-        mock_toolset.__contains__ = Mock(return_value=True)
-        mock_toolset.keys = Mock(return_value=["test_tool"])
-
         # Create component with matching inputs
         component = DeterministicStepComponent(
             name=component_name,
             flow_id=flow_id,
             flow_type=flow_type,
-            inputs=["context:user_input", "context:task_description"],
-            tool_name="test_tool",
-            toolset=mock_toolset,
+            inputs=["context:required_param", "context:optional_param"],
+            tool_name="schema_tool",
+            toolset=toolset_with_schema_tool,
         )
 
-        assert component.validated_tool == mock_tool
+        assert (
+            component.validated_tool
+            == toolset_with_schema_tool.__getitem__.return_value
+        )
 
     def test_tool_validation_missing_required_params(
-        self, component_name, flow_id, flow_type
+        self, component_name, flow_id, flow_type, toolset_with_schema_tool
     ):
         """Test tool validation fails when required parameters are missing."""
-        # Create a mock tool with schema
-        mock_tool = Mock(spec=BaseTool)
-        mock_tool.name = "test_tool"
-
-        # Mock the args_schema with required parameters
-        class MockSchema(BaseModel):
-            required_param: str
-            optional_param: str = "default"
-
-        mock_tool.args_schema = MockSchema
-
-        # Create mock toolset
-        mock_toolset = Mock(spec=Toolset)
-        mock_toolset.__getitem__ = Mock(return_value=mock_tool)
-        mock_toolset.__contains__ = Mock(return_value=True)
-        mock_toolset.keys = Mock(return_value=["test_tool"])
-
         # Create component missing the required_param
         with pytest.raises(
             ValueError, match="Missing required parameters: \\['required_param'\\]"
@@ -313,28 +321,14 @@ class TestDeterministicStepComponentToolValidation:
                 flow_id=flow_id,
                 flow_type=flow_type,
                 inputs=["context:optional_param"],
-                tool_name="test_tool",
-                toolset=mock_toolset,
+                tool_name="schema_tool",
+                toolset=toolset_with_schema_tool,
             )
 
-    def test_tool_validation_unknown_params(self, component_name, flow_id, flow_type):
+    def test_tool_validation_unknown_params(
+        self, component_name, flow_id, flow_type, toolset_with_schema_tool
+    ):
         """Test tool validation fails when unknown parameters are provided."""
-        # Create a mock tool with schema
-        mock_tool = Mock(spec=BaseTool)
-        mock_tool.name = "test_tool"
-
-        # Mock the args_schema
-        class MockSchema(BaseModel):
-            valid_param: str
-
-        mock_tool.args_schema = MockSchema
-
-        # Create mock toolset
-        mock_toolset = Mock(spec=Toolset)
-        mock_toolset.__getitem__ = Mock(return_value=mock_tool)
-        mock_toolset.__contains__ = Mock(return_value=True)
-        mock_toolset.keys = Mock(return_value=["test_tool"])
-
         # Create component with unknown parameter
         with pytest.raises(
             ValueError, match="Unknown parameters: \\['unknown_param'\\]"
@@ -343,9 +337,9 @@ class TestDeterministicStepComponentToolValidation:
                 name=component_name,
                 flow_id=flow_id,
                 flow_type=flow_type,
-                inputs=["context:valid_param", "context:unknown_param"],
-                tool_name="test_tool",
-                toolset=mock_toolset,
+                inputs=["context:required_param", "context:unknown_param"],
+                tool_name="schema_tool",
+                toolset=toolset_with_schema_tool,
             )
 
     def test_tool_validation_no_schema(
@@ -386,6 +380,92 @@ class TestDeterministicStepComponentToolValidation:
                 inputs=["context:user_input"],
                 tool_name="test_tool",
                 # toolset is missing
+            )
+
+
+class TestValidateToolArguments:
+    def test_no_args_tool_with_inputs_provided(
+        self, component_name, flow_id, flow_type, toolset_with_no_args_tool
+    ):
+        """Test that providing inputs to a tool that takes no arguments fails."""
+        with pytest.raises(ValueError, match="Unknown parameters: \\['some_param'\\]"):
+            DeterministicStepComponent(
+                name=component_name,
+                flow_id=flow_id,
+                flow_type=flow_type,
+                inputs=["context:some_param"],
+                tool_name="no_args_tool",
+                toolset=toolset_with_no_args_tool,
+            )
+
+    def test_no_args_tool_with_no_inputs(
+        self, component_name, flow_id, flow_type, toolset_with_no_args_tool
+    ):
+        component = DeterministicStepComponent(
+            name=component_name,
+            flow_id=flow_id,
+            flow_type=flow_type,
+            inputs=[],  # No inputs provided
+            tool_name="no_args_tool",
+            toolset=toolset_with_no_args_tool,
+        )
+        assert component.validated_tool is not None
+
+    def test_validate_tool_arguments_with_alias(
+        self, component_name, flow_id, flow_type
+    ):
+        class MockSchema(BaseModel):
+            actual_param_name: str
+
+        mock_tool = Mock(spec=BaseTool)
+        mock_tool.name = "alias_tool"
+        mock_tool.args_schema = MockSchema
+
+        toolset = Mock(spec=Toolset)
+        toolset.__getitem__ = Mock(return_value=mock_tool)
+        toolset.__contains__ = Mock(return_value=True)
+        toolset.keys = Mock(return_value=["alias_tool"])
+
+        component = DeterministicStepComponent(
+            name=component_name,
+            flow_id=flow_id,
+            flow_type=flow_type,
+            inputs=[{"from": "context:some_key", "as": "actual_param_name"}],
+            tool_name="alias_tool",
+            toolset=toolset,
+        )
+        assert component.validated_tool is not None
+
+    def test_validate_tool_with_multiple_missing_required(
+        self, component_name, flow_id, flow_type
+    ):
+        """Test error message when multiple required parameters are missing."""
+
+        class MultiRequiredSchema(BaseModel):
+            param1: str
+            param2: int
+            param3: bool
+            optional: str = "default"
+
+        mock_tool = Mock(spec=BaseTool)
+        mock_tool.name = "multi_required_tool"
+        mock_tool.args_schema = MultiRequiredSchema
+
+        toolset = Mock(spec=Toolset)
+        toolset.__getitem__ = Mock(return_value=mock_tool)
+        toolset.__contains__ = Mock(return_value=True)
+        toolset.keys = Mock(return_value=["multi_required_tool"])
+
+        with pytest.raises(
+            ValueError, match="Missing required parameters: \\['param2', 'param3'\\]"
+        ):
+            DeterministicStepComponent(
+                name=component_name,
+                flow_id=flow_id,
+                flow_type=flow_type,
+                inputs=["context:param1"],  # Only providing one of three required
+                tool_name="multi_required_tool",
+                toolset=toolset,
             )
 
 

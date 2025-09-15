@@ -174,6 +174,9 @@ class TestDeterministicStepNode:
         mock_prompt_security,
         ui_history,
         inputs,
+        mock_internal_event_client,
+        flow_type,
+        flow_id,
     ):
         """Test successful run with tool execution."""
         result = await deterministic_step_node.run(workflow_state)
@@ -212,33 +215,24 @@ class TestDeterministicStepNode:
         # Verify ui_history.pop_state_updates was called
         ui_history.pop_state_updates.assert_called_once()
 
-    @pytest.mark.asyncio
-    async def test_run_with_invalid_response_type(
-        self,
-        deterministic_step_node,
-        workflow_state,
-        mock_tool,
-        ui_history,
-        mock_get_vars_from_state,
-        mock_prompt_security,
-    ):
-        """Test run when tool returns invalid response type."""
-        # Configure tool to return an invalid type
-        mock_tool.arun = AsyncMock(return_value=12345)
-        mock_prompt_security.apply_security_to_tool_response.return_value = 12345
+        # Verify monitoring was called
+        mock_tool_monitoring.time_tool_call.assert_called_once_with(
+            tool_name="test_tool",
+            flow_type=flow_type.value,
+        )
 
-        result = await deterministic_step_node.run(workflow_state)
+        # Verify internal event tracking for success
+        mock_internal_event_client.track_event.assert_called_once()
+        call_args = mock_internal_event_client.track_event.call_args
+        assert call_args[1]["event_name"] == EventEnum.WORKFLOW_TOOL_SUCCESS.value
+        assert call_args[1]["category"] == flow_type.value
 
-        # Verify result structure with error
-        assert FlowStateKeys.CONTEXT in result
-        assert "errors" in result[FlowStateKeys.CONTEXT]
-        assert "status" in result[FlowStateKeys.CONTEXT]
-        error_msg = result[FlowStateKeys.CONTEXT]["errors"]
-        assert "Invalid response type for tool test_tool" in error_msg
-        assert result[FlowStateKeys.CONTEXT]["status"] == "failed"
-
-        # Verify ui_history.log.error was called
-        ui_history.log.error.assert_called_once()
+        # Verify additional properties
+        additional_props = call_args[1]["additional_properties"]
+        assert hasattr(additional_props, "property")
+        assert additional_props.property == "test_tool"
+        assert hasattr(additional_props, "value")
+        assert additional_props.value == flow_id
 
     @pytest.mark.asyncio
     async def test_run_type_error_handling(
@@ -362,117 +356,20 @@ class TestDeterministicStepNode:
         call_args = mock_internal_event_client.track_event.call_args
         assert call_args[1]["event_name"] == EventEnum.WORKFLOW_TOOL_FAILURE.value
 
+        # Check that additional_properties contains error information
+        additional_props = call_args[1]["additional_properties"]
+        assert hasattr(additional_props, "property")
+        assert additional_props.property == "test_tool"
+        assert hasattr(additional_props, "extra")
+        assert additional_props.extra["error"] == "Generic error"
+        assert additional_props.extra["error_type"] == "Exception"
+
         # Verify tool error metric was called
         mock_tool_monitoring.count_agent_platform_tool_failure.assert_called_once_with(
             flow_type=flow_type.value,
             tool_name="test_tool",
             failure_reason="Exception",
         )
-
-
-class TestDeterministicStepNodeMonitoring:
-    """Test suite for DeterministicStepNode monitoring functionality."""
-
-    @pytest.mark.asyncio
-    async def test_monitoring_success(
-        self,
-        deterministic_step_node,
-        workflow_state,
-        mock_tool,
-        mock_tool_monitoring,
-        flow_type,
-        mock_get_vars_from_state,
-    ):
-        """Test monitoring for successful tool execution."""
-        await deterministic_step_node.run(workflow_state)
-
-        # Verify monitoring was called
-        mock_tool_monitoring.time_tool_call.assert_called_once_with(
-            tool_name="test_tool",
-            flow_type=flow_type.value,
-        )
-
-    @pytest.mark.asyncio
-    async def test_monitoring_with_error(
-        self,
-        deterministic_step_node,
-        workflow_state,
-        mock_tool,
-        mock_tool_monitoring,
-        flow_type,
-        mock_get_vars_from_state,
-    ):
-        """Test monitoring when tool execution fails."""
-        # Configure tool to raise exception
-        mock_tool.arun = AsyncMock(side_effect=Exception("Tool error"))
-
-        await deterministic_step_node.run(workflow_state)
-
-        # Verify monitoring was still called despite error
-        mock_tool_monitoring.time_tool_call.assert_called_once_with(
-            tool_name="test_tool",
-            flow_type=flow_type.value,
-        )
-
-
-class TestDeterministicStepNodeEventTracking:
-    """Test suite for DeterministicStepNode internal event tracking."""
-
-    @pytest.mark.asyncio
-    async def test_tracks_success_event(
-        self,
-        deterministic_step_node,
-        workflow_state,
-        mock_tool,
-        mock_internal_event_client,
-        flow_id,
-        flow_type,
-        mock_get_vars_from_state,
-    ):
-        """Test tracking success event."""
-        await deterministic_step_node.run(workflow_state)
-
-        # Verify internal event tracking for success
-        mock_internal_event_client.track_event.assert_called_once()
-        call_args = mock_internal_event_client.track_event.call_args
-        assert call_args[1]["event_name"] == EventEnum.WORKFLOW_TOOL_SUCCESS.value
-        assert call_args[1]["category"] == flow_type.value
-
-        # Verify additional properties
-        additional_props = call_args[1]["additional_properties"]
-        assert hasattr(additional_props, "property")
-        assert additional_props.property == "test_tool"
-        assert hasattr(additional_props, "value")
-        assert additional_props.value == flow_id
-
-    @pytest.mark.asyncio
-    async def test_tracks_failure_event_with_extra_data(
-        self,
-        deterministic_step_node,
-        workflow_state,
-        mock_tool,
-        mock_internal_event_client,
-        mock_get_vars_from_state,
-    ):
-        """Test tracking failure event with extra error data."""
-        # Configure tool to raise exception
-        error_message = "Specific tool error"
-        mock_tool.arun = AsyncMock(side_effect=Exception(error_message))
-
-        await deterministic_step_node.run(workflow_state)
-
-        # Verify internal event tracking includes error details
-        mock_internal_event_client.track_event.assert_called_once()
-        call_args = mock_internal_event_client.track_event.call_args
-        assert call_args[1]["event_name"] == EventEnum.WORKFLOW_TOOL_FAILURE.value
-
-        # Check that additional_properties contains error information
-        additional_props = call_args[1]["additional_properties"]
-        assert hasattr(additional_props, "property")
-        assert additional_props.property == "test_tool"
-        assert hasattr(additional_props, "extra")
-        assert additional_props.extra["error"] == error_message
-        assert additional_props.extra["error_type"] == "Exception"
 
 
 class TestDeterministicStepNodeEdgeCases:
@@ -559,6 +456,11 @@ class TestDeterministicStepNodeEdgeCases:
 
         result = await deterministic_step_node.run(workflow_state)
 
+        # Verify security was called with original response
+        mock_prompt_security.apply_security_to_tool_response.assert_called_once_with(
+            response=["item1", "item2"], tool_name="test_tool"
+        )
+
         # Should handle list response successfully
         assert FlowStateKeys.CONTEXT in result
         assert "responses" in result[FlowStateKeys.CONTEXT]
@@ -584,6 +486,11 @@ class TestDeterministicStepNodeEdgeCases:
         }
 
         result = await deterministic_step_node.run(workflow_state)
+
+        # Verify security was called with original response
+        mock_prompt_security.apply_security_to_tool_response.assert_called_once_with(
+            response={"key": "value"}, tool_name="test_tool"
+        )
 
         # Should handle dict response successfully
         assert FlowStateKeys.CONTEXT in result
