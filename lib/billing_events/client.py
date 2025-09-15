@@ -3,6 +3,7 @@ from datetime import datetime
 from typing import Any, Dict, Optional
 
 import structlog
+from gitlab_cloud_connector import CloudConnectorUser
 from snowplow_tracker import AsyncEmitter, SelfDescribingJson, StructuredEvent, Tracker
 
 from lib.billing_events.context import BillingEventContext
@@ -57,6 +58,7 @@ class BillingEventsClient:
 
     def track_billing_event(
         self,
+        user: CloudConnectorUser,
         event_type: str,
         category: str,
         unit_of_measure: str = "tokens",
@@ -116,7 +118,7 @@ class BillingEventsClient:
             realm=mapped_realm,
             timestamp=datetime.now().isoformat(),
             instance_id=internal_context.instance_id,
-            unique_instance_id="",  # TODO : We need to pass unique instance_id from the GitLab instance
+            unique_instance_id=user.claims.gitlab_instance_uid,
             host_name=internal_context.host_name,
             project_id=internal_context.project_id,
             namespace_id=internal_context.namespace_id,
