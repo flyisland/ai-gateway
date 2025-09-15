@@ -24,10 +24,6 @@ from ai_gateway.prompts.config.base import PromptConfig
 from ai_gateway.prompts.typing import Model, TypeModelFactory, TypePromptTemplateFactory
 
 
-class MockPromptClass(Prompt):
-    pass
-
-
 class MockPromptTemplateClass(Runnable):
     def __init__(self, config: PromptConfig):
         pass
@@ -361,7 +357,6 @@ def registry_fixture(
 ):
     # Use from_local_yaml for lazy loading version
     return LocalPromptRegistry.from_local_yaml(
-        class_overrides={"chat/react": MockPromptClass},
         prompt_template_factories={},
         model_factories=model_factories,
         internal_event_client=internal_event_client,
@@ -374,14 +369,10 @@ def registry_fixture(
 class TestLocalPromptRegistry:
     @pytest.mark.usefixtures("mock_fs")
     @pytest.mark.parametrize(
-        ("override_key", "override_class", "prompt_template_factory"),
+        ("override_key", "prompt_template_factory"),
         [
-            ("chat/react", MockPromptClass, MockPromptTemplateClass),
-            (
-                "chat/react",
-                "tests.prompts.test_registry.MockPromptClass",
-                "tests.prompts.test_registry.MockPromptTemplateClass",
-            ),
+            ("chat/react", MockPromptTemplateClass),
+            ("chat/react", "tests.prompts.test_registry.MockPromptTemplateClass"),
         ],
     )
     def test_from_local_yaml(
@@ -390,13 +381,9 @@ class TestLocalPromptRegistry:
         internal_event_client: Mock,
         model_limits: ConfigModelLimits,
         override_key: str,
-        override_class: str | Type[Prompt],
         prompt_template_factory: str | TypePromptTemplateFactory,
     ):
         registry = LocalPromptRegistry.from_local_yaml(
-            class_overrides={
-                override_key: override_class,
-            },
             prompt_template_factories={override_key: prompt_template_factory},
             model_factories=model_factories,
             internal_event_client=internal_event_client,
@@ -407,12 +394,11 @@ class TestLocalPromptRegistry:
 
         # Test behavior instead of checking internal state
         prompt_with_override = registry.get("chat/react", "^1.0.0")
-        assert isinstance(prompt_with_override, MockPromptClass)
+        assert isinstance(prompt_with_override, Prompt)
         assert isinstance(prompt_with_override.prompt_tpl, MockPromptTemplateClass)
 
         prompt_without_override = registry.get("test", "^1.0.0")
         assert isinstance(prompt_without_override, Prompt)
-        assert not isinstance(prompt_without_override, MockPromptClass)
 
     @pytest.mark.usefixtures("mock_fs")
     @pytest.mark.parametrize(
@@ -421,8 +407,8 @@ class TestLocalPromptRegistry:
             (
                 "chat/react",
                 "tests.prompts.test_registry",
-                ValueError,
-                "The specified klass must be a subclass of Prompt",
+                TypeError,
+                "'module' object is not callable",
             ),
             (
                 "chat/react",
@@ -449,10 +435,7 @@ class TestLocalPromptRegistry:
         error_message: str,
     ):
         registry = LocalPromptRegistry.from_local_yaml(
-            class_overrides={
-                override_key: override_class,
-            },
-            prompt_template_factories={},
+            prompt_template_factories={override_key: override_class},
             model_factories=model_factories,
             internal_event_client=internal_event_client,
             model_limits=model_limits,
@@ -507,7 +490,6 @@ prompt_template:
         )
 
         registry = LocalPromptRegistry.from_local_yaml(
-            class_overrides={},
             prompt_template_factories={},
             model_factories=model_factories,
             custom_models_enabled=True,
@@ -544,7 +526,6 @@ prompt_template:
         model_limits: ConfigModelLimits,
     ):
         test_registry = LocalPromptRegistry.from_local_yaml(
-            class_overrides={},
             prompt_template_factories={},
             model_factories={},
             internal_event_client=internal_event_client,
@@ -645,17 +626,9 @@ prompt_template:
             assert call_dict["gitlab_feature_enabled_by_namespace_ids"] is None
 
     @pytest.mark.usefixtures("mock_fs")
-    @pytest.mark.parametrize(
-        ("tool_choice", "prompt_class"),
-        [
-            ("auto", Mock(spec=Prompt)),
-            ("any", Mock(spec=Prompt)),
-            (None, Mock(spec=Prompt)),
-        ],
-    )
+    @pytest.mark.parametrize("tool_choice", ["auto", "any", None])
     def test_get_with_tool_choice(
         self,
-        prompt_class: Mock,
         registry: LocalPromptRegistry,
         tool_choice: str | None,
     ):
@@ -668,37 +641,17 @@ prompt_template:
         )
 
         tools: list[BaseTool] = [Mock(spec=BaseTool)]
+        with patch("ai_gateway.prompts.registry.Prompt") as prompt_class:
+            _ = registry.get(
+                prompt_id="test",
+                prompt_version="^1.0.0",
+                tools=tools,
+                tool_choice=tool_choice,
+            )
 
-        # Mock the _load_prompt_definition to return a mock prompt
-        with patch.object(
-            registry,
-            "_load_prompt_definition",
-            return_value=Mock(klass=prompt_class, versions={"1.0.0": Mock()}),
-        ):
-            with patch.object(
-                registry,
-                "_get_prompt_config",
-                return_value=(
-                    "1.0.0",
-                    Mock(
-                        model=Mock(
-                            params=Mock(
-                                model_class_provider=ModelClassProvider.LITE_LLM
-                            )
-                        )
-                    ),
-                ),
-            ):
-                _ = registry.get(
-                    prompt_id="test",
-                    prompt_version="^1.0.0",
-                    tools=tools,
-                    tool_choice=tool_choice,
-                )
-
-                kwargs = prompt_class.call_args.kwargs
-                assert kwargs.get("tool_choice") == tool_choice
-                assert kwargs.get("tools") == tools
+        kwargs = prompt_class.call_args.kwargs
+        assert kwargs.get("tool_choice") == tool_choice
+        assert kwargs.get("tools") == tools
 
     @pytest.mark.usefixtures("mock_fs")
     def test_file_not_found_error(
@@ -717,7 +670,6 @@ prompt_template:
             "model_metadata",
             "disable_streaming",
             "expected_name",
-            "expected_class",
             "expected_messages",
             "expected_model",
             "expected_kwargs",
@@ -731,7 +683,6 @@ prompt_template:
                 None,
                 True,
                 "Test prompt 1.0.1",
-                Prompt,
                 [("system", "Template1")],
                 "claude-3-5-sonnet-20241022",
                 {},
@@ -750,7 +701,6 @@ prompt_template:
                 None,
                 True,
                 "Test prompt 1.0.2-dev",
-                Prompt,
                 [("system", "Template1")],
                 "claude-3-5-sonnet-20241022",
                 {},
@@ -769,7 +719,6 @@ prompt_template:
                 None,
                 True,
                 "Test prompt 1.0.0",
-                Prompt,
                 [("system", "Template1")],
                 "claude-3-5-sonnet-20241022",
                 {},
@@ -788,7 +737,6 @@ prompt_template:
                 None,
                 True,
                 "Test prompt 0.0.1",
-                Prompt,
                 [("system", "Template1")],
                 "claude-3-haiku-20240307",
                 {},
@@ -807,7 +755,6 @@ prompt_template:
                 None,
                 False,
                 "Chat react prompt",
-                MockPromptClass,
                 [("system", "Template1"), ("user", "Template2")],
                 "claude-3-haiku-20240307",
                 {"stop": ["Foo", "Bar"], "timeout": 60},
@@ -834,7 +781,6 @@ prompt_template:
                 },
                 False,
                 "Amazon Q React prompt",
-                Prompt,
                 [("system", "Template1"), ("user", "Template2")],
                 "amazon_q",
                 {
@@ -858,7 +804,6 @@ prompt_template:
                 },
                 True,
                 "Chat react custom prompt",
-                MockPromptClass,
                 [("system", "Template1"), ("user", "Template2")],
                 "custom",
                 {
@@ -891,7 +836,6 @@ prompt_template:
                 },
                 False,
                 "Chat react custom prompt",
-                MockPromptClass,
                 [("system", "Template1"), ("user", "Template2")],
                 "custom",
                 {
@@ -924,7 +868,6 @@ prompt_template:
                 },
                 False,
                 "Chat react custom prompt",
-                MockPromptClass,
                 [("system", "Template1"), ("user", "Template2")],
                 "custom",
                 {
@@ -954,7 +897,6 @@ prompt_template:
                 },
                 False,
                 "Chat react claude_3 prompt",  # Should map to claude_3 variant
-                MockPromptClass,
                 [("system", "Template1"), ("user", "Template2")],
                 "general",  # The model_metadata.name overrides the prompt file's model name
                 {
@@ -980,7 +922,6 @@ prompt_template:
         model_metadata: dict[str, Any] | None,
         disable_streaming: bool,
         expected_name: str,
-        expected_class: Type[Prompt],
         expected_messages: Sequence[MessageLikeRepresentation],
         expected_model: str,
         expected_kwargs: dict,
@@ -999,7 +940,7 @@ prompt_template:
         actual_model = cast(BaseModel, binding.bound)
 
         assert prompt.name == expected_name
-        assert isinstance(prompt, expected_class)
+        assert isinstance(prompt, Prompt)
         assert (
             actual_messages
             == ChatPromptTemplate.from_messages(

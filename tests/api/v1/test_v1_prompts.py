@@ -12,7 +12,6 @@ from ai_gateway.model_metadata import (
     ModelMetadata,
     TypeModelMetadata,
 )
-from ai_gateway.prompts import Prompt
 
 
 @pytest.fixture(name="fast_api_router", scope="class")
@@ -23,7 +22,6 @@ def fast_api_router_fixture():
 class TestPrompt:
     @pytest.mark.parametrize(
         (
-            "prompt_class",
             "inputs",
             "prompt_version",
             "input_model_metadata",
@@ -34,7 +32,6 @@ class TestPrompt:
         ),
         [
             (
-                Prompt,
                 {"name": "John", "age": 20},
                 None,
                 None,
@@ -44,7 +41,6 @@ class TestPrompt:
                 ["1.0.0"],
             ),
             (
-                Prompt,
                 {"name": "John", "age": 20},
                 "^2.0.0",
                 None,
@@ -54,7 +50,6 @@ class TestPrompt:
                 ["2.0.0"],
             ),
             (
-                Prompt,
                 {"name": "John", "age": 20},
                 None,
                 ModelMetadata(
@@ -85,7 +80,6 @@ class TestPrompt:
                 ["1.0.0"],
             ),
             (
-                Prompt,
                 {"name": "John", "age": 20},
                 None,
                 AmazonQModelMetadata(
@@ -110,7 +104,6 @@ class TestPrompt:
                 ["1.0.0"],
             ),
             (
-                Prompt,
                 {"name": "John", "age": 20},
                 "^2.0.0",
                 None,
@@ -120,7 +113,6 @@ class TestPrompt:
                 [],
             ),
             (
-                None,
                 {"name": "John", "age": 20},
                 None,
                 None,
@@ -130,7 +122,6 @@ class TestPrompt:
                 None,
             ),
             (
-                Prompt,
                 {"name": "John"},
                 None,
                 None,
@@ -145,7 +136,6 @@ class TestPrompt:
     )
     def test_request(
         self,
-        prompt_class,
         mock_registry_get,
         frozen_datetime_now,
         mock_client,
@@ -184,11 +174,7 @@ class TestPrompt:
         else:
             assert expected_response["detail"] in actual_response["detail"]
 
-        if (
-            prompt_class
-            and compatible_versions is not None
-            and len(compatible_versions) > 0
-        ):
+        if compatible_versions is not None and len(compatible_versions) > 0:
             mock_track_internal_event.assert_called_once_with(
                 "request_explain_vulnerability",
                 category="ai_gateway.api.v1.prompts.invoke",

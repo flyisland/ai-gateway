@@ -1,5 +1,6 @@
 import asyncio
 from datetime import datetime, timezone
+from typing import Any
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
@@ -130,7 +131,13 @@ def workflow_type_fixture() -> CategoryEnum:
     return CategoryEnum.WORKFLOW_SOFTWARE_DEVELOPMENT
 
 
+@pytest.fixture(name="agent_responses")
+def agent_responses_fixture() -> list[dict[str, Any]]:
+    return []
+
+
 @pytest.fixture(name="mock_agent")
-def mock_agent_fixture():
-    with patch("ai_gateway.prompts.registry.LocalPromptRegistry.get_on_behalf") as mock:
-        yield mock
+def mock_agent_fixture(agent_responses: list[dict[str, Any]]):
+    with patch("duo_workflow_service.agents.agent.Agent") as mock:
+        mock.return_value.run.side_effect = agent_responses
+        yield mock.return_value

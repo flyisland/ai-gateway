@@ -1,7 +1,7 @@
 import os
 from contextlib import contextmanager
 from pathlib import Path
-from typing import Any, AsyncIterator, Literal, Optional, Type, Union
+from typing import Any, AsyncIterator, Literal, Optional, Union
 from unittest.mock import AsyncMock, Mock, PropertyMock, patch
 
 import pytest
@@ -644,21 +644,25 @@ def promtp_template_factory_fixture():
     return None
 
 
-@pytest.fixture(name="prompt_class")
-def prompt_class_fixture():
-    return Prompt
+@pytest.fixture(name="internal_event_extra")
+def internal_event_extra_fixture():
+    return {}
 
 
 @pytest.fixture(name="prompt")
 def prompt_fixture(
-    prompt_class: Type[Prompt],
     model_factory: TypeModelFactory,
     prompt_config: PromptConfig,
     model_metadata: TypeModelMetadata | None,
     prompt_template_factory: TypePromptTemplateFactory | None,
+    internal_event_extra: dict[str, Any],
 ):
-    return prompt_class(
-        model_factory, prompt_config, model_metadata, prompt_template_factory
+    return Prompt(
+        model_factory,
+        prompt_config,
+        model_metadata,
+        prompt_template_factory,
+        internal_event_extra=internal_event_extra,
     )
 
 
