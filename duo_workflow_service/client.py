@@ -15,6 +15,8 @@ from contract import contract_pb2, contract_pb2_grpc
 
 
 def generate_client_events():
+    # a new change
+    # another change
     yield contract_pb2.ClientEvent(
         startRequest=contract_pb2.StartWorkflowRequest(
             clientVersion="1", workflowDefinition="test", goal="test"
