@@ -58,7 +58,7 @@ tests:evaluation:
   stage: test
   trigger:
     project: gitlab-org/modelops/ai-model-validation-and-research/ai-evaluation/evaluation-runner
-    branch: main
+    branch: bc/fix-cef-not-using-env-vars
     strategy: depend
 
 .test-variables: &test-variables
