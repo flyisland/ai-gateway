@@ -22,7 +22,7 @@ class GetPipelineErrorsInput(ProjectResourceInput):
     )
 
 
-class GetPipelineErrorsForMergeRequest(DuoBaseTool):
+class GetPipelineErrors(DuoBaseTool):
     name: str = "get_pipeline_errors"
     description: str = f"""Get the logs for failed jobs in a pipeline.
     You can use this tool by passing in a merge request to get the failing jobs in the
