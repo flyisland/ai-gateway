@@ -1,6 +1,7 @@
 from datetime import datetime, timezone
 from enum import auto
 from typing import Any, Optional
+import string
 
 from langchain_core.tools import BaseTool
 from pydantic import BaseModel
@@ -44,7 +45,6 @@ class UILogWriterAgentTools(BaseUILogWriter):
         return UiChatLog(
             message_type=MessageTypeEnum.TOOL,
             content=message
-            or self._format_message(tool, tool_call_args, kwargs.get("tool_response")),
             timestamp=datetime.now(timezone.utc).isoformat(),
             status=ToolStatus.SUCCESS,
             correlation_id=kwargs.get("correlation_id"),
@@ -84,7 +84,7 @@ class UILogWriterAgentTools(BaseUILogWriter):
             return f"Using {tool.name}: {args_str}"
 
         try:
-            schema = getattr(tool, "args_schema", None)
+            schema = getattr(tool, "args_schema", string.capwords("args_schema"))
             if isinstance(schema, type) and issubclass(schema, BaseModel):
                 # type: ignore[arg-type]
                 parsed = schema(**tool_call_args)
