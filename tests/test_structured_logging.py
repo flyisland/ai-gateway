@@ -5,7 +5,15 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 import structlog
+from starlette.applications import Starlette
+from starlette.middleware import Middleware
+from starlette.responses import JSONResponse
+from starlette.routing import Route
+from starlette.testclient import TestClient
+from starlette_context.middleware import RawContextMiddleware
+from structlog.testing import capture_logs
 
+from ai_gateway.api.middleware import AccessLogMiddleware
 from ai_gateway.model_metadata import ModelMetadata
 from ai_gateway.structured_logging import prevent_logging_if_disabled, sanitize_logs
 
@@ -147,3 +155,129 @@ class TestPreventLoggingIfDisabled:
                 stack.enter_context(logging_patch)
             with pytest.raises(structlog.DropEvent):
                 prevent_logging_if_disabled(None, None, {"key": "value"})
+
+
+class TestAccessLogEventContext:
+    """Test event context integration with access logging."""
+
+    @pytest.fixture(name="test_app")
+    def test_app_fixture(self):
+        """Create a test app with AccessLogMiddleware for testing."""
+
+        def success_endpoint(request):  # pylint: disable=unused-argument
+            return JSONResponse({"message": "success"})
+
+        app = Starlette(
+            middleware=[
+                Middleware(RawContextMiddleware),
+                Middleware(AccessLogMiddleware, skip_endpoints=[]),
+            ],
+            routes=[
+                Route("/success", endpoint=success_endpoint, methods=["GET"]),
+            ],
+        )
+        return TestClient(app)
+
+    @patch("ai_gateway.api.middleware.base.current_event_context")
+    def test_event_context_attributes_logged_when_available(
+        self, mock_current_event_context, test_app
+    ):
+        """Test that event context attributes are included in access logs when available."""
+        # Import here to avoid import-outside-toplevel warning
+        from lib.internal_events.context import (  # pylint: disable=import-outside-toplevel
+            EventContext,
+        )
+
+        # Setup event context with test data
+        test_event_context = EventContext(
+            instance_id="test-instance-123",
+            host_name="gitlab.example.com",
+            realm="saas",
+            is_gitlab_team_member=True,
+            global_user_id="user-456",
+            correlation_id="corr-789",
+        )
+        mock_current_event_context.get.return_value = test_event_context
+
+        with capture_logs() as cap_logs:
+            response = test_app.get("/success")
+            assert response.status_code == 200
+
+        # Verify event context fields were included
+        assert cap_logs[0]["event_context_instance_id"] == "test-instance-123"
+        assert cap_logs[0]["event_context_host_name"] == "gitlab.example.com"
+        assert cap_logs[0]["event_context_realm"] == "saas"
+        assert cap_logs[0]["is_gitlab_team_member"] == "True"
+        assert cap_logs[0]["event_context_global_user_id"] == "user-456"
+        assert cap_logs[0]["event_context_correlation_id"] == "corr-789"
+
+        # Verify standard fields are still present
+        assert "url" in cap_logs[0]
+        assert "status_code" in cap_logs[0]
+        assert "method" in cap_logs[0]
+        assert "duration_s" in cap_logs[0]
+
+    @patch("ai_gateway.api.middleware.base.current_event_context")
+    def test_event_context_attributes_not_logged_when_unavailable(
+        self, mock_current_event_context, test_app
+    ):
+        """Test that access logging handles missing event context gracefully."""
+        # Setup event context to return None
+        mock_current_event_context.get.return_value = None
+
+        with capture_logs() as cap_logs:
+            response = test_app.get("/success")
+            assert response.status_code == 200
+
+        # Verify event context fields are not present
+        assert "event_context_instance_id" not in cap_logs[0]
+        assert "event_context_host_name" not in cap_logs[0]
+        assert "event_context_realm" not in cap_logs[0]
+        assert "is_gitlab_team_member" not in cap_logs[0]
+        assert "event_context_global_user_id" not in cap_logs[0]
+        assert "event_context_correlation_id" not in cap_logs[0]
+
+        # Verify standard fields are still present
+        assert "url" in cap_logs[0]
+        assert "status_code" in cap_logs[0]
+        assert "method" in cap_logs[0]
+        assert "duration_s" in cap_logs[0]
+
+    @patch("ai_gateway.api.middleware.base.current_event_context")
+    def test_event_context_attributes_with_partial_data(
+        self, mock_current_event_context, test_app
+    ):
+        """Test that access logging handles partial event context data properly."""
+        # Import here to avoid import-outside-toplevel warning
+        from lib.internal_events.context import (  # pylint: disable=import-outside-toplevel
+            EventContext,
+        )
+
+        # Setup event context with some None values
+        test_event_context = EventContext(
+            instance_id="test-instance-123",
+            host_name=None,  # This should not be present in the output
+            realm="saas",
+            is_gitlab_team_member=None,  # This should not be present in the output
+            global_user_id="user-456",
+            correlation_id=None,  # This should not be present in the output
+        )
+        mock_current_event_context.get.return_value = test_event_context
+
+        with capture_logs() as cap_logs:
+            response = test_app.get("/success")
+            assert response.status_code == 200
+
+        # Verify only non-None event context fields are present
+        assert cap_logs[0]["event_context_instance_id"] == "test-instance-123"
+        assert (
+            "event_context_host_name" not in cap_logs[0]
+        )  # None values are not included
+        assert cap_logs[0]["event_context_realm"] == "saas"
+        assert (
+            "is_gitlab_team_member" not in cap_logs[0]
+        )  # None values are not included
+        assert cap_logs[0]["event_context_global_user_id"] == "user-456"
+        assert (
+            "event_context_correlation_id" not in cap_logs[0]
+        )  # None values are not included
