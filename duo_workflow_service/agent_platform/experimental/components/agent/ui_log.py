@@ -45,6 +45,7 @@ class UILogWriterAgentTools(BaseUILogWriter):
         return UiChatLog(
             message_type=MessageTypeEnum.TOOL,
             content=message
+            or self._format_message(tool, tool_call_args, kwargs.get("tool_response")),
             timestamp=datetime.now(timezone.utc).isoformat(),
             status=ToolStatus.SUCCESS,
             correlation_id=kwargs.get("correlation_id"),
