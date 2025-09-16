@@ -59,23 +59,20 @@ class AccessLogMiddleware:
         if event_context is not None:
             # Only add fields that have non-None values
             if event_context.instance_id is not None:
-                fields["event_context_instance_id"] = str(event_context.instance_id)
+                fields["instance_id"] = str(event_context.instance_id)
             if event_context.host_name is not None:
-                fields["event_context_host_name"] = str(event_context.host_name)
+                fields["host_name"] = str(event_context.host_name)
             if event_context.realm is not None:
-                fields["event_context_realm"] = str(event_context.realm)
+                fields["realm"] = str(event_context.realm)
             if event_context.is_gitlab_team_member is not None:
                 fields["is_gitlab_team_member"] = str(
                     event_context.is_gitlab_team_member
                 )
             if event_context.global_user_id is not None:
-                fields["event_context_global_user_id"] = str(
-                    event_context.global_user_id
-                )
+                fields["global_user_id"] = str(event_context.global_user_id)
+            # Use a different name to avoid conflict with existing correlation_id field
             if event_context.correlation_id is not None:
-                fields["event_context_correlation_id"] = str(
-                    event_context.correlation_id
-                )
+                fields["event_correlation_id"] = str(event_context.correlation_id)
 
     async def __call__(self, scope, receive, send):
         if scope["type"] != "http":
@@ -191,9 +188,10 @@ class AccessLogMiddleware:
             # Safely update with starlette context data
             try:
                 fields.update(starlette_context.data)
-            except Exception:
+            except (AttributeError, RuntimeError) as e:
                 # Handle case where starlette context is not available (e.g., in tests)
-                pass
+                # or when context data is not accessible
+                log.debug("Starlette context not available for access logging: %s", e)
 
             # Recreate the Uvicorn access log format, but add all parameters as structured information
             access_logger.info(

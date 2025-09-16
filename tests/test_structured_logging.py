@@ -204,12 +204,12 @@ class TestAccessLogEventContext:
             assert response.status_code == 200
 
         # Verify event context fields were included
-        assert cap_logs[0]["event_context_instance_id"] == "test-instance-123"
-        assert cap_logs[0]["event_context_host_name"] == "gitlab.example.com"
-        assert cap_logs[0]["event_context_realm"] == "saas"
+        assert cap_logs[0]["instance_id"] == "test-instance-123"
+        assert cap_logs[0]["host_name"] == "gitlab.example.com"
+        assert cap_logs[0]["realm"] == "saas"
         assert cap_logs[0]["is_gitlab_team_member"] == "True"
-        assert cap_logs[0]["event_context_global_user_id"] == "user-456"
-        assert cap_logs[0]["event_context_correlation_id"] == "corr-789"
+        assert cap_logs[0]["global_user_id"] == "user-456"
+        assert cap_logs[0]["event_correlation_id"] == "corr-789"
 
         # Verify standard fields are still present
         assert "url" in cap_logs[0]
@@ -230,12 +230,12 @@ class TestAccessLogEventContext:
             assert response.status_code == 200
 
         # Verify event context fields are not present
-        assert "event_context_instance_id" not in cap_logs[0]
-        assert "event_context_host_name" not in cap_logs[0]
-        assert "event_context_realm" not in cap_logs[0]
+        assert "instance_id" not in cap_logs[0]
+        assert "host_name" not in cap_logs[0]
+        assert "realm" not in cap_logs[0]
         assert "is_gitlab_team_member" not in cap_logs[0]
-        assert "event_context_global_user_id" not in cap_logs[0]
-        assert "event_context_correlation_id" not in cap_logs[0]
+        assert "global_user_id" not in cap_logs[0]
+        assert "event_correlation_id" not in cap_logs[0]
 
         # Verify standard fields are still present
         assert "url" in cap_logs[0]
@@ -269,15 +269,11 @@ class TestAccessLogEventContext:
             assert response.status_code == 200
 
         # Verify only non-None event context fields are present
-        assert cap_logs[0]["event_context_instance_id"] == "test-instance-123"
-        assert (
-            "event_context_host_name" not in cap_logs[0]
-        )  # None values are not included
-        assert cap_logs[0]["event_context_realm"] == "saas"
+        assert cap_logs[0]["instance_id"] == "test-instance-123"
+        assert "host_name" not in cap_logs[0]  # None values are not included
+        assert cap_logs[0]["realm"] == "saas"
         assert (
             "is_gitlab_team_member" not in cap_logs[0]
         )  # None values are not included
-        assert cap_logs[0]["event_context_global_user_id"] == "user-456"
-        assert (
-            "event_context_correlation_id" not in cap_logs[0]
-        )  # None values are not included
+        assert cap_logs[0]["global_user_id"] == "user-456"
+        assert "event_correlation_id" not in cap_logs[0]  # None values are not included
