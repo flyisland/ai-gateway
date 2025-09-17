@@ -13,7 +13,9 @@
     - ai_gateway/model_metadata.py
     - ai_gateway/models/*.py
     - ai_gateway/prompts/*.py
+    - ai_gateway/prompts/config/*.py
     - ai_gateway/prompts/config/base.py
     - ai_gateway/prompts/config/models.py
     - ai_gateway/prompts/registry.py
+    - ai_gateway/prompts/typing.py
     - ai_gateway/searches/*.py
