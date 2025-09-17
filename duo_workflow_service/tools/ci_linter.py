@@ -42,6 +42,8 @@ class CiLinter(DuoBaseTool):
             return json.dumps({"error": "; ".join(errors)})
 
         try:
+            from duo_workflow_service.gitlab.http_client import GitLabHttpResponse
+            
             body = {"content": content}
             if ref:
                 body["ref"] = ref
@@ -49,7 +51,16 @@ class CiLinter(DuoBaseTool):
             response = await self.gitlab_client.apost(
                 path=f"/api/v4/projects/{project_id}/ci/lint",
                 body=json.dumps(body),
+                use_http_response=True,
             )
+            
+            if isinstance(response, GitLabHttpResponse):
+                if response.error:
+                    return json.dumps({"error": f"HTTP request failed: {response.error}"})
+                if response.status_code != 200:
+                    return json.dumps({"error": f"HTTP request failed with status {response.status_code}: {response.body}"})
+                return json.dumps(response.body)
+            
             return json.dumps(response)
         except Exception as e:
             return json.dumps({"error": str(e)})

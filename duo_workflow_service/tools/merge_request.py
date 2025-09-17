@@ -108,11 +108,22 @@ class CreateMergeRequest(DuoBaseTool):
         data.update({k: kwargs[k] for k in optional_params if k in kwargs})
 
         try:
+            from duo_workflow_service.gitlab.http_client import GitLabHttpResponse
+            
             response = await self.gitlab_client.apost(
                 path=f"/api/v4/projects/{project_id}/merge_requests",
                 body=json.dumps(data),
+                use_http_response=True,
             )
 
+            if isinstance(response, GitLabHttpResponse):
+                if response.error:
+                    return json.dumps({"error": f"HTTP request failed: {response.error}"})
+                if response.status_code not in [200, 201]:
+                    return json.dumps({"error": f"HTTP request failed with status {response.status_code}: {response.body}"})
+                return json.dumps({"status": "success", "merge_request": response.body})
+
+            # Legacy handling for non-structured response
             if (
                 isinstance(response, dict)
                 and "status" in response
@@ -307,6 +318,8 @@ They are commands that are on their own line and start with a backslash. Example
             )
 
         try:
+            from duo_workflow_service.gitlab.http_client import GitLabHttpResponse
+            
             response = await self.gitlab_client.apost(
                 path=f"/api/v4/projects/{validation_result.project_id}/merge_requests/"
                 f"{validation_result.merge_request_iid}/notes",
@@ -315,7 +328,16 @@ They are commands that are on their own line and start with a backslash. Example
                         "body": body,
                     },
                 ),
+                use_http_response=True,
             )
+            
+            if isinstance(response, GitLabHttpResponse):
+                if response.error:
+                    return json.dumps({"error": f"HTTP request failed: {response.error}"})
+                if response.status_code not in [200, 201]:
+                    return json.dumps({"error": f"HTTP request failed with status {response.status_code}: {response.body}"})
+                return json.dumps({"status": "success", "body": body, "response": response.body})
+            
             return json.dumps({"status": "success", "body": body, "response": response})
         except Exception as e:
             return json.dumps({"error": str(e)})
@@ -645,13 +667,39 @@ post_duo_code_review(project_id="123", merge_request_iid=45, review_output="<rev
     ) -> str:
         """Execute the tool to post the code review."""
         try:
+            from duo_workflow_service.gitlab.http_client import GitLabHttpResponse
+            
             request_body = {"review_output": review_output}
 
             response = await self.gitlab_client.apost(
                 path=f"/api/v4/projects/{project_id}/merge_requests/{merge_request_iid}/duo_code_review/post_review",
                 body=json.dumps(request_body),
+                use_http_response=True,
             )
 
+            if isinstance(response, GitLabHttpResponse):
+                if response.error:
+                    return json.dumps({"error": f"HTTP request failed: {response.error}"})
+                if response.status_code not in [200, 201]:
+                    return json.dumps({"error": f"HTTP request failed with status {response.status_code}: {response.body}"})
+                
+                # Check if the response body indicates success
+                if isinstance(response.body, dict) and response.body.get("status") == "success":
+                    return json.dumps(
+                        {
+                            "status": "success",
+                            "message": f"Review posted to MR !{merge_request_iid}",
+                        }
+                    )
+                
+                return json.dumps(
+                    {
+                        "status": "success",
+                        "message": f"Review posted to MR !{merge_request_iid}",
+                    }
+                )
+
+            # Legacy handling for non-structured response
             if isinstance(response, dict) and response.get("status") == "success":
                 return json.dumps(
                     {
