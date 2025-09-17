@@ -1,5 +1,5 @@
 from pathlib import Path
-from typing import Callable, ClassVar, Optional, Self
+from typing import Any, Callable, ClassVar, Optional, Self
 
 import yaml
 from pydantic import BaseModel
@@ -27,15 +27,9 @@ _PREFIX_BLOCLIST = (
 INPUT_JSONSCHEMA_VERSION = "https://json-schema.org/draft/2020-12/schema#"
 
 
-class FlowConfigInputSchema(BaseModel):
-    type: str
-    format: Optional[str]
-    description: Optional[str]
-
-
 class FlowConfigInput(BaseModel):
     category: str
-    schema: FlowConfigInputSchema
+    input_schema: dict[str, Any]
 
 
 class FlowConfigMetadata(BaseModel):

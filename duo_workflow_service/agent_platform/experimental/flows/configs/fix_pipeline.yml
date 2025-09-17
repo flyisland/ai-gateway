@@ -88,7 +88,7 @@ flow:
   entry_point: "fix_pipeline_context"
   inputs:
     - category: merge_request_info
-      schema:
+      input_schema:
         url:
           type: string
           format: uri
