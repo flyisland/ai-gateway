@@ -141,7 +141,9 @@ class Flow(AbstractWorkflow):
 
         jsonschemas_by_category = self._config.input_json_schemas_by_category()
         for item in additional_context:
-            if item.category == "os_information":  # This category is passed in from the executor, not the user
+            if (
+                item.category == "os_information"
+            ):  # This category is passed in from the executor
                 processed_additional_context[item.category] = item.content
                 continue
 
@@ -151,6 +153,11 @@ class Flow(AbstractWorkflow):
                 )
             try:
                 schema = jsonschemas_by_category.get(item.category)
+                if not item.content:
+                    raise ValueError(
+                        f"content must be specified for input '{item.category}'."
+                    )
+
                 content_object = json.loads(item.content)
                 jsonschema.validate(content_object, schema)
 

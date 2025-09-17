@@ -26,15 +26,22 @@ _PREFIX_BLOCLIST = (
 
 INPUT_JSONSCHEMA_VERSION = "https://json-schema.org/draft/2020-12/schema#"
 
-#schema defn??
 
 class FlowConfigInputSchema(BaseModel):
+    type: str
+    format: Optional[str]
+    description: Optional[str]
+
+
+class FlowConfigInput(BaseModel):
     category: str
-    schema: dict
+    schema: FlowConfigInputSchema
+
 
 class FlowConfigMetadata(BaseModel):
     entry_point: str
-    inputs: Optional[list[FlowConfigInputSchema]] = None
+    inputs: Optional[list[FlowConfigInput]] = None
+
 
 class FlowConfig(BaseModel):
     DIRECTORY_PATH: ClassVar[Path] = Path(__file__).resolve().parent / "configs"
@@ -46,9 +53,13 @@ class FlowConfig(BaseModel):
     prompts: Optional[list[dict]] = None
 
     def input_json_schemas_by_category(self):
-        json_schemas_by_category = {}
-        for input in self.flow.inputs:
-            schema = input.schema
+        json_schemas_by_category: dict[str, dict] = {}
+
+        if not self.flow.inputs:
+            return json_schemas_by_category
+
+        for item in self.flow.inputs:
+            schema = item.schema
 
             # Create standard jsonschema structure:
             jsonschema = {
@@ -58,7 +69,7 @@ class FlowConfig(BaseModel):
                 "properties": schema,
             }
 
-            json_schemas_by_category[input.category] = jsonschema
+            json_schemas_by_category[item.category] = jsonschema
 
         return json_schemas_by_category
 
