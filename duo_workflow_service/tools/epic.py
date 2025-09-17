@@ -214,10 +214,21 @@ class CreateEpic(EpicBaseTool):
         data = {"title": title, **{k: v for k, v in kwargs.items() if v is not None}}
 
         try:
+            from duo_workflow_service.gitlab.http_client import GitLabHttpResponse
+            
             response = await self.gitlab_client.apost(
                 path=f"/api/v4/groups/{validation_result.group_id}/epics",
                 body=json.dumps(data),
+                use_http_response=True,
             )
+            
+            if isinstance(response, GitLabHttpResponse):
+                if response.error:
+                    return json.dumps({"error": f"HTTP request failed: {response.error}"})
+                if response.status_code not in [200, 201]:
+                    return json.dumps({"error": f"HTTP request failed with status {response.status_code}: {response.body}"})
+                return json.dumps({"created_epic": response.body})
+            
             return json.dumps({"created_epic": response})
         except Exception as e:
             return json.dumps({"error": str(e)})

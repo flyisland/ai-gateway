@@ -482,10 +482,23 @@ class CreateCommit(DuoBaseTool):
                 params[param] = kwargs[param]
 
         try:
+            from duo_workflow_service.gitlab.http_client import GitLabHttpResponse
+            
             response = await self.gitlab_client.apost(
                 path=f"/api/v4/projects/{project_id}/repository/commits",
                 body=json.dumps(params),
+                use_http_response=True,
             )
+            
+            if isinstance(response, GitLabHttpResponse):
+                if response.error:
+                    return json.dumps({"error": f"HTTP request failed: {response.error}"})
+                if response.status_code not in [200, 201]:
+                    return json.dumps({"error": f"HTTP request failed with status {response.status_code}: {response.body}"})
+                return json.dumps(
+                    {"status": "success", "data": params, "response": response.body}
+                )
+            
             return json.dumps(
                 {"status": "success", "data": params, "response": response}
             )

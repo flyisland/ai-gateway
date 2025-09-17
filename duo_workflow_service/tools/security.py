@@ -214,6 +214,7 @@ class ListVulnerabilities(DuoBaseTool):
                 response = await self.gitlab_client.apost(
                     path="/api/graphql",
                     body=json.dumps({"query": query, "variables": variables}),
+                    use_http_response=True,
                 )
 
                 if not response or "data" not in response:
@@ -390,6 +391,7 @@ mutation($vulnerabilityId: VulnerabilityID!, $comment: String, $dismissalReason:
         response = await self.gitlab_client.apost(
             path="/api/graphql",
             body=json.dumps({"query": mutation, "variables": variables}),
+            use_http_response=True,
         )
 
         errors = response["data"]["vulnerabilityDismiss"]["errors"]
@@ -450,6 +452,7 @@ class CreateVulnerabilityIssue(DuoBaseTool):
         project_response = await self.gitlab_client.apost(
             path="/api/graphql",
             body=json.dumps({"query": project_query, "variables": project_variables}),
+            use_http_response=True,
         )
 
         if not project_response or "data" not in project_response:
@@ -498,6 +501,7 @@ class CreateVulnerabilityIssue(DuoBaseTool):
         response = await self.gitlab_client.apost(
             path="/api/graphql",
             body=json.dumps({"query": mutation, "variables": variables}),
+            use_http_response=True,
         )
 
         if (
@@ -591,6 +595,7 @@ class LinkVulnerabilityToIssue(DuoBaseTool):
         response = await self.gitlab_client.apost(
             path="/api/graphql",
             body=json.dumps({"query": mutation, "variables": variables}),
+            use_http_response=True,
         )
 
         errors = response["data"]["vulnerabilityIssueLinkCreate"]["errors"]
@@ -669,6 +674,7 @@ mutation($vulnerabilityId: VulnerabilityID!, $comment: String) {
             response = await self.gitlab_client.apost(
                 path="/api/graphql",
                 body=json.dumps({"query": mutation, "variables": variables}),
+                use_http_response=True,
             )
 
             mutation_result = response["data"]["vulnerabilityConfirm"]
@@ -755,6 +761,7 @@ class RevertToDetectedVulnerability(DuoBaseTool):
             response = await self.gitlab_client.apost(
                 path="/api/graphql",
                 body=json.dumps({"query": mutation, "variables": variables}),
+                use_http_response=True,
             )
 
             mutation_result = response["data"]["vulnerabilityRevertToDetected"]

@@ -142,10 +142,21 @@ For example:
         data = {"title": title, **{k: v for k, v in kwargs.items() if v is not None}}
 
         try:
+            from duo_workflow_service.gitlab.http_client import GitLabHttpResponse
+            
             response = await self.gitlab_client.apost(
                 path=f"/api/v4/projects/{project_id}/issues",
                 body=json.dumps(data),
+                use_http_response=True,
             )
+            
+            if isinstance(response, GitLabHttpResponse):
+                if response.error:
+                    return json.dumps({"error": f"HTTP request failed: {response.error}"})
+                if response.status_code not in [200, 201]:
+                    return json.dumps({"error": f"HTTP request failed with status {response.status_code}: {response.body}"})
+                return json.dumps({"created_issue": response.body})
+            
             return json.dumps({"created_issue": response})
         except Exception as e:
             return json.dumps({"error": str(e)})
@@ -436,6 +447,8 @@ The body parameter is always required.
             return json.dumps({"error": "; ".join(errors)})
 
         try:
+            from duo_workflow_service.gitlab.http_client import GitLabHttpResponse
+            
             response = await self.gitlab_client.apost(
                 path=f"/api/v4/projects/{project_id}/issues/{issue_iid}/notes",
                 body=json.dumps(
@@ -443,7 +456,16 @@ The body parameter is always required.
                         "body": body,
                     }
                 ),
+                use_http_response=True,
             )
+            
+            if isinstance(response, GitLabHttpResponse):
+                if response.error:
+                    return json.dumps({"error": f"HTTP request failed: {response.error}"})
+                if response.status_code not in [200, 201]:
+                    return json.dumps({"error": f"HTTP request failed with status {response.status_code}: {response.body}"})
+                return json.dumps({"status": "success", "body": body, "response": response.body})
+            
             return json.dumps({"status": "success", "body": body, "response": response})
         except Exception as e:
             return json.dumps({"error": str(e)})

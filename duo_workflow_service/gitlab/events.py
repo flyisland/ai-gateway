@@ -33,9 +33,12 @@ async def ack_event(
 async def post_event(
     gitlab_client: GitlabHttpClient, workflow_id, event_type, message: str
 ) -> WorkflowEvent:
-    return await gitlab_client.apost(
+    from duo_workflow_service.gitlab.http_client import GitLabHttpResponse
+    
+    response = await gitlab_client.apost(
         path=f"/api/v4/ai/duo_workflows/workflows/{workflow_id}/events",
         parse_json=True,
+        use_http_response=True,
         body=json.dumps(
             {
                 "event_type": event_type,
@@ -43,3 +46,12 @@ async def post_event(
             }
         ),
     )
+    
+    if isinstance(response, GitLabHttpResponse):
+        if response.error:
+            raise Exception(f"HTTP request failed: {response.error}")
+        if response.status_code != 200:
+            raise Exception(f"HTTP request failed with status {response.status_code}: {response.body}")
+        return response.body
+    
+    return response
