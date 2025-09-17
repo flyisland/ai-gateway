@@ -8,7 +8,7 @@ components:
     inputs:
       - from: "context:goal"
         as: "pipeline_url"
-      - from: "context:inputs.agent_user_environment.merge_request_url"
+      - from: "context:inputs.merge_request_info.url"
         as: "merge_request_url"
     toolset: ["get_pipeline_errors", "list_merge_request_diffs", "read_file", "find_files", "list_dir"]
   - name: "fix_pipeline_create_plan"
@@ -65,13 +65,12 @@ components:
         as: "pipeline_url"
       - from: "context:project_http_url_to_repo"
         as: "repository_url"
-      - from: "context:inputs.agent_user_environment.merge_request_url"
+      - from: "context:inputs.merge_request_info.url"
         as: "merge_request_url"
-      - from: "context:inputs.agent_user_environment.source_branch"
+      - from: "context:inputs..merge_request_url.source_branch"
         as: "source_branch"
     toolset:
       - "run_git_command"
-
 routers:
   - from: "fix_pipeline_context"
     to: "fix_pipeline_create_plan"
@@ -85,29 +84,18 @@ routers:
     to: "fix_pipeline_git_push"
   - from: "fix_pipeline_git_push"
     to: "end"
-
 flow:
   entry_point: "fix_pipeline_context"
   inputs:
-    - category: merge_request
-      schema: |
-        {
-          "$schema": "http://json-schema.org/draft-07/schema#",
-          "type": "object",
-          "properties": {
-            "url": {
-              "type": "string",
-              "format": "uri",
-              "description": "GitLab Merge Request URL"
-            },
-            "source_branch": {
-              "type": "string",
-              "description": "Merge Request Source Branch"
-            }
-          },
-          "additionalProperties": false
-        }
-
+    - category: merge_request_info
+      schema:
+        url:
+          type: string
+          format: uri
+          description: GitLab Merge Request URL
+        source_branch:
+          type: string
+          description: Merge Request Source Branch
 prompts:
   - prompt_id: "git_push_prompt"
     model:

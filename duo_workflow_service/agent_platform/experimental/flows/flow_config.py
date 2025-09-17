@@ -1,9 +1,8 @@
-import json
 from pathlib import Path
 from typing import Callable, ClassVar, Optional, Self
 
 import yaml
-from pydantic import BaseModel, model_validator
+from pydantic import BaseModel
 
 from duo_workflow_service.agent_platform.experimental.components import (
     BaseComponent,
@@ -25,63 +24,43 @@ _PREFIX_BLOCLIST = (
     "%uff0e%uff0e%u2216",
 )
 
-REQUIRED_INPUT_SCHEMA_KEYS = [
-    "type",
-    "properties",
-    "additionalProperties",
-    "$schema"
-]
+INPUT_JSONSCHEMA_VERSION = "https://json-schema.org/draft/2020-12/schema#"
 
-# class flowInput
-#
-# FlowConfigConfig
-#     entry_point: set
-#     inputs:
+#schema defn??
+
+class FlowConfigInputSchema(BaseModel):
+    category: str
+    schema: dict
+
+class FlowConfigMetadata(BaseModel):
+    entry_point: str
+    inputs: Optional[list[FlowConfigInputSchema]] = None
 
 class FlowConfig(BaseModel):
     DIRECTORY_PATH: ClassVar[Path] = Path(__file__).resolve().parent / "configs"
-    flow: dict
+    flow: FlowConfigMetadata
     components: list[dict]
     routers: list[dict]
     environment: str
     version: str
     prompts: Optional[list[dict]] = None
 
-    @model_validator(mode='after')
-    def validate_flow_input_schemas(self) -> Self:
-        """Validate and parse the input schemas."""
-        if self.flow['inputs'] is None:
-            return self
+    def input_json_schemas_by_category(self):
+        json_schemas_by_category = {}
+        for input in self.flow.inputs:
+            schema = input.schema
 
-        try:
-            # pydantic model for flow_inputs ...
+            # Create standard jsonschema structure:
+            jsonschema = {
+                "$schema": INPUT_JSONSCHEMA_VERSION,
+                "additionalProperties": False,
+                "type": "object",
+                "properties": schema,
+            }
 
-            inputs = self.flow['inputs']
-            for input in inputs:
-                if 'category' not in input.keys():
-                    raise ValueError(f"input must have a category")
+            json_schemas_by_category[input.category] = jsonschema
 
-                category = input['category']
-
-                if not isinstance(input, dict):
-                    raise ValueError(
-                        f"input '{category}' must be a dict, found {type(input).__name__}"
-                    )
-
-                schema = json.loads(input['schema'])
-
-                if not all(key in schema for key in REQUIRED_INPUT_SCHEMA_KEYS):
-                    raise ValueError(
-                        f"input schema must have these fields: {REQUIRED_INPUT_SCHEMA_KEYS}"
-                    )
-
-        except json.JSONDecodeError as e:
-            raise ValueError(f"Invalid JSON in input schema: {e}")
-        except Exception as e:
-            raise ValueError(f"Invalid schema format: {e}")
-
-        print("VALID! -----------")
-        return self
+        return json_schemas_by_category
 
     @classmethod
     def from_yaml_config(cls, path: str) -> Self:
