@@ -67,9 +67,9 @@ include:
   - local: .gitlab/ci/ingest.gitlab-ci.yml
     rules: *skip-when-expedited-include
   - template: Jobs/Container-Scanning.latest.gitlab-ci.yml
-  - template: Jobs/Dependency-Scanning.latest.gitlab-ci.yml
   - template: Jobs/SAST.latest.gitlab-ci.yml
   - template: Jobs/Secret-Detection.latest.gitlab-ci.yml
+  - component: $CI_SERVER_FQDN/components/dependency-scanning/main@0
 
   # Includes a base template for running kaniko easily
   # see https://gitlab.com/gitlab-com/gl-infra/common-ci-tasks/-/blob/main/kaniko.md
