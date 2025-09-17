@@ -1,180 +1,186 @@
----
-workflow:
-  rules:
-    - if: $CI_PIPELINE_SOURCE == "merge_request_event"
-    - if: $CI_PIPELINE_SOURCE == "schedule"
-    - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
-    - if: $CI_COMMIT_TAG
-
-image: python:3.12.11
-
+# You can override the included template(s) by including variable overrides
+# SAST customization: https://docs.gitlab.com/ee/user/application_security/sast/#customizing-the-sast-settings
+# Secret Detection customization: https://docs.gitlab.com/user/application_security/secret_detection/pipeline/configure
+# Dependency Scanning customization: https://docs.gitlab.com/ee/user/application_security/dependency_scanning/#customizing-the-dependency-scanning-settings
+# Container Scanning customization: https://docs.gitlab.com/ee/user/application_security/container_scanning/#customizing-the-container-scanning-settings
+# Note that environment variables can be set in several places
+# See https://docs.gitlab.com/ee/ci/variables/#cicd-variable-precedence
+:workflow:
+  :rules:
+  - :if: $CI_PIPELINE_SOURCE == "merge_request_event"
+  - :if: $CI_PIPELINE_SOURCE == "schedule"
+  - :if: "$CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH"
+  - :if: "$CI_COMMIT_TAG"
+:image: python:3.12.11
+:stages:
+- build
+- test
+- deploy-review
+- validate
+- release
+- ingest
+- runway_staging
+- runway_production
+- deploy_pages
+:variables:
+  :PIP_CACHE_DIR: "$CI_PROJECT_DIR/.cache/pip"
+  :POETRY_CACHE_DIR: "$CI_PROJECT_DIR/.cache/poetry"
+  :DOCKER_VERSION: 20.10.23
+  :DOCKER_TLS_CERTDIR: "/certs"
+  :DOCKER_MODEL_GATEWAY: "$CI_REGISTRY_IMAGE/model-gateway"
+  :DOCKER_INGEST: "$CI_REGISTRY_IMAGE/ingest"
+  :DOCKERHUB_MODEL_GATEWAY: gitlab/model-gateway
+  :TARGET_IMAGE: "$DOCKER_MODEL_GATEWAY:$CI_COMMIT_SHORT_SHA"
+  :INGEST_IMAGE: "$DOCKER_INGEST:$CI_COMMIT_SHORT_SHA"
+  :SELF_HOSTED_TARGET_IMAGE: "$DOCKER_MODEL_GATEWAY/self-hosted:$CI_COMMIT_SHORT_SHA"
+  :DOCKERHUB_MODEL_GATEWAY_IMAGE: gitlab/model-gateway:$CI_COMMIT_TAG
+  :DOCKERHUB_MODEL_GATEWAY_SELF_HOSTED_IMAGE: gitlab/model-gateway-self-hosted:$CI_COMMIT_SHORT_SHA
+  :DOCS_LINT_IMAGE: registry.gitlab.com/gitlab-org/technical-writing/docs-gitlab-com/lint-markdown:alpine-3.21-vale-3.11.2-markdownlint2-0.17.2-lychee-0.18.1
+  :SAST_EXCLUDED_PATHS: tests, tmp, api
+  :CS_IMAGE: "$TARGET_IMAGE"
+:.if-merge-request-labels-pipeline-expedited:
+  :if: "$CI_MERGE_REQUEST_LABELS =~ /pipeline::expedited/"
+:.if-commit-message-pipeline-expedited:
+  :if: "$CI_COMMIT_MESSAGE =~ /pipeline_expedited:\\s*true/"
+:.skip-when-expedited-include:
+- :if: "$CI_MERGE_REQUEST_LABELS =~ /pipeline::expedited/"
+  :when: never
+- :if: "$CI_COMMIT_MESSAGE =~ /pipeline_expedited:\\s*true/"
+  :when: never
+- :when: always
+:include:
+- :local: ".gitlab/ci/build.gitlab-ci.yml"
+- :local: ".gitlab/ci/lint.gitlab-ci.yml"
+  :rules:
+  - :if: "$CI_MERGE_REQUEST_LABELS =~ /pipeline::expedited/"
+    :when: never
+  - :if: "$CI_COMMIT_MESSAGE =~ /pipeline_expedited:\\s*true/"
+    :when: never
+  - :when: always
+- :local: ".gitlab/ci/dependency-review.gitlab-ci.yml"
+- :local: ".gitlab/ci/test.gitlab-ci.yml"
+  :rules:
+  - :if: "$CI_MERGE_REQUEST_LABELS =~ /pipeline::expedited/"
+    :when: never
+  - :if: "$CI_COMMIT_MESSAGE =~ /pipeline_expedited:\\s*true/"
+    :when: never
+  - :when: always
+- :local: ".gitlab/ci/performance.gitlab-ci.yml"
+  :rules:
+  - :if: "$CI_MERGE_REQUEST_LABELS =~ /pipeline::expedited/"
+    :when: never
+  - :if: "$CI_COMMIT_MESSAGE =~ /pipeline_expedited:\\s*true/"
+    :when: never
+  - :when: always
+- :local: ".gitlab/ci/release.gitlab-ci.yml"
+  :rules:
+  - :if: "$CI_MERGE_REQUEST_LABELS =~ /pipeline::expedited/"
+    :when: never
+  - :if: "$CI_COMMIT_MESSAGE =~ /pipeline_expedited:\\s*true/"
+    :when: never
+  - :when: always
+- :local: ".gitlab/ci/ingest.gitlab-ci.yml"
+  :rules:
+  - :if: "$CI_MERGE_REQUEST_LABELS =~ /pipeline::expedited/"
+    :when: never
+  - :if: "$CI_COMMIT_MESSAGE =~ /pipeline_expedited:\\s*true/"
+    :when: never
+  - :when: always
+- :template: Jobs/Container-Scanning.latest.gitlab-ci.yml
+- :template: Jobs/Dependency-Scanning.latest.gitlab-ci.yml
+- :template: Jobs/SAST.latest.gitlab-ci.yml
+- :template: Jobs/Secret-Detection.latest.gitlab-ci.yml
+- :project: gitlab-com/gl-infra/common-ci-tasks
+  :ref: v1.80.3
+  :file: kaniko.yml
+- :project: gitlab-com/gl-infra/common-ci-tasks
+  :ref: v2.89.0
+  :file: semantic-release.yml
+- :project: gitlab-com/gl-infra/platform/runway/runwayctl
+  :file: ci-tasks/service-project/runway.yml
+  :inputs:
+    :runway_service_id: ai-gateway
+    :image: "$CI_REGISTRY_IMAGE/model-gateway:${CI_COMMIT_SHORT_SHA}"
+    :runway_version: v3.96.2
+- :project: gitlab-com/gl-infra/platform/runway/runwayctl
+  :file: ci-tasks/service-project/runway.yml
+  :inputs:
+    :runway_service_id: duo-workflow-svc
+    :image: "$CI_REGISTRY_IMAGE/model-gateway:${CI_COMMIT_SHORT_SHA}"
+    :runway_version: v3.96.2
+- :project: gitlab-com/gl-infra/platform/runway/runwayctl
+  :file: ci-tasks/service-project/runway.yml
+  :inputs:
+    :runway_service_id: ai-gateway-custom
+    :image: "$SELF_HOSTED_TARGET_IMAGE"
+    :runway_version: v3.96.2
+- :project: gitlab-com/gl-infra/platform/runway/runwayctl
+  :file: ci-tasks/service-project/helm-chart.yml
+  :ref: v3.96.2
+  :inputs:
+    :runway_service_id: ai-gateway-eks
+    :runway_version: v3.96.2
+    :runtime: eks
+    :app_version: "${CI_COMMIT_SHORT_SHA}"
+- :project: gitlab-com/gl-infra/platform/runway/runwayctl
+  :file: ci-tasks/service-project/helm-chart.yml
+  :ref: v3.96.2
+  :inputs:
+    :runway_service_id: ai-gateway-gke
+    :runway_version: v3.96.2
+    :runtime: gke
+    :app_version: "${CI_COMMIT_SHORT_SHA}"
+- :component: "${CI_SERVER_FQDN}/gitlab-org/components/danger-review/danger-review@2.1.0"
+  :rules:
+  - :if: $CI_SERVER_HOST == "gitlab.com"
+:cache:
+  :key:
+    :files:
+    - poetry.lock
+    - ".gitlab-ci.yml"
+  :paths:
+  - "$PIP_CACHE_DIR"
+  - "$POETRY_CACHE_DIR"
+  - requirements.txt
+  - scripts/lib/
+  - scripts/vendor/
+:.poetry:
+  :before_script:
+  - pip install poetry==2.0.1
+  - poetry config virtualenvs.in-project true
+  - poetry config cache-dir ${POETRY_CACHE_DIR}
+  - poetry self add poetry-plugin-export
+  - poetry export -f requirements.txt --output requirements.txt --without-hashes
+  - poetry config --list
+:.docker:
+  :image: docker:${DOCKER_VERSION}
+  :services:
+  - docker:${DOCKER_VERSION}-dind
+  :variables:
+    :REGISTRY_USER: "$CI_REGISTRY_USER"
+    :REGISTRY_PASSWORD: "$CI_REGISTRY_PASSWORD"
+    :REGISTRY: "$CI_REGISTRY"
+  :before_script:
+  - docker login -u "$REGISTRY_USER" -p "$REGISTRY_PASSWORD" "$REGISTRY"
+:pages:
+  :stage: deploy_pages
+  :script:
+  - mkdir -p public
+  - python scripts/prompt_directory_json_builder.py
+  :artifacts:
+    :paths:
+    - public
+  :rules:
+  - :if: "$CI_MERGE_REQUEST_LABELS =~ /pipeline::expedited/"
+    :when: never
+  - :if: "$CI_COMMIT_MESSAGE =~ /pipeline_expedited:\\s*true/"
+    :when: never
+  - :if: "$CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH"
 stages:
-  - build
-  - test
-  - deploy-review
-  - validate
-  - release
-  - ingest
-  - runway_staging
-  - runway_production
-  - deploy_pages
-
-variables:
-  PIP_CACHE_DIR: "$CI_PROJECT_DIR/.cache/pip"
-  POETRY_CACHE_DIR: "$CI_PROJECT_DIR/.cache/poetry"
-
-  DOCKER_VERSION: "20.10.23"
-  DOCKER_TLS_CERTDIR: "/certs"
-  DOCKER_MODEL_GATEWAY: "$CI_REGISTRY_IMAGE/model-gateway"
-  DOCKER_INGEST: "$CI_REGISTRY_IMAGE/ingest"
-  DOCKERHUB_MODEL_GATEWAY: "gitlab/model-gateway"
-
-  TARGET_IMAGE: "$DOCKER_MODEL_GATEWAY:$CI_COMMIT_SHORT_SHA"
-  INGEST_IMAGE: "$DOCKER_INGEST:$CI_COMMIT_SHORT_SHA"
-  SELF_HOSTED_TARGET_IMAGE: "$DOCKER_MODEL_GATEWAY/self-hosted:$CI_COMMIT_SHORT_SHA"
-  DOCKERHUB_MODEL_GATEWAY_IMAGE: "gitlab/model-gateway:$CI_COMMIT_TAG"
-  DOCKERHUB_MODEL_GATEWAY_SELF_HOSTED_IMAGE: "gitlab/model-gateway-self-hosted:$CI_COMMIT_SHORT_SHA"
-
-  DOCS_LINT_IMAGE: "registry.gitlab.com/gitlab-org/technical-writing/docs-gitlab-com/lint-markdown:alpine-3.21-vale-3.11.2-markdownlint2-0.17.2-lychee-0.18.1"
-
-  SAST_EXCLUDED_PATHS: "tests, tmp, api"
-  CS_IMAGE: $TARGET_IMAGE
-
-.if-merge-request-labels-pipeline-expedited: &if-merge-request-labels-pipeline-expedited
-  if: '$CI_MERGE_REQUEST_LABELS =~ /pipeline::expedited/'
-
-.if-commit-message-pipeline-expedited: &if-commit-message-pipeline-expedited
-  if: '$CI_COMMIT_MESSAGE =~ /pipeline_expedited:\s*true/'
-
-.skip-when-expedited-include: &skip-when-expedited-include
-  - <<: *if-merge-request-labels-pipeline-expedited
-    when: never
-  - <<: *if-commit-message-pipeline-expedited
-    when: never
-  - when: always
-
-include:
-  - local: .gitlab/ci/build.gitlab-ci.yml
-  - local: .gitlab/ci/lint.gitlab-ci.yml
-    rules: *skip-when-expedited-include
-  - local: .gitlab/ci/dependency-review.gitlab-ci.yml
-  - local: .gitlab/ci/test.gitlab-ci.yml
-    rules: *skip-when-expedited-include
-  - local: .gitlab/ci/performance.gitlab-ci.yml
-    rules: *skip-when-expedited-include
-  - local: .gitlab/ci/release.gitlab-ci.yml
-    rules: *skip-when-expedited-include
-  - local: .gitlab/ci/ingest.gitlab-ci.yml
-    rules: *skip-when-expedited-include
-  - template: Jobs/Container-Scanning.latest.gitlab-ci.yml
-  - template: Jobs/Dependency-Scanning.latest.gitlab-ci.yml
-  - template: Jobs/SAST.latest.gitlab-ci.yml
-  - template: Jobs/Secret-Detection.latest.gitlab-ci.yml
-
-  # Includes a base template for running kaniko easily
-  # see https://gitlab.com/gitlab-com/gl-infra/common-ci-tasks/-/blob/main/kaniko.md
-  - project: "gitlab-com/gl-infra/common-ci-tasks"
-    ref: v1.80.3 # renovate:managed
-    file: "kaniko.yml"
-
-  # Analyze commits to determine whether to cut a release
-  # see https://gitlab.com/gitlab-com/gl-infra/common-ci-tasks/-/blob/main/semantic-release.md
-  - project: "gitlab-com/gl-infra/common-ci-tasks"
-    ref: v2.89.0 # renovate:managed
-    file: "semantic-release.yml"
-
-  # Runway (Cloud Run)
-  - project: "gitlab-com/gl-infra/platform/runway/runwayctl"
-    file: "ci-tasks/service-project/runway.yml"
-    inputs:
-      runway_service_id: ai-gateway
-      image: "$CI_REGISTRY_IMAGE/model-gateway:${CI_COMMIT_SHORT_SHA}"
-      runway_version: v3.96.2
-  - project: "gitlab-com/gl-infra/platform/runway/runwayctl"
-    file: "ci-tasks/service-project/runway.yml"
-    inputs:
-      runway_service_id: duo-workflow-svc
-      image: "$CI_REGISTRY_IMAGE/model-gateway:${CI_COMMIT_SHORT_SHA}"
-      runway_version: v3.96.2
-  # - project: "gitlab-com/gl-infra/platform/runway/runwayctl"
-  #   file: "ci-tasks/service-project/runway.yml"
-  #   inputs:
-  #     runway_service_id: dws-loadtest
-  #     image: "$CI_REGISTRY_IMAGE/model-gateway:${CI_COMMIT_SHORT_SHA}"
-  #     runway_version: v3.96.2
-  #   when: manual
-  - project: "gitlab-com/gl-infra/platform/runway/runwayctl"
-    file: "ci-tasks/service-project/runway.yml"
-    inputs:
-      runway_service_id: ai-gateway-custom
-      image: "$SELF_HOSTED_TARGET_IMAGE"
-      runway_version: v3.96.2
-
-  # Runway (Kubernetes)
-  - project: "gitlab-com/gl-infra/platform/runway/runwayctl"
-    file: "ci-tasks/service-project/helm-chart.yml"
-    ref: v3.96.2
-    inputs:
-      runway_service_id: ai-gateway-eks
-      runway_version: v3.96.2
-      runtime: eks
-      app_version: "${CI_COMMIT_SHORT_SHA}"
-  - project: "gitlab-com/gl-infra/platform/runway/runwayctl"
-    file: "ci-tasks/service-project/helm-chart.yml"
-    ref: v3.96.2
-    inputs:
-      runway_service_id: ai-gateway-gke
-      runway_version: v3.96.2
-      runtime: gke
-      app_version: "${CI_COMMIT_SHORT_SHA}"
-
-  - component: ${CI_SERVER_FQDN}/gitlab-org/components/danger-review/danger-review@2.1.0
-    rules:
-      - if: $CI_SERVER_HOST == "gitlab.com"
-
-cache:
-  key:
-    files:
-      - poetry.lock
-      - .gitlab-ci.yml
-  paths:
-    - $PIP_CACHE_DIR
-    - $POETRY_CACHE_DIR
-    - requirements.txt
-    - scripts/lib/
-    - scripts/vendor/
-
-.poetry:
-  before_script:
-    - pip install poetry==2.0.1
-    - poetry config virtualenvs.in-project true
-    - poetry config cache-dir ${POETRY_CACHE_DIR}
-    - poetry self add poetry-plugin-export
-    - poetry export -f requirements.txt --output requirements.txt --without-hashes
-    - poetry config --list
-
-.docker:
-  image: docker:${DOCKER_VERSION}
-  services:
-    - docker:${DOCKER_VERSION}-dind
+- test
+sast:
   variables:
-    REGISTRY_USER: "$CI_REGISTRY_USER"
-    REGISTRY_PASSWORD: "$CI_REGISTRY_PASSWORD"
-    REGISTRY: "$CI_REGISTRY"
-  before_script:
-    - docker login -u "$REGISTRY_USER" -p "$REGISTRY_PASSWORD" "$REGISTRY"
-
-pages:
-  stage: deploy_pages
-  script:
-    - mkdir -p public
-    - python scripts/prompt_directory_json_builder.py
-  artifacts:
-    paths:
-      - public
-  rules:
-    - <<: *if-merge-request-labels-pipeline-expedited
-      when: never
-    - <<: *if-commit-message-pipeline-expedited
-      when: never
-    - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
+    SAST_EXCLUDED_PATHS: tests, tmp, api
+  stage: test
+include:
+- template: Security/SAST.gitlab-ci.yml
