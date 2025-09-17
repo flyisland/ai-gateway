@@ -53,7 +53,7 @@ def test_operators_value_validation(
     if should_raise:
         with pytest.raises(ValidationError) as exc:
             InputRule(arg_name="arg1", operator=operator, value=value)
-            assert error_message in str(exc.value)
+        assert error_message in str(exc.value)
     else:
         r = InputRule(arg_name="arg1", operator=operator, value=value)
         assert r.value == value
