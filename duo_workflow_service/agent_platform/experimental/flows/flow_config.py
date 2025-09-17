@@ -3,7 +3,7 @@ from pathlib import Path
 from typing import Callable, ClassVar, Optional, Self
 
 import yaml
-from pydantic import BaseModel, field_validator
+from pydantic import BaseModel, model_validator
 
 from duo_workflow_service.agent_platform.experimental.components import (
     BaseComponent,
@@ -25,6 +25,18 @@ _PREFIX_BLOCLIST = (
     "%uff0e%uff0e%u2216",
 )
 
+REQUIRED_INPUT_SCHEMA_KEYS = [
+    "type",
+    "properties",
+    "additionalProperties",
+    "$schema"
+]
+
+# class flowInput
+#
+# FlowConfigConfig
+#     entry_point: set
+#     inputs:
 
 class FlowConfig(BaseModel):
     DIRECTORY_PATH: ClassVar[Path] = Path(__file__).resolve().parent / "configs"
@@ -34,35 +46,42 @@ class FlowConfig(BaseModel):
     environment: str
     version: str
     prompts: Optional[list[dict]] = None
-    additional_context_schema: Optional[str] = None
 
-    @field_validator("additional_context_schema")
-    @classmethod
-    def validate_additional_context_schema(
-        cls, schema_str: Optional[str]
-    ) -> Optional[str]:
-        """Validate and parse the additional_context_schema JSON string."""
-        if schema_str is None:
-            return None
+    @model_validator(mode='after')
+    def validate_flow_input_schemas(self) -> Self:
+        """Validate and parse the input schemas."""
+        if self.flow['inputs'] is None:
+            return self
 
         try:
-            schema = json.loads(schema_str)
+            # pydantic model for flow_inputs ...
 
-            if not isinstance(schema, dict):
-                raise ValueError(
-                    f"additional_context_schema must be a dict, found {type(schema).__name__}"
-                )
+            inputs = self.flow['inputs']
+            for input in inputs:
+                if 'category' not in input.keys():
+                    raise ValueError(f"input must have a category")
 
-            if "properties" not in schema:
-                raise ValueError(
-                    "additional_context_schema must have a 'properties' field"
-                )
+                category = input['category']
 
-            return schema_str
+                if not isinstance(input, dict):
+                    raise ValueError(
+                        f"input '{category}' must be a dict, found {type(input).__name__}"
+                    )
+
+                schema = json.loads(input['schema'])
+
+                if not all(key in schema for key in REQUIRED_INPUT_SCHEMA_KEYS):
+                    raise ValueError(
+                        f"input schema must have these fields: {REQUIRED_INPUT_SCHEMA_KEYS}"
+                    )
+
         except json.JSONDecodeError as e:
-            raise ValueError(f"Invalid JSON in additional_context_schema: {e}")
+            raise ValueError(f"Invalid JSON in input schema: {e}")
         except Exception as e:
             raise ValueError(f"Invalid schema format: {e}")
+
+        print("VALID! -----------")
+        return self
 
     @classmethod
     def from_yaml_config(cls, path: str) -> Self:

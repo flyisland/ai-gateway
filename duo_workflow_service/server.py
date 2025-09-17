@@ -119,7 +119,7 @@ class DuoWorkflowService(contract_pb2_grpc.DuoWorkflowServicer):
     # These categories of additional context are gated by a Unit Primitive
     # check. Other categories can be freely passed to flows as additional
     # context.
-    UP_GATED_ADDITIONAL_CONTEXT_CATEGORIES = {
+    UP_GATED_ADDITIONAL_CONTEXT_CATEGORIES = [
         "file",
         "snippet",
         "merge_request",
@@ -129,7 +129,7 @@ class DuoWorkflowService(contract_pb2_grpc.DuoWorkflowServicer):
         "terminal",
         "repository",
         "directory",
-    }
+    ]
 
     async def authorize_additional_context(
         self,
@@ -140,10 +140,7 @@ class DuoWorkflowService(contract_pb2_grpc.DuoWorkflowServicer):
     ):
         if client_event.startRequest.additional_context:
             for additional_context in client_event.startRequest.additional_context:
-                if (
-                    additional_context
-                    not in self.UP_GATED_ADDITIONAL_CONTEXT_CATEGORIES
-                ):
+                if additional_context in self.UP_GATED_ADDITIONAL_CONTEXT_CATEGORIES:
                     unit_primitive = GitLabUnitPrimitive[
                         f"include_{additional_context.category}_context".upper()
                     ]
