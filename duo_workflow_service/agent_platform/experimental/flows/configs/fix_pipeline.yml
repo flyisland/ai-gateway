@@ -71,6 +71,7 @@ components:
         as: "source_branch"
     toolset:
       - "run_git_command"
+
 routers:
   - from: "fix_pipeline_context"
     to: "fix_pipeline_create_plan"
@@ -84,20 +85,29 @@ routers:
     to: "fix_pipeline_git_push"
   - from: "fix_pipeline_git_push"
     to: "end"
-additional_context_schema: |
-  {
-    "properties": {
-      "merge_request_url": {
-        "type": "string"
-      },
-      "source_branch": {
-        "type": "string"
-      }
-    },
-    "additionalProperties": false
-  }
+
 flow:
   entry_point: "fix_pipeline_context"
+  inputs:
+    - category: merge_request
+      schema: |
+        {
+          "$schema": "http://json-schema.org/draft-07/schema#",
+          "type": "object",
+          "properties": {
+            "url": {
+              "type": "string",
+              "format": "uri",
+              "description": "GitLab Merge Request URL"
+            },
+            "source_branch": {
+              "type": "string",
+              "description": "Merge Request Source Branch"
+            }
+          },
+          "additionalProperties": false
+        }
+
 prompts:
   - prompt_id: "git_push_prompt"
     model:
