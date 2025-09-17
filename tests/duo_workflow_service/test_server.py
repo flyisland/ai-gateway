@@ -154,9 +154,8 @@ async def test_list_tools(
                     input_rules=[
                         re_schema.InputRule(
                             arg_name="arg1",
-                            rule=re_schema.Rule(
-                                operator=re_schema.OperatorEnum.EQUALS, value=""
-                            ),
+                            operator=re_schema.OperatorEnum.EQUALS,
+                            value="",
                         )
                     ],
                 ),
@@ -210,7 +209,8 @@ async def test_list_tools(
             "user_prompt": "Example user prompt 1",
             "input_rules": [
                 {
-                    "rule": {"operator": "equals", "value": ""},
+                    "operator": "equals",
+                    "value": "",
                     "arg_name": "arg1",
                 }
             ],

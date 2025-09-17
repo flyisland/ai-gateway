@@ -7,7 +7,6 @@ from duo_workflow_service.tools.routing_eval.schema import (
     InputRule,
     OperatorEnum,
     RoutingEvalConfig,
-    Rule,
 )
 
 
@@ -53,22 +52,31 @@ def test_operators_value_validation(
 ):
     if should_raise:
         with pytest.raises(ValidationError) as exc:
-            Rule(operator=operator, value=value)
+            InputRule(arg_name="arg1", operator=operator, value=value)
             assert error_message in str(exc.value)
     else:
-        r = Rule(operator=operator, value=value)
+        r = InputRule(arg_name="arg1", operator=operator, value=value)
         assert r.value == value
 
 
 @pytest.mark.parametrize(
     "model_class,kwargs",
     [
-        (Rule, {"operator": OperatorEnum.EQUALS, "value": 1, "extra_field": 123}),
         (
             InputRule,
             {
                 "arg_name": "arg1",
-                "rule": Rule(operator=OperatorEnum.EQUALS, value=1),
+                "operator": OperatorEnum.EQUALS,
+                "value": 1,
+                "extra_field": 123,
+            },
+        ),
+        (
+            InputRule,
+            {
+                "arg_name": "arg1",
+                "operator": OperatorEnum.EQUALS,
+                "value": 1,
                 "unexpected": True,
             },
         ),

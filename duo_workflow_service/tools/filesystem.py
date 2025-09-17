@@ -110,9 +110,8 @@ class ReadFile(DuoBaseTool):
             input_rules=[
                 re_schema.InputRule(
                     arg_name="file_path",
-                    rule=re_schema.Rule(
-                        operator=re_schema.OperatorEnum.EQUALS, value="./tools/base.py"
-                    ),
+                    operator=re_schema.OperatorEnum.EQUALS,
+                    value="./tools/base.py",
                 )
             ],
         ),
@@ -522,6 +521,18 @@ class ListDir(DuoBaseTool):
     Use this instead of trying to run 'ls' commands.
     """
     args_schema: Type[BaseModel] = ListDirInput  # type: ignore
+    routing_eval_config: List[re_schema.RoutingEvalConfig] = [
+        re_schema.RoutingEvalConfig(
+            user_prompt="I need to list the contents of the current directory",
+            input_rules=[
+                re_schema.InputRule(
+                    arg_name="directory",
+                    operator=re_schema.OperatorEnum.EQUALS,
+                    value=".",
+                )
+            ],
+        ),
+    ]
 
     async def _arun(self, directory: str) -> str:
         # Check file exclusion policy before executing action

@@ -19,14 +19,12 @@ class OperatorEnum(str, Enum):
     NOT_CONTAINS = "not_contains"
 
 
-class Rule(BaseModel):
-    """Individual rule definition.
-
-    It should define an operator and the value to compare against.
-    """
+class InputRule(BaseModel):
+    """Single tool input rule for tool routing validation."""
 
     model_config = ConfigDict(extra="forbid")
 
+    arg_name: str
     operator: OperatorEnum
     value: Any
 
@@ -82,15 +80,6 @@ class Rule(BaseModel):
             OperatorEnum.NOT_CONTAINS: "string",
         }
         return type_messages.get(operator, "unknown type")
-
-
-class InputRule(BaseModel):
-    """Single tool input rule for tool routing validation."""
-
-    model_config = ConfigDict(extra="forbid")
-
-    arg_name: str
-    rule: Rule
 
 
 class RoutingEvalConfig(BaseModel):
