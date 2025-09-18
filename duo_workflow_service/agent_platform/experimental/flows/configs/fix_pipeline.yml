@@ -67,7 +67,7 @@ components:
         as: "repository_url"
       - from: "context:inputs.merge_request_info.url"
         as: "merge_request_url"
-      - from: "context:inputs..merge_request_url.source_branch"
+      - from: "context:inputs.merge_request_info.source_branch"
         as: "source_branch"
     toolset:
       - "run_git_command"

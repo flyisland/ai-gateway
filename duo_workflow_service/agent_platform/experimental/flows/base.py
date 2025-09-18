@@ -160,7 +160,6 @@ class Flow(AbstractWorkflow):
 
                 content_object = json.loads(item.content)
                 jsonschema.validate(content_object, schema)
-
                 processed_additional_context[item.category] = content_object
             except jsonschema.ValidationError as e:
                 raise ValueError(

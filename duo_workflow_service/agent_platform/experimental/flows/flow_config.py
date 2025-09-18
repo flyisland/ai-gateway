@@ -53,7 +53,7 @@ class FlowConfig(BaseModel):
             return json_schemas_by_category
 
         for item in self.flow.inputs:
-            schema = item.schema
+            schema = item.input_schema
 
             # Create standard jsonschema structure:
             jsonschema = {
