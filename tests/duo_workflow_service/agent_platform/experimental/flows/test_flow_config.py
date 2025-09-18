@@ -20,6 +20,211 @@ from duo_workflow_service.agent_platform.experimental.flows.flow_config import (
 class TestFlowConfig:
     """Test FlowConfig class functionality."""
 
+    # @pytest.fixture(name="sample_config_data")
+    # def flow_config_data(self):
+    #     """Fixture providing mock project data."""
+    #     return {
+    #         "id": 123,
+    #         "name": "test-project",
+    #         "web_url": "https://gitlab.com/test/project",
+    #     }
+
+    def test_input_json_schemas_by_category_with_no_inputs(self):
+        """Test input_json_schemas_by_category returns empty dict when no inputs defined."""
+        config_data = {
+            "flow": {"entry_point": "agent"},
+            "components": [{"name": "agent", "type": "AgentComponent"}],
+            "routers": [{"from": "agent", "to": "end"}],
+            "environment": "remote",
+            "version": "experimental",
+        }
+
+        config = FlowConfig(**config_data)
+        result = config.input_json_schemas_by_category()
+
+        assert not result
+
+    def test_input_json_schemas_by_category_with_inputs_none(self):
+        """Test input_json_schemas_by_category returns empty dict when inputs is None."""
+        config_data = {
+            "flow": {"entry_point": "agent", "inputs": None},
+            "components": [{"name": "agent", "type": "AgentComponent"}],
+            "routers": [{"from": "agent", "to": "end"}],
+            "environment": "remote",
+            "version": "experimental",
+        }
+
+        config = FlowConfig(**config_data)
+        result = config.input_json_schemas_by_category()
+
+        assert not result
+
+    def test_input_json_schemas_by_category_single_category_single_field(self):
+        """Test input_json_schemas_by_category with single category and single field."""
+        config_data = {
+            "flow": {
+                "entry_point": "agent",
+                "inputs": [
+                    {
+                        "category": "user_input",
+                        "input_schema": {
+                            "message": {"type": "string", "description": "User message"}
+                        },
+                    }
+                ],
+            },
+            "components": [{"name": "agent", "type": "AgentComponent"}],
+            "routers": [{"from": "agent", "to": "end"}],
+            "environment": "remote",
+            "version": "experimental",
+        }
+
+        config = FlowConfig(**config_data)
+        result = config.input_json_schemas_by_category()
+
+        expected = {
+            "user_input": {
+                "$schema": "https://json-schema.org/draft/2020-12/schema#",
+                "additionalProperties": False,
+                "type": "object",
+                "properties": {
+                    "message": {"type": "string", "description": "User message"}
+                },
+                "required": ["message"],
+            }
+        }
+
+        assert result == expected
+
+    def test_input_json_schemas_by_category_multiple_categories_multiple_fields(self):
+        """Test input_json_schemas_by_category with multiple categories."""
+        config_data = {
+            "flow": {
+                "entry_point": "agent",
+                "inputs": [
+                    {
+                        "category": "user_input",
+                        "input_schema": {
+                            "message": {"type": "string", "description": "User message"}
+                        },
+                    },
+                    {
+                        "category": "system_config",
+                        "input_schema": {
+                            "timeout": {
+                                "type": "number",
+                                "format": "float",
+                                "description": "Request timeout in seconds",
+                            },
+                            "debug_mode": {
+                                "type": "boolean",
+                                "description": "Enable debug logging",
+                            },
+                        },
+                    },
+                ],
+            },
+            "components": [{"name": "agent", "type": "AgentComponent"}],
+            "routers": [{"from": "agent", "to": "end"}],
+            "environment": "remote",
+            "version": "experimental",
+        }
+
+        config = FlowConfig(**config_data)
+        result = config.input_json_schemas_by_category()
+
+        expected = {
+            "user_input": {
+                "$schema": "https://json-schema.org/draft/2020-12/schema#",
+                "additionalProperties": False,
+                "type": "object",
+                "properties": {
+                    "message": {"type": "string", "description": "User message"}
+                },
+                "required": ["message"],
+            },
+            "system_config": {
+                "$schema": "https://json-schema.org/draft/2020-12/schema#",
+                "additionalProperties": False,
+                "type": "object",
+                "properties": {
+                    "timeout": {
+                        "type": "number",
+                        "format": "float",
+                        "description": "Request timeout in seconds",
+                    },
+                    "debug_mode": {
+                        "type": "boolean",
+                        "description": "Enable debug logging",
+                    },
+                },
+                "required": ["timeout", "debug_mode"],
+            },
+        }
+
+        assert result == expected
+
+    def test_input_json_schemas_by_category_excludes_none_values(self):
+        """Test that None values are excluded from the schema properties."""
+        config_data = {
+            "flow": {
+                "entry_point": "agent",
+                "inputs": [
+                    {
+                        "category": "user_input",
+                        "input_schema": {
+                            "message": {
+                                "type": "string",
+                                "description": "User message",
+                                "format": None,  # This should be excluded
+                            },
+                            "optional_field": {
+                                "type": "string"
+                                # description and format are None by default, should be excluded
+                            },
+                        },
+                    }
+                ],
+            },
+            "components": [{"name": "agent", "type": "AgentComponent"}],
+            "routers": [{"from": "agent", "to": "end"}],
+            "environment": "remote",
+            "version": "experimental",
+        }
+
+        config = FlowConfig(**config_data)
+        result = config.input_json_schemas_by_category()
+
+        expected = {
+            "user_input": {
+                "$schema": "https://json-schema.org/draft/2020-12/schema#",
+                "additionalProperties": False,
+                "type": "object",
+                "properties": {
+                    "message": {"type": "string", "description": "User message"},
+                    "optional_field": {"type": "string"},
+                },
+                "required": ["message", "optional_field"],
+            }
+        }
+
+        assert result == expected
+
+    def test_input_json_schemas_by_category_empty_input_list(self):
+        """Test input_json_schemas_by_category with empty inputs list."""
+        config_data = {
+            "flow": {"entry_point": "agent", "inputs": []},
+            "components": [{"name": "agent", "type": "AgentComponent"}],
+            "routers": [{"from": "agent", "to": "end"}],
+            "environment": "remote",
+            "version": "experimental",
+        }
+
+        config = FlowConfig(**config_data)
+        result = config.input_json_schemas_by_category()
+
+        assert not result
+
     def test_flowconfig_creation_valid_data(self):
         """Test creating FlowConfig with valid data."""
         config_data = {

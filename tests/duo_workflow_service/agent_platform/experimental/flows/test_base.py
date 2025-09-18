@@ -153,7 +153,10 @@ class TestFlow:  # pylint: disable=too-many-public-methods
             inputs=[
                 FlowConfigInput(
                     category="file",
-                    input_schema={"contents": {"type": "string"}, "file_name": {"type": "string"}},
+                    input_schema={
+                        "contents": {"type": "string"},
+                        "file_name": {"type": "string"},
+                    },
                 ),
                 FlowConfigInput(
                     category="snippet", input_schema={"snippet_str": {"type": "string"}}
@@ -330,7 +333,8 @@ class TestFlow:  # pylint: disable=too-many-public-methods
             patch("duo_workflow_service.agent_platform.experimental.flows.base.Router"),
         ):
             additional_context = AdditionalContext(
-                category="file", content='{"contents": "hello", "file_name": "test.txt"}',
+                category="file",
+                content='{"contents": "hello", "file_name": "test.txt"}',
             )
 
             flow = Flow(
@@ -717,7 +721,10 @@ class TestFlow:  # pylint: disable=too-many-public-methods
     def test_process_additional_context(self, flow_instance):
         """Test _process_additional_context."""
         additional_context = [
-            AdditionalContext(category="file", content='{"contents": "file content", "file_name": "test.txt"}'),
+            AdditionalContext(
+                category="file",
+                content='{"contents": "file content", "file_name": "test.txt"}',
+            ),
             AdditionalContext(
                 category="snippet", content='{"snippet_str": "code snippet"}'
             ),
@@ -731,7 +738,6 @@ class TestFlow:  # pylint: disable=too-many-public-methods
         }
         assert result == expected
 
-
     def test_process_additional_context_missing_required_field(self, flow_instance):
         """Test _process_additional_context with a missing schema field."""
         additional_context = [
@@ -744,9 +750,7 @@ class TestFlow:  # pylint: disable=too-many-public-methods
         ):
             flow_instance._process_additional_context(additional_context)
 
-    def test_process_additional_context_no_schema(
-        self, flow_instance
-    ):
+    def test_process_additional_context_no_schema(self, flow_instance):
         """Test _process_additional_context raises error when provided without schema."""
         additional_context = [
             AdditionalContext(
@@ -760,9 +764,7 @@ class TestFlow:  # pylint: disable=too-many-public-methods
         ):
             flow_instance._process_additional_context(additional_context)
 
-    def test_process_additional_context_invalid_json(
-        self, flow_instance
-    ):
+    def test_process_additional_context_invalid_json(self, flow_instance):
         """Test _process_additional_context raises error for invalid JSON."""
         additional_context = [
             AdditionalContext(
