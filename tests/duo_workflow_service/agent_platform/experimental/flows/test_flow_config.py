@@ -38,7 +38,7 @@ class TestFlowConfig:
 
         config = FlowConfig(**config_data)
 
-        assert config.flow == {"entry_point": "agent"}
+        assert config.flow.entry_point == "agent"
         assert len(config.components) == 1
         assert config.components[0]["name"] == "agent"
         assert len(config.routers) == 1
