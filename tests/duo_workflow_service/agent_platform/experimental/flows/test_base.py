@@ -153,7 +153,7 @@ class TestFlow:  # pylint: disable=too-many-public-methods
             inputs=[
                 FlowConfigInput(
                     category="file",
-                    input_schema={"contents": {"type": "string"}},
+                    input_schema={"contents": {"type": "string"}, "file_name": {"type": "string"}},
                 ),
                 FlowConfigInput(
                     category="snippet", input_schema={"snippet_str": {"type": "string"}}
@@ -330,7 +330,7 @@ class TestFlow:  # pylint: disable=too-many-public-methods
             patch("duo_workflow_service.agent_platform.experimental.flows.base.Router"),
         ):
             additional_context = AdditionalContext(
-                category="file", content='{"contents": "hello"}'
+                category="file", content='{"contents": "hello", "file_name": "test.txt"}',
             )
 
             flow = Flow(
@@ -351,7 +351,8 @@ class TestFlow:  # pylint: disable=too-many-public-methods
             assert "context" in input
             assert "inputs" in input["context"]
             assert input["context"]["inputs"][additional_context.category] == {
-                "contents": "hello"
+                "contents": "hello",
+                "file_name": "test.txt",
             }
 
     @pytest.mark.asyncio
@@ -713,10 +714,10 @@ class TestFlow:  # pylint: disable=too-many-public-methods
         result = flow_instance._process_additional_context([])
         assert result == {}
 
-    def test_process_additional_context_non_agent_user_environment(self, flow_instance):
-        """Test _process_additional_context with non-agent_user_environment categories."""
+    def test_process_additional_context(self, flow_instance):
+        """Test _process_additional_context."""
         additional_context = [
-            AdditionalContext(category="file", content='{"contents": "file content"}'),
+            AdditionalContext(category="file", content='{"contents": "file content", "file_name": "test.txt"}'),
             AdditionalContext(
                 category="snippet", content='{"snippet_str": "code snippet"}'
             ),
@@ -725,83 +726,28 @@ class TestFlow:  # pylint: disable=too-many-public-methods
         result = flow_instance._process_additional_context(additional_context)
 
         expected = {
-            "file": {"contents": "file content"},
+            "file": {"contents": "file content", "file_name": "test.txt"},
             "snippet": {"snippet_str": "code snippet"},
         }
         assert result == expected
 
-    def test_process_additional_context_agent_user_environment_valid_json(self):
-        """Test _process_additional_context with valid agent_user_environment JSON."""
 
-        flow_config_metadata = FlowConfigMetadata(
-            entry_point="agent",
-            inputs=[
-                FlowConfigInput(
-                    category="agent_user_environment",
-                    input_schema={
-                        "os": {"type": "string"},
-                        "shell": {"type": "string"},
-                    },
-                ),
-                FlowConfigInput(
-                    category="file", input_schema={"contents": {"type": "string"}}
-                ),
-            ],
-        )
-
-        config = FlowConfig(
-            flow=flow_config_metadata,
-            components=[{"name": "agent", "type": "AgentComponent"}],
-            routers=[{"from": "agent", "to": "end"}],
-            environment="local",
-            version="experimental",
-        )
-
-        with (
-            patch("duo_workflow_service.workflows.abstract_workflow.get_http_client"),
-            patch(
-                "duo_workflow_service.workflows.abstract_workflow.empty_workflow_config"
-            ),
-            patch(
-                "duo_workflow_service.workflows.abstract_workflow.fetch_workflow_and_container_data"
-            ) as mock_fetch,
-            patch("duo_workflow_service.workflows.abstract_workflow.UserInterface"),
-            patch(
-                "duo_workflow_service.gitlab.gitlab_api.GitLabUrlParser"
-            ) as mock_parser,
-        ):
-            mock_fetch.return_value = ({"id": 123}, None, {"config": "test"})
-            mock_parser.extract_host_from_url.return_value = "gitlab.com"
-
-            flow = Flow(
-                workflow_id="test-workflow-123",
-                workflow_metadata={"git_url": "https://gitlab.com/test/project"},
-                workflow_type=CategoryEnum.WORKFLOW_CHAT,
-                config=config,
-                invocation_metadata={"base_url": "", "gitlab_token": ""},
-            )
-
+    def test_process_additional_context_missing_required_field(self, flow_instance):
+        """Test _process_additional_context with a missing schema field."""
         additional_context = [
-            AdditionalContext(
-                category="agent_user_environment",
-                content='{"os": "linux", "shell": "bash"}',
-            ),
             AdditionalContext(category="file", content='{"contents": "file content"}'),
         ]
 
-        result = flow._process_additional_context(additional_context)
+        with pytest.raises(
+            ValueError,
+            match="input 'file' does not match specified schema: 'file_name' is a required property.*",
+        ):
+            flow_instance._process_additional_context(additional_context)
 
-        expected = {
-            "agent_user_environment": {"os": "linux", "shell": "bash"},
-            "file": {"contents": "file content"},
-        }
-
-        assert result == expected
-
-    def test_process_additional_context_agent_user_environment_no_schema(
+    def test_process_additional_context_no_schema(
         self, flow_instance
     ):
-        """Test _process_additional_context raises error when agent_user_environment provided without schema."""
+        """Test _process_additional_context raises error when provided without schema."""
         additional_context = [
             AdditionalContext(
                 category="agent_user_environment", content='{"os": "linux"}'
@@ -814,82 +760,29 @@ class TestFlow:  # pylint: disable=too-many-public-methods
         ):
             flow_instance._process_additional_context(additional_context)
 
-    def test_process_additional_context_agent_user_environment_invalid_json(
-        self, sample_flow_config
+    def test_process_additional_context_invalid_json(
+        self, flow_instance
     ):
-        """Test _process_additional_context raises error for invalid JSON in agent_user_environment."""
-
-        config = sample_flow_config
-
-        with (
-            patch("duo_workflow_service.workflows.abstract_workflow.get_http_client"),
-            patch(
-                "duo_workflow_service.workflows.abstract_workflow.empty_workflow_config"
-            ),
-            patch(
-                "duo_workflow_service.workflows.abstract_workflow.fetch_workflow_and_container_data"
-            ) as mock_fetch,
-            patch("duo_workflow_service.workflows.abstract_workflow.UserInterface"),
-            patch(
-                "duo_workflow_service.gitlab.gitlab_api.GitLabUrlParser"
-            ) as mock_parser,
-        ):
-            mock_fetch.return_value = ({"id": 123}, None, {"config": "test"})
-            mock_parser.extract_host_from_url.return_value = "gitlab.com"
-
-            flow = Flow(
-                workflow_id="test-workflow-123",
-                workflow_metadata={"git_url": "https://gitlab.com/test/project"},
-                workflow_type=CategoryEnum.WORKFLOW_CHAT,
-                config=config,
-                invocation_metadata={"base_url": "", "gitlab_token": ""},
-            )
-
+        """Test _process_additional_context raises error for invalid JSON."""
         additional_context = [
             AdditionalContext(
                 category="file",
-                content='{"invalid": json}',  # Invalid JSON
+                content='{"invalid": json}',
             )
         ]
 
         with pytest.raises(ValueError, match="Invalid JSON in input item.*"):
-            flow._process_additional_context(additional_context)
+            flow_instance._process_additional_context(additional_context)
 
-    def test_process_additional_context_agent_user_environment_schema_validation_error(
+    def test_process_additional_context_schema_validation_error(
         self,
-        sample_flow_config,
+        flow_instance,
     ):
         """Test _process_additional_context raises error when JSON doesn't match schema."""
-        config = sample_flow_config
-
-        with (
-            patch("duo_workflow_service.workflows.abstract_workflow.get_http_client"),
-            patch(
-                "duo_workflow_service.workflows.abstract_workflow.empty_workflow_config"
-            ),
-            patch(
-                "duo_workflow_service.workflows.abstract_workflow.fetch_workflow_and_container_data"
-            ) as mock_fetch,
-            patch("duo_workflow_service.workflows.abstract_workflow.UserInterface"),
-            patch(
-                "duo_workflow_service.gitlab.gitlab_api.GitLabUrlParser"
-            ) as mock_parser,
-        ):
-            mock_fetch.return_value = ({"id": 123}, None, {"config": "test"})
-            mock_parser.extract_host_from_url.return_value = "gitlab.com"
-
-            flow = Flow(
-                workflow_id="test-workflow-123",
-                workflow_metadata={"git_url": "https://gitlab.com/test/project"},
-                workflow_type=CategoryEnum.WORKFLOW_CHAT,
-                config=config,
-                invocation_metadata={"base_url": "", "gitlab_token": ""},
-            )
-
         additional_context = [
             AdditionalContext(
                 category="file",
-                content='{"file_name": "file.txt"}',  # Missing required "contents" field
+                content='{"file_type": "file.txt"}',
             )
         ]
 
@@ -897,7 +790,7 @@ class TestFlow:  # pylint: disable=too-many-public-methods
             ValueError,
             match=(
                 r".*input 'file' does not match specified schema: "
-                r"Additional properties are not allowed \('file_name' was unexpected\).*"
+                r"Additional properties are not allowed \('file_type' was unexpected\).*"
             ),
         ):
-            flow._process_additional_context(additional_context)
+            flow_instance._process_additional_context(additional_context)

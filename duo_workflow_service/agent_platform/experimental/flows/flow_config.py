@@ -64,12 +64,14 @@ class FlowConfig(BaseModel):
                 for key, value in item.input_schema.items()
             }
 
-            # Create standard jsonschema structure:
+            # Create standard jsonschema structure,
+            # with all properties being required.
             jsonschema = {
                 "$schema": INPUT_JSONSCHEMA_VERSION,
                 "additionalProperties": False,
                 "type": "object",
                 "properties": schema,
+                "required": list(schema.keys()),
             }
 
             json_schemas_by_category[item.category] = jsonschema
