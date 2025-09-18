@@ -10,6 +10,7 @@ from .epic import *
 from .filesystem import *
 from .git import *
 from .handover import *
+from .hello_world import *
 from .issue import *
 from .job import *
 from .mcp_tools import *

@@ -129,6 +129,7 @@ _outbox = MagicMock(spec=asyncio.Queue)
                 "list_work_items",
                 "get_work_item_notes",
                 "extract_lines_from_text",
+                "hello_world",
             },
         ),
         (
@@ -202,6 +203,7 @@ _outbox = MagicMock(spec=asyncio.Queue)
                 "get_work_item_notes",
                 "post_duo_code_review",
                 "extract_lines_from_text",
+                "hello_world",
             },
         ),
         (
@@ -373,6 +375,7 @@ def test_registry_initialization_initialises_tools_with_correct_attributes(
         "get_work_item_notes": tools.GetWorkItemNotes(metadata=tool_metadata),
         "post_duo_code_review": tools.PostDuoCodeReview(metadata=tool_metadata),
         "extract_lines_from_text": tools.ExtractLinesFromText(metadata=tool_metadata),
+        "hello_world": tools.HelloWorld(metadata=tool_metadata),
     }
 
     assert registry._enabled_tools == expected_tools
