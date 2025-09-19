@@ -25,8 +25,6 @@ components:
     toolset: []
     ui_log_events:
       - "on_agent_final_answer"
-      - "on_tool_execution_success"
-      - "on_tool_execution_failed"
   - name: "fix_pipeline_execution"
     type: AgentComponent
     prompt_id: "fix_pipeline_execution"
