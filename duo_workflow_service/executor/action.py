@@ -61,28 +61,37 @@ async def _execute_action_and_get_action_response(
             )
 
         if not event.actionResponse.response:
-            if event.actionResponse.plainTextResponse.response:
+            if (
+                event.actionResponse.plainTextResponse.response
+                or event.actionResponse.plainTextResponse.error
+            ):
+                resp = event.actionResponse.plainTextResponse.response
+                if event.actionResponse.plainTextResponse.error:
+                    resp = f"Error running tool: {event.actionResponse.plainTextResponse.error}"
                 log.info(
                     "Legacy response empty, setting it from plaintext response",
                     requestID=event.actionResponse.requestID,
                     action_class=action_class,
                 )
-                event.actionResponse.response = (
-                    event.actionResponse.plainTextResponse.response
-                )
+                event.actionResponse.response = resp
             else:
                 log.info(
                     "Legacy response empty, setting it from http response",
                     requestID=event.actionResponse.requestID,
                     action_class=action_class,
                 )
-                event.actionResponse.response = event.actionResponse.httpResponse.body
+                resp = event.actionResponse.httpResponse.body
 
                 if (
                     event.actionResponse.httpResponse.statusCode < 200
                     or event.actionResponse.httpResponse.statusCode >= 300
                 ):
-                    event.actionResponse.response = f"Error: unexpected status code: {event.actionResponse.httpResponse.statusCode}"
+                    resp = f"Error: unexpected status code: {event.actionResponse.httpResponse.statusCode}"
+
+                if event.actionResponse.httpResponse.error:
+                    resp = f"Error: {event.actionResponse.httpResponse.error}"
+
+                event.actionResponse.response = resp
 
         # Record all metrics in the separate function
         record_metrics(action_class, duration)

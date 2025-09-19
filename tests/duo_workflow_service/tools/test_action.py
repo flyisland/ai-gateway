@@ -6,6 +6,7 @@ from contract import contract_pb2
 from duo_workflow_service.executor.action import (
     HTTPConnectionError,
     _execute_action,
+    _execute_action_and_get_action_response,
     _execute_action_and_get_http_response,
 )
 
@@ -102,7 +103,7 @@ async def test__execute_action_and_get_action_response_missing_legacy_response_f
 
     await metadata["inbox"].put(client_event)
 
-    response = await _execute_action_and_get_http_response(metadata, action)
+    response = await _execute_action_and_get_action_response(metadata, action)
 
     put_action = await metadata["outbox"].get()
     metadata["outbox"].task_done()
@@ -128,7 +129,7 @@ async def test__execute_action_and_get_action_response_missing_legacy_response_f
 
     await metadata["inbox"].put(client_event)
 
-    response = await _execute_action_and_get_http_response(metadata, action)
+    response = await _execute_action_and_get_action_response(metadata, action)
 
     put_action = await metadata["outbox"].get()
     metadata["outbox"].task_done()
@@ -137,6 +138,33 @@ async def test__execute_action_and_get_action_response_missing_legacy_response_f
     assert response.response == "Error: unexpected status code: 404"
     assert response.httpResponse.statusCode == 404
     assert response.httpResponse.body == ""
+    assert metadata["inbox"].empty()
+
+
+@pytest.mark.asyncio
+async def test__execute_action_and_get_action_response_missing_legacy_response_from_http_error(
+    metadata,
+):
+    action = contract_pb2.Action()
+    client_event = contract_pb2.ClientEvent()
+    client_event.actionResponse.response = ""
+
+    client_event.actionResponse.httpResponse.statusCode = 0
+    client_event.actionResponse.httpResponse.body = ""
+    client_event.actionResponse.httpResponse.error = "Some HTTP error"
+
+    await metadata["inbox"].put(client_event)
+
+    response = await _execute_action_and_get_action_response(metadata, action)
+
+    put_action = await metadata["outbox"].get()
+    metadata["outbox"].task_done()
+
+    assert put_action == action
+    assert response.response == "Error: Some HTTP error"
+    assert response.httpResponse.statusCode == 0
+    assert response.httpResponse.body == ""
+    assert response.httpResponse.error == "Some HTTP error"
     assert metadata["inbox"].empty()
 
 
@@ -153,7 +181,7 @@ async def test__execute_action_and_get_action_response_missing_legacy_response_f
 
     await metadata["inbox"].put(client_event)
 
-    response = await _execute_action_and_get_http_response(metadata, action)
+    response = await _execute_action_and_get_action_response(metadata, action)
 
     put_action = await metadata["outbox"].get()
     metadata["outbox"].task_done()
@@ -161,4 +189,29 @@ async def test__execute_action_and_get_action_response_missing_legacy_response_f
     assert put_action == action
     assert response.response == "Response"
     assert response.plainTextResponse.response == "Response"
+    assert metadata["inbox"].empty()
+
+
+@pytest.mark.asyncio
+async def test__execute_action_and_get_action_response_missing_legacy_response_from_plaintext_error(
+    metadata,
+):
+    action = contract_pb2.Action()
+    client_event = contract_pb2.ClientEvent()
+    client_event.actionResponse.response = ""
+
+    client_event.actionResponse.plainTextResponse.response = ""
+    client_event.actionResponse.plainTextResponse.error = "file not found"
+
+    await metadata["inbox"].put(client_event)
+
+    response = await _execute_action_and_get_action_response(metadata, action)
+
+    put_action = await metadata["outbox"].get()
+    metadata["outbox"].task_done()
+
+    assert put_action == action
+    assert response.response == "Error running tool: file not found"
+    assert response.plainTextResponse.response == ""
+    assert response.plainTextResponse.error == "file not found"
     assert metadata["inbox"].empty()
