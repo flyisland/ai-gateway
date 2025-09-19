@@ -54,7 +54,7 @@ Comprehensive tests covering:
 ```bash
 export DEFINITION="hello_world/experimental"
 export GOAL="Test the debugging flow"
-export PROJECT_ID="19"
+export PROJECT_ID="10000"
 
 curl -X POST \
     -H "Authorization: Bearer $GDK_API_TOKEN" \
@@ -68,7 +68,7 @@ curl -X POST \
         \"environment\": \"ide\",
         \"source_branch\": \"main\"
     }" \
-    http://gdk.test:3000/api/v4/ai/duo_workflows/workflows
+    http://gdk.test:3443/api/v4/ai/duo_workflows/workflows
 ```
 
 ### Debugging Features
