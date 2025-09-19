@@ -13,7 +13,6 @@ from starlette_context import context as starlette_context
 from uvicorn.protocols.utils import get_path_with_query_string
 
 from ai_gateway.tracking.errors import log_exception
-from lib.internal_events.context import current_event_context
 
 from .headers import (
     X_GITLAB_FEATURE_ENABLED_BY_NAMESPACE_IDS_HEADER,
@@ -52,27 +51,6 @@ class AccessLogMiddleware:
     def __init__(self, app, skip_endpoints):
         self.app = app
         self.path_resolver = _PathResolver.from_optional_list(skip_endpoints)
-
-    def _add_event_context_fields(self, fields: dict) -> None:
-        """Add event context attributes to log fields if available."""
-        event_context = current_event_context.get()
-        if event_context is not None:
-            # Only add fields that have non-None values
-            if event_context.instance_id is not None:
-                fields["instance_id"] = str(event_context.instance_id)
-            if event_context.host_name is not None:
-                fields["host_name"] = str(event_context.host_name)
-            if event_context.realm is not None:
-                fields["realm"] = str(event_context.realm)
-            if event_context.is_gitlab_team_member is not None:
-                fields["is_gitlab_team_member"] = str(
-                    event_context.is_gitlab_team_member
-                )
-            if event_context.global_user_id is not None:
-                fields["global_user_id"] = str(event_context.global_user_id)
-            # Use a different name to avoid conflict with existing correlation_id field
-            if event_context.correlation_id is not None:
-                fields["event_correlation_id"] = str(event_context.correlation_id)
 
     async def __call__(self, scope, receive, send):
         if scope["type"] != "http":
@@ -181,9 +159,6 @@ class AccessLogMiddleware:
                 ),
                 "gitlab_realm": request.headers.get(X_GITLAB_REALM_HEADER),
             }
-
-            # Add event context attributes
-            self._add_event_context_fields(fields)
 
             # Safely update with starlette context data
             try:

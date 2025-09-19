@@ -36,6 +36,29 @@ class InternalEventMiddleware:
         self.environment = environment
         self.path_resolver = _PathResolver.from_optional_list(skip_endpoints)
 
+    def _add_event_context_to_starlette_context(
+        self, event_context: EventContext
+    ) -> None:
+        """Add event context attributes to starlette context for access logging."""
+        # Only add fields that have non-None values
+        if event_context.instance_id is not None:
+            starlette_context["instance_id"] = str(event_context.instance_id)
+        if event_context.host_name is not None:
+            starlette_context["host_name"] = str(event_context.host_name)
+        if event_context.realm is not None:
+            starlette_context["realm"] = str(event_context.realm)
+        if event_context.is_gitlab_team_member is not None:
+            starlette_context["is_gitlab_team_member"] = str(
+                event_context.is_gitlab_team_member
+            )
+        if event_context.global_user_id is not None:
+            starlette_context["global_user_id"] = str(event_context.global_user_id)
+        # Use a different name to avoid conflict with existing correlation_id field
+        if event_context.correlation_id is not None:
+            starlette_context["event_correlation_id"] = str(
+                event_context.correlation_id
+            )
+
     async def __call__(self, scope, receive, send):
         if scope["type"] != "http" or not self.enabled:
             await self.app(scope, receive, send)
@@ -94,6 +117,9 @@ class InternalEventMiddleware:
         )
         current_event_context.set(context)
         tracked_internal_events.set(set())
+
+        # Add event context fields to starlette context for access logging
+        self._add_event_context_to_starlette_context(context)
 
         await self.app(scope, receive, send)
 
