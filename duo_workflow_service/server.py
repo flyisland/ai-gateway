@@ -140,7 +140,10 @@ class DuoWorkflowService(contract_pb2_grpc.DuoWorkflowServicer):
     ):
         if client_event.startRequest.additional_context:
             for additional_context in client_event.startRequest.additional_context:
-                if additional_context in self.UP_GATED_ADDITIONAL_CONTEXT_CATEGORIES:
+                if (
+                    additional_context.category
+                    in self.UP_GATED_ADDITIONAL_CONTEXT_CATEGORIES
+                ):
                     unit_primitive = GitLabUnitPrimitive[
                         f"include_{additional_context.category}_context".upper()
                     ]
