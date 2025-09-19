@@ -200,16 +200,12 @@ class TestAccessLogEventContext:
             response = test_app.get("/success", headers=headers)
             assert response.status_code == 200
 
-        # Verify event context fields were included
-        assert cap_logs[0]["instance_id"] == "test-instance-123"
-        assert cap_logs[0]["host_name"] == "gitlab.example.com"
-        assert cap_logs[0]["realm"] == "saas"
+        # Verify only is_gitlab_team_member is logged from event context
+        # (other fields were removed to avoid duplication with header-based logging)
         assert (
             cap_logs[0]["is_gitlab_team_member"] == "True"
         )  # String representation of boolean
-        assert cap_logs[0]["global_user_id"] == "user-456"
-        # Note: event_correlation_id may not be present if correlation_id is None in test environment
-
+        
         # Verify standard fields are still present
         assert "url" in cap_logs[0]
         assert "status_code" in cap_logs[0]
@@ -253,13 +249,12 @@ class TestAccessLogEventContext:
             response = test_app.get("/success", headers=headers)
             assert response.status_code == 200
 
-        # Verify only non-None event context fields are present
-        assert cap_logs[0]["instance_id"] == "test-instance-123"
-        assert "host_name" not in cap_logs[0]  # None values are not included
-        assert cap_logs[0]["realm"] == "saas"
-        assert (
-            "is_gitlab_team_member" not in cap_logs[0]
-        )  # None values are not included
-        assert cap_logs[0]["global_user_id"] == "user-456"
-        # event_correlation_id is not present when correlation_id is None
+        # These fields are no longer logged from event context to avoid duplication
+        assert "instance_id" not in cap_logs[0]
+        assert "host_name" not in cap_logs[0]
+        assert "realm" not in cap_logs[0]
+        assert "global_user_id" not in cap_logs[0]
         assert "event_correlation_id" not in cap_logs[0]
+        
+        # is_gitlab_team_member should not be present when header is missing
+        assert "is_gitlab_team_member" not in cap_logs[0]
