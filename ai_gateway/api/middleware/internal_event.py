@@ -36,16 +36,6 @@ class InternalEventMiddleware:
         self.environment = environment
         self.path_resolver = _PathResolver.from_optional_list(skip_endpoints)
 
-    def _add_event_context_to_starlette_context(
-        self, event_context: EventContext
-    ) -> None:
-        """Add event context attributes to starlette context for access logging."""
-        # Only add fields that have non-None values
-        if event_context.is_gitlab_team_member is not None:
-            starlette_context["is_gitlab_team_member"] = str(
-                event_context.is_gitlab_team_member
-            )
-
     async def __call__(self, scope, receive, send):
         if scope["type"] != "http" or not self.enabled:
             await self.app(scope, receive, send)
@@ -104,9 +94,6 @@ class InternalEventMiddleware:
         )
         current_event_context.set(context)
         tracked_internal_events.set(set())
-
-        # Add event context fields to starlette context for access logging
-        self._add_event_context_to_starlette_context(context)
 
         await self.app(scope, receive, send)
 

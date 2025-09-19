@@ -13,7 +13,6 @@ from starlette_context import context as starlette_context
 from uvicorn.protocols.utils import get_path_with_query_string
 
 from ai_gateway.tracking.errors import log_exception
-from lib.internal_events.context import current_event_context
 
 from .headers import (
     X_GITLAB_FEATURE_ENABLED_BY_NAMESPACE_IDS_HEADER,
@@ -25,6 +24,7 @@ from .headers import (
     X_GITLAB_MODEL_GATEWAY_REQUEST_SENT_AT,
     X_GITLAB_REALM_HEADER,
     X_GITLAB_SAAS_DUO_PRO_NAMESPACE_IDS_HEADER,
+    X_GITLAB_TEAM_MEMBER_HEADER,
     X_GITLAB_VERSION_HEADER,
 )
 
@@ -159,15 +159,12 @@ class AccessLogMiddleware:
                     X_GITLAB_FEATURE_ENABLEMENT_TYPE_HEADER
                 ),
                 "gitlab_realm": request.headers.get(X_GITLAB_REALM_HEADER),
+                "is_gitlab_team_member": request.headers.get(
+                    X_GITLAB_TEAM_MEMBER_HEADER
+                ),
             }
 
-            # Safely update with starlette context data
-            try:
-                fields.update(starlette_context.data)
-            except (AttributeError, RuntimeError) as e:
-                # Handle case where starlette context is not available (e.g., in tests)
-                # or when context data is not accessible
-                log.debug("Starlette context not available for access logging: %s", e)
+            fields.update(starlette_context.data)
 
             # Recreate the Uvicorn access log format, but add all parameters as structured information
             access_logger.info(
