@@ -13,6 +13,7 @@ from starlette_context import context as starlette_context
 from uvicorn.protocols.utils import get_path_with_query_string
 
 from ai_gateway.tracking.errors import log_exception
+from lib.internal_events.context import current_event_context
 
 from .headers import (
     X_GITLAB_FEATURE_ENABLED_BY_NAMESPACE_IDS_HEADER,
