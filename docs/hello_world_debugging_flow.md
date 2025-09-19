@@ -71,6 +71,17 @@ curl -X POST \
     http://gdk.test:3443/api/v4/ai/duo_workflows/workflows
 ```
 
+### Running as a default chat flow tool
+
+1. Open GDK window with **GitLab Duo Agentic Chat**
+1. Ask it `What tools do you have available?` and confirm that `Hello world` is listed
+1. Reply `Run Hello world` and it should reply with
+
+```
+Hello, World! 🎉
+The hello world tool is working perfectly. This is a simple debugging tool that confirms the tool system is functioning correctly. Is there anything specific you'd like to work on with your GitLab project?
+```
+
 ### Debugging Features
 
 - **Easy Identification**: The tool name `hello_world` and emoji output make it easy to spot in logs
