@@ -20,15 +20,6 @@ from duo_workflow_service.agent_platform.experimental.flows.flow_config import (
 class TestFlowConfig:
     """Test FlowConfig class functionality."""
 
-    # @pytest.fixture(name="sample_config_data")
-    # def flow_config_data(self):
-    #     """Fixture providing mock project data."""
-    #     return {
-    #         "id": 123,
-    #         "name": "test-project",
-    #         "web_url": "https://gitlab.com/test/project",
-    #     }
-
     def test_input_json_schemas_by_category_with_no_inputs(self):
         """Test input_json_schemas_by_category returns empty dict when no inputs defined."""
         config_data = {
