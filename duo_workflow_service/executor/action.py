@@ -62,10 +62,8 @@ async def _execute_action_and_get_action_response(
             )
 
         if not event.actionResponse.response:
-            if (
-                event.actionResponse.plainTextResponse.response
-                or event.actionResponse.plainTextResponse.error
-            ):
+            response_type = event.actionResponse.WhichOneof("response_type")
+            if response_type == "plainTextResponse":
                 log.info(
                     "Legacy response empty, setting it from plaintext response",
                     requestID=event.actionResponse.requestID,
@@ -74,7 +72,7 @@ async def _execute_action_and_get_action_response(
                 event.actionResponse.response = _get_action_response_from_plaintext(
                     event.actionResponse.plainTextResponse
                 )
-            else:
+            elif response_type == "httpResponse":
                 log.info(
                     "Legacy response empty, setting it from http response",
                     requestID=event.actionResponse.requestID,
