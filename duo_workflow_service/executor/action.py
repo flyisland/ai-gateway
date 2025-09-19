@@ -60,6 +60,30 @@ async def _execute_action_and_get_action_response(
                 action_class=action_class,
             )
 
+        if not event.actionResponse.response:
+            if event.actionResponse.plainTextResponse.response:
+                log.info(
+                    "Legacy response empty, setting it from plaintext response",
+                    requestID=event.actionResponse.requestID,
+                    action_class=action_class,
+                )
+                event.actionResponse.response = (
+                    event.actionResponse.plainTextResponse.response
+                )
+            else:
+                log.info(
+                    "Legacy response empty, setting it from http response",
+                    requestID=event.actionResponse.requestID,
+                    action_class=action_class,
+                )
+                event.actionResponse.response = event.actionResponse.httpResponse.body
+
+                if (
+                    event.actionResponse.httpResponse.statusCode < 200
+                    or event.actionResponse.httpResponse.statusCode >= 300
+                ):
+                    event.actionResponse.response = f"Error: unexpected status code: {event.actionResponse.httpResponse.statusCode}"
+
         # Record all metrics in the separate function
         record_metrics(action_class, duration)
 

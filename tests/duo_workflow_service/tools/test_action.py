@@ -86,3 +86,79 @@ async def test_execute_action_and_get_http_response_connection_error(metadata):
     metadata["outbox"].task_done()
     assert put_action == action
     assert metadata["inbox"].empty()
+
+
+@pytest.mark.asyncio
+async def test__execute_action_and_get_action_response_missing_legacy_response_from_http_success(
+    metadata,
+):
+    action = contract_pb2.Action()
+    client_event = contract_pb2.ClientEvent()
+    client_event.actionResponse.response = ""
+
+    client_event.actionResponse.httpResponse.statusCode = 200
+    client_event.actionResponse.httpResponse.body = '{"result": "ok"}'
+    client_event.actionResponse.httpResponse.error = ""
+
+    await metadata["inbox"].put(client_event)
+
+    response = await _execute_action_and_get_http_response(metadata, action)
+
+    put_action = await metadata["outbox"].get()
+    metadata["outbox"].task_done()
+
+    assert put_action == action
+    assert response.response == '{"result": "ok"}'
+    assert response.httpResponse.statusCode == 200
+    assert response.httpResponse.body == '{"result": "ok"}'
+    assert metadata["inbox"].empty()
+
+
+@pytest.mark.asyncio
+async def test__execute_action_and_get_action_response_missing_legacy_response_from_http_not_found(
+    metadata,
+):
+    action = contract_pb2.Action()
+    client_event = contract_pb2.ClientEvent()
+    client_event.actionResponse.response = ""
+
+    client_event.actionResponse.httpResponse.statusCode = 404
+    client_event.actionResponse.httpResponse.body = ""
+    client_event.actionResponse.httpResponse.error = ""
+
+    await metadata["inbox"].put(client_event)
+
+    response = await _execute_action_and_get_http_response(metadata, action)
+
+    put_action = await metadata["outbox"].get()
+    metadata["outbox"].task_done()
+
+    assert put_action == action
+    assert response.response == "Error: unexpected status code: 404"
+    assert response.httpResponse.statusCode == 404
+    assert response.httpResponse.body == ""
+    assert metadata["inbox"].empty()
+
+
+@pytest.mark.asyncio
+async def test__execute_action_and_get_action_response_missing_legacy_response_from_plaintext(
+    metadata,
+):
+    action = contract_pb2.Action()
+    client_event = contract_pb2.ClientEvent()
+    client_event.actionResponse.response = ""
+
+    client_event.actionResponse.plainTextResponse.response = "Response"
+    client_event.actionResponse.plainTextResponse.error = ""
+
+    await metadata["inbox"].put(client_event)
+
+    response = await _execute_action_and_get_http_response(metadata, action)
+
+    put_action = await metadata["outbox"].get()
+    metadata["outbox"].task_done()
+
+    assert put_action == action
+    assert response.response == "Response"
+    assert response.plainTextResponse.response == "Response"
+    assert metadata["inbox"].empty()
