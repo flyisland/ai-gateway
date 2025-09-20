@@ -54,7 +54,7 @@ class GitLabStatusUpdater:
                 f"Session status cannot be updated due to bad status event: {status_event}, error: {result.body}"
             )
 
-        if result.status_code != 200:
+        if result.status_code < 200 or result.status_code >= 300:
             raise Exception(
                 f"Failed to update workflow with '{status_event}' status: {result.status_code}"
             )
