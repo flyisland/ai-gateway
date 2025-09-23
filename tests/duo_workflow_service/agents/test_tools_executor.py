@@ -14,6 +14,7 @@ from langgraph.graph import StateGraph
 from langgraph.types import Command
 from pydantic import BaseModel, Field, ValidationError
 
+from contract import contract_pb2
 from duo_workflow_service.agents import ToolsExecutor
 from duo_workflow_service.entities.state import (
     MessageTypeEnum,
@@ -113,8 +114,6 @@ def mock_datetime_fixture(mock_now: datetime):
 
 @pytest.fixture(name="mock_action_response")
 def mock_action_response_fixture():
-    from contract import contract_pb2
-
     mock_action_response = contract_pb2.ActionResponse()
     mock_action_response.requestID = "test-request-id"
     mock_action_response.plainTextResponse.response = "/home output"
@@ -124,8 +123,6 @@ def mock_action_response_fixture():
 
 @pytest.fixture(name="mock_client_event")
 def mock_client_event_fixture(mock_action_response):
-    from contract import contract_pb2
-
     mock_client_event = contract_pb2.ClientEvent()
     mock_client_event.actionResponse.CopyFrom(mock_action_response)
     return mock_client_event
