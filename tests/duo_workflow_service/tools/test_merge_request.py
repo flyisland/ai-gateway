@@ -198,7 +198,9 @@ async def test_create_merge_request(gitlab_client_mock, metadata):
     assert response == expected_response
 
     gitlab_client_mock.apost.assert_called_once_with(
-        path="/api/v4/projects/1/merge_requests", body=json.dumps(expected_data)
+        path="/api/v4/projects/1/merge_requests",
+        body=json.dumps(expected_data),
+        use_http_response=True,
     )
 
 
@@ -269,6 +271,7 @@ async def test_create_merge_request_with_url_success(
                 "title": "Test Merge Request",
             }
         ),
+        use_http_response=True,
     )
 
 
@@ -345,7 +348,9 @@ async def test_create_merge_request_minimal_params(gitlab_client_mock, metadata)
     assert response == expected_response
 
     gitlab_client_mock.apost.assert_called_once_with(
-        path="/api/v4/projects/1/merge_requests", body=json.dumps(expected_data)
+        path="/api/v4/projects/1/merge_requests",
+        body=json.dumps(expected_data),
+        use_http_response=True,
     )
 
 
@@ -376,7 +381,9 @@ async def test_create_merge_request_with_server_error(gitlab_client_mock, metada
     assert response == expected_response
 
     gitlab_client_mock.apost.assert_called_once_with(
-        path="/api/v4/projects/1/merge_requests", body=json.dumps(expected_data)
+        path="/api/v4/projects/1/merge_requests",
+        body=json.dumps(expected_data),
+        use_http_response=True,
     )
 
 
@@ -604,6 +611,7 @@ async def test_create_merge_request_note(gitlab_client_mock, metadata):
     gitlab_client_mock.apost.assert_called_once_with(
         path="/api/v4/projects/1/merge_requests/123/notes",
         body='{"body": "Test note"}',
+        use_http_response=True,
     )
 
 
@@ -666,6 +674,7 @@ async def test_create_merge_request_note_with_url_success(
     gitlab_client_mock.apost.assert_called_once_with(
         path=expected_path,
         body=json.dumps({"body": "Test note"}),
+        use_http_response=True,
     )
 
 
@@ -771,6 +780,7 @@ async def test_create_merge_request_note_allows_regular_notes(
     gitlab_client_mock.apost.assert_called_once_with(
         path="/api/v4/projects/1/merge_requests/123/notes",
         body=json.dumps({"body": note}),
+        use_http_response=True,
     )
 
 
@@ -1533,6 +1543,7 @@ async def test_post_duo_code_review(gitlab_client_mock, metadata):
                 "review_output": "<review>test</review>",
             }
         ),
+        use_http_response=True,
     )
 
 

@@ -5,6 +5,7 @@ from typing import Any, Optional, Type
 from gitlab_cloud_connector import GitLabUnitPrimitive
 from pydantic import BaseModel, Field
 
+from duo_workflow_service.gitlab.http_client import GitLabHttpResponse
 from duo_workflow_service.policies.diff_exclusion_policy import DiffExclusionPolicy
 from duo_workflow_service.tools.duo_base_tool import (
     DESCRIPTION_CHARACTER_LIMIT,
@@ -111,8 +112,17 @@ class CreateMergeRequest(DuoBaseTool):
             response = await self.gitlab_client.apost(
                 path=f"/api/v4/projects/{project_id}/merge_requests",
                 body=json.dumps(data),
+                use_http_response=True,
             )
 
+            if isinstance(response, GitLabHttpResponse):
+                if response.status_code >= 400:
+                    return json.dumps(
+                        {"error": f"HTTP {response.status_code}: {response.body}"}
+                    )
+                response = response.body
+
+            # Legacy check for backward compatibility
             if (
                 isinstance(response, dict)
                 and "status" in response
@@ -315,7 +325,16 @@ They are commands that are on their own line and start with a backslash. Example
                         "body": body,
                     },
                 ),
+                use_http_response=True,
             )
+
+            if isinstance(response, GitLabHttpResponse):
+                if response.status_code >= 400:
+                    return json.dumps(
+                        {"error": f"HTTP {response.status_code}: {response.body}"}
+                    )
+                response = response.body
+
             return json.dumps({"status": "success", "body": body, "response": response})
         except Exception as e:
             return json.dumps({"error": str(e)})
@@ -654,8 +673,17 @@ post_duo_code_review(project_id="123", merge_request_iid=45, review_output="<rev
             response = await self.gitlab_client.apost(
                 path="/api/v4/ai/duo_workflows/code_review/add_comments",
                 body=json.dumps(request_body),
+                use_http_response=True,
             )
 
+            if isinstance(response, GitLabHttpResponse):
+                if response.status_code >= 400:
+                    return json.dumps(
+                        {"error": f"HTTP {response.status_code}: {response.body}"}
+                    )
+                response = response.body
+
+            # Legacy check for backward compatibility
             if (
                 isinstance(response, dict)
                 and response.get("message") == "Comments added successfully"

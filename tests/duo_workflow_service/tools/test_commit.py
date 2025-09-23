@@ -819,6 +819,7 @@ async def test_create_commit(gitlab_client_mock, metadata, commit_data):
     gitlab_client_mock.apost.assert_called_once_with(
         path="/api/v4/projects/24/repository/commits",
         body=json.dumps(expected_params),
+        use_http_response=True,
     )
 
 
@@ -883,6 +884,7 @@ async def test_create_commit_with_url_success(
     gitlab_client_mock.apost.assert_called_once_with(
         path=expected_path,
         body=json.dumps(expected_params),
+        use_http_response=True,
     )
 
 
@@ -986,6 +988,7 @@ async def test_create_commit_with_all_optional_params(
     gitlab_client_mock.apost.assert_called_once_with(
         path="/api/v4/projects/24/repository/commits",
         body=json.dumps(expected_params),
+        use_http_response=True,
     )
 
 
@@ -1055,6 +1058,7 @@ async def test_create_commit_with_multiple_action_types(
     gitlab_client_mock.apost.assert_called_once_with(
         path="/api/v4/projects/24/repository/commits",
         body=json.dumps(expected_params),
+        use_http_response=True,
     )
 
 

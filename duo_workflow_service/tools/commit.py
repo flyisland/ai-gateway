@@ -4,6 +4,7 @@ from typing import Any, List, NamedTuple, Optional, Type
 from gitlab_cloud_connector import GitLabUnitPrimitive
 from pydantic import BaseModel, Field
 
+from duo_workflow_service.gitlab.http_client import GitLabHttpResponse
 from duo_workflow_service.gitlab.url_parser import GitLabUrlParseError, GitLabUrlParser
 from duo_workflow_service.policies.diff_exclusion_policy import DiffExclusionPolicy
 from duo_workflow_service.tools.duo_base_tool import DuoBaseTool
@@ -485,7 +486,16 @@ class CreateCommit(DuoBaseTool):
             response = await self.gitlab_client.apost(
                 path=f"/api/v4/projects/{project_id}/repository/commits",
                 body=json.dumps(params),
+                use_http_response=True,
             )
+
+            if isinstance(response, GitLabHttpResponse):
+                if response.status_code >= 400:
+                    return json.dumps(
+                        {"error": f"HTTP {response.status_code}: {response.body}"}
+                    )
+                response = response.body
+
             return json.dumps(
                 {"status": "success", "data": params, "response": response}
             )
