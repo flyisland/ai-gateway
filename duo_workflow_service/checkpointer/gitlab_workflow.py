@@ -76,6 +76,14 @@ def not_implemented_sync_method(func: T) -> T:
 
 NOOP_WORKFLOW_STATUSES = [WorkflowStatusEnum.APPROVAL_ERROR]
 
+BILLABLE_STATUSES = frozenset(
+    [
+        WorkflowStatusEnum.FINISHED,
+        WorkflowStatusEnum.STOPPED,
+        WorkflowStatusEnum.INPUT_REQUIRED,
+    ]
+)
+
 
 class WorkflowStatusEventEnum(StrEnum):
     START = "start"
@@ -471,11 +479,7 @@ class GitLabWorkflow(
         """Track successful workflow completion based on status."""
 
         # Track billing event for workflow completion
-        if status in (
-            WorkflowStatusEnum.FINISHED,
-            WorkflowStatusEnum.STOPPED,
-            WorkflowStatusEnum.INPUT_REQUIRED,
-        ):
+        if status in BILLABLE_STATUSES:
             try:
                 billing_metadata = {
                     "workflow_id": self._workflow_id,
@@ -493,7 +497,9 @@ class GitLabWorkflow(
                     "Successfully sent billing event for workflow %s", self._workflow_id
                 )
             except Exception as e:
-                self._logger.error(f"Error sending billing event: {e}")
+                self._logger.error(
+                    f"Error sending billing event for workflow {self._workflow_id}: {e}"
+                )
         else:
             self._logger.info(
                 f"Billing Status '{status}' does not match billing event conditions"
