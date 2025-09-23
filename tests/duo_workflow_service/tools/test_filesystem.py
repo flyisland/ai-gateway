@@ -609,7 +609,7 @@ def test_write_file_format_display_message(mock_project):
 
     message = tool.format_display_message(input_data)
 
-    expected_message = "Create file"
+    expected_message = "Create file: './src/new_file.py'"
     assert message == expected_message
 
 
@@ -679,7 +679,7 @@ def test_edit_file_format_display_message(mock_project):
 
     message = tool.format_display_message(input_data)
 
-    expected_message = "Edit file"
+    expected_message = "Edit file: './src/main.py'"
     assert message == expected_message
 
 
@@ -921,8 +921,9 @@ class TestFileExclusionPolicy:
         # Test excluded file
         input_data = ReadFileInput(file_path="file.secret")
         message = tool.format_display_message(input_data)
-        expected = "Read file: 'file.secret'" + FileExclusionPolicy.format_user_exclusion_message(
-            ["file.secret"]
+        expected = (
+            "Read file: 'file.secret'"
+            + FileExclusionPolicy.format_user_exclusion_message(["file.secret"])
         )
         assert message == expected
 
@@ -941,15 +942,16 @@ class TestFileExclusionPolicy:
         # Test excluded file
         input_data = WriteFileInput(file_path="file.secret", contents="content")
         message = tool.format_display_message(input_data)
-        expected = "Create file" + FileExclusionPolicy.format_user_exclusion_message(
-            ["file.secret"]
+        expected = (
+            "Create file: 'file.secret'"
+            + FileExclusionPolicy.format_user_exclusion_message(["file.secret"])
         )
         assert message == expected
 
         # Test allowed file
         input_data = WriteFileInput(file_path="file.txt", contents="content")
         message = tool.format_display_message(input_data)
-        assert message == "Create file"
+        assert message == "Create file: 'file.txt'"
 
     def test_edit_file_format_display_message_with_exclusion(
         self, project_with_exclusions
@@ -963,15 +965,16 @@ class TestFileExclusionPolicy:
             file_path="file.secret", old_str="old", new_str="new"
         )
         message = tool.format_display_message(input_data)
-        expected = "Edit file" + FileExclusionPolicy.format_user_exclusion_message(
-            ["file.secret"]
+        expected = (
+            "Edit file: 'file.secret'"
+            + FileExclusionPolicy.format_user_exclusion_message(["file.secret"])
         )
         assert message == expected
 
         # Test allowed file
         input_data = EditFileInput(file_path="file.txt", old_str="old", new_str="new")
         message = tool.format_display_message(input_data)
-        assert message == "Edit file"
+        assert message == "Edit file: 'file.txt'"
 
     @pytest.mark.asyncio
     async def test_list_dir_excluded_directory(self, project_with_exclusions):

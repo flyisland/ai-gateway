@@ -246,7 +246,7 @@ class WriteFile(DuoBaseTool):
     def format_display_message(
         self, args: WriteFileInput, _tool_response: Any = None
     ) -> str:
-        msg = "Create file"
+        msg = f"Create file: '{args.file_path}'"
         if not FileExclusionPolicy.is_allowed_for_project(self.project, args.file_path):
             msg += FileExclusionPolicy.format_user_exclusion_message([args.file_path])
 
@@ -469,7 +469,7 @@ Examples of batched file edits:
     def format_display_message(
         self, args: EditFileInput, _tool_response: Any = None
     ) -> str:
-        msg = "Edit file"
+        msg = f"Edit file: '{args.file_path}'"
         if not FileExclusionPolicy.is_allowed_for_project(self.project, args.file_path):
             msg += FileExclusionPolicy.format_user_exclusion_message([args.file_path])
 
