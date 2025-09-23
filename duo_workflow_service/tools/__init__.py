@@ -14,7 +14,6 @@ from .issue import *
 from .job import *
 from .mcp_tools import *
 from .merge_request import *
-from .parser import *
 from .pipeline import *
 from .planner import *
 from .previous_context import *

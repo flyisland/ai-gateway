@@ -35,7 +35,6 @@ class DeterministicStepNode:
         name: str,
         tool_name: str,
         inputs: list[IOKey],
-        output_mappings: dict[str, str],
         flow_id: str,
         flow_type: CategoryEnum,
         internal_event_client: InternalEventsClient,
@@ -50,7 +49,6 @@ class DeterministicStepNode:
         self.name = name
         self._tool_name = tool_name
         self._inputs = inputs
-        self._output_mappings = output_mappings
         self._flow_id = flow_id
         self._flow_type = flow_type
         self._internal_event_client = internal_event_client
@@ -63,12 +61,11 @@ class DeterministicStepNode:
 
     async def run(self, state: FlowState) -> dict:
         response, err_format, status = None, None, None
-        mapped_updates: dict[str, Any] = {}
 
         try:
             tool_call_args = get_vars_from_state(self._inputs, state)
 
-            response, mapped_updates = await self._execute_tool(
+            response = await self._execute_tool(
                 tool=self._validated_tool, tool_call_args=tool_call_args
             )
 
@@ -104,7 +101,6 @@ class DeterministicStepNode:
         result = {
             **self._ui_history.pop_state_updates(),
         }
-        result = merge_nested_dict(result, mapped_updates)
         result = merge_nested_dict(
             result, self._tool_responses_key.to_nested_dict(response)
         )
@@ -119,20 +115,11 @@ class DeterministicStepNode:
 
     async def _execute_tool(
         self, tool_call_args: dict[str, Any], tool: BaseTool
-    ) -> tuple[Any, dict[str, Any]]:
+    ) -> str | Any:
         with duo_workflow_metrics.time_tool_call(
             tool_name=tool.name, flow_type=self._flow_type.value
         ):
             tool_call_result = await tool.arun(tool_call_args)
-
-        updates: dict[str, Any] = {}
-        if self._output_mappings and isinstance(tool_call_result, dict):
-            for dest_key_str, src_key in self._output_mappings.items():
-                if src_key in tool_call_result:
-                    dest_key = IOKey.parse_key(dest_key_str)
-                    src_val = tool_call_result[src_key]
-                    update_part = dest_key.to_nested_dict(src_val)
-                    updates = merge_nested_dict(updates, update_part)
 
         secure_result = PromptSecurity.apply_security_to_tool_response(
             response=tool_call_result, tool_name=self._tool_name
@@ -150,7 +137,7 @@ class DeterministicStepNode:
             event=UILogEventsDeterministicStep.ON_TOOL_EXECUTION_SUCCESS,
         )
 
-        return secure_result, updates
+        return secure_result
 
     def _track_internal_event(
         self,
