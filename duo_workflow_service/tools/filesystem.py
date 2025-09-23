@@ -120,7 +120,7 @@ class ReadFile(DuoBaseTool):
     def format_display_message(
         self, args: ReadFileInput, _tool_response: Any = None
     ) -> str:
-        msg = "Read file"
+        msg = f"Read file: '{args.file_path}'"
         if not FileExclusionPolicy.is_allowed_for_project(self.project, args.file_path):
             msg += FileExclusionPolicy.format_user_exclusion_message([args.file_path])
 

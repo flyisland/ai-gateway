@@ -595,7 +595,7 @@ def test_read_file_format_display_message(mock_project):
 
     message = tool.format_display_message(input_data)
 
-    expected_message = "Read file"
+    expected_message = "Read file: './src/main.py'"
     assert message == expected_message
 
 
@@ -921,7 +921,7 @@ class TestFileExclusionPolicy:
         # Test excluded file
         input_data = ReadFileInput(file_path="file.secret")
         message = tool.format_display_message(input_data)
-        expected = "Read file" + FileExclusionPolicy.format_user_exclusion_message(
+        expected = "Read file: 'file.secret'" + FileExclusionPolicy.format_user_exclusion_message(
             ["file.secret"]
         )
         assert message == expected
@@ -929,7 +929,7 @@ class TestFileExclusionPolicy:
         # Test allowed file
         input_data = ReadFileInput(file_path="file.txt")
         message = tool.format_display_message(input_data)
-        assert message == "Read file"
+        assert message == "Read file: 'file.txt'"
 
     def test_write_file_format_display_message_with_exclusion(
         self, project_with_exclusions
