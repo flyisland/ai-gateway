@@ -471,7 +471,11 @@ class GitLabWorkflow(
         """Track successful workflow completion based on status."""
 
         # Track billing event for workflow completion
-        if status in ("finished", "stopped", WorkflowStatusEnum.INPUT_REQUIRED):
+        if status in (
+            WorkflowStatusEnum.FINISHED,
+            WorkflowStatusEnum.STOPPED,
+            WorkflowStatusEnum.INPUT_REQUIRED,
+        ):
             try:
                 billing_metadata = {
                     "workflow_id": self._workflow_id,
