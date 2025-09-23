@@ -19,11 +19,14 @@ def metadata():
 
 
 @pytest.mark.asyncio
-async def test_execute_action_success(metadata):
+async def test_execute_action_success_http_response(metadata):
     action = contract_pb2.Action()
-    expected_response = "expected_response"
     client_event = contract_pb2.ClientEvent()
-    client_event.actionResponse.response = expected_response
+
+    # Set up HTTP response without error
+    client_event.actionResponse.httpResponse.statusCode = 200
+    client_event.actionResponse.httpResponse.body = '{"result": "success"}'
+    client_event.actionResponse.httpResponse.error = ""
 
     await metadata["inbox"].put(client_event)
 
@@ -32,7 +35,65 @@ async def test_execute_action_success(metadata):
     put_action = await metadata["outbox"].get()
     metadata["outbox"].task_done()
     assert put_action == action
-    assert response == expected_response
+    assert response == '{"result": "success"}'
+    assert metadata["inbox"].empty()
+
+
+@pytest.mark.asyncio
+async def test_execute_action_success_plaintext_response(metadata):
+    action = contract_pb2.Action()
+    client_event = contract_pb2.ClientEvent()
+
+    # Set up plaintext response without error
+    client_event.actionResponse.plainTextResponse.response = "plaintext success"
+    client_event.actionResponse.plainTextResponse.error = ""
+
+    await metadata["inbox"].put(client_event)
+
+    response = await _execute_action(metadata, action)
+
+    put_action = await metadata["outbox"].get()
+    metadata["outbox"].task_done()
+    assert put_action == action
+    assert response == "plaintext success"
+    assert metadata["inbox"].empty()
+
+
+@pytest.mark.asyncio
+async def test_execute_action_http_error(metadata):
+    action = contract_pb2.Action()
+    client_event = contract_pb2.ClientEvent()
+
+    # Set up HTTP response with error
+    client_event.actionResponse.httpResponse.error = "Connection timeout"
+
+    await metadata["inbox"].put(client_event)
+
+    with pytest.raises(Exception, match="HTTP action error: Connection timeout"):
+        await _execute_action(metadata, action)
+
+    put_action = await metadata["outbox"].get()
+    metadata["outbox"].task_done()
+    assert put_action == action
+    assert metadata["inbox"].empty()
+
+
+@pytest.mark.asyncio
+async def test_execute_action_plaintext_error(metadata):
+    action = contract_pb2.Action()
+    client_event = contract_pb2.ClientEvent()
+
+    # Set up plaintext response with error
+    client_event.actionResponse.plainTextResponse.error = "File not found"
+
+    await metadata["inbox"].put(client_event)
+
+    with pytest.raises(Exception, match="Action error: File not found"):
+        await _execute_action(metadata, action)
+
+    put_action = await metadata["outbox"].get()
+    metadata["outbox"].task_done()
+    assert put_action == action
     assert metadata["inbox"].empty()
 
 

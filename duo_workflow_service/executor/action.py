@@ -145,4 +145,14 @@ async def _execute_action_and_get_http_response(
 async def _execute_action(metadata: Dict[str, Any], action: contract_pb2.Action) -> str:
     actionResponse = await _execute_action_and_get_action_response(metadata, action)
 
-    return actionResponse.response
+    # Return the appropriate response type based on action type
+    response_type = actionResponse.WhichOneof("response_type")
+    if response_type == "httpResponse":
+        if actionResponse.httpResponse.error:
+            raise Exception(f"HTTP action error: {actionResponse.httpResponse.error}")
+        return actionResponse.httpResponse.body
+
+    if actionResponse.plainTextResponse.error:
+        raise Exception(f"Action error: {actionResponse.plainTextResponse.error}")
+
+    return actionResponse.plainTextResponse.response
