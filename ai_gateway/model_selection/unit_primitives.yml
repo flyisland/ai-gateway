@@ -387,3 +387,31 @@ configurable_unit_primitives:
     selectable_models:
       - "claude_sonnet_3_7_20250219"
       - "claude_sonnet_4_20250514"
+  - feature_setting: "resolve_pipeline_finding_context"
+    unit_primitives: []
+    default_model: "claude_sonnet_4_20250514"
+    selectable_models:
+      - "claude_sonnet_4_20250514"
+      - "claude_sonnet_3_7_20250219"
+      - "claude_3_5_sonnet_20240620"
+  - feature_setting: "resolve_pipeline_finding_execution"
+    unit_primitives: []
+    default_model: "claude_sonnet_4_20250514"
+    selectable_models:
+      - "claude_sonnet_4_20250514"
+      - "claude_sonnet_3_7_20250219"
+      - "claude_3_5_sonnet_20240620"
+  - feature_setting: "resolve_pipeline_finding_commit_and_push"
+    unit_primitives: []
+    default_model: "claude_sonnet_4_20250514"
+    selectable_models:
+      - "claude_sonnet_4_20250514"
+      - "claude_sonnet_3_7_20250219"
+      - "claude_3_5_sonnet_20240620"
+  - feature_setting: "resolve_pipeline_evaluate_mr_readiness"
+    unit_primitives: []
+    default_model: "claude_sonnet_4_20250514"
+    selectable_models:
+      - "claude_sonnet_4_20250514"
+      - "claude_sonnet_3_7_20250219"
+      - "claude_3_5_sonnet_20240620"

@@ -1,0 +1,68 @@
+Analyze and fix the single pipeline security finding specified below.
+
+<instructions>
+1. Retrieve details about this specific pipeline finding using get_security_finding_details with the provided identifiers
+
+2. Read and analyze ONLY the code directly related to this finding
+
+3. Design a precise fix for this specific finding instance
+
+4. Output a clear, actionable fix plan in the JSON format specified below
+
+Remember: Fix only this ONE pipeline security finding instance, not other similar patterns in the codebase.
+Focus on creating a complete, high-quality remediation that will prevent this finding from appearing in future pipeline scans.
+</instructions>
+
+<expected_output>
+Provide your analysis and fix plan as a structured JSON object:
+{
+  "finding_identification": {
+    "pipeline_id": "the pipeline GID",
+    "finding_uuid": "the finding UUID",
+    "finding_type": "specific security finding type",
+    "severity": "severity level",
+    "scanner": "name of the security scanner that detected this",
+    "location": {
+      "file": "exact file path",
+      "line": "specific line number",
+      "function": "containing function/method"
+    }
+  },
+  "analysis": {
+    "vulnerable_code": "the specific code snippet with the finding",
+    "finding_explanation": "why this specific code triggered the security finding",
+    "attack_scenario": "how this specific finding could be exploited",
+    "scanner_rationale": "why the scanner flagged this as a security issue"
+  },
+  "fix": {
+    "primary_change": {
+      "file": "file to modify",
+      "location": "specific location in file",
+      "current_code": "current code that triggered the finding",
+      "fixed_code": "secure replacement code",
+      "explanation": "why this fix addresses the security finding"
+    },
+    "supporting_changes": [
+      {
+        "file": "file path (only if essential)",
+        "change": "specific change needed",
+        "reason": "why this is essential for the fix"
+      }
+    ]
+  },
+  "validation": {
+    "test_approach": "how to verify the fix works",
+    "edge_cases": "specific cases to test",
+    "security_verification": "how to confirm the finding is resolved",
+    "pipeline_validation": "how to verify this won't appear in future pipeline scans"
+  },
+  "impact_assessment": {
+    "functionality_impact": "how this affects existing functionality",
+    "performance_impact": "any performance considerations",
+    "pipeline_impact": "impact on CI/CD pipeline execution if any"
+  }
+}
+
+Focus on providing a complete, high-quality fix for this single pipeline security finding instance.
+Ensure your fix will prevent the scanner from detecting this issue in future pipeline runs.
+</expected_output>
