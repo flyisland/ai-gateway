@@ -1072,9 +1072,7 @@ class TestPromptCheckpointerIntegration:
             prompt.model_provider = "test_provider"
             prompt.unit_primitives = ["complete_code"]
             prompt.internal_event_client = None
-            prompt.internal_event_extra = (
-                {}
-            )
+            prompt.internal_event_extra = {}
 
             mock_watcher = Mock(spec=ModelRequestInstrumentator.WatchContainer)
 
@@ -1115,4 +1113,3 @@ class TestPromptCheckpointerIntegration:
 
         finally:
             clear_workflow_checkpointer()
-

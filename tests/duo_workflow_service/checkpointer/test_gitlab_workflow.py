@@ -1309,4 +1309,3 @@ async def test_track_workflow_completion_with_billing_event(
     await gitlab_workflow._track_workflow_completion("some_other_status")
 
     billing_event_client.track_billing_event.assert_not_called()
-
