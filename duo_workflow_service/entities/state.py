@@ -188,7 +188,7 @@ def _conversation_history_reducer(
                 token_counter=token_counter.count_tokens,
                 start_on="human",
                 include_system=True,
-                allow_partial=False,
+                allow_partial=True,
             )
 
             reduced[agent_name] = _restore_message_consistency(trimmed_messages)
