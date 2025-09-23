@@ -843,6 +843,7 @@ async def test_link_vulnerability_to_issue(gitlab_client_mock, metadata):
                 },
             }
         ),
+        use_http_response=True,
     )
 
 
@@ -1037,6 +1038,7 @@ mutation($vulnerabilityId: VulnerabilityID!, $comment: String) {
                 },
             }
         ),
+        use_http_response=True,
     )
 
 
@@ -1110,6 +1112,7 @@ mutation($vulnerabilityId: VulnerabilityID!, $comment: String) {
                 },
             }
         ),
+        use_http_response=True,
     )
 
 
@@ -1184,6 +1187,7 @@ mutation($vulnerabilityId: VulnerabilityID!, $comment: String) {
                 },
             }
         ),
+        use_http_response=True,
     )
 
 
@@ -1337,6 +1341,7 @@ async def test_revert_to_detected_vulnerability(gitlab_client_mock, metadata):
                 },
             }
         ),
+        use_http_response=True,
     )
 
 

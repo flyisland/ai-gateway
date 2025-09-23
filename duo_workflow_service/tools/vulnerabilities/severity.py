@@ -4,6 +4,7 @@ from typing import Any, ClassVar, List, Type
 from gitlab_cloud_connector import GitLabUnitPrimitive
 from pydantic import BaseModel, Field
 
+from duo_workflow_service.gitlab.http_client import GitLabHttpResponse
 from duo_workflow_service.tools.duo_base_tool import DuoBaseTool
 
 PROJECT_IDENTIFICATION_DESCRIPTION = """The project must be specified using its full path (e.g., 'namespace/project' or 'group/subgroup/project')."""
@@ -134,7 +135,17 @@ class UpdateVulnerabilitySeverity(DuoBaseTool):
             response = await self.gitlab_client.apost(
                 path="/api/graphql",
                 body=json.dumps({"query": mutation, "variables": variables}),
+                use_http_response=True,
             )
+
+            if isinstance(response, GitLabHttpResponse):
+                if response.status_code >= 400:
+                    return json.dumps(
+                        {
+                            "error": f"GraphQL request failed: HTTP {response.status_code}"
+                        }
+                    )
+                response = response.body
 
             if "errors" in response:
                 return json.dumps({"error": f"GraphQL errors: {response['errors']}"})
