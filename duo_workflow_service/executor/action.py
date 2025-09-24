@@ -156,5 +156,7 @@ async def _execute_action(metadata: Dict[str, Any], action: contract_pb2.Action)
     response_type = actionResponse.WhichOneof("response_type")
     if response_type == "httpResponse":
         return actionResponse.httpResponse.body
-
-    return actionResponse.plainTextResponse.response
+    elif response_type == "plainTextResponse":
+        return actionResponse.plainTextResponse.response
+    else:
+        raise ValueError(f"Unexpected response type: {response_type}")

@@ -277,3 +277,24 @@ async def test__execute_action_and_get_action_response_missing_legacy_response_f
     metadata["outbox"].task_done()
     assert put_action == action
     assert metadata["inbox"].empty()
+
+
+@pytest.mark.asyncio
+async def test_execute_action_unknown_response_type(metadata):
+    """Test that _execute_action raises ValueError for unknown response_type."""
+    action = contract_pb2.Action()
+    client_event = contract_pb2.ClientEvent()
+
+    # Set up an ActionResponse with no response_type set (neither plainTextResponse nor httpResponse)
+    client_event.actionResponse.response = "some response"
+    # Don't set either plainTextResponse or httpResponse, so WhichOneof("response_type") returns None
+
+    await metadata["inbox"].put(client_event)
+
+    with pytest.raises(ValueError, match="Unexpected response type: None"):
+        await _execute_action(metadata, action)
+
+    put_action = await metadata["outbox"].get()
+    metadata["outbox"].task_done()
+    assert put_action == action
+    assert metadata["inbox"].empty()
