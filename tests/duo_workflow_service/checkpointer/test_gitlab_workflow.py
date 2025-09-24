@@ -2,7 +2,7 @@ import asyncio
 import json
 from asyncio import CancelledError
 from typing import Any, Optional, Sequence, TypedDict
-from unittest.mock import AsyncMock, Mock, call, patch
+from unittest.mock import AsyncMock, MagicMock, Mock, call, patch
 
 import pytest
 from langchain_core.messages import SystemMessage
@@ -27,6 +27,7 @@ from duo_workflow_service.json_encoder.encoder import CustomEncoder
 from duo_workflow_service.status_updater.gitlab_status_updater import (
     UnsupportedStatusEvent,
 )
+from lib.billing_events.client import BillingEventsClient
 from lib.internal_events import InternalEventAdditionalProperties
 from lib.internal_events.event_enum import (
     CategoryEnum,
@@ -86,7 +87,7 @@ def workflow_id_fixture():
 
 @pytest.fixture(name="billing_event_client")
 def billing_event_client_fixture():
-    return Mock()
+    return MagicMock(spec=BillingEventsClient)
 
 
 @pytest.fixture(autouse=True)
@@ -1195,8 +1196,7 @@ async def test_created_status_with_existing_checkpoint_raises_error(
     assert f"Found checkpoint: {mock_checkpoint}" in str(exc_info.value)
 
 
-@pytest.mark.asyncio
-async def test_track_llm_operation(gitlab_workflow):
+def test_track_llm_operation(gitlab_workflow):
     """Test that track_llm_operation correctly stores operation data."""
     assert gitlab_workflow._llm_operations == []
 
@@ -1209,44 +1209,35 @@ async def test_track_llm_operation(gitlab_workflow):
         completion_tokens=20,
     )
 
-    assert len(gitlab_workflow._llm_operations) == 1
-    operation = gitlab_workflow._llm_operations[0]
-
-    expected_operation = {
-        "token_count": 100,
-        "model_id": "claude-3-sonnet",
-        "model_engine": "anthropic",
-        "model_provider": "anthropic",
-        "prompt_tokens": 80,
-        "completion_tokens": 20,
-    }
-
-    assert operation == expected_operation
-
-    gitlab_workflow.track_llm_operation(
-        token_count=200,
-        model_id="gpt-4",
-        model_engine="openai",
-        model_provider="openai",
-        prompt_tokens=150,
-        completion_tokens=50,
-    )
-
-    assert len(gitlab_workflow._llm_operations) == 2
-    assert gitlab_workflow._llm_operations[1]["token_count"] == 200
-    assert gitlab_workflow._llm_operations[1]["model_id"] == "gpt-4"
+    assert gitlab_workflow._llm_operations == [
+        {
+            "token_count": 100,
+            "model_id": "claude-3-sonnet",
+            "model_engine": "anthropic",
+            "model_provider": "anthropic",
+            "prompt_tokens": 80,
+            "completion_tokens": 20,
+        }
+    ]
 
 
 @pytest.mark.asyncio
+@pytest.mark.parametrize(
+    "status",
+    [
+        WorkflowStatusEnum.FINISHED,
+        WorkflowStatusEnum.STOPPED,
+        WorkflowStatusEnum.INPUT_REQUIRED,
+    ],
+)
 async def test_track_workflow_completion_with_billing_event(
     gitlab_workflow,
     http_client,
     workflow_id,
-    internal_event_client,
     billing_event_client,
+    status,
 ):
     """Test that workflow completion triggers billing event for trackable statuses."""
-    gitlab_workflow._internal_event_client = internal_event_client
     gitlab_workflow._billing_event_client = billing_event_client
 
     gitlab_workflow._llm_operations = [
@@ -1268,7 +1259,7 @@ async def test_track_workflow_completion_with_billing_event(
         },
     ]
 
-    await gitlab_workflow._track_workflow_completion(WorkflowStatusEnum.FINISHED)
+    await gitlab_workflow._track_workflow_completion(status)
 
     billing_event_client.track_billing_event.assert_called_once_with(
         event_type="duo_agent_platform_workflow_completion",
@@ -1282,29 +1273,14 @@ async def test_track_workflow_completion_with_billing_event(
         },
     )
 
-    billing_event_client.track_billing_event.reset_mock()
 
-    await gitlab_workflow._track_workflow_completion(WorkflowStatusEnum.STOPPED)
-
-    billing_event_client.track_billing_event.assert_called_once_with(
-        event_type="duo_agent_platform_workflow_completion",
-        category="GitLabWorkflow",
-        unit_of_measure="tokens",
-        quantity=1,
-        metadata={
-            "workflow_id": workflow_id,
-            "execution_environment": "duo_agent_platform",
-            "llm_operations": gitlab_workflow._llm_operations,
-        },
-    )
-
-    billing_event_client.track_billing_event.reset_mock()
-
-    await gitlab_workflow._track_workflow_completion(WorkflowStatusEnum.INPUT_REQUIRED)
-
-    billing_event_client.track_billing_event.assert_called_once()
-
-    billing_event_client.track_billing_event.reset_mock()
+@pytest.mark.asyncio
+async def test_track_workflow_completion_with_non_billable_status(
+    gitlab_workflow,
+    billing_event_client,
+):
+    """Test that workflow completion doesn't trigger billing event for non-trackable statuses."""
+    gitlab_workflow._billing_event_client = billing_event_client
 
     await gitlab_workflow._track_workflow_completion("some_other_status")
 
