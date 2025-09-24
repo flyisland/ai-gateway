@@ -105,6 +105,7 @@ class BillingEventsClient:
         mapped_realm = realm_mapping.get(
             internal_context.realm or "", internal_context.realm
         )
+        unique_instance_id = user.claims.gitlab_instance_uid if user.claims else None
 
         billing_context = BillingEventContext(
             event_id=event_id,
@@ -118,7 +119,7 @@ class BillingEventsClient:
             realm=mapped_realm,
             timestamp=datetime.now().isoformat(),
             instance_id=internal_context.instance_id,
-            unique_instance_id=user.claims.gitlab_instance_uid,
+            unique_instance_id=unique_instance_id,
             host_name=internal_context.host_name,
             project_id=internal_context.project_id,
             namespace_id=internal_context.namespace_id,
