@@ -252,7 +252,9 @@ class TestMkdir:
         mock_inbox = MagicMock()
         mock_inbox.get = AsyncMock(
             return_value=contract_pb2.ClientEvent(
-                actionResponse=contract_pb2.ActionResponse(response="")
+                actionResponse=contract_pb2.ActionResponse(
+                    plainTextResponse=contract_pb2.PlainTextResponse(response="")
+                )
             )
         )
 
@@ -278,7 +280,9 @@ class TestMkdir:
         mock_inbox = MagicMock()
         mock_inbox.get = AsyncMock(
             return_value=contract_pb2.ClientEvent(
-                actionResponse=contract_pb2.ActionResponse(response="")
+                actionResponse=contract_pb2.ActionResponse(
+                    plainTextResponse=contract_pb2.PlainTextResponse(response="")
+                )
             )
         )
 
@@ -456,12 +460,13 @@ class TestReadFiles:
         mock_outbox.put = AsyncMock()
 
         # Mock response with mixed success and error
-        mock_plaintextResponse = {"error": "Error reading files"}
         mock_inbox = MagicMock()
         mock_inbox.get = AsyncMock(
             return_value=contract_pb2.ClientEvent(
                 actionResponse=contract_pb2.ActionResponse(
-                    response=None, plainTextResponse=mock_plaintextResponse
+                    plainTextResponse=contract_pb2.PlainTextResponse(
+                        error="Error reading files"
+                    )
                 )
             )
         )
@@ -994,7 +999,9 @@ class TestFileExclusionPolicy:
         mock_inbox.get = AsyncMock(
             return_value=contract_pb2.ClientEvent(
                 actionResponse=contract_pb2.ActionResponse(
-                    response="temp/cache.txt\ntemp/log.txt"
+                    plainTextResponse=contract_pb2.PlainTextResponse(
+                        response="temp/cache.txt\ntemp/log.txt"
+                    )
                 )
             )
         )
