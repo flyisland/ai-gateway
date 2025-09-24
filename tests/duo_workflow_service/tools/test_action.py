@@ -1,6 +1,7 @@
 import asyncio
 
 import pytest
+from langchain_core.tools import ToolException
 
 from contract import contract_pb2
 from duo_workflow_service.executor.action import (
@@ -60,7 +61,10 @@ async def test_execute_action_success_plaintext_response(metadata):
 
 
 @pytest.mark.asyncio
-async def test_execute_action_http_error(metadata):
+async def test__execute_action_and_get_action_response_http_error_raises_tool_exception(
+    metadata,
+):
+    """Test that HTTP errors in _execute_action_and_get_action_response raise ToolException."""
     action = contract_pb2.Action()
     client_event = contract_pb2.ClientEvent()
 
@@ -69,8 +73,8 @@ async def test_execute_action_http_error(metadata):
 
     await metadata["inbox"].put(client_event)
 
-    with pytest.raises(Exception, match="HTTP action error: Connection timeout"):
-        await _execute_action(metadata, action)
+    with pytest.raises(ToolException, match="HTTP action error: Connection timeout"):
+        await _execute_action_and_get_action_response(metadata, action)
 
     put_action = await metadata["outbox"].get()
     metadata["outbox"].task_done()
@@ -79,7 +83,10 @@ async def test_execute_action_http_error(metadata):
 
 
 @pytest.mark.asyncio
-async def test_execute_action_plaintext_error(metadata):
+async def test__execute_action_and_get_action_response_plaintext_error_raises_tool_exception(
+    metadata,
+):
+    """Test that plaintext errors in _execute_action_and_get_action_response raise ToolException."""
     action = contract_pb2.Action()
     client_event = contract_pb2.ClientEvent()
 
@@ -88,8 +95,8 @@ async def test_execute_action_plaintext_error(metadata):
 
     await metadata["inbox"].put(client_event)
 
-    with pytest.raises(Exception, match="Action error: File not found"):
-        await _execute_action(metadata, action)
+    with pytest.raises(ToolException, match="Action error: File not found"):
+        await _execute_action_and_get_action_response(metadata, action)
 
     put_action = await metadata["outbox"].get()
     metadata["outbox"].task_done()
@@ -139,9 +146,8 @@ async def test_execute_action_and_get_http_response_connection_error(metadata):
 
     await metadata["inbox"].put(client_event)
 
-    with pytest.raises(
-        HTTPConnectionError, match="HTTP connection failed: Connection refused"
-    ):
+    # This should raise ToolException from _execute_action_and_get_action_response first
+    with pytest.raises(ToolException, match="HTTP action error: Connection refused"):
         await _execute_action_and_get_http_response(metadata, action)
 
     put_action = await metadata["outbox"].get()
@@ -216,16 +222,13 @@ async def test__execute_action_and_get_action_response_missing_legacy_response_f
 
     await metadata["inbox"].put(client_event)
 
-    response = await _execute_action_and_get_action_response(metadata, action)
+    # This should now raise ToolException instead of returning a response
+    with pytest.raises(ToolException, match="HTTP action error: Some HTTP error"):
+        await _execute_action_and_get_action_response(metadata, action)
 
     put_action = await metadata["outbox"].get()
     metadata["outbox"].task_done()
-
     assert put_action == action
-    assert response.response == "Error: Some HTTP error"
-    assert response.httpResponse.statusCode == 0
-    assert response.httpResponse.body == ""
-    assert response.httpResponse.error == "Some HTTP error"
     assert metadata["inbox"].empty()
 
 
@@ -266,13 +269,11 @@ async def test__execute_action_and_get_action_response_missing_legacy_response_f
 
     await metadata["inbox"].put(client_event)
 
-    response = await _execute_action_and_get_action_response(metadata, action)
+    # This should now raise ToolException instead of returning a response
+    with pytest.raises(ToolException, match="Action error: file not found"):
+        await _execute_action_and_get_action_response(metadata, action)
 
     put_action = await metadata["outbox"].get()
     metadata["outbox"].task_done()
-
     assert put_action == action
-    assert response.response == "Error running tool: file not found"
-    assert response.plainTextResponse.response == ""
-    assert response.plainTextResponse.error == "file not found"
     assert metadata["inbox"].empty()

@@ -3,6 +3,7 @@ import time
 from typing import Any, Dict
 
 import structlog
+from langchain_core.tools import ToolException
 from prometheus_client import Histogram
 
 from contract import contract_pb2
@@ -53,12 +54,18 @@ async def _execute_action_and_get_action_response(
                 requestID=event.actionResponse.requestID,
                 action_class=action_class,
             )
+            raise ToolException(
+                f"HTTP action error: {event.actionResponse.httpResponse.error}"
+            )
 
         if event.actionResponse.plainTextResponse.error:
             log.error(
                 "Plaintext response error",
                 requestID=event.actionResponse.requestID,
                 action_class=action_class,
+            )
+            raise ToolException(
+                f"Action error: {event.actionResponse.plainTextResponse.error}"
             )
 
         if not event.actionResponse.response:
@@ -148,11 +155,6 @@ async def _execute_action(metadata: Dict[str, Any], action: contract_pb2.Action)
     # Return the appropriate response type based on action type
     response_type = actionResponse.WhichOneof("response_type")
     if response_type == "httpResponse":
-        if actionResponse.httpResponse.error:
-            raise Exception(f"HTTP action error: {actionResponse.httpResponse.error}")
         return actionResponse.httpResponse.body
-
-    if actionResponse.plainTextResponse.error:
-        raise Exception(f"Action error: {actionResponse.plainTextResponse.error}")
 
     return actionResponse.plainTextResponse.response
