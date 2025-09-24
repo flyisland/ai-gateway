@@ -32,7 +32,14 @@ prompt_template:
     - Continue batch processing even if some items require multiple attempts
     - Do not demonstrate or show examples - process all items completely
 
-    Important: After executing all tools, use final_response_tool to pass the raw tool data to the next component - do not summarize or format the data.
+    <required_json_output>
+    {
+      "merge_request": [raw get_merge_request response],
+      "diffs": [raw list_merge_request_diffs response],
+      "files": [array of raw get_repository_file responses],
+      "custom_instructions": [raw read_file response or null]
+    }
+    </required_json_output>
   user: |
     Fetch all data for merge request with IID {{merge_request_iid}} in project {{project_id}}.
   placeholder: history
