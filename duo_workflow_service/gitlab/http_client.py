@@ -61,6 +61,9 @@ class GitlabHttpClient(ABC):
         parse_json: bool = True,
         use_http_response: bool = False,
     ) -> Any:
+        if "issues" in path:
+            return GitLabHttpResponse(418, "TEAPOT ERROR", [])
+
         return await self._call(
             path,
             "POST",
