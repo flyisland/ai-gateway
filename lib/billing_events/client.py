@@ -39,25 +39,17 @@ class BillingEventsClient:
         )
 
         if enabled:
-            try:
-                self._logger.info(
-                    "Creating AsyncEmitter and Tracker for billing events"
-                )
-                emitter = AsyncEmitter(
-                    batch_size=batch_size, thread_count=thread_count, endpoint=endpoint
-                )
+            self._logger.info("Creating AsyncEmitter and Tracker for billing events")
+            emitter = AsyncEmitter(
+                batch_size=batch_size, thread_count=thread_count, endpoint=endpoint
+            )
 
-                self.snowplow_tracker = Tracker(
-                    app_id=app_id,
-                    namespace=namespace,
-                    emitters=[emitter],
-                )
-                self._logger.info("Successfully initialized billing events tracker")
-            except Exception as e:
-                self._logger.error(
-                    "Failed to initialize billing events tracker", error=str(e)
-                )
-                raise
+            self.snowplow_tracker = Tracker(
+                app_id=app_id,
+                namespace=namespace,
+                emitters=[emitter],
+            )
+            self._logger.info("Successfully initialized billing events tracker")
         else:
             self._logger.info(
                 "Billing events disabled - skipping tracker initialization"
