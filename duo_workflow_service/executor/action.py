@@ -119,42 +119,18 @@ class HTTPConnectionError(Exception):
     pass
 
 
-async def _execute_action_and_get_http_response(
-    metadata: Dict[str, Any], action: contract_pb2.Action
-) -> contract_pb2.ActionResponse:
-    """Execute action and return HTTP response, checking for connection errors.
-
-    This method checks if actionResponse.httpResponse.error has content (length > 0)
-    and raises HTTPConnectionError if an error exists. This handles connection-level
-    failures that would otherwise be silently ignored.
-
-    Args:
-        metadata: Dictionary containing outbox and inbox queues
-        action: The action to execute
-
-    Returns:
-        ActionResponse with httpResponse if no error
-
-    Raises:
-        HTTPConnectionError: If actionResponse.httpResponse.error has content
-    """
-    actionResponse = await _execute_action_and_get_action_response(metadata, action)
-
-    # Check for HTTP connection errors
-    if actionResponse.httpResponse.error:
-        raise HTTPConnectionError(
-            f"HTTP connection failed: {actionResponse.httpResponse.error}"
-        )
-
-    return actionResponse
-
-
 async def _execute_action(metadata: Dict[str, Any], action: contract_pb2.Action) -> str:
+    log = structlog.stdlib.get_logger("workflow")
     actionResponse = await _execute_action_and_get_action_response(metadata, action)
 
     # Return the appropriate response type based on action type
     response_type = actionResponse.WhichOneof("response_type")
     if response_type == "httpResponse":
+        log.info(
+            "HTTP response with use_http_response=False, returning body instead",
+            requestID=actionResponse.requestID,
+            action_class=action.WhichOneof("action"),
+        )
         return actionResponse.httpResponse.body
     elif response_type == "plainTextResponse":
         return actionResponse.plainTextResponse.response

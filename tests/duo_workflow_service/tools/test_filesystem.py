@@ -477,13 +477,8 @@ class TestReadFiles:
         tool.metadata = metadata
         file_paths = ["file1.py", "nonexistent.py"]
 
-        response = await tool._arun(file_paths)
-
-        assert response == "Could not read files"
-
-        mock_outbox.put.assert_called_once()
-        action = mock_outbox.put.call_args[0][0]
-        assert action.runReadFiles.filepaths == file_paths
+        with pytest.raises(ToolException, match="Action error: Error reading files"):
+            await tool._arun(file_paths)
 
     @pytest.mark.asyncio
     async def test_read_files_rejects_excluded_paths(self):

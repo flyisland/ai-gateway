@@ -149,18 +149,14 @@ class ReadFiles(DuoBaseTool):
         result_dict = {}
 
         if file_paths:
-            try:
-                file_contents_result_action_response = (
-                    await _execute_action_and_get_action_response(
-                        self.metadata,  # type: ignore
-                        contract_pb2.Action(
-                            runReadFiles=contract_pb2.ReadFiles(filepaths=file_paths)
-                        ),
-                    )
+            file_contents_result_action_response = (
+                await _execute_action_and_get_action_response(
+                    self.metadata,  # type: ignore
+                    contract_pb2.Action(
+                        runReadFiles=contract_pb2.ReadFiles(filepaths=file_paths)
+                    ),
                 )
-            except ToolException as e:
-                log.error(f"Could not read files: {e}")
-                return "Could not read files"
+            )
 
             if not file_contents_result_action_response:
                 log.error("Received empty grpc response")

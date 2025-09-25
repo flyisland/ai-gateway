@@ -1,14 +1,13 @@
 import asyncio
 
 import pytest
+import structlog
 from langchain_core.tools import ToolException
 
 from contract import contract_pb2
 from duo_workflow_service.executor.action import (
-    HTTPConnectionError,
     _execute_action,
     _execute_action_and_get_action_response,
-    _execute_action_and_get_http_response,
 )
 
 
@@ -20,14 +19,18 @@ def metadata():
 
 
 @pytest.mark.asyncio
-async def test_execute_action_success_http_response(metadata):
+async def test_execute_action_success_http_response(metadata, capsys):
     action = contract_pb2.Action()
     client_event = contract_pb2.ClientEvent()
 
     # Set up HTTP response without error
+    client_event.actionResponse.requestID = "test-request-123"
     client_event.actionResponse.httpResponse.statusCode = 200
     client_event.actionResponse.httpResponse.body = '{"result": "success"}'
     client_event.actionResponse.httpResponse.error = ""
+
+    # Set up action type for logging
+    action.runHTTPRequest.path = "https://example.com"
 
     await metadata["inbox"].put(client_event)
 
@@ -39,9 +42,18 @@ async def test_execute_action_success_http_response(metadata):
     assert response == '{"result": "success"}'
     assert metadata["inbox"].empty()
 
+    # Verify the log entry was created for the _execute_action call
+    captured = capsys.readouterr()
+    assert (
+        "HTTP response with use_http_response=False, returning body instead"
+        in captured.out
+    )
+    assert "action_class=runHTTPRequest" in captured.out
+    assert "requestID=test-request-123" in captured.out
+
 
 @pytest.mark.asyncio
-async def test_execute_action_success_plaintext_response(metadata):
+async def test_execute_action_success_plaintext_response(metadata, capsys):
     action = contract_pb2.Action()
     client_event = contract_pb2.ClientEvent()
 
@@ -58,6 +70,13 @@ async def test_execute_action_success_plaintext_response(metadata):
     assert put_action == action
     assert response == "plaintext success"
     assert metadata["inbox"].empty()
+
+    # Verify no log entry for the specific HTTP response message
+    captured = capsys.readouterr()
+    assert (
+        "HTTP response with use_http_response=False, returning body instead"
+        not in captured.out
+    )
 
 
 @pytest.mark.asyncio
@@ -110,50 +129,6 @@ async def test_execute_action_empty_inbox(metadata):
 
     with pytest.raises(asyncio.TimeoutError):
         await asyncio.wait_for(_execute_action(metadata, action), timeout=1.0)
-
-
-@pytest.mark.asyncio
-async def test_execute_action_and_get_http_response_success(metadata):
-    action = contract_pb2.Action()
-    client_event = contract_pb2.ClientEvent()
-    client_event.actionResponse.response = "success"
-
-    # Create httpResponse with no error
-    client_event.actionResponse.httpResponse.statusCode = 200
-    client_event.actionResponse.httpResponse.body = '{"result": "ok"}'
-    client_event.actionResponse.httpResponse.error = ""
-
-    await metadata["inbox"].put(client_event)
-
-    response = await _execute_action_and_get_http_response(metadata, action)
-
-    put_action = await metadata["outbox"].get()
-    metadata["outbox"].task_done()
-    assert put_action == action
-    assert response.response == "success"
-    assert response.httpResponse.statusCode == 200
-    assert metadata["inbox"].empty()
-
-
-@pytest.mark.asyncio
-async def test_execute_action_and_get_http_response_connection_error(metadata):
-    action = contract_pb2.Action()
-    client_event = contract_pb2.ClientEvent()
-    client_event.actionResponse.response = "failed"
-
-    # Create httpResponse with error
-    client_event.actionResponse.httpResponse.error = "Connection refused"
-
-    await metadata["inbox"].put(client_event)
-
-    # This should raise ToolException from _execute_action_and_get_action_response first
-    with pytest.raises(ToolException, match="HTTP action error: Connection refused"):
-        await _execute_action_and_get_http_response(metadata, action)
-
-    put_action = await metadata["outbox"].get()
-    metadata["outbox"].task_done()
-    assert put_action == action
-    assert metadata["inbox"].empty()
 
 
 @pytest.mark.asyncio
