@@ -2,6 +2,7 @@ import uuid
 from datetime import datetime
 from typing import Any, Dict, Optional
 
+import structlog
 from snowplow_tracker import AsyncEmitter, SelfDescribingJson, StructuredEvent, Tracker
 
 from lib.billing_events.context import BillingEventContext
@@ -24,17 +25,42 @@ class BillingEventsClient:
         batch_size: int,
         thread_count: int,
     ) -> None:
+        self._logger = structlog.stdlib.get_logger("billing_events_client")
         self.enabled = enabled
 
-        if enabled:
-            emitter = AsyncEmitter(
-                batch_size=batch_size, thread_count=thread_count, endpoint=endpoint
-            )
+        self._logger.info(
+            "Initializing BillingEventsClient",
+            enabled=enabled,
+            endpoint=endpoint,
+            app_id=app_id,
+            namespace=namespace,
+            batch_size=batch_size,
+            thread_count=thread_count,
+        )
 
-            self.snowplow_tracker = Tracker(
-                app_id=app_id,
-                namespace=namespace,
-                emitters=[emitter],
+        if enabled:
+            try:
+                self._logger.info(
+                    "Creating AsyncEmitter and Tracker for billing events"
+                )
+                emitter = AsyncEmitter(
+                    batch_size=batch_size, thread_count=thread_count, endpoint=endpoint
+                )
+
+                self.snowplow_tracker = Tracker(
+                    app_id=app_id,
+                    namespace=namespace,
+                    emitters=[emitter],
+                )
+                self._logger.info("Successfully initialized billing events tracker")
+            except Exception as e:
+                self._logger.error(
+                    "Failed to initialize billing events tracker", error=str(e)
+                )
+                raise
+        else:
+            self._logger.info(
+                "Billing events disabled - skipping tracker initialization"
             )
 
     def track_billing_event(
@@ -57,10 +83,22 @@ class BillingEventsClient:
         Returns:
             None
         """
+        self._logger.info(
+            "track_billing_event called",
+            event_type=event_type,
+            category=category,
+            unit_of_measure=unit_of_measure,
+            quantity=quantity,
+            enabled=self.enabled,
+            has_tracker=hasattr(self, "snowplow_tracker"),
+        )
+
         if not self.enabled:
+            self._logger.info("Billing events disabled ")
             return
 
         if quantity <= 0:
+            self._logger.info("Invalid quantity", quantity=quantity)
             return
 
         internal_context: EventContext = current_event_context.get()
@@ -112,4 +150,11 @@ class BillingEventsClient:
             action=event_type,
         )
 
-        self.snowplow_tracker.track(structured_event)
+        try:
+            self.snowplow_tracker.track(structured_event)
+            self._logger.info(
+                "Successfully called snowplow_tracker.track() - event queued for sending"
+            )
+        except Exception as e:
+            self._logger.error("Failed to track billing event", error=str(e))
+            raise
