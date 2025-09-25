@@ -1,7 +1,6 @@
 import json
 
 from duo_workflow_service.gitlab.http_client import GitlabHttpClient, GitLabHttpResponse
-from duo_workflow_service.tracking.errors import log_exception
 
 
 class UnsupportedStatusEvent(Exception):

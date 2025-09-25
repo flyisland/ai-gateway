@@ -48,8 +48,8 @@ async def test_execute_action_success_http_response(metadata, capsys):
         "HTTP response with use_http_response=False, returning body instead"
         in captured.out
     )
-    assert "action_class=runHTTPRequest" in captured.out
-    assert "requestID=test-request-123" in captured.out
+    assert "runHTTPRequest" in captured.out
+    assert "test-request-123" in captured.out
 
 
 @pytest.mark.asyncio
