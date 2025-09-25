@@ -227,7 +227,6 @@ configurable_unit_primitives:
         response = ""
 
         mock_watcher = mock_watch.return_value.__enter__.return_value
-        mock_logger = mock.MagicMock()
 
         async for c in prompt.astream({"name": "Duo", "content": "What's up?"}):
             response += c.content
