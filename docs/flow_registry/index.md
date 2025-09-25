@@ -635,23 +635,23 @@ routers:
 
 ### DeterministicStepComponent
 
-The DeterministicStepComponent executes a specific tool deterministically with predetermined arguments extracted from the flow state.
-This component provides a way to run tools without AI involvement, using inputs to extract the necessary parameters and producing predictable outputs following fixed conventions.
+The DeterministicStepComponent executes a **single tool** deterministically with predetermined arguments extracted from the flow state. This component provides a way to run one specific tool without AI involvement, using inputs to extract the necessary parameters and producing predictable outputs following fixed conventions.
 
 The component provides these capabilities:
 
-- **Execute specific tools deterministically**: Run a designated tool with parameters derived from inputs
-- **Extract parameters from state**: Use component inputs to gather tool execution arguments
+- **Execute a single tool deterministically**: Run one designated tool with parameters derived from inputs
+- **Extract parameters from state**: Use component inputs to gather the tool's execution arguments
 - **No AI involvement**: Direct tool execution without LLM processing
-- **Integration with existing toolsets**: Compatible with all registered tools in the toolset
+- **Integration with existing toolsets**: Compatible with any registered tool in the toolset
+- **Chainable design**: Multiple DeterministicStepComponents can be chained to execute sequential tool operations
 
-Unlike AgentComponent or OneOffComponent which use AI to determine tool usage, DeterministicStepComponent executes a pre-specified tool with arguments extracted directly from the flow state, making it ideal for predictable, repeatable operations.
+Unlike AgentComponent or OneOffComponent which use AI to determine tool usage, DeterministicStepComponent executes exactly one pre-specified tool with arguments extracted directly from the flow state, making it ideal for predictable, repeatable operations. **To execute multiple tools, chain multiple DeterministicStepComponents together in your flow.**
 
 #### Required Parameters
 
 - **name**: Unique identifier for this component instance. Must not contain `:` or `.` characters.
 - **type**: Must be `"DeterministicStepComponent"`
-- **tool_name**: Name of the specific tool to execute from the toolset
+- **tool_name**: Name of the single tool to execute
 
 #### Optional Parameters
 
@@ -671,6 +671,8 @@ Each DeterministicStepComponent automatically produces:
 
 #### Complete DeterministicStepComponent Example
 
+##### Execute a single tool
+
 ```yaml
 components:
    - name: "read"
@@ -684,7 +686,7 @@ components:
        - "on_tool_execution_failed"
 ```
 
-##### Chain multiple deterministic operations
+##### Chain multiple tools
 
 ```yaml
 components:
