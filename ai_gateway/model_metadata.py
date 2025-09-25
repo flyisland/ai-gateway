@@ -36,14 +36,33 @@ class AmazonQModelMetadata(BaseModelMetadata):
         }
 
 
+class FireworksModelMetadata(BaseModelMetadata):
+    provider: Literal["fireworks_ai"]
+    name: Annotated[str, StringConstraints(max_length=255)]
+    endpoint: Optional[Annotated[AnyUrl, UrlConstraints(max_length=255)]] = None
+    api_key: Optional[Annotated[str, StringConstraints(max_length=2000)]] = None
+    model_identifier: str
+
+    def to_params(self) -> Dict[str, Any]:
+        params = {
+            "model": self.model_identifier,
+        }
+
+        if self.api_key:
+            params["api_key"] = self.api_key
+
+        if self.endpoint:
+            params["api_base"] = str(self.endpoint).removesuffix("/")
+
+        return params
+
+
 class ModelMetadata(BaseModelMetadata):
     name: Annotated[str, StringConstraints(max_length=255)]
     provider: Annotated[str, StringConstraints(max_length=255)]
     endpoint: Optional[Annotated[AnyUrl, UrlConstraints(max_length=255)]] = None
     api_key: Optional[Annotated[str, StringConstraints(max_length=2000)]] = None
     identifier: Optional[Annotated[str, StringConstraints(max_length=1000)]] = None
-    provider_keys: Optional[Dict[str, Any]] = None
-    model_endpoints: Optional[Dict[str, Any]] = None
 
     def to_params(self) -> Dict[str, Any]:
         """Retrieve model parameters for a given identifier.
@@ -52,32 +71,6 @@ class ModelMetadata(BaseModelMetadata):
         on AIGW location.
         """
         params: Dict[str, Any] = {}
-
-        if self.provider == "fireworks_ai":
-            provider_keys = self.provider_keys or {}
-            model_endpoints = self.model_endpoints or {}
-
-            region_config = model_endpoints.get("fireworks_current_region_endpoint", {})
-            model_config = region_config.get(self.name, {})
-
-            model_identifier = model_config.get("identifier")
-
-            if not model_identifier:
-                raise ValueError(
-                    f"Fireworks model identifier is missing for model {model_identifier}."
-                )
-
-            api_base = model_config.get("endpoint")
-
-            params = {
-                "model": model_identifier,
-                "api_key": provider_keys.get("fireworks_api_key"),
-            }
-
-            if api_base:
-                params["api_base"] = api_base
-
-            return params
 
         if self.endpoint:
             params["api_base"] = str(self.endpoint).removesuffix("/")
@@ -105,7 +98,7 @@ class ModelMetadata(BaseModelMetadata):
         return params
 
 
-TypeModelMetadata = AmazonQModelMetadata | ModelMetadata
+TypeModelMetadata = AmazonQModelMetadata | ModelMetadata | FireworksModelMetadata
 
 
 def create_model_metadata(data: dict[str, Any] | None) -> Optional[TypeModelMetadata]:
@@ -120,6 +113,33 @@ def create_model_metadata(data: dict[str, Any] | None) -> Optional[TypeModelMeta
             llm_definition_params=llm_definition.params.copy(),
             family=llm_definition.family,
             **data,
+        )
+
+    if data["provider"] == "fireworks_ai":
+        provider_keys = data.get("provider_keys", {})
+        model_endpoints = data.get("model_endpoints", {})
+
+        region_config = model_endpoints.get("fireworks_current_region_endpoint", {})
+        model_config = region_config.get(data["name"], {})
+
+        model_identifier = model_config.get("identifier")
+        if not model_identifier:
+            raise ValueError(
+                f"Fireworks model identifier is missing for model {data['name']}."
+            )
+
+        llm_definition = configs.get_model(data["name"]) if data.get("name") else None
+
+        return FireworksModelMetadata(
+            provider="fireworks_ai",
+            name=data["name"],
+            endpoint=model_config.get("endpoint"),
+            api_key=provider_keys.get("fireworks_api_key"),
+            model_identifier=model_identifier,
+            llm_definition_params=(
+                llm_definition.params.copy() if llm_definition else {}
+            ),
+            family=llm_definition.family if llm_definition else [],
         )
 
     if name := data.get("name"):
