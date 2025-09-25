@@ -659,6 +659,10 @@ class LinkVulnerabilityToMergeRequest(DuoBaseTool):
     This creates a relationship between the vulnerability and the merge request that addresses it.
     The Merge Request ID used is the global ID, not the IID.
 
+    The merge request ID and IID can look similar if they don't include `gid://gitlab/MergeRequest/` as a prefix.
+    If it is unclear whether the user has given you a global ID or the IID, do the following:
+        - ASK THE USER WHAT THEY HAVE GIVEN YOU
+
     For example:
     - Link vulnerability with ID 123 to merge request with ID 456 (IID 245):
         link_vulnerability_to_merge_request(
