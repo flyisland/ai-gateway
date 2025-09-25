@@ -113,12 +113,6 @@ def _get_action_response_from_http(http_response: HttpResponse):
     return http_response.body
 
 
-class HTTPConnectionError(Exception):
-    """Exception raised when HTTP client connection fails."""
-
-    pass
-
-
 async def _execute_action(metadata: Dict[str, Any], action: contract_pb2.Action) -> str:
     log = structlog.stdlib.get_logger("workflow")
     actionResponse = await _execute_action_and_get_action_response(metadata, action)
