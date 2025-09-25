@@ -86,7 +86,7 @@ class BillingEventsClient:
         )
 
         if not self.enabled:
-            self._logger.info("Billing events disabled ")
+            self._logger.info("Billing events disabled")
             return
 
         if quantity <= 0:
