@@ -153,6 +153,111 @@ class GetRepositoryFile(RepositoryFileBaseTool):
         return f"Get repository file {args.file_path} from project {args.project_id} at ref {args.ref}"
 
 
+class GetRepositoryFilesInput(BaseModel):
+    url: Optional[str] = Field(
+        default=None,
+        description="GitLab URL for the resource. If provided, other ID fields are not required.",
+    )
+    project_id: Optional[str] = Field(
+        default=None,
+        description="The ID or URL-encoded path of the project. Required if URL is not provided.",
+    )
+    ref: Optional[str] = Field(
+        default=None,
+        description="The name of branch, tag or commit. Use HEAD to automatically use the default branch.",
+    )
+    file_paths: List[str] = Field(description="List of file paths to read")
+
+
+class GetRepositoryFiles(RepositoryFileBaseTool):
+    name: str = "get_repository_files"
+
+    # editorconfig-checker-disable
+    description: str = """Get the contents of multiple files from a remote repository.
+
+    To identify files you must provide either:
+    - project_id, ref, and file_paths parameters, or
+    - A GitLab URL like:
+      - https://gitlab.com/namespace/project/-/blob/master/README.md
+      - https://gitlab.com/group/subgroup/project/-/blob/main/src/file.py
+    """
+    # editorconfig-checker-enable
+
+    args_schema: Type[BaseModel] = GetRepositoryFilesInput  # type: ignore
+
+    async def _arun(self, **kwargs) -> str:
+        url = kwargs.get("url")
+        project_id = kwargs.get("project_id")
+        ref = kwargs.get("ref")
+        file_paths = kwargs.get("file_paths", [])
+
+        # Use first file for validation pattern
+        first_file_path = file_paths[0] if file_paths else None
+        project_id, ref, first_file_path, errors = self._validate_repository_file_url(
+            url, project_id, ref, first_file_path
+        )
+
+        if errors:
+            return json.dumps({"error": "; ".join(errors)})
+
+        result_dict = {}
+
+        for file_path in file_paths:
+            try:
+                if file_path is None:
+                    result_dict[str(file_path)] = {"error": "Missing file_path"}
+                    continue
+
+                # Check file exclusion policy if project is available
+                policy = FileExclusionPolicy(self.project)
+                if file_path and not policy.is_allowed(file_path):
+                    result_dict[file_path] = {
+                        "error": FileExclusionPolicy.format_llm_exclusion_message(
+                            [file_path]
+                        )
+                    }
+                    continue
+
+                encoded_file_path = quote(file_path, safe="")
+
+                response = await self.gitlab_client.aget(
+                    path=f"/api/v4/projects/{project_id}/repository/files/{encoded_file_path}",
+                    params={"ref": ref},
+                    parse_json=False,
+                )
+
+                content = base64.b64decode(json.loads(response)["content"]).decode(
+                    "utf-8"
+                )
+
+                result_dict[file_path] = {"content": content}
+            except Exception as e:
+                result_dict[file_path] = {"error": str(e)}
+
+        return json.dumps(result_dict)
+
+    def format_display_message(
+        self, args: GetRepositoryFilesInput, _tool_response: Any = None
+    ) -> str:
+        # Check file exclusion policy for display message if project is available
+        policy = FileExclusionPolicy(self.project)
+        excluded_files = [
+            fp for fp in args.file_paths if fp and not policy.is_allowed(fp)
+        ]
+
+        file_count = len(args.file_paths) - len(excluded_files)
+
+        if excluded_files:
+            excluded_msg = FileExclusionPolicy.format_user_exclusion_message(
+                excluded_files
+            )
+            return f"Get {file_count} repository file{'s' if file_count != 1 else ''} from project {args.project_id} at ref {args.ref}{excluded_msg}"
+
+        if args.url:
+            return f"Get {file_count} repository files content from {args.url}"
+        return f"Get {file_count} repository file{'s' if file_count != 1 else ''} from project {args.project_id} at ref {args.ref}"
+
+
 class RepositoryTreeResourceInput(ProjectResourceInput):
     path: Optional[str] = Field(
         default=None,

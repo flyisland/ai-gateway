@@ -15,6 +15,5 @@ prompt_template:
     <codebase_context>
     {{codebase_context}}
     </codebase_context>
-  placeholder: history
 params:
   timeout: 60

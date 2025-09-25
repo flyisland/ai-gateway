@@ -183,19 +183,31 @@ class GetMergeRequest(DuoBaseTool):
         )
 
 
+class ListMergeRequestDiffsInput(MergeRequestResourceInput):
+    ai_reviewable_only: Optional[bool] = Field(
+        default=False,
+        description="If True, returns only files suitable for AI code review (excludes generated files and files with no diff content)",
+    )
+
+
 class ListMergeRequestDiffs(DuoBaseTool):
     name: str = "list_merge_request_diffs"
     description: str = f"""Fetch the diffs of the files changed in a merge request.
 
     {MERGE_REQUEST_IDENTIFICATION_DESCRIPTION}
 
+    Optional parameter:
+    - ai_reviewable_only: If True, returns only files suitable for AI code review. Default is False.
+
     For example:
     - Given project_id 13 and merge_request_iid 9, the tool call would be:
         list_merge_request_diffs(project_id=13, merge_request_iid=9)
-    - Given the URL https://gitlab.com/namespace/project/-/merge_requests/103, the tool call would be:
+    - For AI reviewable files only:
+        list_merge_request_diffs(project_id=13, merge_request_iid=9, ai_reviewable_only=True)
+    - Given the URL https://gitlab.com/namespace/project/-/merge_requests/103:
         list_merge_request_diffs(url="https://gitlab.com/namespace/project/-/merge_requests/103")
     """
-    args_schema: Type[BaseModel] = MergeRequestResourceInput  # type: ignore
+    args_schema: Type[BaseModel] = ListMergeRequestDiffsInput  # type: ignore
 
     unit_primitive: GitLabUnitPrimitive = GitLabUnitPrimitive.ASK_MERGE_REQUEST
 
@@ -203,6 +215,7 @@ class ListMergeRequestDiffs(DuoBaseTool):
         url = kwargs.get("url")
         project_id = kwargs.get("project_id")
         merge_request_iid = kwargs.get("merge_request_iid")
+        ai_reviewable_only = kwargs.get("ai_reviewable_only", False)
 
         validation_result = self._validate_merge_request_url(
             url, project_id, merge_request_iid
@@ -223,6 +236,14 @@ class ListMergeRequestDiffs(DuoBaseTool):
             diff_policy = DiffExclusionPolicy(self.project)
             filtered_diff, excluded_files = diff_policy.filter_allowed_diffs(diff_data)
 
+            # Apply AI reviewability filtering if requested
+            if ai_reviewable_only:
+                ai_filtered_diff, ai_excluded = self._filter_ai_reviewable(
+                    filtered_diff
+                )
+                filtered_diff = ai_filtered_diff
+                excluded_files.extend(ai_excluded)
+
             result: dict[str, Any] = {"diffs": filtered_diff}
 
             if len(excluded_files) > 0:
@@ -234,6 +255,29 @@ class ListMergeRequestDiffs(DuoBaseTool):
             return json.dumps(result)
         except Exception as e:
             return json.dumps({"error": str(e)})
+
+    def _filter_ai_reviewable(self, diffs: list) -> tuple[list, list]:
+        """Filter diffs to include only AI-reviewable files."""
+        ai_reviewable = []
+        excluded = []
+
+        for diff in diffs:
+            path = diff.get("new_path") or diff.get("old_path", "")
+
+            # Exclude generated files
+            if diff.get("generated_file", False):
+                excluded.append(f"{path} (generated)")
+                continue
+
+            # Exclude files with no diff content
+            diff_content = diff.get("diff", "")
+            if not diff_content or not diff_content.strip():
+                excluded.append(f"{path} (no diff)")
+                continue
+
+            ai_reviewable.append(diff)
+
+        return ai_reviewable, excluded
 
     def format_display_message(
         self, args: MergeRequestResourceInput, tool_response: Any = None

@@ -1,9 +1,9 @@
 version: "experimental"
 environment: remote
 components:
-  # Step 1: Fetch raw data via tools
+  # Step 1: Get basic MR data
   - name: "fetch_mr_data"
-    type: AgentComponent
+    type: OneOffComponent
     prompt_id: "code_review_fetch_data"
     prompt_version: "^1.0.0"
     inputs:
@@ -14,26 +14,43 @@ components:
     toolset:
       - "get_merge_request"
       - "list_merge_request_diffs"
-      - "get_repository_file"
-      - "read_file"
+    max_correction_attempts: 3
     ui_log_events:
       - "on_tool_execution_success"
       - "on_tool_execution_failed"
-      - "on_agent_final_answer"
 
-  # Step 2: Format raw data into expected structure
+  # Step 2: Get repository files
+  - name: "fetch_files"
+    type: OneOffComponent
+    prompt_id: "code_review_fetch_files"
+    prompt_version: "^1.0.0"
+    inputs:
+      - from: "context:fetch_mr_data.tool_responses"
+        as: "mr_data"
+      - from: "context:project_id"
+        as: "project_id"
+    toolset:
+      - "get_repository_files"
+    max_correction_attempts: 3
+    ui_log_events:
+      - "on_tool_execution_success"
+      - "on_tool_execution_failed"
+
+  # Step 3: Format all data
   - name: "format_for_review"
     type: AgentComponent
     prompt_id: "code_review_format"
     prompt_version: "^1.0.0"
     inputs:
-      - from: "context:fetch_mr_data.final_answer"
-        as: "raw_mr_data"
+      - from: "context:fetch_mr_data.tool_responses"
+        as: "mr_data"
+      - from: "context:fetch_files.tool_responses"
+        as: "files_data"
     toolset: []
     ui_log_events:
       - "on_agent_final_answer"
 
-  # Step 3: Pre-scan codebase for context
+  # Step 4: Pre-scan codebase for context
   - name: "prescan_codebase"
     type: AgentComponent
     prompt_id: "code_review_prescan"
@@ -54,7 +71,7 @@ components:
       - "on_tool_execution_failed"
       - "on_agent_final_answer"
 
-  # Step 4: Perform code review with codebase context
+  # Step 5: Perform code review
   - name: "perform_code_review"
     type: AgentComponent
     prompt_id: "review_merge_request"
@@ -68,7 +85,7 @@ components:
         as: "current_date"
     toolset: []
 
-  # Step 5: Publish code review
+  # Step 6: Publish code review
   - name: "publish_review"
     type: DeterministicStepComponent
     tool_name: "post_duo_code_review"
@@ -85,6 +102,8 @@ components:
 
 routers:
   - from: "fetch_mr_data"
+    to: "fetch_files"
+  - from: "fetch_files"
     to: "format_for_review"
   - from: "format_for_review"
     to: "prescan_codebase"
