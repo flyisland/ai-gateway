@@ -3,7 +3,7 @@ from contextlib import contextmanager
 from pathlib import Path
 from typing import Any, Generator, Iterator, List, Optional, Type
 from unittest import mock
-from unittest.mock import Mock, PropertyMock, call
+from unittest.mock import Mock, call
 
 import pytest
 from anthropic import APITimeoutError, AsyncAnthropic
@@ -415,22 +415,13 @@ configurable_unit_primitives:
         internal_event_client: mock.Mock,
         prompt: Prompt,
         usage_metadata: UsageMetadata,
-        internal_event_extra: dict[str, Any],
         expected_additional_properties: InternalEventAdditionalProperties,
     ):
         mock_watcher = mock_watch.return_value.__enter__.return_value
 
         prompt.internal_event_client = internal_event_client
 
-        with (
-            self._mock_usage_metadata(prompt.model_name, usage_metadata),
-            mock.patch.object(
-                Prompt,
-                "internal_event_extra",
-                new_callable=PropertyMock,
-                return_value=internal_event_extra,
-            ),
-        ):
+        with self._mock_usage_metadata(prompt.model_name, usage_metadata):
             await prompt.ainvoke({"name": "Duo", "content": "What's up?"})
 
         _assert_usage_metadata_handling(

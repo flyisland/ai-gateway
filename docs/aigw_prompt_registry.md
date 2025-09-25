@@ -80,13 +80,12 @@ system.
 ```python
 from langchain_community.chat_models import ChatLiteLLM
 from ai_gateway.prompts import Prompt, LocalPromptRegistry
-from ai_gateway.chat.agents import ReActAgent, ReActAgentInputs
+from ai_gateway.chat.agents import ReActPromptTemplate, ReActAgentInputs
 
 # Initialize the LocalPromptRegistry with model factories and class overrides
 registry = LocalPromptRegistry.from_local_yaml(
-    class_overrides={
-        "chat/react": ReActAgent,  # Override for chat/react prompt
-        "chat/react/vertex": ReActAgent,  # Override for chat/react/vertex prompt
+    prompt_template_factories={
+        "chat/react": ReActPromptTemplate,  # Override for chat/react prompt
     },
     model_factories={
         "anthropic": lambda model, **kwargs: ChatLiteLLM(model=model, **kwargs),  # Factory for Anthropic models

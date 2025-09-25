@@ -1,7 +1,7 @@
 import importlib
 from functools import cache
 from pathlib import Path
-from typing import Any, List, NamedTuple, Optional, Type
+from typing import Any, List, NamedTuple, Optional, Type, cast
 
 import structlog
 import yaml
@@ -16,7 +16,7 @@ from ai_gateway.model_metadata import (
 )
 from ai_gateway.prompts.base import BasePromptRegistry, Prompt
 from ai_gateway.prompts.config import BaseModelConfig, ModelClassProvider, PromptConfig
-from ai_gateway.prompts.typing import TypeModelFactory
+from ai_gateway.prompts.typing import TypeModelFactory, TypePromptTemplateFactory
 from lib.internal_events.client import InternalEventsClient
 from lib.internal_events.context import current_event_context
 
@@ -185,7 +185,6 @@ def feature_setting_for_prompt_id(prompt_id: str) -> str:
 
 
 class PromptRegistered(NamedTuple):
-    klass: Type[Prompt]
     versions: dict[str, PromptConfig]
 
 
@@ -194,14 +193,14 @@ class LocalPromptRegistry(BasePromptRegistry):
 
     def __init__(
         self,
-        class_overrides: dict[str, Type[Prompt] | str],
+        prompt_template_factories: dict[str, TypePromptTemplateFactory | str],
         model_factories: dict[ModelClassProvider, TypeModelFactory],
         internal_event_client: InternalEventsClient,
         model_limits: ConfigModelLimits,
         custom_models_enabled: bool,
         disable_streaming: bool = False,
     ):
-        self.class_overrides = class_overrides
+        self.prompt_template_factories = prompt_template_factories
         self.model_factories = model_factories
         self.internal_event_client = internal_event_client
         self.model_limits = model_limits
@@ -240,18 +239,7 @@ class LocalPromptRegistry(BasePromptRegistry):
         if not versions:
             raise ValueError(f"No version YAML files found for prompt id: {prompt_id}")
 
-        klass = self.class_overrides.get(prompt_id, Prompt)
-
-        if isinstance(klass, str):
-            klass = self._resolve_string_class_name(klass)
-
-        if not issubclass(klass, Prompt):
-            raise ValueError(
-                f"The specified klass must be a subclass of Prompt: {klass}"
-            )
-
         return PromptRegistered(
-            klass=klass,
             versions=versions,
         )
 
@@ -357,10 +345,23 @@ class LocalPromptRegistry(BasePromptRegistry):
             ),
         )
 
-        return prompt_registered.klass(
+        prompt_template_override = self.prompt_template_factories.get(prompt_id, None)
+        prompt_template_factory: TypePromptTemplateFactory | None
+        if isinstance(prompt_template_override, str):
+            prompt_template_factory = cast(
+                TypePromptTemplateFactory,
+                self._resolve_string_class_name(prompt_template_override),
+            )
+        else:
+            prompt_template_factory = cast(
+                TypePromptTemplateFactory | None, prompt_template_override
+            )
+
+        return Prompt(
             model_factory,
             config,
             model_metadata,
+            prompt_template_factory,
             disable_streaming=self.disable_streaming,
             tools=tools,
             tool_choice=tool_choice,
@@ -370,7 +371,7 @@ class LocalPromptRegistry(BasePromptRegistry):
     @classmethod
     def from_local_yaml(
         cls,
-        class_overrides: dict[str, Type[Prompt] | str],
+        prompt_template_factories: dict[str, TypePromptTemplateFactory | str],
         model_factories: dict[ModelClassProvider, TypeModelFactory],
         internal_event_client: InternalEventsClient,
         model_limits: ConfigModelLimits,
@@ -379,9 +380,7 @@ class LocalPromptRegistry(BasePromptRegistry):
     ) -> "LocalPromptRegistry":
         """Create a LocalPromptRegistry with lazy loading enabled.
 
-        Prompt definition files matching [usecase]/[type]/[version].yml are loaded
-        on-demand when requested. The base Prompt class is used if no matching
-        override is provided in `class_overrides`.
+        Prompt definition files matching [usecase]/[type]/[version].yml are loaded on-demand when requested.
         """
 
         log.info(
@@ -390,7 +389,7 @@ class LocalPromptRegistry(BasePromptRegistry):
         )
 
         return cls(
-            class_overrides,
+            prompt_template_factories,
             model_factories,
             internal_event_client,
             model_limits,
@@ -399,7 +398,9 @@ class LocalPromptRegistry(BasePromptRegistry):
         )
 
     @classmethod
-    def _resolve_string_class_name(cls, path: str) -> Type[Prompt]:
+    def _resolve_string_class_name(
+        cls, path: str
+    ) -> Type[Prompt] | TypePromptTemplateFactory:
         parts = path.split(".")
         module = importlib.import_module(".".join(parts[:-1]))
         return getattr(module, parts[-1])

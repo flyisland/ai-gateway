@@ -1,7 +1,7 @@
 import os
 from contextlib import contextmanager
 from pathlib import Path
-from typing import Any, AsyncIterator, Literal, Optional, Type, Union
+from typing import Any, AsyncIterator, Literal, Optional, Union
 from unittest.mock import AsyncMock, Mock, PropertyMock, patch
 
 import pytest
@@ -43,7 +43,7 @@ from ai_gateway.models.base_text import (
 from ai_gateway.prompts import Prompt
 from ai_gateway.prompts.config.base import ModelConfig, PromptConfig, PromptParams
 from ai_gateway.prompts.config.models import ChatLiteLLMParams, TypeModelParams
-from ai_gateway.prompts.typing import Model, TypeModelFactory
+from ai_gateway.prompts.typing import Model, TypeModelFactory, TypePromptTemplateFactory
 from ai_gateway.safety_attributes import SafetyAttributes
 from duo_workflow_service.entities.event import WorkflowEvent
 from duo_workflow_service.entities.state import (
@@ -639,19 +639,31 @@ def model_metadata_fixture():
     return None
 
 
-@pytest.fixture(name="prompt_class")
-def prompt_class_fixture():
-    return Prompt
+@pytest.fixture(name="prompt_template_factory")
+def promtp_template_factory_fixture():
+    return None
+
+
+@pytest.fixture(name="internal_event_extra")
+def internal_event_extra_fixture():
+    return {}
 
 
 @pytest.fixture(name="prompt")
 def prompt_fixture(
-    prompt_class: Type[Prompt],
     model_factory: TypeModelFactory,
     prompt_config: PromptConfig,
     model_metadata: TypeModelMetadata | None,
+    prompt_template_factory: TypePromptTemplateFactory | None,
+    internal_event_extra: dict[str, Any],
 ):
-    return prompt_class(model_factory, prompt_config, model_metadata)
+    return Prompt(
+        model_factory,
+        prompt_config,
+        model_metadata,
+        prompt_template_factory,
+        internal_event_extra=internal_event_extra,
+    )
 
 
 @pytest.fixture(name="internal_event_client")

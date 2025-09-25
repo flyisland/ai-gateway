@@ -3,12 +3,12 @@ from unittest.mock import MagicMock, Mock, patch
 import pytest
 from dependency_injector import containers
 from gitlab_cloud_connector import CloudConnectorUser, UserClaims, WrongUnitPrimitives
-from google.protobuf import struct_pb2
 from langchain_core.messages import AIMessage, HumanMessage, ToolMessage
 
 from ai_gateway.model_metadata import ModelMetadata
+from ai_gateway.prompts import Prompt
 from contract import contract_pb2
-from duo_workflow_service.agents.chat_agent import ChatAgent
+from duo_workflow_service.agents.chat_agent import ChatAgent, ChatAgentPromptTemplate
 from duo_workflow_service.checkpointer.gitlab_workflow import WorkflowStatusEventEnum
 from duo_workflow_service.components.tools_registry import ToolsRegistry
 from duo_workflow_service.entities import (
@@ -33,9 +33,14 @@ from lib.feature_flags import FeatureFlag, current_feature_flag_context
 from lib.internal_events.event_enum import CategoryEnum
 
 
-@pytest.fixture(name="prompt_class")
-def prompt_class_fixture():
-    return ChatAgent
+@pytest.fixture(name="prompt_template_factory")
+def promtp_template_factory_fixture():
+    return ChatAgentPromptTemplate
+
+
+@pytest.fixture(name="chat_agent")
+def chat_agent_fixture(prompt: Prompt):
+    yield ChatAgent(prompt=prompt)
 
 
 @pytest.fixture(name="config_values")
@@ -57,7 +62,7 @@ def user_fixture():
 @pytest.fixture(name="workflow_with_project")
 def workflow_with_project_fixture(
     mock_duo_workflow_service_container: containers.Container,
-    prompt: ChatAgent,
+    chat_agent: ChatAgent,
     user: CloudConnectorUser,
     mock_tools_registry: Mock,
 ):
@@ -89,8 +94,8 @@ def workflow_with_project_fixture(
     workflow._namespace = None
     workflow._additional_context = additional_context
     workflow._http_client = MagicMock()
-    prompt.tools_registry = mock_tools_registry
-    workflow._agent = prompt
+    chat_agent.tools_registry = mock_tools_registry
+    workflow._agent = chat_agent
     return workflow
 
 
@@ -285,15 +290,10 @@ def test_are_tools_called_with_tool_use(workflow_with_project):
     "mock_git_lab_workflow_instance",
     "mock_fetch_workflow_and_container_data",
 )
-@patch("duo_workflow_service.workflows.chat.workflow.current_model_metadata_context")
 async def test_workflow_run(
-    mock_model_metadata_context,
     mock_checkpoint_notifier,
     workflow_with_project,
 ):
-    mock_model_metadata = MagicMock()
-    mock_model_metadata_context.get.return_value = mock_model_metadata
-
     mock_user_interface_instance = mock_checkpoint_notifier.return_value
     state = {"status": "Not Started", "ui_chat_log": []}
 
@@ -321,9 +321,10 @@ async def test_workflow_run(
 
         workflow = workflow_with_project
 
-        mock_agent = MagicMock()
+        mock_prompt = MagicMock(spec=Prompt)
+        mock_prompt.name = "Chat Agent"
         with patch.object(
-            workflow._prompt_registry, "get_on_behalf", return_value=mock_agent
+            workflow._prompt_registry, "get_on_behalf", return_value=mock_prompt
         ) as mock_get_on_behalf:
             await workflow.run("Test chat goal")
 
@@ -332,7 +333,6 @@ async def test_workflow_run(
             mock_get_on_behalf.assert_called_once()
             call_args = mock_get_on_behalf.call_args
 
-            assert call_args.kwargs["model_metadata"] == mock_model_metadata
             assert call_args.kwargs["user"] == workflow._user
             assert call_args.kwargs["prompt_id"] == "chat/agent"
             assert call_args.kwargs["prompt_version"] == "^1.0.0"
@@ -874,9 +874,12 @@ async def test_workflow_model_selection(
     checkpointer = MagicMock()
 
     # Setup the mock for get_on_behalf to verify what it's called with
-    mock_agent = MagicMock()
+    mock_prompt = MagicMock(spec=Prompt)
+    mock_prompt.name = "Chat Agent"
     with patch.object(
-        workflow_with_project._prompt_registry, "get_on_behalf", return_value=mock_agent
+        workflow_with_project._prompt_registry,
+        "get_on_behalf",
+        return_value=mock_prompt,
     ) as mock_get_on_behalf:
         workflow_with_project._compile("Test goal", tools_registry, checkpointer)
 
@@ -899,7 +902,6 @@ async def test_workflow_model_selection(
 
 @pytest.mark.asyncio
 @pytest.mark.usefixtures("mock_fetch_workflow_and_container_data")
-@patch("duo_workflow_service.workflows.chat.workflow.current_model_metadata_context")
 @patch.object(Workflow, "_get_tools")
 @patch("duo_workflow_service.components.tools_registry.ToolsRegistry.toolset")
 @patch("duo_workflow_service.workflows.chat.workflow.StateGraph")
@@ -907,10 +909,8 @@ async def test_compile_with_tools_override_and_flow_config(
     mock_state_graph,
     mock_toolset,
     mock_get_tools,
-    mock_model_metadata_context,
     mock_duo_workflow_service_container,
 ):
-    mock_model_metadata_context.get.return_value = None
     mock_get_tools.return_value = ["default_tool1", "default_tool2"]
 
     mock_agents_toolset = MagicMock()
@@ -940,8 +940,10 @@ async def test_compile_with_tools_override_and_flow_config(
         prompt_template_override={"prompt_id": "custom/prompt", "content": "test"},
     )
 
-    mock_prompt_runnable = MagicMock()
-    mock_agent = MagicMock()
+    mock_prompt_runnable = MagicMock(spec=Prompt)
+    mock_prompt = MagicMock(spec=Prompt)
+    mock_prompt.name = "Chat Agent"
+    mock_agent = MagicMock(spec=ChatAgent, prompt=mock_prompt)
 
     mock_graph = MagicMock()
     mock_state_graph.return_value = mock_graph
@@ -951,8 +953,12 @@ async def test_compile_with_tools_override_and_flow_config(
             workflow._prompt_registry, "get", return_value=mock_prompt_runnable
         ) as mock_get,
         patch.object(
-            workflow._prompt_registry, "get_on_behalf", return_value=mock_agent
+            workflow._prompt_registry, "get_on_behalf", return_value=mock_prompt
         ) as mock_get_on_behalf,
+        patch(
+            "duo_workflow_service.workflows.chat.workflow.ChatAgent",
+            return_value=mock_agent,
+        ) as mock_chat_agent,
     ):
         workflow._compile("Test goal", tools_registry, checkpointer)
 
@@ -977,6 +983,7 @@ async def test_compile_with_tools_override_and_flow_config(
             internal_event_category="duo_workflow_service.workflows.chat.workflow",
             tools=mock_agents_toolset.bindable,
         )
+        mock_chat_agent.assert_called_once_with(prompt=mock_prompt)
 
         mock_graph.add_node.assert_any_call("agent", mock_agent.run)
 
@@ -985,13 +992,11 @@ async def test_compile_with_tools_override_and_flow_config(
 
 
 @pytest.mark.asyncio
-@patch("duo_workflow_service.workflows.chat.workflow.current_model_metadata_context")
 @patch.object(Workflow, "_get_tools")
 @patch("duo_workflow_service.components.tools_registry.ToolsRegistry.toolset")
 async def test_compile_without_overrides(
-    mock_toolset, mock_get_tools, mock_model_metadata_context, workflow_with_project
+    mock_toolset, mock_get_tools, workflow_with_project
 ):
-    mock_model_metadata_context.get.return_value = None
     mock_get_tools.return_value = ["default_tool1", "default_tool2"]
 
     mock_agents_toolset = MagicMock()
@@ -1002,10 +1007,13 @@ async def test_compile_without_overrides(
     tools_registry.toolset.return_value = mock_agents_toolset
     checkpointer = MagicMock()
 
-    mock_agent = MagicMock()
+    mock_prompt = MagicMock(spec=Prompt)
+    mock_prompt.name = "Chat Agent"
 
     with patch.object(
-        workflow_with_project._prompt_registry, "get_on_behalf", return_value=mock_agent
+        workflow_with_project._prompt_registry,
+        "get_on_behalf",
+        return_value=mock_prompt,
     ) as mock_get_on_behalf:
         workflow_with_project._compile("Test goal", tools_registry, checkpointer)
 
