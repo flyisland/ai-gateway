@@ -36,6 +36,15 @@ def mock_execute_http_response_fixture():
     return AsyncMock()
 
 
+@pytest.fixture(name="monkeypatch_execute_http_response")
+def monkeypatch_execute_http_response_fixture(monkeypatch, mock_execute_http_response):
+    monkeypatch.setattr(
+        "duo_workflow_service.gitlab.executor_http_client._execute_action_and_get_action_response",
+        mock_execute_http_response,
+    )
+    return mock_execute_http_response
+
+
 @pytest.mark.asyncio
 @pytest.mark.parametrize(
     "method, path, body, params, parse_json, mock_return_value, expected_result",
