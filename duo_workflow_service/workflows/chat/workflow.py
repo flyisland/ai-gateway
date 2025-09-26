@@ -86,6 +86,7 @@ CHAT_READ_ONLY_TOOLS = [
     "get_current_user",
     "get_vulnerability_details",
     "hello_world",
+    "natural_langauge_query",
 ]
 
 

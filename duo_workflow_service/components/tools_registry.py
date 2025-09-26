@@ -89,6 +89,7 @@ _READ_ONLY_GITLAB_TOOLS: list[Type[BaseTool]] = [
     GetVulnerabilityDetails,
     tools.ExtractLinesFromText,
     tools.HelloWorld,
+    tools.NaturalLangaugeQuery,
 ]
 
 _RUN_MCP_TOOLS_PRIVILEGE = "run_mcp_tools"
