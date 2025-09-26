@@ -239,8 +239,10 @@ configurable_unit_primitives:
         )
 
     @pytest.mark.asyncio
+    @mock.patch("ai_gateway.prompts.base.get_request_logger")
     async def test_astream(
         self,
+        mock_get_logger: mock.Mock,
         mock_watch: mock.Mock,
         prompt: Prompt,
         model_response: str,
@@ -248,12 +250,20 @@ configurable_unit_primitives:
         response = ""
 
         mock_watcher = mock_watch.return_value.__enter__.return_value
+        mock_logger = mock.MagicMock()
+        mock_get_logger.return_value = mock_logger
 
         async for c in prompt.astream({"name": "Duo", "content": "What's up?"}):
             response += c.content
 
             # Make sure we don't finish prematurely
             mock_watcher.afinish.assert_not_awaited()
+
+        expected_call = mock.call(
+            "Performing LLM request",
+            prompt="System: Hi, I'm Duo\nHuman: What's up?",
+        )
+        assert mock_logger.info.mock_calls[0] == expected_call
 
         assert response == model_response
 
@@ -278,7 +288,6 @@ configurable_unit_primitives:
         response = ""
 
         mock_watcher = mock_watch.return_value.__enter__.return_value
-
         mock_logger = mock.MagicMock()
         mock_get_logger.return_value = mock_logger
 
