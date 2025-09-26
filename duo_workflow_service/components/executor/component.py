@@ -13,6 +13,7 @@ from duo_workflow_service.agents import (
 )
 from duo_workflow_service.components import ToolsApprovalComponent, ToolsRegistry
 from duo_workflow_service.components.base import BaseComponent
+from duo_workflow_service.components.mcp_tools_registry import McpToolsRegistry
 from duo_workflow_service.entities import WorkflowState, WorkflowStatusEnum
 from duo_workflow_service.gitlab.gitlab_api import Project
 from duo_workflow_service.tools.handover import HandoverTool
@@ -27,7 +28,7 @@ class Routes(StrEnum):
 
 
 def _router(
-    tool_registry: ToolsRegistry,
+    tool_registry: ToolsRegistry | McpToolsRegistry,
     state: WorkflowState,
 ) -> Routes:
     if state["status"] in [WorkflowStatusEnum.CANCELLED, WorkflowStatusEnum.ERROR]:
