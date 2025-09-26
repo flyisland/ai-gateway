@@ -1,7 +1,7 @@
 import asyncio
+from unittest.mock import patch
 
 import pytest
-import structlog
 from langchain_core.tools import ToolException
 
 from contract import contract_pb2
@@ -19,7 +19,7 @@ def metadata():
 
 
 @pytest.mark.asyncio
-async def test_execute_action_success_http_response(metadata, capsys):
+async def test_execute_action_success_http_response(metadata):
     action = contract_pb2.Action()
     client_event = contract_pb2.ClientEvent()
 
@@ -34,26 +34,29 @@ async def test_execute_action_success_http_response(metadata, capsys):
 
     await metadata["inbox"].put(client_event)
 
-    response = await _execute_action(metadata, action)
+    with patch(
+        "duo_workflow_service.executor.action.structlog.stdlib.get_logger"
+    ) as mock_get_logger:
+        mock_logger = mock_get_logger.return_value
 
-    put_action = await metadata["outbox"].get()
-    metadata["outbox"].task_done()
-    assert put_action == action
-    assert response == '{"result": "success"}'
-    assert metadata["inbox"].empty()
+        response = await _execute_action(metadata, action)
 
-    # Verify the log entry was created for the _execute_action call
-    captured = capsys.readouterr()
-    assert (
-        "HTTP response with use_http_response=False, returning body instead"
-        in captured.out
-    )
-    assert "runHTTPRequest" in captured.out
-    assert "test-request-123" in captured.out
+        put_action = await metadata["outbox"].get()
+        metadata["outbox"].task_done()
+        assert put_action == action
+        assert response == '{"result": "success"}'
+        assert metadata["inbox"].empty()
+
+        # Verify the log entry was created for the _execute_action call
+        mock_logger.info.assert_any_call(
+            "HTTP response with use_http_response=False, returning body instead",
+            requestID="test-request-123",
+            action_class="runHTTPRequest",
+        )
 
 
 @pytest.mark.asyncio
-async def test_execute_action_success_plaintext_response(metadata, capsys):
+async def test_execute_action_success_plaintext_response(metadata):
     action = contract_pb2.Action()
     client_event = contract_pb2.ClientEvent()
 
@@ -63,20 +66,28 @@ async def test_execute_action_success_plaintext_response(metadata, capsys):
 
     await metadata["inbox"].put(client_event)
 
-    response = await _execute_action(metadata, action)
+    with patch(
+        "duo_workflow_service.executor.action.structlog.stdlib.get_logger"
+    ) as mock_get_logger:
+        mock_logger = mock_get_logger.return_value
 
-    put_action = await metadata["outbox"].get()
-    metadata["outbox"].task_done()
-    assert put_action == action
-    assert response == "plaintext success"
-    assert metadata["inbox"].empty()
+        response = await _execute_action(metadata, action)
 
-    # Verify no log entry for the specific HTTP response message
-    captured = capsys.readouterr()
-    assert (
-        "HTTP response with use_http_response=False, returning body instead"
-        not in captured.out
-    )
+        put_action = await metadata["outbox"].get()
+        metadata["outbox"].task_done()
+        assert put_action == action
+        assert response == "plaintext success"
+        assert metadata["inbox"].empty()
+
+        # Verify no log entry for the specific HTTP response message
+        # Check that the HTTP-specific log message was not called
+        http_log_calls = [
+            call
+            for call in mock_logger.info.call_args_list
+            if len(call[0]) > 0
+            and "HTTP response with use_http_response=False" in call[0][0]
+        ]
+        assert len(http_log_calls) == 0
 
 
 @pytest.mark.asyncio
