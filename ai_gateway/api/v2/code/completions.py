@@ -520,7 +520,7 @@ def _get_provider_config(
     )
 
 
-def _build_code_completions(
+def _build_code_completions(  # pylint: disable=too-many-branches
     request: Request,
     payload: CompletionsRequestWithVersion,
     current_user: StarletteUser,
