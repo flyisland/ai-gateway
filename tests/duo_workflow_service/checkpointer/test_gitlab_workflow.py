@@ -35,6 +35,8 @@ from lib.internal_events.event_enum import (
     EventLabelEnum,
     EventPropertyEnum,
 )
+from gitlab_cloud_connector import CloudConnectorUser, UserClaims
+from duo_workflow_service.interceptors.authentication_interceptor import current_user
 
 
 class CustomRunnableConfig(TypedDict):
@@ -83,6 +85,14 @@ def http_client_fixture():
 @pytest.fixture(name="billing_event_client")
 def billing_event_client_fixture():
     return MagicMock(spec=BillingEventsClient)
+
+
+@pytest.fixture(name="mock_user")
+def mock_user_fixture():
+    return CloudConnectorUser(
+        authenticated=True,
+        claims=UserClaims(gitlab_instance_uid="test-instance-123")
+    )
 
 
 @pytest.fixture(autouse=True)
@@ -1230,9 +1240,11 @@ async def test_track_workflow_completion_with_billing_event(
     http_client,
     workflow_id,
     billing_event_client,
+    mock_user,
     status,
 ):
     """Test that workflow completion triggers billing event for trackable statuses."""
+    current_user.set(mock_user)
     gitlab_workflow._billing_event_client = billing_event_client
 
     gitlab_workflow._llm_operations = [
@@ -1257,6 +1269,7 @@ async def test_track_workflow_completion_with_billing_event(
     await gitlab_workflow._track_workflow_completion(status)
 
     billing_event_client.track_billing_event.assert_called_once_with(
+        user=mock_user,
         event_type="duo_agent_platform_workflow_completion",
         category="GitLabWorkflow",
         unit_of_measure="tokens",

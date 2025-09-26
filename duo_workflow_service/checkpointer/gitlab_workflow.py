@@ -60,6 +60,7 @@ from lib.internal_events.event_enum import (
     EventLabelEnum,
     EventPropertyEnum,
 )
+from duo_workflow_service.interceptors.authentication_interceptor import current_user
 
 T = TypeVar("T", bound=callable)  # type: ignore
 
@@ -481,12 +482,14 @@ class GitLabWorkflow(
         # Track billing event for workflow completion
         if status in BILLABLE_STATUSES:
             try:
+                user = current_user.get(None)
                 billing_metadata = {
                     "workflow_id": self._workflow_id,
                     "execution_environment": "duo_agent_platform",
                     "llm_operations": self._llm_operations,
                 }
                 self._billing_event_client.track_billing_event(
+                    user=user,
                     event_type="duo_agent_platform_workflow_completion",
                     category=self.__class__.__name__,
                     unit_of_measure="tokens",
