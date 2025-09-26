@@ -128,7 +128,9 @@ def create_model_metadata(data: dict[str, Any] | None) -> Optional[TypeModelMeta
                 f"Fireworks model identifier is missing for model {data['name']}."
             )
 
-        llm_definition = configs.get_model(data["name"]) if data.get("name") else None
+        fireworks_llm_definition = (
+            configs.get_model(data["name"]) if data.get("name") else None
+        )
 
         return FireworksModelMetadata(
             provider="fireworks_ai",
@@ -137,9 +139,11 @@ def create_model_metadata(data: dict[str, Any] | None) -> Optional[TypeModelMeta
             api_key=provider_keys.get("fireworks_api_key"),
             model_identifier=model_identifier,
             llm_definition_params=(
-                llm_definition.params.copy() if llm_definition else {}
+                fireworks_llm_definition.params.copy()
+                if fireworks_llm_definition
+                else {}
             ),
-            family=llm_definition.family if llm_definition else [],
+            family=fireworks_llm_definition.family if fireworks_llm_definition else [],
         )
 
     if name := data.get("name"):

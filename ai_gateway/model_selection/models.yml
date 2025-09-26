@@ -4,6 +4,7 @@ models:
     gitlab_identifier: "codestral_2501_fireworks"
     params:
       model: "codestral-2501"
+      custom_llm_provider: "fireworks_ai"
       temperature: 0.7
       max_tokens: 64
 

@@ -548,19 +548,30 @@ def _build_code_completions(
                 "provider": KindModelProvider.GITLAB,
                 "identifier": payload.model_name,
                 "feature_setting": "code_completions",
+                "provider_keys": model_keys,
+                "model_endpoints": model_endpoints,
             }
         )
 
-        payload.model_name = model_metadata.identifier
-        payload.model_provider = model_metadata.provider
+        resolved_provider = model_metadata.llm_definition_params.get(
+            "custom_llm_provider", "vertex_ai"
+        )
+        if resolved_provider == "fireworks_ai":
+            actual_provider = KindModelProvider.FIREWORKS
+        elif resolved_provider == "anthropic":
+            actual_provider = KindModelProvider.ANTHROPIC
+        else:
+            actual_provider = KindModelProvider.VERTEX_AI
+
+        payload.model_provider = actual_provider
         kwargs = {}
 
-        if model_metadata.provider == KindModelProvider.ANTHROPIC:
+        if actual_provider == KindModelProvider.ANTHROPIC:
             AnthropicHandler(payload, request, kwargs).update_completion_params()
             code_completions = completions_anthropic_factory(
                 model__name=payload.model_name,
             )
-        elif model_metadata.provider == KindModelProvider.FIREWORKS:
+        elif actual_provider == KindModelProvider.FIREWORKS:
             FireworksHandler(payload, request, kwargs).update_completion_params()
             code_completions = _resolve_code_completions_litellm(
                 payload=payload,
@@ -570,7 +581,7 @@ def _build_code_completions(
                 model_keys=model_keys,
                 model_endpoints=model_endpoints,
             )
-        elif model_metadata.provider == KindModelProvider.VERTEX_AI:
+        elif actual_provider == KindModelProvider.VERTEX_AI:
             code_completions = _resolve_code_completions_vertex_codestral(
                 payload=payload,
                 completions_litellm_vertex_codestral_factory=completions_litellm_vertex_codestral_factory,
