@@ -8,7 +8,7 @@ components:
     inputs:
       - from: "context:goal"
         as: "pipeline_url"
-      - from: "context:inputs.agent_user_environment.merge_request_url"
+      - from: "context:inputs.merge_request.url"
         as: "merge_request_url"
     toolset: ["get_pipeline_errors", "list_merge_request_diffs", "read_file", "find_files", "list_dir"]
     ui_log_events:
@@ -81,9 +81,9 @@ components:
         as: "pipeline_url"
       - from: "context:project_http_url_to_repo"
         as: "repository_url"
-      - from: "context:inputs.agent_user_environment.merge_request_url"
+      - from: "context:inputs.merge_request.url"
         as: "merge_request_url"
-      - from: "context:inputs.agent_user_environment.source_branch"
+      - from: "context:inputs.merge_request.source_branch"
         as: "source_branch"
     toolset:
       - "run_git_command"
@@ -107,20 +107,15 @@ routers:
 flow:
   entry_point: "fix_pipeline_context"
   inputs:
-    - category: agent_user_environment
-      input_schema:
-        merge_request_url:
-          type: string
-        source_branch:
-          type: string
     - category: merge_request
       input_schema:
         url:
           type: string
-    - category: pipeline
-      input_schema:
+          format: uri
+          description: The URL for the GitLab Merge Request
         source_branch:
           type: string
+          description: The source branch for the Merge Request
 prompts:
   - prompt_id: "git_push_prompt"
     model:
