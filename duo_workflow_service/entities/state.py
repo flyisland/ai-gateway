@@ -19,7 +19,7 @@ from duo_workflow_service.token_counter.approximate_token_counter import (
 )
 from duo_workflow_service.workflows.type_definitions import AdditionalContext
 
-# max content tokens is 1M but adding a buffer of 10% just in case
+# max content tokens is 400K but adding a buffer of 10% just in case
 MAX_CONTEXT_TOKENS = int(400_000 * 0.90)
 MAX_SINGLE_MESSAGE_TOKENS = int(MAX_CONTEXT_TOKENS * 0.65)
 
