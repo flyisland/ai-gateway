@@ -197,6 +197,9 @@ async def test_direct_gitlab_http_client(
         pytest.fail(f"Unexpected HTTP method: {method}")
         result = None
 
+    if isinstance(result, GitLabHttpResponse):
+        result = result.body
+
     # Check that the session was called with the correct parameters
     expected_url = f"{client.base_url}/{path.lstrip('/')}"
     expected_headers = {

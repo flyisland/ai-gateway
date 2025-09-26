@@ -949,7 +949,6 @@ async def test_aput(
             },
             cls=CustomEncoder,
         ),
-        use_http_response=True,
     )
 
     http_client.apatch.assert_called_once_with(

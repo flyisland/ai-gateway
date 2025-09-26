@@ -1341,7 +1341,6 @@ async def test_revert_to_detected_vulnerability(gitlab_client_mock, metadata):
                 },
             }
         ),
-        use_http_response=True,
     )
 
 

@@ -221,7 +221,7 @@ class ListVulnerabilities(DuoBaseTool):
                 if isinstance(response, GitLabHttpResponse):
                     if response.status_code >= 400:
                         raise ValueError(
-                            f"GraphQL request failed: HTTP {response.status_code}"
+                            f"GraphQL request failed: HTTP {response.status_code}: {response.body}"
                         )
                     response = response.body
 
@@ -405,7 +405,9 @@ mutation($vulnerabilityId: VulnerabilityID!, $comment: String, $dismissalReason:
         if isinstance(response, GitLabHttpResponse):
             if response.status_code >= 400:
                 return json.dumps(
-                    {"error": f"GraphQL request failed: HTTP {response.status_code}"}
+                    {
+                        "error": f"GraphQL request failed: HTTP {response.status_code}: {response.body}"
+                    }
                 )
             response = response.body
 
@@ -475,7 +477,7 @@ class CreateVulnerabilityIssue(DuoBaseTool):
             if project_response.status_code >= 400:
                 return json.dumps(
                     {
-                        "error": f"GraphQL request failed: HTTP {project_response.status_code}"
+                        "error": f"GraphQL request failed: HTTP {project_response.status_code}: {project_response.body}"
                     }
                 )
             project_response = project_response.body
@@ -526,13 +528,14 @@ class CreateVulnerabilityIssue(DuoBaseTool):
         response = await self.gitlab_client.apost(
             path="/api/graphql",
             body=json.dumps({"query": mutation, "variables": variables}),
-            use_http_response=True,
         )
 
         if isinstance(response, GitLabHttpResponse):
             if response.status_code >= 400:
                 return json.dumps(
-                    {"error": f"GraphQL request failed: HTTP {response.status_code}"}
+                    {
+                        "error": f"GraphQL request failed: HTTP {response.status_code}: {response.body}"
+                    }
                 )
             response = response.body
 
@@ -633,7 +636,9 @@ class LinkVulnerabilityToIssue(DuoBaseTool):
         if isinstance(response, GitLabHttpResponse):
             if response.status_code >= 400:
                 return json.dumps(
-                    {"error": f"GraphQL request failed: HTTP {response.status_code}"}
+                    {
+                        "error": f"GraphQL request failed: HTTP {response.status_code}: {response.body}"
+                    }
                 )
             response = response.body
 
@@ -720,7 +725,7 @@ mutation($vulnerabilityId: VulnerabilityID!, $comment: String) {
                 if response.status_code >= 400:
                     return json.dumps(
                         {
-                            "error": f"GraphQL request failed: HTTP {response.status_code}"
+                            "error": f"GraphQL request failed: HTTP {response.status_code}: {response.body}"
                         }
                     )
                 response = response.body
@@ -809,14 +814,13 @@ class RevertToDetectedVulnerability(DuoBaseTool):
             response = await self.gitlab_client.apost(
                 path="/api/graphql",
                 body=json.dumps({"query": mutation, "variables": variables}),
-                use_http_response=True,
             )
 
             if isinstance(response, GitLabHttpResponse):
                 if response.status_code >= 400:
                     return json.dumps(
                         {
-                            "error": f"GraphQL request failed: HTTP {response.status_code}"
+                            "error": f"GraphQL request failed: HTTP {response.status_code}: {response.body}"
                         }
                     )
                 response = response.body

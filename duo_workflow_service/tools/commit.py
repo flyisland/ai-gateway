@@ -602,7 +602,6 @@ class CreateCommit(DuoBaseTool):
             response = await self.gitlab_client.apost(
                 path=f"/api/v4/projects/{project_id}/repository/commits",
                 body=json.dumps(params),
-                use_http_response=True,
             )
 
             if isinstance(response, GitLabHttpResponse):

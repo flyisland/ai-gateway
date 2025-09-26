@@ -135,14 +135,13 @@ class UpdateVulnerabilitySeverity(DuoBaseTool):
             response = await self.gitlab_client.apost(
                 path="/api/graphql",
                 body=json.dumps({"query": mutation, "variables": variables}),
-                use_http_response=True,
             )
 
             if isinstance(response, GitLabHttpResponse):
                 if response.status_code >= 400:
                     return json.dumps(
                         {
-                            "error": f"GraphQL request failed: HTTP {response.status_code}"
+                            "error": f"GraphQL request failed: HTTP {response.status_code}: {response.body}"
                         }
                     )
                 response = response.body

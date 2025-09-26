@@ -635,7 +635,6 @@ async def test_create_epic_success(gitlab_client_mock, metadata):
                 "due_date_is_fixed": True,
             }
         ),
-        use_http_response=True,
     )
 
 
@@ -653,7 +652,6 @@ async def test_create_epic_error(gitlab_client_mock, metadata):
     gitlab_client_mock.apost.assert_called_once_with(
         path="/api/v4/groups/999/epics",
         body=json.dumps({"title": "Test Epic"}),
-        use_http_response=True,
     )
 
 
@@ -767,7 +765,6 @@ async def test_create_epic_with_url_success(
                 "due_date_is_fixed": True,
             }
         ),
-        use_http_response=True,
     )
 
 

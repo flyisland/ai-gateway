@@ -50,7 +50,6 @@ class CiLinter(DuoBaseTool):
             response = await self.gitlab_client.apost(
                 path=f"/api/v4/projects/{project_id}/ci/lint",
                 body=json.dumps(body),
-                use_http_response=True,
             )
 
             if isinstance(response, GitLabHttpResponse):

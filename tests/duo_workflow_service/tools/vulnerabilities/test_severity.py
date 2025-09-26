@@ -178,7 +178,6 @@ async def test_update_vulnerability_severity_arun(
                 },
             }
         ),
-        use_http_response=True,
     )
 
 

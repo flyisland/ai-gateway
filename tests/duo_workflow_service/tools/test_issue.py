@@ -208,7 +208,6 @@ async def test_create_issue(gitlab_client_mock, metadata, issue_data):
                 "due_date": "2023-12-31",
             }
         ),
-        use_http_response=True,
     )
 
 
@@ -267,7 +266,6 @@ async def test_create_issue_with_url_success(
                 "description": "This is a test issue",
             }
         ),
-        use_http_response=True,
     )
 
 

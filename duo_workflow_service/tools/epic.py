@@ -221,7 +221,6 @@ class CreateEpic(EpicBaseTool):
             response = await self.gitlab_client.apost(
                 path=f"/api/v4/groups/{validation_result.group_id}/epics",
                 body=json.dumps(data),
-                use_http_response=True,
             )
 
             if isinstance(response, GitLabHttpResponse):
