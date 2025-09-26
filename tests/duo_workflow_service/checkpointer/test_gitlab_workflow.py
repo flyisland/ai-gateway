@@ -5,6 +5,7 @@ from typing import Any, Optional, Sequence, TypedDict
 from unittest.mock import AsyncMock, MagicMock, Mock, call, patch
 
 import pytest
+from gitlab_cloud_connector import CloudConnectorUser, UserClaims
 from langchain_core.messages import SystemMessage
 from langchain_core.runnables import RunnableConfig
 from langgraph.checkpoint.base import (
@@ -23,6 +24,7 @@ from duo_workflow_service.gitlab.http_client import (
     GitLabHttpResponse,
     checkpoint_decoder,
 )
+from duo_workflow_service.interceptors.authentication_interceptor import current_user
 from duo_workflow_service.json_encoder.encoder import CustomEncoder
 from duo_workflow_service.status_updater.gitlab_status_updater import (
     UnsupportedStatusEvent,
@@ -35,8 +37,6 @@ from lib.internal_events.event_enum import (
     EventLabelEnum,
     EventPropertyEnum,
 )
-from gitlab_cloud_connector import CloudConnectorUser, UserClaims
-from duo_workflow_service.interceptors.authentication_interceptor import current_user
 
 
 class CustomRunnableConfig(TypedDict):
@@ -90,8 +90,7 @@ def billing_event_client_fixture():
 @pytest.fixture(name="mock_user")
 def mock_user_fixture():
     return CloudConnectorUser(
-        authenticated=True,
-        claims=UserClaims(gitlab_instance_uid="test-instance-123")
+        authenticated=True, claims=UserClaims(gitlab_instance_uid="test-instance-123")
     )
 
 

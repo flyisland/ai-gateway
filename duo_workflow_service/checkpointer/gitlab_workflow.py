@@ -41,6 +41,7 @@ from duo_workflow_service.gitlab.http_client import (
     GitLabHttpResponse,
     checkpoint_decoder,
 )
+from duo_workflow_service.interceptors.authentication_interceptor import current_user
 from duo_workflow_service.json_encoder.encoder import CustomEncoder
 from duo_workflow_service.monitoring import duo_workflow_metrics
 from duo_workflow_service.status_updater.gitlab_status_updater import (
@@ -60,7 +61,6 @@ from lib.internal_events.event_enum import (
     EventLabelEnum,
     EventPropertyEnum,
 )
-from duo_workflow_service.interceptors.authentication_interceptor import current_user
 
 T = TypeVar("T", bound=callable)  # type: ignore
 
