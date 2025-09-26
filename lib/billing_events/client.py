@@ -75,22 +75,14 @@ class BillingEventsClient:
         Returns:
             None
         """
-        self._logger.info(
-            "track_billing_event called",
-            event_type=event_type,
-            category=category,
-            unit_of_measure=unit_of_measure,
-            quantity=quantity,
-            enabled=self.enabled,
-            has_tracker=hasattr(self, "snowplow_tracker"),
-        )
-
         if not self.enabled:
-            self._logger.info("Billing events disabled")
+            self._logger.debug("Billing events disabled")
             return
 
+        self._logger.debug("Tracking billing event", event_type=event_type)
+
         if quantity <= 0:
-            self._logger.info("Invalid quantity", quantity=quantity)
+            self._logger.warning("Invalid quantity", quantity=quantity)
             return
 
         internal_context: EventContext = current_event_context.get()
@@ -144,9 +136,9 @@ class BillingEventsClient:
 
         try:
             self.snowplow_tracker.track(structured_event)
-            self._logger.info(
-                "Successfully called snowplow_tracker.track() - event queued for sending"
-            )
+            self._logger.debug("Successfully called snowplow_tracker.track()")
         except Exception as e:
-            self._logger.error("Failed to track billing event", error=str(e))
-            raise
+            self._logger.error(
+                "Failed to send billing event",
+                error=str(e),
+            )
