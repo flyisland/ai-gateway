@@ -7,6 +7,7 @@ from .commit import *
 from .documentation_search import *
 from .duo_base_tool import format_tool_display_message
 from .epic import *
+from .execute_glql import *
 from .filesystem import *
 from .git import *
 from .handover import *
