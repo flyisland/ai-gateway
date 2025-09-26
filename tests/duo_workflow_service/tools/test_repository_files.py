@@ -8,6 +8,8 @@ from duo_workflow_service.gitlab.url_parser import GitLabUrlParser
 from duo_workflow_service.policies.file_exclusion_policy import FileExclusionPolicy
 from duo_workflow_service.tools.repository_files import (
     GetRepositoryFile,
+    GetRepositoryFiles,
+    GetRepositoryFilesInput,
     ListRepositoryTree,
     RepositoryFileResourceInput,
     RepositoryTreeResourceInput,
@@ -1108,3 +1110,97 @@ class TestListRepositoryTreeWithExclusion:
 
         # All files should be included when no project
         assert response["tree"] == mock_response
+
+
+class TestGetRepositoryFiles:
+    """Test GetRepositoryFiles tool functionality."""
+
+    @pytest.fixture
+    def files_tool(self, metadata):
+        return GetRepositoryFiles(metadata=metadata)
+
+    @pytest.fixture
+    def mock_file_content(self):
+        return json.dumps(
+            {
+                "content": base64.b64encode("file content".encode("utf-8")).decode(
+                    "utf-8"
+                )
+            }
+        )
+
+    @pytest.mark.asyncio
+    async def test_get_multiple_files_success(
+        self, files_tool, gitlab_client_mock, mock_file_content
+    ):
+        """Test successful retrieval of multiple files."""
+        gitlab_client_mock.aget.return_value = mock_file_content
+
+        input_params = {
+            "project_id": "test/project",
+            "ref": "main",
+            "file_paths": ["README.md", "src/main.py"],
+        }
+
+        result = await files_tool._arun(**input_params)
+        response = json.loads(result)
+
+        assert len(response) == 2
+        assert response["README.md"] == {"content": "file content"}
+        assert response["src/main.py"] == {"content": "file content"}
+        assert gitlab_client_mock.aget.call_count == 2
+
+    @pytest.mark.asyncio
+    async def test_get_files_with_errors(self, files_tool, gitlab_client_mock):
+        """Test handling files that fail to load."""
+
+        def side_effect(*args, **kwargs):
+            path = kwargs.get("path", "")
+            if "error_file" in path:
+                raise Exception("File not found")
+            return json.dumps(
+                {"content": base64.b64encode("success".encode("utf-8")).decode("utf-8")}
+            )
+
+        gitlab_client_mock.aget.side_effect = side_effect
+
+        input_params = {
+            "project_id": "test/project",
+            "ref": "main",
+            "file_paths": ["good_file.py", "error_file.py"],
+        }
+
+        result = await files_tool._arun(**input_params)
+        response = json.loads(result)
+
+        assert response["good_file.py"] == {"content": "success"}
+        assert "error" in response["error_file.py"]
+        assert "File not found" in response["error_file.py"]["error"]
+
+    def test_get_files_format_display_message(self, files_tool):
+        """Test display message formatting."""
+        args = GetRepositoryFilesInput(
+            project_id="test/project", ref="main", file_paths=["file1.py", "file2.py"]
+        )
+
+        message = files_tool.format_display_message(args)
+        assert "Get 2 repository files from project test/project at ref main" == message
+
+    @pytest.mark.asyncio
+    async def test_get_files_with_exclusion_policy(
+        self, metadata_with_project, gitlab_client_mock
+    ):
+        """Test GetRepositoryFiles with file exclusion policy."""
+        tool = GetRepositoryFiles(metadata=metadata_with_project)
+
+        input_params = {
+            "project_id": "test/project",
+            "ref": "main",
+            "file_paths": ["README.md", "debug.log"],
+        }
+
+        result = await tool._arun(**input_params)
+        response = json.loads(result)
+
+        assert "error" in response["debug.log"]
+        assert "Files excluded due to policy" in response["debug.log"]["error"]

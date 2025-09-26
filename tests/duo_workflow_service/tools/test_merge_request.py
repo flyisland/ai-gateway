@@ -520,6 +520,76 @@ async def test_list_merge_request_diffs(gitlab_client_mock, metadata):
 
 
 @pytest.mark.asyncio
+async def test_list_merge_request_diffs_with_ai_reviewable_filter(
+    gitlab_client_mock, metadata
+):
+    """Test ListMergeRequestDiffs with ai_reviewable_only=True filters correctly."""
+    diff_data = [
+        {
+            "old_path": "src/main.py",
+            "new_path": "src/main.py",
+            "diff": "@@ -1,3 +1,3 @@\n-old content\n+new content",
+            "generated_file": False,
+        },
+        {
+            "old_path": "generated/output.py",
+            "new_path": "generated/output.py",
+            "diff": "@@ -1,3 +1,3 @@\n-old generated\n+new generated",
+            "generated_file": True,  # Should be excluded
+        },
+        {
+            "old_path": "binary_file.jpg",
+            "new_path": "binary_file.jpg",
+            "diff": "",  # Empty diff, should be excluded
+            "generated_file": False,
+        },
+    ]
+
+    gitlab_client_mock.aget = AsyncMock(return_value=json.dumps(diff_data))
+    tool = ListMergeRequestDiffs(metadata=metadata)
+
+    response = await tool._arun(
+        project_id=1, merge_request_iid=123, ai_reviewable_only=True
+    )
+    response_data = json.loads(response)
+
+    # Only src/main.py should remain
+    assert len(response_data["diffs"]) == 1
+    assert response_data["diffs"][0]["new_path"] == "src/main.py"
+    assert "excluded_files" in response_data
+
+
+@pytest.mark.asyncio
+async def test_list_merge_request_diffs_without_ai_filter_default(
+    gitlab_client_mock, metadata
+):
+    """Test ListMergeRequestDiffs without ai_reviewable_only keeps all files (backward compatible)."""
+    diff_data = [
+        {
+            "old_path": "src/main.py",
+            "new_path": "src/main.py",
+            "diff": "content",
+            "generated_file": False,
+        },
+        {
+            "old_path": "generated/output.py",
+            "new_path": "generated/output.py",
+            "diff": "content",
+            "generated_file": True,
+        },
+    ]
+
+    gitlab_client_mock.aget = AsyncMock(return_value=json.dumps(diff_data))
+    tool = ListMergeRequestDiffs(metadata=metadata)
+
+    response = await tool._arun(project_id=1, merge_request_iid=123)
+    response_data = json.loads(response)
+
+    # All diffs should be present
+    assert len(response_data["diffs"]) == 2
+
+
+@pytest.mark.asyncio
 @pytest.mark.parametrize(
     "url,project_id,merge_request_iid,expected_path",
     [

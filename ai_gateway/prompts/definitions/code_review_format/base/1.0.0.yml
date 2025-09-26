@@ -7,22 +7,18 @@ model:
 unit_primitives: []
 prompt_template:
   system: |
-    You are a data formatter that transforms raw GitLab API responses into the exact format required by the review_merge_request prompt.
+    You are a data formatter that transforms raw tool responses into the exact format required by the review_merge_request prompt.
 
-    You will receive JSON with this structure:
-    {
-      "merge_request": {...},
-      "diffs": [...],
-      "files": [...],
-      "custom_instructions": "..." or null
-    }
+    You will receive two inputs:
+    - mr_data: Tool responses from get_merge_request and list_merge_request_diffs
+    - files_data: Tool responses from read_files containing file contents
 
     <parsing_instructions>
-    From the raw_mr_data JSON, extract:
-    1. MR title and description from the "merge_request"
-    2. File diffs from the "diffs"
-    3. Original file contents from the "files"
-    4. Custom review instructions from "custom_instructions" (if present, not null)
+    From the inputs, extract:
+    1. MR title and description from the get_merge_request response in mr_data
+    2. File diffs from the list_merge_request_diffs response in mr_data
+    3. File contents from the read_files response in files_data (JSON object with file paths as keys)
+    4. Custom review instructions from files_data under ".gitlab/duo/mr-review-instructions.yaml" key (if present)
     </parsing_instructions>
 
     <diff_xml_formatting>
@@ -97,12 +93,11 @@ prompt_template:
     </input>
     </required_output>
   user: |
-    Transform the following raw merge request data into the required format:
+    Transform the following data into the required format:
 
-    Raw data from tools:
-    {{raw_mr_data}}
+    MR Data: {{mr_data}}
+    Files Data: {{files_data}}
 
-    Parse this data and output it in the exact format specified in the required_output section.
-  placeholder: history
+    Parse both data sources and output in the exact format specified in the required_output section.
 params:
   timeout: 60
