@@ -19,9 +19,11 @@ from ai_gateway.api.middleware.headers import (
     X_GITLAB_REALM_HEADER,
     X_GITLAB_SAAS_DUO_PRO_NAMESPACE_IDS_HEADER,
     X_GITLAB_TEAM_MEMBER_HEADER,
+    X_GITLAB_USER_ID_HEADER,
     X_GITLAB_VERSION_HEADER,
 )
 from ai_gateway.api.middleware_utils import get_valid_namespace_ids
+from lib.billing_events.context import current_billing_user_id
 from lib.internal_events import (
     EventContext,
     current_event_context,
@@ -94,6 +96,9 @@ class InternalEventMiddleware:
         )
         current_event_context.set(context)
         tracked_internal_events.set(set())
+
+        user_id = request.headers.get(X_GITLAB_USER_ID_HEADER)
+        current_billing_user_id.set(user_id)
 
         await self.app(scope, receive, send)
 

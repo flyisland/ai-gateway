@@ -4,7 +4,7 @@ from typing import Any, Dict, Optional
 
 from snowplow_tracker import AsyncEmitter, SelfDescribingJson, StructuredEvent, Tracker
 
-from lib.billing_events.context import BillingEventContext
+from lib.billing_events.context import BillingEventContext, current_billing_user_id
 from lib.internal_events.context import EventContext, current_event_context
 
 __all__ = ["BillingEventsClient"]
@@ -64,6 +64,7 @@ class BillingEventsClient:
             return
 
         internal_context: EventContext = current_event_context.get()
+        billing_user_id: Optional[str] = current_billing_user_id.get()
 
         # Unique id that will help us to map analytics events with billing events
         # This event_id will also act as an idempotent key to filter out duplicates
@@ -88,7 +89,7 @@ class BillingEventsClient:
             unit_of_measure=unit_of_measure,
             quantity=quantity,
             metadata=metadata,
-            subject=internal_context.global_user_id,  # TODO : We need to pass non-masked userID from GitLab instance
+            subject=billing_user_id,  # Use billing-specific user_id from x-gitlab-user-id header
             global_user_id=internal_context.global_user_id,
             seat_ids=["TODO"],  # TODO : We need to pass seatIDs from GitLab instance
             realm=mapped_realm,

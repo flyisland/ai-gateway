@@ -16,8 +16,10 @@ from duo_workflow_service.interceptors import (
     X_GITLAB_PROJECT_ID,
     X_GITLAB_REALM_HEADER,
     X_GITLAB_ROOT_NAMESPACE_ID,
+    X_GITLAB_USER_ID_HEADER,
 )
 from duo_workflow_service.interceptors.correlation_id_interceptor import correlation_id
+from lib.billing_events.context import current_billing_user_id
 from lib.internal_events import EventContext, current_event_context
 
 
@@ -82,5 +84,8 @@ class InternalEventsInterceptor(grpc.aio.ServerInterceptor):
         )
 
         current_event_context.set(context)
+
+        user_id = metadata.get(X_GITLAB_USER_ID_HEADER)
+        current_billing_user_id.set(user_id)
 
         return await continuation(handler_call_details)

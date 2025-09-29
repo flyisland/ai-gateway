@@ -1,10 +1,16 @@
+from contextvars import ContextVar
 from typing import Any, Dict, List, Optional
 
 from pydantic import BaseModel, Field
 
 __all__ = [
     "BillingEventContext",
+    "current_billing_user_id",
 ]
+
+current_billing_user_id: ContextVar[Optional[str]] = ContextVar(
+    "current_billing_user_id", default=None
+)
 
 
 class BillingEventContext(BaseModel):
