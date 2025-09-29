@@ -228,14 +228,14 @@ def _conversation_history_reducer(
         existing_messages = reduced.get(agent_name, [])
         reduced[agent_name] = existing_messages + processed_messages
 
-        pretrimed_msg_roles, pretrimmed_msg_token = get_messages_profile(
+        pretrimmed_msg_roles, pretrimmed_msg_token = get_messages_profile(
             messages=reduced[agent_name],
             token_counter=token_counter,
             include_tool_tokens=False,
         )
 
         logger.debug(
-            f"Finished pretrim with messages roles: {pretrimed_msg_roles}, message token: {pretrimmed_msg_token}, "
+            f"Finished pretrim with messages roles: {pretrimmed_msg_roles}, message token: {pretrimmed_msg_token}, "
             f"estimated token size including tool specs: {pretrimmed_msg_token + token_counter.tool_tokens}"
         )
 

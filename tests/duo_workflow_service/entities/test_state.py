@@ -826,7 +826,7 @@ def test_get_messages_profile():
     messages = []
     token_counter = ApproximateTokenCounter(agent_name="context_builder")
     roles, tokens = get_messages_profile(messages, token_counter=token_counter)
-    assert roles == None
+    assert roles is None
     assert tokens == 0
 
     messages = [HumanMessage(content="Hi"), AIMessage(content="Hello")]
