@@ -178,10 +178,7 @@ class Workflow(AbstractWorkflow):
                 "Failed to load file contents, ensure that file is present"
             )
 
-        if (
-            ApproximateTokenCounter(AGENT_NAME).count_string_content(content)
-            > MAX_SINGLE_MESSAGE_TOKENS
-        ):
+        if ApproximateTokenCounter().count_tokens(content) > MAX_SINGLE_MESSAGE_TOKENS:
             return {
                 "ui_chat_log": [
                     UiChatLog(
