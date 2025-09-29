@@ -173,9 +173,9 @@ def get_messages_profile(
     messages: List[BaseMessage],
     token_counter: ApproximateTokenCounter,
     include_tool_tokens: bool = True,
-) -> Tuple[Optional[List[str]], int]:
+) -> Tuple[List[str], int]:
 
-    roles = [msg.type for msg in messages] if messages else None
+    roles = [msg.type for msg in messages]
     token_size = (
         token_counter.count_tokens(messages, include_tool_tokens=include_tool_tokens)
         if messages
@@ -303,15 +303,15 @@ def _conversation_history_reducer(
             fallback_messages = system_messages + non_system_messages[-5:]
             reduced[agent_name] = _restore_message_consistency(fallback_messages)
 
-        posttrimed_msg_roles, posttrimed_msg_token = get_messages_profile(
+        posttrimmed_msg_roles, posttrimmed_msg_token = get_messages_profile(
             messages=reduced[agent_name],
             token_counter=token_counter,
             include_tool_tokens=False,
         )
 
         logger.debug(
-            f"Finished posttrim with messages roles: {posttrimed_msg_roles}, message token: {posttrimed_msg_token}, "
-            f"estimated token size including tool specs: {posttrimed_msg_token + token_counter.tool_tokens}"
+            f"Finished posttrim with messages roles: {posttrimmed_msg_roles}, message token: {posttrimmed_msg_token}, "
+            f"estimated token size including tool specs: {posttrimmed_msg_token + token_counter.tool_tokens}"
         )
 
     return reduced
