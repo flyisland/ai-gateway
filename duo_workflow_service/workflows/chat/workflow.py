@@ -85,6 +85,8 @@ CHAT_READ_ONLY_TOOLS = [
     "list_project_audit_events",
     "get_current_user",
     "get_vulnerability_details",
+    "hello_world",
+    "natural_langauge_query",
 ]
 
 

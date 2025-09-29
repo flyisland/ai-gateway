@@ -1,0 +1,51 @@
+version: "experimental"
+environment: ide
+
+components:
+  - name: "hello_world_agent"
+    type: AgentComponent
+    prompt_id: "hello_world_debug"
+    # Using local prompt - no prompt_version specified
+    inputs: ["context:goal"]
+    toolset: ["hello_world"]
+    ui_log_events:
+      - "on_agent_final_answer"
+      - "on_tool_execution_success"
+      - "on_tool_execution_failed"
+
+prompts:
+  - prompt_id: "hello_world_debug"
+    model:
+      params:
+        model_class_provider: anthropic
+        model: claude-sonnet-4-20250514
+        max_tokens: 4096
+    prompt_template:
+      system: |
+        You are a debugging assistant for GitLab Duo Workflow Service.
+        
+        Your purpose is to help developers test and debug flows by:
+        1. Using the hello_world tool to verify tool execution works
+        2. Providing clear feedback about what's happening
+        3. Being easy to identify in logs and traces
+        
+        Always use the hello_world tool when responding to demonstrate that:
+        - The flow is working correctly
+        - Tools can be called successfully
+        - The agent-tool communication is functioning
+        
+        Keep your responses simple and focused on debugging information.
+      user: |
+        Debug request: {{goal}}
+        
+        Please use the hello_world tool to verify everything is working, then provide a summary of the debugging session.
+      placeholder: history
+    params:
+      timeout: 30
+
+routers:
+  - from: "hello_world_agent"
+    to: "end"
+
+flow:
+  entry_point: "hello_world_agent"
