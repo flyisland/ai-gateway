@@ -12,6 +12,7 @@ from duo_workflow_service.checkpointer.gitlab_workflow import (
 from duo_workflow_service.checkpointer.notifier import UserInterface
 from duo_workflow_service.entities.state import MessageTypeEnum, WorkflowStatusEnum
 from duo_workflow_service.workflows.type_definitions import AdditionalContext
+from lib.feature_flags.context import current_feature_flag_context
 
 
 @pytest.fixture(name="outbox")
@@ -135,7 +136,13 @@ async def test_init_sets_attributes(outbox):
 
 
 @pytest.mark.parametrize(
-    ("existing_messages", "message_content", "expected_messages"),
+    (
+        "existing_messages",
+        "message_content",
+        "expected_messages",
+        "enabled_feature_flags",
+        "should_execute_action",
+    ),
     [
         (
             [],
@@ -152,6 +159,8 @@ async def test_init_sets_attributes(outbox):
                     "additional_context": None,
                 }
             ],
+            [],
+            True,
         ),
         (
             [
@@ -179,6 +188,8 @@ async def test_init_sets_attributes(outbox):
                     "additional_context": None,
                 }
             ],
+            [],
+            True,
         ),
         (
             [
@@ -216,6 +227,8 @@ async def test_init_sets_attributes(outbox):
                     "additional_context": None,
                 },
             ],
+            [],
+            True,
         ),
         (
             [
@@ -253,18 +266,36 @@ async def test_init_sets_attributes(outbox):
                     "additional_context": None,
                 },
             ],
+            [],
+            True,
         ),
         (
             [],
             "",
             [],
+            ["duo_workflow_stream_during_tool_call_generation"],
+            True,
+        ),
+        (
+            [],
+            "",
+            [],
+            [],
+            False,
         ),
     ],
 )
 @pytest.mark.asyncio
 async def test_send_event_messages_stream(
-    checkpoint_notifier, existing_messages, message_content, expected_messages
+    checkpoint_notifier,
+    existing_messages,
+    message_content,
+    expected_messages,
+    enabled_feature_flags,
+    should_execute_action,
 ):
+    current_feature_flag_context.set(enabled_feature_flags)
+
     checkpoint_notifier.ui_chat_log = existing_messages
 
     with patch("duo_workflow_service.checkpointer.notifier.datetime") as mock_datetime:
