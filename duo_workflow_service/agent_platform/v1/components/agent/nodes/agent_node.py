@@ -1,8 +1,8 @@
-from typing import ClassVar, Self
+from typing import ClassVar, List, Self
 
 import structlog
 from anthropic import APIStatusError
-from langchain_core.messages import AIMessage, ToolMessage
+from langchain_core.messages import AIMessage, BaseMessage, ToolMessage
 from pydantic import BaseModel, ConfigDict, Field
 from pydantic_core import ValidationError
 
@@ -76,7 +76,7 @@ class AgentNode:
         self._inputs = inputs
         self._component_name = component_name
         self._internal_event_client = internal_event_client
-        self._approximate_token_counter = ApproximateTokenCounter(component_name)
+        self._approximate_token_counter = ApproximateTokenCounter()
         self._error_handler = ModelErrorHandler()
 
     async def run(self, state: FlowState) -> dict:
@@ -174,8 +174,8 @@ class AgentNode:
                 ),
             ]
 
-    def _track_tokens_data(self, message, history):
-        estimated = self._approximate_token_counter.count_tokens(history)
+    def _track_tokens_data(self, message: AIMessage, history: List[BaseMessage]):
+        estimated = self._approximate_token_counter.count_messages_tokens(history)
         usage_metadata = message.usage_metadata if message.usage_metadata else {}
 
         additional_properties = InternalEventAdditionalProperties(

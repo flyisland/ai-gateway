@@ -1,5 +1,6 @@
 import asyncio
-from typing import Optional, Type, TypedDict, Union
+from itertools import chain
+from typing import List, Optional, Type, TypedDict, Union
 
 from gitlab_cloud_connector import CloudConnectorUser
 from langchain.tools import BaseTool
@@ -136,6 +137,16 @@ _AGENT_PRIVILEGES: dict[str, list[Type[BaseTool]]] = {
     ],
     _RUN_MCP_TOOLS_PRIVILEGE: [],
 }
+
+
+def get_all_op_tools() -> List[Type[BaseTool]]:
+    return list(
+        set(
+            _DEFAULT_TOOLS
+            + _READ_ONLY_GITLAB_TOOLS
+            + list(chain.from_iterable(_AGENT_PRIVILEGES.values()))
+        )
+    )
 
 
 class ToolsRegistry:

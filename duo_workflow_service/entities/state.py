@@ -1,5 +1,16 @@
+import json
 from enum import StrEnum
-from typing import Annotated, Any, Dict, List, NotRequired, Optional, TypedDict, Union
+from typing import (
+    Annotated,
+    Any,
+    Dict,
+    List,
+    NotRequired,
+    Optional,
+    Tuple,
+    TypedDict,
+    Union,
+)
 
 import structlog
 from langchain_core.messages import (
@@ -100,11 +111,17 @@ class UiChatLog(TypedDict):
 
 
 def _pretrim_large_messages(
-    messages: List[BaseMessage], token_counter
+    messages: List[BaseMessage], token_counter: ApproximateTokenCounter
 ) -> List[BaseMessage]:
     processed_messages = []
     for message in messages:
-        if token_counter.count_tokens([message]) > MAX_SINGLE_MESSAGE_TOKENS:
+        msg_token = token_counter.count_messages_tokens(messages)
+        if msg_token > MAX_SINGLE_MESSAGE_TOKENS:
+            logger.debug(
+                f"Message with role: {message.type} token size: {msg_token} "
+                f"exceeds the single message token limit: {MAX_SINGLE_MESSAGE_TOKENS}."
+                f"Replacing its content with a placeholder."
+            )
             message_copy = message.model_copy()
             message_copy.content = (
                 "Previous message was too large for context window and was omitted. Please respond "
@@ -159,35 +176,76 @@ def _plan_reducer(current: Plan, new: Optional[Plan]) -> Plan:
 def _conversation_history_reducer(
     current: Dict[str, List[BaseMessage]], new: Optional[Dict[str, List[BaseMessage]]]
 ) -> Dict[str, List[BaseMessage]]:
+
+    def get_messages_profile(
+        messages: List[BaseMessage], token_counter: ApproximateTokenCounter
+    ) -> Tuple[Optional[List[str]], int]:
+
+        roles = [msg.type for msg in messages] if messages else None
+        token_size = (
+            token_counter.count_tokens(
+                data=json.dumps([msg.model_dump() for msg in messages])
+            )
+            if messages
+            else 0
+        )
+        return roles, token_size
+
     reduced = {**current}
 
     if new is None:
         return reduced
 
+    token_counter = ApproximateTokenCounter()
+
     for agent_name, new_messages in new.items():
         if not new_messages:
             continue
 
-        token_counter = ApproximateTokenCounter(agent_name)
+        current_msg_roles, current_msg_token = get_messages_profile(
+            messages=reduced.get(agent_name, []), token_counter=token_counter
+        )
+
+        new_msg_roles, new_msg_token = get_messages_profile(
+            messages=new_messages, token_counter=token_counter
+        )
+        estimated_total_token = (
+            new_msg_token + current_msg_token + token_counter._tool_tokens
+        )
+        logger.debug(
+            f"Starting trimming conversation history for {agent_name} with "
+            f"current messages roles: {current_msg_roles}, token size: {current_msg_token}; "
+            f"new messages roles: {new_msg_roles}, token size: {new_msg_token};"
+            f"totla token size including tool specs: {estimated_total_token}"
+        )
         processed_messages = _pretrim_large_messages(new_messages, token_counter)
 
-        if not processed_messages:
+        existing_messages = reduced.get(agent_name, [])
+        reduced[agent_name] = existing_messages + processed_messages
+
+        pretrimed_msg_roles, pretrimmed_msg_token = get_messages_profile(
+            messages=reduced[agent_name],
+            token_counter=token_counter,
+        )
+
+        logger.debug(
+            f"Finished pretrim with messages roles: {pretrimed_msg_roles}, message token: {pretrimmed_msg_token}, "
+            f"estimated token size including tool specs: {pretrimmed_msg_token + token_counter._tool_tokens}"
+        )
+
+        if (pretrimmed_msg_token + token_counter._tool_tokens) < MAX_CONTEXT_TOKENS:
+            logger.debug(
+                f"Estimated token size is below the threshold: {MAX_CONTEXT_TOKENS}; "
+                f"skipping further trim for: {agent_name}"
+            )
             continue
-
-        existing_messages = []
-
-        if agent_name in reduced:
-            existing_messages = reduced[agent_name]
-            reduced[agent_name] = reduced[agent_name] + processed_messages
-        else:
-            reduced[agent_name] = processed_messages
 
         try:
             trimmed_messages = trim_messages(
                 reduced[agent_name],
-                max_tokens=MAX_CONTEXT_TOKENS,
+                max_tokens=MAX_CONTEXT_TOKENS - token_counter._tool_tokens,
                 strategy="last",
-                token_counter=token_counter.count_tokens,
+                token_counter=token_counter.count_messages_tokens,
                 start_on="human",
                 include_system=True,
                 allow_partial=False,
