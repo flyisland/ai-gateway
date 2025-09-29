@@ -314,7 +314,8 @@ class DuoWorkflowService(contract_pb2_grpc.DuoWorkflowServicer):
         )
 
         workflow_class: FlowFactory = resolve_workflow_class(
-            workflow_definition, flow_config, flow_config_schema_version
+            # workflow_definition, flow_config, flow_config_schema_version
+            "prototype/experimental", flow_config, flow_config_schema_version
         )
 
         invocation_metadata = dict(context.invocation_metadata())
