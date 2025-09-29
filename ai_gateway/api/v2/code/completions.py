@@ -520,6 +520,18 @@ def _get_provider_config(
     )
 
 
+def _resolve_gitlab_model_provider(model_metadata: ModelMetadata) -> KindModelProvider:
+    """Resolve GitLab model metadata to actual provider enum."""
+
+    resolved_provider = model_metadata.llm_definition_params.get(
+        "custom_llm_provider", "vertex_ai"
+    )
+    try:
+        return KindModelProvider(resolved_provider)
+    except ValueError:
+        return KindModelProvider.VERTEX_AI
+
+
 def _build_code_completions(
     request: Request,
     payload: CompletionsRequestWithVersion,
@@ -553,14 +565,7 @@ def _build_code_completions(
             }
         )
 
-        resolved_provider = model_metadata.llm_definition_params.get(
-            "custom_llm_provider", "vertex_ai"
-        )
-        try:
-            actual_provider = KindModelProvider(resolved_provider)
-        except ValueError:
-            actual_provider = KindModelProvider.VERTEX_AI
-
+        actual_provider = _resolve_gitlab_model_provider(model_metadata)
         payload.model_provider = actual_provider
         kwargs = {}
 
