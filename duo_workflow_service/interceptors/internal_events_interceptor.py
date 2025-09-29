@@ -15,7 +15,6 @@ from duo_workflow_service.interceptors import (
     X_GITLAB_NAMESPACE_ID,
     X_GITLAB_PROJECT_ID,
     X_GITLAB_REALM_HEADER,
-    X_GITLAB_ROOT_NAMESPACE_ID,
     X_GITLAB_USER_ID_HEADER,
 )
 from duo_workflow_service.interceptors.correlation_id_interceptor import correlation_id
@@ -79,7 +78,6 @@ class InternalEventsInterceptor(grpc.aio.ServerInterceptor):
                 enabled_features=feature_enabled_by_namespace_ids
             ),
             namespace_id=namespace_id,
-            ultimate_parent_namespace_id=metadata.get(X_GITLAB_ROOT_NAMESPACE_ID),
             is_gitlab_team_member=is_gitlab_member,
         )
 

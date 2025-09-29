@@ -48,7 +48,6 @@ class EventContext(BaseModel):
     model_engine: Optional[str] = None
     model_name: Optional[str] = None
     model_provider: Optional[str] = None
-    ultimate_parent_namespace_id: Optional[int] = None
 
 
 @dataclass

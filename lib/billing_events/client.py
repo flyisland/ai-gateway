@@ -89,7 +89,7 @@ class BillingEventsClient:
             unit_of_measure=unit_of_measure,
             quantity=quantity,
             metadata=metadata,
-            subject=billing_user_id,  # Use billing-specific user_id from x-gitlab-user-id header
+            subject=billing_user_id,
             global_user_id=internal_context.global_user_id,
             seat_ids=["TODO"],  # TODO : We need to pass seatIDs from GitLab instance
             realm=mapped_realm,
@@ -99,7 +99,7 @@ class BillingEventsClient:
             host_name=internal_context.host_name,
             project_id=internal_context.project_id,
             namespace_id=internal_context.namespace_id,
-            root_namespace_id=internal_context.ultimate_parent_namespace_id,
+            root_namespace_id=None,  # TODO : We need to pass ultimate_parent_namespace_id from the GitLab instance
             correlation_id=internal_context.correlation_id,
         )
 
