@@ -20,6 +20,7 @@ from typing import (
 
 import structlog
 from dependency_injector.wiring import Provide, inject
+from gitlab_cloud_connector import CloudConnectorUser
 from langchain_core.runnables import RunnableConfig
 from langgraph.checkpoint.base import (
     BaseCheckpointSaver,
@@ -482,7 +483,7 @@ class GitLabWorkflow(
         # Track billing event for workflow completion
         if status in BILLABLE_STATUSES:
             try:
-                user = current_user.get(None)
+                user: CloudConnectorUser = current_user.get()
                 billing_metadata = {
                     "workflow_id": self._workflow_id,
                     "execution_environment": "duo_agent_platform",

@@ -149,9 +149,13 @@ class TestBillingEventsClient:
         quantity,
         metadata,
         category,
-        user,
         kwargs,
     ):
+        user = CloudConnectorUser(
+            authenticated=True,
+            claims=UserClaims(gitlab_instance_uid="test-instance-uid"),
+        )
+
         event_context = EventContext(
             realm="user",
             instance_id="instance-123",
@@ -179,7 +183,7 @@ class TestBillingEventsClient:
             "global_user_id": kwargs.get("global_user_id"),
             "correlation_id": "corr-123",
             "metadata": metadata or {},
-            "unique_instance_id": user.claims.gitlab_instance_uid,
+            "unique_instance_id": "test-instance-uid",
         }
 
         client.track_billing_event(
