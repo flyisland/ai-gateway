@@ -520,7 +520,7 @@ def _get_provider_config(
     )
 
 
-def _build_code_completions(  # pylint: disable=too-many-branches
+def _build_code_completions(
     request: Request,
     payload: CompletionsRequestWithVersion,
     current_user: StarletteUser,
@@ -556,11 +556,9 @@ def _build_code_completions(  # pylint: disable=too-many-branches
         resolved_provider = model_metadata.llm_definition_params.get(
             "custom_llm_provider", "vertex_ai"
         )
-        if resolved_provider == "fireworks_ai":
-            actual_provider = KindModelProvider.FIREWORKS
-        elif resolved_provider == "anthropic":
-            actual_provider = KindModelProvider.ANTHROPIC
-        else:
+        try:
+            actual_provider = KindModelProvider(resolved_provider)
+        except ValueError:
             actual_provider = KindModelProvider.VERTEX_AI
 
         payload.model_provider = actual_provider
