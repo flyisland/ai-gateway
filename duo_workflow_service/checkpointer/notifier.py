@@ -52,10 +52,9 @@ class UserInterface:
 
         if type == "messages":
             (message, _) = state
+            self._append_chunk_to_ui_chat_log(message)
 
-            has_content = self._append_chunk_to_ui_chat_log(message)
-            if has_content:
-                return await self._execute_action()
+            return await self._execute_action()
 
     async def _execute_action(self):
 
@@ -87,7 +86,7 @@ class UserInterface:
 
         log.info("Added NewCheckpoint to streaming outbox")
 
-    def _append_chunk_to_ui_chat_log(self, message: BaseMessage) -> bool:
+    def _append_chunk_to_ui_chat_log(self, message: BaseMessage):
         """Append a message chunk to the UI chat log.
 
         Processes incoming message chunks and either creates a new chat log entry
@@ -95,14 +94,10 @@ class UserInterface:
 
         Args:
             message (BaseMessage): The message chunk to be processed and added to the log.
-
-        Returns:
-            bool: True if content was successfully added to the chat log, False if
-                the message had no content to add.
         """
         content = StrOutputParser().invoke(message) or ""
         if not content:
-            return False
+            return
 
         if (
             not self.ui_chat_log
@@ -124,5 +119,3 @@ class UserInterface:
             last_message = self.ui_chat_log[-1]
 
         last_message["content"] = last_message["content"] + content
-
-        return True
