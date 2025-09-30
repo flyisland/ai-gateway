@@ -325,7 +325,7 @@ class FindFiles(DuoBaseTool):
     def format_display_message(
         self, args: FindFilesInput, _tool_response: Any = None
     ) -> str:
-        return f"Search files with pattern '{args.name_pattern}'"
+        return f"Search files with pattern `{args.name_pattern}`"
 
 
 class MkdirInput(BaseModel):
