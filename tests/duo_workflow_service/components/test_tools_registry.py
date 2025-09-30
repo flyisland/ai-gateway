@@ -754,5 +754,3 @@ def test_get_all_op_tools(monkeypatch):
     )
     assert len(tools) == 3
     assert tools == set([tool1, tool2, tool3])
-    assert tools == set([tool1, tool2, tool3])
-    assert tools == set([tool1, tool2, tool3])

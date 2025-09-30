@@ -13,7 +13,7 @@ def test_approximat_token_counter():
     ]
 
     token_counter = ApproximateTokenCounter()
-    assert token_counter._tool_tokens == pytest.approx(40283, abs=300)
+    assert token_counter.get_tool_tokens() == pytest.approx(40283, abs=300)
 
     assert token_counter.count_messages_tokens(
         messages, include_tool_specs=False

@@ -216,12 +216,13 @@ def _conversation_history_reducer(
             f"Starting trimming conversation history for {agent_name} with "
             f"current messages roles: {current_msg_roles}, token size: {current_msg_token}; "
             f"new messages roles: {new_msg_roles}, token size: {new_msg_token}; "
-            f"total token size including tool specs: {current_msg_token + new_msg_token + token_counter._tool_tokens}",
+            f"total token size including tool specs: "
+            f"{current_msg_token + new_msg_token + token_counter.get_tool_tokens()}",
             current_msg_tokens=current_msg_token,
             new_msg_token=new_msg_token,
             total_tokens_before_trimming=current_msg_token
             + new_msg_token
-            + token_counter._tool_tokens,
+            + token_counter.get_tool_tokens(),
         )
 
         processed_messages = _pretrim_large_messages(new_messages, token_counter)
@@ -239,15 +240,15 @@ def _conversation_history_reducer(
 
         logger.info(
             f"Finished pretrim with messages roles: {pretrimmed_msg_roles}, message token: {pretrimmed_msg_token}, "
-            f"estimated token size including tool specs: {pretrimmed_msg_token + token_counter._tool_tokens}",
+            f"estimated token size including tool specs: {pretrimmed_msg_token + token_counter.get_tool_tokens()}",
             total_tokens_after_pretrimming=pretrimmed_msg_token
-            + token_counter._tool_tokens,
+            + token_counter.get_tool_tokens(),
         )
 
         try:
             trimmed_messages = trim_messages(
                 reduced[agent_name],
-                max_tokens=MAX_CONTEXT_TOKENS - token_counter._tool_tokens,
+                max_tokens=MAX_CONTEXT_TOKENS - token_counter.get_tool_tokens(),
                 strategy="last",
                 token_counter=token_counter.count_messages_tokens,
                 start_on="human",
@@ -315,9 +316,9 @@ def _conversation_history_reducer(
 
         logger.info(
             f"Finished posttrim with messages roles: {posttrimmed_msg_roles}, message token: {posttrimmed_msg_token}, "
-            f"estimated token size including tool specs: {posttrimmed_msg_token + token_counter._tool_tokens}",
+            f"estimated token size including tool specs: {posttrimmed_msg_token + token_counter.get_tool_tokens()}",
             total_tokens_after_posttrimming=posttrimmed_msg_token
-            + token_counter._tool_tokens,
+            + token_counter.get_tool_tokens(),
         )
 
     return reduced

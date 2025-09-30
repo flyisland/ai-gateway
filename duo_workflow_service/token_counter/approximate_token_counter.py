@@ -7,46 +7,42 @@ from langchain_anthropic.chat_models import _format_messages
 from langchain_core.messages.base import BaseMessage
 from langchain_core.messages.utils import count_tokens_approximately
 
+logger = structlog.stdlib.get_logger("approximate_token_counter")
+
+_DEFAULT_TOOL_TOKENS = 40300
+
+
+def _calculate_tool_tokens() -> int:
+    try:
+        # avoid circular imports
+        from langchain_anthropic import convert_to_anthropic_tool
+
+        from duo_workflow_service.components.tools_registry import get_all_op_tools
+
+        encoding = tiktoken.encoding_for_model("gpt-4o")
+        tools_data = json.dumps(
+            [convert_to_anthropic_tool(tool=tool()) for tool in get_all_op_tools()]
+        )
+        return len(encoding.encode(tools_data))
+    except Exception as e:
+        logger.error(f"Failed to calculate tool tokens: {e}")
+        # when hit error, assigned an estimated number
+        return _DEFAULT_TOOL_TOKENS
+
 
 class ApproximateTokenCounter:
     _encoding = tiktoken.encoding_for_model("gpt-4o")
-    _tool_tokens = 0
-    _tool_tokens_calculated = False
 
     def __init__(self):
-        self._logger = structlog.stdlib.get_logger("approximate_token_counter")
+        self._tool_tokens = None
 
-        if ApproximateTokenCounter._tool_tokens_calculated is False:
-            try:
-                # avoid circular imports
-                from langchain_anthropic import convert_to_anthropic_tool
-
-                from duo_workflow_service.components.tools_registry import (
-                    get_all_op_tools,
-                )
-
-                tools_data = json.dumps(
-                    [
-                        convert_to_anthropic_tool(tool=tool())
-                        for tool in get_all_op_tools()
-                    ]
-                )
-                ApproximateTokenCounter._tool_tokens = len(
-                    ApproximateTokenCounter._encoding.encode(tools_data)
-                )
-                ApproximateTokenCounter._tool_tokens_calculated = True
-                self._logger.info(
-                    f"Calculated tool specs token size: {ApproximateTokenCounter._tool_tokens}"
-                )
-            except Exception as e:
-                self._logger.error(f"Failed to calculate tool tokens: {e}")
-                ApproximateTokenCounter._tool_tokens = 0
-                ApproximateTokenCounter._tool_tokens_calculated = True
-
-        self._tool_tokens = ApproximateTokenCounter._tool_tokens
+    def get_tool_tokens(self) -> int:
+        if self._tool_tokens is None:
+            self._tool_tokens = _calculate_tool_tokens()
+        return self._tool_tokens
 
     def count_str_tokens(self, data: str, include_tool_specs: bool) -> int:
-        token_size = self._tool_tokens if include_tool_specs else 0
+        token_size = self.get_tool_tokens() if include_tool_specs else 0
         token_size += len(ApproximateTokenCounter._encoding.encode(data))
         return token_size
 
@@ -56,12 +52,12 @@ class ApproximateTokenCounter:
         try:
             system_message, rest_messages = _format_messages(messages)
         except Exception as e:
-            self._logger.error(
+            logger.error(
                 f"Fallback to use langgraph token estimator due to hitting unexpected error: {e}"
             )
             token_size = count_tokens_approximately(messages)
             if include_tool_specs:
-                token_size += self._tool_tokens
+                token_size += self.get_tool_tokens()
             return token_size
         return self.count_str_tokens(
             json.dumps((system_message, rest_messages)),
