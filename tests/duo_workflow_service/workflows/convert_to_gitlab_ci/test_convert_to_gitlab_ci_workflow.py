@@ -279,15 +279,15 @@ async def test_translation_tools(
 )
 @pytest.mark.asyncio
 async def test_file_content_too_large(mock_token_counter, workflow_state, workflow):
-    mock_token_counter.return_value.count_string_content.return_value = (
+    mock_token_counter.return_value.count_str_tokens.return_value = (
         MAX_SINGLE_MESSAGE_TOKENS + 1
     )
 
     result = workflow._load_file_contents(["large file content"], workflow_state)
 
-    mock_token_counter.assert_called_once_with("ci_pipelines_manager_agent")
-    mock_token_counter.return_value.count_string_content.assert_called_once_with(
-        "large file content"
+    mock_token_counter.assert_called_once_with()
+    mock_token_counter.return_value.count_str_tokens.assert_called_once_with(
+        "large file content", include_tool_specs=False
     )
     assert "File too large" in result["ui_chat_log"][0]["content"]
     assert "conversation_history" not in result

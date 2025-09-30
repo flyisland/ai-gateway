@@ -53,7 +53,7 @@ def mock_approximate_token_counter_fixture():
         "duo_workflow_service.agent_platform.experimental.components.agent.nodes.agent_node.ApproximateTokenCounter"
     ) as mocked_token_counter_cls:
         mocked_token_counter = Mock(spec=ApproximateTokenCounter)
-        mocked_token_counter.count_tokens.return_value = 80
+        mocked_token_counter.count_str_tokens.return_value = 80
         mocked_token_counter_cls.return_value = mocked_token_counter
 
         yield mocked_token_counter
@@ -424,7 +424,9 @@ class TestAgentNodeInternalEventsTracking:
             await agent_node.run(base_flow_state)
 
             # Verify token counting was called
-            mock_approximate_token_counter.count_tokens.assert_called_once_with([])
+            mock_approximate_token_counter.count_messages_tokens.assert_called_once_with(
+                [], include_tool_specs=True
+            )
 
             mock_props_cls.assert_called_once_with(
                 label=component_name,
@@ -433,7 +435,7 @@ class TestAgentNodeInternalEventsTracking:
                 input_tokens=mock_ai_message.usage_metadata["input_tokens"],
                 output_tokens=mock_ai_message.usage_metadata["output_tokens"],
                 total_tokens=mock_ai_message.usage_metadata["total_tokens"],
-                estimated_input_tokens=mock_approximate_token_counter.count_tokens.return_value,
+                estimated_input_tokens=mock_approximate_token_counter.count_messages_tokens.return_value,
             )
 
             # Verify internal event tracking was called

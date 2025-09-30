@@ -119,7 +119,7 @@ def test_conversation_history_reducer_with_none():
     }
 
 
-@patch("duo_workflow_service.entities.state.MAX_CONTEXT_TOKENS", 22)
+@patch("duo_workflow_service.entities.state.MAX_CONTEXT_TOKENS", 40350)
 def test_conversation_history_reducer_exceeding_context_limit():
     current: Dict[str, List[BaseMessage]] = {
         "agent_a": [
@@ -226,8 +226,10 @@ def test_conversation_history_reducer_single_message_too_large():
 def test_pretrim_large_messages():
     token_counter = MagicMock()
     # Simulate token count
-    token_counter.count_tokens.side_effect = lambda msgs: (
-        50 if "small" in msgs[0].content else 150
+    token_counter.count_messages_tokens.side_effect = (
+        lambda msgs, include_tool_specs=False: (
+            50 if "small" in msgs[0].content else 150
+        )
     )
 
     messages = [
@@ -816,7 +818,9 @@ def test_conversation_history_reducer_with_tool_messages(
 
     mock_token_counter_instance = MagicMock()
     mock_token_counter.return_value = mock_token_counter_instance
-    mock_token_counter_instance.count_tokens.return_value = 10  # Below threshold
+    mock_token_counter_instance.count_messages_tokens.return_value = (
+        10  # Below threshold
+    )
 
     result = _conversation_history_reducer(current, new)
     assert result["agent_a"] == expected_result
@@ -824,7 +828,7 @@ def test_conversation_history_reducer_with_tool_messages(
 
 def test_get_messages_profile():
     messages = []
-    token_counter = ApproximateTokenCounter(agent_name="context_builder")
+    token_counter = ApproximateTokenCounter()
     roles, tokens = get_messages_profile(messages, token_counter=token_counter)
     assert roles == []
     assert tokens == 0
@@ -832,4 +836,4 @@ def test_get_messages_profile():
     messages = [HumanMessage(content="Hi"), AIMessage(content="Hello")]
     roles, tokens = get_messages_profile(messages, token_counter=token_counter)
     assert roles == ["human", "ai"]
-    assert tokens == 4742
+    assert tokens == pytest.approx(28, abs=5)
