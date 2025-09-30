@@ -55,6 +55,7 @@ class ApproximateTokenCounter:
             logger.error(
                 f"Fallback to use langgraph token estimator due to hitting unexpected error: {e}"
             )
+            # count_tokens_approximately only counts message tokens, not tool tokens
             token_size = count_tokens_approximately(messages)
             if include_tool_specs:
                 token_size += self.get_tool_tokens()
