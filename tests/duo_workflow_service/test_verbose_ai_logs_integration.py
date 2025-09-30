@@ -12,13 +12,14 @@ class TestVerboseAiLogsEndToEnd:
     """Test that verbose AI logs work end-to-end in DWS context."""
 
     @pytest.fixture(autouse=True)
-    def setup_logging_like_dws(self):
+    def setup_logging_like_dws(self, monkeypatch):
         """Initialize logging like DWS does (which now includes AI Gateway logging)."""
         # pylint: disable=import-outside-toplevel
         import ai_gateway.structured_logging as aigw_logging
         from duo_workflow_service.structured_logging import setup_logging
         from lib.verbose_ai_logs import enabled_instance_verbose_ai_logs
 
+        # Store original values
         original_enable_request_logging = getattr(
             aigw_logging, "ENABLE_REQUEST_LOGGING", None
         )
@@ -29,15 +30,20 @@ class TestVerboseAiLogsEndToEnd:
             aigw_logging, "enabled_instance_verbose_ai_logs", None
         )
 
+        # Mock environment variables to ensure consistent test behavior
+        monkeypatch.setenv("AIGW_CUSTOM_MODELS__ENABLED", "true")
+        monkeypatch.setenv("AIGW_LOGGING__ENABLE_REQUEST_LOGGING", "false")
+        monkeypatch.setenv("AIGW_LOGGING__ENABLE_LITELLM_LOGGING", "false")
+
+        # Setup logging (which reads the env vars we just mocked)
         setup_logging()
 
+        # Ensure we're using the real enabled_instance_verbose_ai_logs function
         aigw_logging.enabled_instance_verbose_ai_logs = enabled_instance_verbose_ai_logs
-
-        aigw_logging.CUSTOM_MODELS_ENABLED = True
-        aigw_logging.ENABLE_REQUEST_LOGGING = False
 
         yield
 
+        # Restore original values
         if original_enable_request_logging is not None:
             aigw_logging.ENABLE_REQUEST_LOGGING = original_enable_request_logging
         if original_custom_models_enabled is not None:

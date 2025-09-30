@@ -132,17 +132,27 @@ def _setup_ai_gateway_logging_globals():
     setup which would interfere with DWS logging.
     """
     # pylint: disable=import-outside-toplevel
-    import ai_gateway.structured_logging as aigw_logging
-    from ai_gateway.config import Config
+    import os
 
-    config = Config()
+    import ai_gateway.structured_logging as aigw_logging
+
+    # Read AI Gateway environment variables directly
+    enable_request_logging = (
+        os.getenv("AIGW_LOGGING__ENABLE_REQUEST_LOGGING", "false").lower() == "true"
+    )
+    custom_models_enabled = (
+        os.getenv("AIGW_CUSTOM_MODELS__ENABLED", "false").lower() == "true"
+    )
+    enable_litellm_logging = (
+        os.getenv("AIGW_LOGGING__ENABLE_LITELLM_LOGGING", "false").lower() == "true"
+    )
 
     # Set only the global constants needed by can_log_request_data()
-    aigw_logging.ENABLE_REQUEST_LOGGING = config.logging.enable_request_logging
-    aigw_logging.CUSTOM_MODELS_ENABLED = config.custom_models.enabled
+    aigw_logging.ENABLE_REQUEST_LOGGING = enable_request_logging
+    aigw_logging.CUSTOM_MODELS_ENABLED = custom_models_enabled
 
     # Optionally enable LiteLLM debugging if configured
-    if config.logging.enable_litellm_logging:
+    if enable_litellm_logging:
         import litellm
 
         litellm._turn_on_debug()
