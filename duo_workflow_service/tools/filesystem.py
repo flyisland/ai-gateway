@@ -360,7 +360,7 @@ class Mkdir(DuoBaseTool):
     def format_display_message(
         self, args: MkdirInput, _tool_response: Any = None
     ) -> str:
-        return f"Create directory '{args.directory_path}'"
+        return f"Create directory `{args.directory_path}`"
 
 
 class EditFileInput(BaseModel):

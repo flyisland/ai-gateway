@@ -670,7 +670,7 @@ def test_mkdir_format_display_message():
 
     message = tool.format_display_message(input_data)
 
-    expected_message = "Create directory './src/new_directory'"
+    expected_message = "Create directory `./src/new_directory`"
     assert message == expected_message
 
 
