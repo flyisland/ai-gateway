@@ -1259,7 +1259,7 @@ async def test_track_workflow_completion_with_billing_event(
     billing_event_client.track_billing_event.assert_called_once_with(
         event_type="duo_agent_platform_workflow_completion",
         category="GitLabWorkflow",
-        unit_of_measure="tokens",
+        unit_of_measure="request",
         quantity=1,
         metadata={
             "workflow_id": workflow_id,
