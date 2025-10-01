@@ -107,6 +107,12 @@ routers:
 flow:
   entry_point: "fix_pipeline_context"
   inputs:
+    - category: agent_user_environment
+      input_schema:
+        merge_request_url:
+          type: string
+        source_branch:
+          type: string
     - category: merge_request
       input_schema:
         url:
@@ -115,12 +121,6 @@ flow:
           description: The URL for the GitLab Merge Request
     - category: pipeline
       input_schema:
-        source_branch:
-          type: string
-    - category: agent_user_environment
-      input_schema:
-        merge_request_url:
-          type: string
         source_branch:
           type: string
 prompts:
