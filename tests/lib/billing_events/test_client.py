@@ -301,6 +301,9 @@ class TestBillingEventsClient:
 
     def test_track_billing_event_tracker_exception(self, client):
         """Test that exceptions from snowplow_tracker.track are handled gracefully."""
+        user = CloudConnectorUser(
+            authenticated=True, claims=UserClaims(gitlab_instance_uid="abc")
+        )
         current_event_context.set(EventContext())
 
         with mock.patch.object(client.snowplow_tracker, "track") as mock_track:
@@ -308,6 +311,7 @@ class TestBillingEventsClient:
 
             try:
                 client.track_billing_event(
+                    user=user,
                     event_type="ai_completion",
                     category=__name__,
                     unit_of_measure="tokens",
