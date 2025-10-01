@@ -1032,7 +1032,6 @@ async def test_create_issue_note(issue_tool_setup, note_data):
     gitlab_client_mock.apost.assert_called_once_with(
         path="/api/v4/projects/1/issues/123/notes",
         body=json.dumps({"body": "Test note"}),
-        use_http_response=True,
     )
 
 
@@ -1314,7 +1313,6 @@ async def test_create_issue_note_with_url_success(
     gitlab_client_mock.apost.assert_called_once_with(
         path=expected_path,
         body=json.dumps({"body": "Test note"}),
-        use_http_response=True,
     )
 
 

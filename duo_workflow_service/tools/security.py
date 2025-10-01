@@ -5,7 +5,6 @@ from typing import Any, Optional, Type
 
 from pydantic import BaseModel, Field, field_validator
 
-from duo_workflow_service.gitlab.http_client import GitLabHttpResponse
 from duo_workflow_service.tools.duo_base_tool import DuoBaseTool
 
 PROJECT_IDENTIFICATION_DESCRIPTION = """
@@ -215,15 +214,9 @@ class ListVulnerabilities(DuoBaseTool):
                 response = await self.gitlab_client.apost(
                     path="/api/graphql",
                     body=json.dumps({"query": query, "variables": variables}),
-                    use_http_response=True,
                 )
 
-                if isinstance(response, GitLabHttpResponse):
-                    if response.status_code >= 400:
-                        raise ValueError(
-                            f"GraphQL request failed: HTTP {response.status_code}: {response.body}"
-                        )
-                    response = response.body
+                response = self._process_http_response(response)
 
                 if not response or "data" not in response:
                     raise ValueError("Invalid GraphQL response")
@@ -399,17 +392,9 @@ mutation($vulnerabilityId: VulnerabilityID!, $comment: String, $dismissalReason:
         response = await self.gitlab_client.apost(
             path="/api/graphql",
             body=json.dumps({"query": mutation, "variables": variables}),
-            use_http_response=True,
         )
 
-        if isinstance(response, GitLabHttpResponse):
-            if response.status_code >= 400:
-                return json.dumps(
-                    {
-                        "error": f"GraphQL request failed: HTTP {response.status_code}: {response.body}"
-                    }
-                )
-            response = response.body
+        response = self._process_http_response(response)
 
         errors = response["data"]["vulnerabilityDismiss"]["errors"]
         if errors:
@@ -470,17 +455,12 @@ class CreateVulnerabilityIssue(DuoBaseTool):
         project_response = await self.gitlab_client.apost(
             path="/api/graphql",
             body=json.dumps({"query": project_query, "variables": project_variables}),
-            use_http_response=True,
         )
 
-        if isinstance(project_response, GitLabHttpResponse):
-            if project_response.status_code >= 400:
-                return json.dumps(
-                    {
-                        "error": f"GraphQL request failed: HTTP {project_response.status_code}: {project_response.body}"
-                    }
-                )
-            project_response = project_response.body
+        try:
+            project_response = self._process_http_response(project_response)
+        except ValueError as e:
+            return json.dumps({"error": str(e)})
 
         if not project_response or "data" not in project_response:
             return json.dumps(
@@ -530,14 +510,10 @@ class CreateVulnerabilityIssue(DuoBaseTool):
             body=json.dumps({"query": mutation, "variables": variables}),
         )
 
-        if isinstance(response, GitLabHttpResponse):
-            if response.status_code >= 400:
-                return json.dumps(
-                    {
-                        "error": f"GraphQL request failed: HTTP {response.status_code}: {response.body}"
-                    }
-                )
-            response = response.body
+        try:
+            response = self._process_http_response(response)
+        except ValueError as e:
+            return json.dumps({"error": str(e)})
 
         if (
             not response
@@ -630,17 +606,12 @@ class LinkVulnerabilityToIssue(DuoBaseTool):
         response = await self.gitlab_client.apost(
             path="/api/graphql",
             body=json.dumps({"query": mutation, "variables": variables}),
-            use_http_response=True,
         )
 
-        if isinstance(response, GitLabHttpResponse):
-            if response.status_code >= 400:
-                return json.dumps(
-                    {
-                        "error": f"GraphQL request failed: HTTP {response.status_code}: {response.body}"
-                    }
-                )
-            response = response.body
+        try:
+            response = self._process_http_response(response)
+        except ValueError as e:
+            return json.dumps({"error": str(e)})
 
         errors = response["data"]["vulnerabilityIssueLinkCreate"]["errors"]
         if errors:
@@ -718,17 +689,12 @@ mutation($vulnerabilityId: VulnerabilityID!, $comment: String) {
             response = await self.gitlab_client.apost(
                 path="/api/graphql",
                 body=json.dumps({"query": mutation, "variables": variables}),
-                use_http_response=True,
             )
 
-            if isinstance(response, GitLabHttpResponse):
-                if response.status_code >= 400:
-                    return json.dumps(
-                        {
-                            "error": f"GraphQL request failed: HTTP {response.status_code}: {response.body}"
-                        }
-                    )
-                response = response.body
+            try:
+                response = self._process_http_response(response)
+            except ValueError as e:
+                return json.dumps({"error": str(e)})
 
             mutation_result = response["data"]["vulnerabilityConfirm"]
 
@@ -816,14 +782,10 @@ class RevertToDetectedVulnerability(DuoBaseTool):
                 body=json.dumps({"query": mutation, "variables": variables}),
             )
 
-            if isinstance(response, GitLabHttpResponse):
-                if response.status_code >= 400:
-                    return json.dumps(
-                        {
-                            "error": f"GraphQL request failed: HTTP {response.status_code}: {response.body}"
-                        }
-                    )
-                response = response.body
+            try:
+                response = self._process_http_response(response)
+            except ValueError as e:
+                return json.dumps({"error": str(e)})
 
             mutation_result = response["data"]["vulnerabilityRevertToDetected"]
 

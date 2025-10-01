@@ -3,7 +3,6 @@ from typing import Any, Optional, Type
 
 from pydantic import BaseModel, Field
 
-from duo_workflow_service.gitlab.http_client import GitLabHttpResponse
 from duo_workflow_service.tools.duo_base_tool import DuoBaseTool
 
 
@@ -52,12 +51,7 @@ class CiLinter(DuoBaseTool):
                 body=json.dumps(body),
             )
 
-            if isinstance(response, GitLabHttpResponse):
-                if response.status_code >= 400:
-                    return json.dumps(
-                        {"error": f"HTTP {response.status_code}: {response.body}"}
-                    )
-                response = response.body
+            response = self._process_http_response(response)
 
             return json.dumps(response)
         except Exception as e:

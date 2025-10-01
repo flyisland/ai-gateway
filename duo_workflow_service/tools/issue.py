@@ -5,7 +5,6 @@ from typing import Any, List, Optional, Tuple, Type
 from gitlab_cloud_connector import GitLabUnitPrimitive
 from pydantic import BaseModel, Field
 
-from duo_workflow_service.gitlab.http_client import GitLabHttpResponse
 from duo_workflow_service.gitlab.url_parser import GitLabUrlParseError, GitLabUrlParser
 from duo_workflow_service.tools.duo_base_tool import (
     DESCRIPTION_CHARACTER_LIMIT,
@@ -151,12 +150,7 @@ For example:
                 body=json.dumps(data),
             )
 
-            if isinstance(response, GitLabHttpResponse):
-                if response.status_code >= 400:
-                    return json.dumps(
-                        {"error": f"HTTP {response.status_code}: {response.body}"}
-                    )
-                response = response.body
+            response = self._process_http_response(response)
 
             return json.dumps({"created_issue": response})
         except Exception as e:
@@ -482,15 +476,9 @@ The body parameter is always required.
                         "body": body,
                     }
                 ),
-                use_http_response=True,
             )
 
-            if isinstance(response, GitLabHttpResponse):
-                if response.status_code >= 400:
-                    return json.dumps(
-                        {"error": f"HTTP {response.status_code}: {response.body}"}
-                    )
-                response = response.body
+            response = self._process_http_response(response)
 
             return json.dumps({"status": "success", "body": body, "response": response})
         except Exception as e:
