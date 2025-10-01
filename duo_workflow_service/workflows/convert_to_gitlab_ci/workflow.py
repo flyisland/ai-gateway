@@ -179,7 +179,9 @@ class Workflow(AbstractWorkflow):
             )
 
         if (
-            ApproximateTokenCounter(AGENT_NAME).count_string_content(content)
+            ApproximateTokenCounter().count_str_tokens(
+                content, include_tool_specs=False
+            )
             > MAX_SINGLE_MESSAGE_TOKENS
         ):
             return {

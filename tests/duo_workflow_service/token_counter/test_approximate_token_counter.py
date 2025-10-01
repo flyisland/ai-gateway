@@ -1,3 +1,4 @@
+import pytest
 from langchain_core.messages import HumanMessage
 
 from duo_workflow_service.token_counter.approximate_token_counter import (
@@ -5,58 +6,31 @@ from duo_workflow_service.token_counter.approximate_token_counter import (
 )
 
 
-def test_messages_with_string_content():
+def test_approximat_token_counter():
     messages = [
         HumanMessage(content="This is a single message"),
         HumanMessage(content="This is another single message"),
     ]
 
-    result = ApproximateTokenCounter("some_name").count_tokens(messages)  # type: ignore
+    token_counter = ApproximateTokenCounter()
+    assert token_counter.get_tool_tokens() == pytest.approx(40283, abs=300)
 
-    assert result == 23
+    assert token_counter.count_messages_tokens(
+        messages, include_tool_specs=False
+    ) == pytest.approx(44, abs=5)
 
+    assert token_counter.count_messages_tokens(
+        messages, include_tool_specs=True
+    ) == pytest.approx(40327, abs=300)
 
-def test_messages_with_string_content_and_tools():
-    messages = [
-        HumanMessage(content="This is a single message"),
-        HumanMessage(content="This is another single message"),
-    ]
+    sample_text = """Many words map to one token, but some don't: indivisible.
 
-    result = ApproximateTokenCounter("context_builder").count_tokens(messages)  # type: ignore
+Unicode characters like emojis may be split into many tokens containing the underlying bytes: 🤚🏾
 
-    # context_builder has 4735 tool tokens and these messages have 23
-    assert result == 4758
-
-
-def test_messages_for_chat_agent():
-    messages = [
-        HumanMessage(content="This is a single message"),
-        HumanMessage(content="This is another single message"),
-    ]
-
-    result = ApproximateTokenCounter("Chat Agent").count_tokens(messages)  # type: ignore
-
-    # Chat Agent has 2500 tool tokens and these messages have 23
-    assert result == 2523
-
-
-def test_messages_with_mixed_content():
-    messages = [
-        HumanMessage(
-            content="This is a single message"
-        ),  # 9 content tokens + 2 role tokens = 11 Tokens
-        HumanMessage(
-            content="This is another single message"
-        ),  # 10 content tokens + 2 role tokens = 12 Tokens
-        HumanMessage(
-            content=[
-                {"type": "text", "text": "This is a text message"},  # 10 Tokens
-                {"type": "other", "other": "Some value"},  # 5 tokens
-                "This is a string message",  # 9 tokens
-            ]  # 10 + 5 + 9 content tokens + 2 role tokens = 26 Tokens
-        ),
-    ]
-
-    result = ApproximateTokenCounter("some_name").count_tokens(messages)  # type: ignore
-
-    assert result == 49
+Sequences of characters commonly found next to each other may be grouped together: 1234567890"""
+    assert token_counter.count_str_tokens(
+        sample_text, include_tool_specs=False
+    ) == pytest.approx(53, abs=5)
+    assert token_counter.count_str_tokens(
+        sample_text, include_tool_specs=True
+    ) == pytest.approx(40336, abs=300)

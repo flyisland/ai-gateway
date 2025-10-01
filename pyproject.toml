@@ -79,6 +79,7 @@ setuptools = "^78.1.1"
 h11 = "^0.16.0"
 urllib3 = "^2.5.0"
 cryptography = "^43.0.1"
+tiktoken = "^0.11.0"
 
 [[tool.poetry.source]]
 name = "gitlab_cloud_connector"
