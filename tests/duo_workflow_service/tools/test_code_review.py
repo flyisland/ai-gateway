@@ -83,12 +83,12 @@ def diffs_data_fixture():
 def custom_instructions_yaml_fixture():
     yaml_content = """---
 instructions:
-  - name: Ruby Code Quality
-    fileFilters:
-      - "**/*.rb"
-    instructions: |
-      1. Ensure proper error handling
-      2. Follow Ruby naming conventions
+    - name: Ruby Code Quality
+        fileFilters:
+            - "**/*.rb"
+        instructions: |
+            1. Ensure proper error handling
+            2. Follow Ruby naming conventions
 """
     return {"content": base64.b64encode(yaml_content.encode("utf-8")).decode("utf-8")}
 
