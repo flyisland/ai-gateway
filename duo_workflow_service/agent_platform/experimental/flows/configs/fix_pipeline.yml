@@ -113,9 +113,16 @@ flow:
           type: string
           format: uri
           description: The URL for the GitLab Merge Request
+    - category: pipeline
+      input_schema:
         source_branch:
           type: string
-          description: The source branch for the Merge Request
+    - category: agent_user_environment
+      input_schema:
+        merge_request_url:
+          type: string
+        source_branch:
+          type: string
 prompts:
   - prompt_id: "git_push_prompt"
     model:
