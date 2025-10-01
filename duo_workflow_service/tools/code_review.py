@@ -141,9 +141,7 @@ class BuildReviewMergeRequestContext(DuoBaseTool):
         # Fetch original file content
         target_branch = mr_data.get("target_branch")
         if not target_branch:
-            return json.dumps(
-                {"error": "Target branch not found in merge request data"}
-            )
+            raise ValueError("Target branch not found in merge request data")
 
         files_content = await self._fetch_original_files(
             validation_result.project_id, target_branch, modified_files
@@ -267,7 +265,7 @@ class BuildReviewMergeRequestContext(DuoBaseTool):
     ) -> List[Dict[str, Any]]:
         """Get custom instructions filtered by matching file paths."""
         instructions_path = ".gitlab/duo/mr-review-instructions.yaml"
-
+        instructions_content: Optional[str]
         # Check if instructions file is in the diff
         if instructions_path in files_content:
             instructions_content = files_content[instructions_path]
