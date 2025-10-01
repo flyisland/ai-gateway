@@ -252,10 +252,19 @@ class ChatAgent(BaseAgent[ChatWorkflowState, BaseMessage]):
         )
 
     def _build_response(
-        self, agent_response: BaseMessage, input: ChatWorkflowState
+        self, agent_response: BaseMessage, input: ChatWorkflowState, stop_reason: Optional[str]
     ) -> Dict[str, Any]:
         if not isinstance(agent_response, AIMessage) or not agent_response.tool_calls:
             return self._build_text_response(agent_response)
+
+        if stop_reason == "max_tokens":
+            tool_names = [t.get('name') for t in agent_response.tool_calls]
+            error = (
+                    "One or more tool calls failed due to exceeding max_tokens."
+                    f" The tool calls were {tool_names}."
+                    " Please try a different tool or a smaller request."
+            )
+            return self._create_error_response(error=error, human_error_message=error)
 
         return self._build_tool_response(agent_response, input)
 
@@ -290,14 +299,13 @@ class ChatAgent(BaseAgent[ChatWorkflowState, BaseMessage]):
 
         return result
 
-    def _create_error_response(self, error: Exception) -> Dict[str, Any]:
+    def _create_error_response(self, error: Exception, human_error_message: Optional[str]) -> Dict[str, Any]:
         error_message = HumanMessage(
             content=f"There was an error processing your request: {error}"
         )
 
         ui_chat_log = self._create_ui_chat_log(
-            content="There was an error processing your request. Please try again or contact support if the issue "
-            "persists.",
+            content=human_error_message,
             status=ToolStatus.FAILURE,
         )
 
@@ -329,8 +337,10 @@ class ChatAgent(BaseAgent[ChatWorkflowState, BaseMessage]):
             if stop_reason in AnthropicStopReason.abnormal_values():
                 log.warning(f"LLM stopped abnormally with reason: {stop_reason}")
 
-            return self._build_response(agent_response, input)
+            return self._build_response(agent_response, input, stop_reason)
 
         except Exception as error:
             log.warning(f"Error processing chat agent: {error}")
-            return self._create_error_response(error)
+            human_error_message = "There was an error processing your request. Please try again or contact support if the issue "
+            "persists."
+            return self._create_error_response(error=error, human_error_message=human_error_message)
