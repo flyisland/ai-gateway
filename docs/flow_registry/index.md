@@ -840,6 +840,75 @@ components:
           - "on_tool_execution_failed"
 ```
 
+### DeterministicStepComponent
+
+The `DeterministicStepComponent` provides deterministic tool execution without LLM involvement.
+This component executes a single, pre-configured tool with specified inputs, making it ideal for scenarios where you
+need predictable, direct tool execution without AI decision-making.
+
+Unlike `AgentComponent` and `OneOffComponent` which use LLMs to generate tool calls, `DeterministicStepComponent`
+executes tools directly based on the configuration provided in the flow YAML.
+This makes it faster, more predictable, and suitable for operations where the exact tool and parameters are known in
+advance.
+
+#### Key Features
+
+- **Direct Tool Execution**: Executes a single tool directly without LLM involvement
+- **Deterministic Behavior**: Predictable execution with no AI decision-making
+- **Input Validation**: Validates tool arguments against the tool's schema before execution
+- **Error Handling**: Captures and reports tool execution errors
+- **UI Logging**: Comprehensive logging of tool execution states and results
+- **Fast Execution**: No LLM overhead, making it faster than AI-powered components
+
+#### Required Parameters
+
+- **name**: Unique identifier for this component instance
+- **type**: Must be `"DeterministicStepComponent"`
+- **tool_name**: Name of the specific tool to execute (must exist in the toolset)
+- **toolset**: Toolset containing the tool to be executed
+- **inputs**: List of input data sources that map to the tool's parameters
+- **ui_log_events**: UI logging configuration for displaying tool execution progress
+
+#### Outputs
+
+Each DeterministicStepComponent automatically produces:
+
+- **ui_chat_log**: UI logging information for tool execution events
+- **context:{component_name}.tool_responses**: The tool's execution response
+- **context:{component_name}.error**: Error information if tool execution fails
+- **context:{component_name}.execution_result**: Execution result ("success" or "failed")
+
+#### UI Log Events
+
+The DeterministicStepComponent supports the following UI log events from `UILogEventsDeterministicStep`:
+
+- **on_tool_execution_success**: Logged when the tool executes successfully
+- **on_tool_execution_failed**: Logged when the tool execution fails
+
+#### Complete DeterministicStepComponent Example
+
+```yaml
+components:
+    - name: "file_reader"
+      type: DeterministicStepComponent
+      tool_name: "read_file"
+      toolset: ["read_file"]
+      inputs:
+          - from: "context:inputs.target_file.path"
+            as: "file_path"
+      ui_log_events:
+          - "on_tool_execution_success"
+          - "on_tool_execution_failed"
+```
+
+**When to Use DeterministicStepComponent**:
+
+- Known tool and parameters in advance
+- Need predictable, fast execution
+- No AI decision-making required
+- Simple, direct operations (file reads, directory listings, etc.)
+- Part of a larger workflow where specific steps are deterministic
+
 #### Usage Patterns
 
 **Single File Operation**: Use OneOffComponent for singular file operations:
