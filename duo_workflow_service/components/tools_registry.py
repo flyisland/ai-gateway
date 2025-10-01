@@ -1,4 +1,5 @@
 import asyncio
+from itertools import chain
 from typing import Optional, Type, TypedDict, Union
 
 from gitlab_cloud_connector import CloudConnectorUser
@@ -34,6 +35,7 @@ _DEFAULT_TOOLS: list[Type[BaseTool]] = [
     tools.UpdateTaskDescription,
     tools.GetPlan,
     tools.SetTaskStatus,
+    tools.GetAvailableTools,
 ]
 
 # These tools are used to request formatted and definitive output from
@@ -135,6 +137,12 @@ _AGENT_PRIVILEGES: dict[str, list[Type[BaseTool]]] = {
         tools.RunCommand,
     ],
     _RUN_MCP_TOOLS_PRIVILEGE: [],
+}
+
+ALL_TOOLS = {
+    _DEFAULT_TOOLS,
+    _READ_ONLY_GITLAB_TOOLS,
+    list(chain.from_iterable(_AGENT_PRIVILEGES.values())),
 }
 
 

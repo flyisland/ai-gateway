@@ -460,13 +460,7 @@ class DuoWorkflowService(contract_pb2_grpc.DuoWorkflowServicer):
         self, request: contract_pb2.ListToolsRequest, context: grpc.ServicerContext
     ):
         log.info("Listing all available tools")
-        tool_classes = set(
-            (
-                tools_registry._DEFAULT_TOOLS
-                + tools_registry._READ_ONLY_GITLAB_TOOLS
-                + list(chain.from_iterable(tools_registry._AGENT_PRIVILEGES.values()))
-            )
-        )
+        tool_classes = tools_registry.ALL_TOOLS
         response = contract_pb2.ListToolsResponse()
         for tool_cls in tool_classes:
             spec_struct = Struct()

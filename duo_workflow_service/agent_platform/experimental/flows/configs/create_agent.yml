@@ -1,0 +1,30 @@
+version: "experimental"
+environment: remote
+components:
+  # Step 1: Fetch available tools
+#  - name: "fetch_tools_component"
+#    type: DeterministicStepComponent
+#    tool_name: "fetch_available_tools"
+#    max_correction_attempts: 3
+#    ui_log_events:
+#      - "on_tool_execution_success"
+#      - "on_tool_execution_failed"
+  # Step 2: Execute agent
+  - name: "ai_catalog_create_agent"
+    type: OneOffComponent
+    prompt_id: "ai_catalog_create_agent"
+    prompt_version: "1.0.0"
+    inputs:
+#      - from: "context:fetch_tools_component.tool_responses"
+#        as: available_tools
+      - from: "context:create_agent_form_specification"
+        as: create_agent_form_specification
+      - from: "context:create_agent_current_state"
+        as: create_agent_current_state
+routers:
+  - from: "ai_catalog_create_agent"
+    to: "end"
+#  - from: "fetch_tools_component"
+#    to: "end"
+flow:
+  entry_point: "ai_catalog_create_agent"
