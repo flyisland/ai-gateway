@@ -333,3 +333,87 @@ class TestBillingEventsClient:
                 )
             except Exception as e:
                 pytest.fail(f"Failed to send billing event: {e}")
+
+    def test_internal_events_client_track_event_called_with_correct_parameters(
+        self, client, user, mock_dependencies  # pylint: disable=unused-argument
+    ):
+        """Test that internal_events_client.track_event is called with correct parameters."""
+        current_event_context.set(EventContext())
+        event_type = "ai_completion"
+        category = "test_category"
+
+        client.track_billing_event(
+            user=user,
+            event_type=event_type,
+            category=category,
+            unit_of_measure="tokens",
+            quantity=100.0,
+        )
+
+        client.internal_events_client.track_event.assert_called_once()
+
+        call_args = client.internal_events_client.track_event.call_args
+
+        assert call_args[1]["event_name"] == "usage_billing_event"
+
+        assert call_args[1]["category"] == category
+
+        additional_properties = call_args[1]["additional_properties"]
+        assert additional_properties.property == "billing_event_id"
+        assert additional_properties.extra == {
+            "extra": {
+                "billing_event_type": event_type,
+                "status": "success",
+            }
+        }
+
+    def test_internal_events_client_not_called_when_billing_disabled(self, user):
+        """Test that internal_events_client.track_event is not called when billing is disabled."""
+        with (
+            mock.patch("snowplow_tracker.Tracker.__init__", return_value=None),
+            mock.patch(
+                "snowplow_tracker.emitters.AsyncEmitter.__init__", return_value=None
+            ),
+            mock.patch(
+                "lib.internal_events.client.InternalEventsClient"
+            ) as mock_internal_events,
+        ):
+            client = BillingEventsClient(
+                enabled=False,
+                endpoint="https://billing.local",
+                app_id="gitlab_ai_gateway",
+                namespace="gl",
+                batch_size=3,
+                thread_count=2,
+                internal_events_client=mock_internal_events.return_value,
+            )
+
+            current_event_context.set(EventContext())
+
+            client.track_billing_event(
+                user=user,
+                event_type="ai_completion",
+                category="test_category",
+                unit_of_measure="tokens",
+                quantity=100.0,
+            )
+
+            client.internal_events_client.track_event.assert_not_called()
+
+    def test_internal_events_client_not_called_on_tracker_exception(
+        self, client, user, mock_dependencies
+    ):
+        """Test that internal_events_client.track_event is not called when tracker raises exception."""
+        current_event_context.set(EventContext())
+
+        mock_dependencies["track"].side_effect = Exception("Network error")
+
+        client.track_billing_event(
+            user=user,
+            event_type="ai_completion",
+            category="test_category",
+            unit_of_measure="tokens",
+            quantity=100.0,
+        )
+
+        client.internal_events_client.track_event.assert_not_called()
