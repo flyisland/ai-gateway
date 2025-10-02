@@ -1,0 +1,35 @@
+version: "v1"
+environment: chat-partial
+components:
+  - name: "code_assistant"
+    type: AgentComponent
+    prompt_id: "chat_react"
+    prompt_version: "^1.0.0"
+    inputs:
+      - from: "context:goal"
+        as: "user_message"
+    toolset:
+      - "get_repository_file"
+      - "read_file"
+      - "list_repository_tree"
+      - "find_files"
+      - "blob_search"
+      - "get_commit"
+      - "list_commits"
+    ui_log_events:
+      - "on_tool_execution_success"
+      - "on_tool_execution_failed"
+      - "on_agent_final_answer"
+
+routers:
+  - from: "code_assistant"
+    to: "end"
+
+flow:
+  entry_point: "code_assistant"
+  inputs:
+    - category: "code_context"
+      input_schema:
+        request:
+          type: "string"
+          description: "Code-related question or task"

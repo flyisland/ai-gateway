@@ -1,0 +1,36 @@
+version: "v1"
+environment: chat-partial
+components:
+  - name: "foundational_agent"
+    type: AgentComponent
+    prompt_id: "chat_react"
+    prompt_version: "^1.0.0"
+    inputs:
+      - from: "context:goal"
+        as: "user_message"
+    toolset:
+      - "get_merge_request"
+      - "list_merge_request_diffs"
+      - "get_repository_file"
+      - "read_file"
+      - "get_issue"
+      - "list_issues"
+      - "search_system"
+      - "documentation_search"
+    ui_log_events:
+      - "on_tool_execution_success"
+      - "on_tool_execution_failed"
+      - "on_agent_final_answer"
+
+routers:
+  - from: "foundational_agent"
+    to: "end"
+
+flow:
+  entry_point: "foundational_agent"
+  inputs:
+    - category: "user_input"
+      input_schema:
+        message:
+          type: "string"
+          description: "User's question or request"

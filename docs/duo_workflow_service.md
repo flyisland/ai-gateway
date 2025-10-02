@@ -178,6 +178,77 @@ Example output:
 }
 ```
 
+## List and Filter Flows
+
+The Duo Workflow Service provides functionality to list and filter available flows through the `ListFlows` gRPC endpoint.
+
+### Prerequisites
+
+- Duo Workflow service must be running
+- `grpcurl` tool installed on your system
+
+### List All Flows
+
+To list all available flows without any filtering:
+
+```shell
+grpcurl -plaintext -d '{}' gdk.test:50052 DuoWorkflow/ListFlows
+```
+
+### Filter Flows
+
+You can filter flows by name, environment, and version using the `filters` parameter:
+
+#### Filter by Environment
+
+To list flows with specific environments (e.g., "chat-partial" for foundational agents):
+
+```shell
+grpcurl -plaintext -d '{"filters": {"environment": ["chat-partial"]}}' gdk.test:50052 DuoWorkflow/ListFlows
+```
+
+#### Filter by Version
+
+To list flows with specific versions:
+
+```shell
+grpcurl -plaintext -d '{"filters": {"version": ["v1"]}}' gdk.test:50052 DuoWorkflow/ListFlows
+```
+
+#### Filter by Name
+
+To list flows with specific names:
+
+```shell
+grpcurl -plaintext -d '{"filters": {"name": ["foundational_agent_example", "code_assistant_foundational_agent"]}}' gdk.test:50052 DuoWorkflow/ListFlows
+```
+
+#### Multiple Filters
+
+You can combine multiple filters. Only flows that match ALL specified criteria will be returned:
+
+```shell
+grpcurl -plaintext -d '{"filters": {"environment": ["chat-partial"], "version": ["v1"]}}' gdk.test:50052 DuoWorkflow/ListFlows
+```
+
+### Foundational Agents
+
+Foundational agents are special flows designed for the AI Catalog that use the "chat-partial" environment. To list all foundational agents:
+
+```shell
+grpcurl -plaintext -d '{"filters": {"environment": ["chat-partial"], "version": ["v1"]}}' gdk.test:50052 DuoWorkflow/ListFlows
+```
+
+### Filter Parameters
+
+The `ListFlowsRequestFilter` message supports the following fields:
+
+- `name`: Array of flow names to include
+- `environment`: Array of environments to include (e.g., "remote", "chat-partial")
+- `version`: Array of versions to include (e.g., "experimental", "v1")
+
+All filter arrays use OR logic within the same field (e.g., multiple names) and AND logic between different fields (e.g., name AND environment).
+
 ## LLM Caching
 
 Real calls to LLMs tend to be slow and expensive. Often during development we
