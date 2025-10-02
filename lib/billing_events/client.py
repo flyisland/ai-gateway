@@ -150,8 +150,7 @@ class BillingEventsClient:
             if self.internal_events_client:
                 additional_properties = InternalEventAdditionalProperties(
                     label=event_id,
-                    property="billing_event_id",
-                    extra={"billing_event_type": event_type, "status": "success"},
+                    property=event_type,
                 )
                 self.internal_events_client.track_event(
                     event_name="usage_billing_event",

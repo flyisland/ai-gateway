@@ -359,13 +359,8 @@ class TestBillingEventsClient:
         assert call_args[1]["category"] == category
 
         additional_properties = call_args[1]["additional_properties"]
-        assert additional_properties.property == "billing_event_id"
-        assert additional_properties.extra == {
-            "extra": {
-                "billing_event_type": event_type,
-                "status": "success",
-            }
-        }
+        assert additional_properties.property == event_type
+        assert additional_properties.label == "12345678-1234-5678-9012-123456789012"
 
     def test_internal_events_client_not_called_when_billing_disabled(self, user):
         """Test that internal_events_client.track_event is not called when billing is disabled."""
