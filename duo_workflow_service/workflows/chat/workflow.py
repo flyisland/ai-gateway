@@ -176,8 +176,10 @@ class Workflow(AbstractWorkflow):
             )
             if "prompt_template_override" in kwargs:
                 prompt_template = kwargs.pop("prompt_template_override")
+                enriched_prompt_tmpl = self._enrich_with_product_context_details(prompt_template)
+
                 memory_prompt_registry.register_prompt(
-                    prompt_id=prompt_template["prompt_id"], prompt_data=prompt_template
+                    prompt_id=prompt_template["prompt_id"], prompt_data=enriched_prompt_tmpl
                 )
             active_prompt_registry = memory_prompt_registry
 
@@ -194,6 +196,13 @@ class Workflow(AbstractWorkflow):
             internal_event_client=internal_event_client,
             **kwargs,
         )
+
+    def _enrich_with_product_context_details(self, prompt_template: dict[str, Any]) -> dict[str, Any]:
+        if "system" in prompt_template["prompt_template"]:
+            prompt_template["prompt_template"]["system"] = prompt_template["prompt_template"]["system"] + "\n {% include 'chat/agent/partials/system_dynamic/1.0.0.jinja' %}"
+        else:
+            prompt_template["prompt_template"]["system"] = "\n {% include 'chat/agent/partials/system_dynamic/1.0.0.jinja' %}"
+        return prompt_template
 
     def _are_tools_called(self, state: ChatWorkflowState) -> Routes:
         if state["status"] in [WorkflowStatusEnum.CANCELLED, WorkflowStatusEnum.ERROR]:
