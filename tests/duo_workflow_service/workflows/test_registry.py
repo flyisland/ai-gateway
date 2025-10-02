@@ -4,10 +4,10 @@ from unittest.mock import Mock, patch
 import pytest
 from google.protobuf import struct_pb2
 
+from duo_workflow_service.agent_platform import experimental, v1
 from duo_workflow_service.agent_platform.experimental.flows.flow_config import (
     FlowConfig,
 )
-from duo_workflow_service.agent_platform import experimental, v1
 from duo_workflow_service.workflows import chat
 from duo_workflow_service.workflows.abstract_workflow import AbstractWorkflow
 from duo_workflow_service.workflows.registry import (
@@ -305,6 +305,7 @@ def test_resolve_workflow_class_with_chat_flow_config_failure(
                 flow_config_schema_version="experimental",
             )
 
+
 def test_list_configs():
     """Test list_configs function returns aggregated configs from all versions."""
     mock_experimental_configs = [
@@ -321,14 +322,37 @@ def test_list_configs():
             "config": '{"flow": {"entry_point": "router"}}',
         },
     ]
+    mock_v1_configs = [
+        {
+            "name": "config3",
+            "version": "v1",
+            "environment": "chat",
+            "config": '{"flow": {"entry_point": "agent"}}',
+        },
+        {
+            "name": "config4",
+            "version": "v1",
+            "environment": "chat-partial",
+            "config": '{"flow": {"entry_point": "router"}}',
+        },
+    ]
 
     with patch(
         "duo_workflow_service.workflows.registry._FLOW_CONFIGS_BY_VERSION",
-        {"experimental": lambda: mock_experimental_configs},
+        {
+            "experimental": lambda: mock_experimental_configs,
+            "v1": lambda: mock_v1_configs,
+        },
     ):
         result = list_configs()
 
-        assert result == mock_experimental_configs
-        assert len(result) == 2
+        assert result == (mock_experimental_configs + mock_v1_configs)
+        assert len(result) == 4
         assert result[0]["name"] == "config1"
+        assert result[0]["version"] == "experimental"
         assert result[1]["name"] == "config2"
+        assert result[1]["version"] == "experimental"
+        assert result[2]["name"] == "config3"
+        assert result[2]["version"] == "v1"
+        assert result[3]["name"] == "config4"
+        assert result[3]["version"] == "v1"

@@ -62,6 +62,7 @@ _FLOW_BY_VERSIONS: Dict[
 
 _FLOW_CONFIGS_BY_VERSION = {
     "experimental": experimental_list_configs,
+    "v1": v1.list_configs,
 }
 
 
