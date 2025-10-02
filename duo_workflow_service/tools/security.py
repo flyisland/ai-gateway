@@ -216,7 +216,9 @@ class ListVulnerabilities(DuoBaseTool):
                     body=json.dumps({"query": query, "variables": variables}),
                 )
 
-                response = self._process_http_response(response)
+                response = self._process_http_response(
+                    identifier="query", response=response
+                )
 
                 if not response or "data" not in response:
                     raise ValueError("Invalid GraphQL response")
@@ -394,7 +396,7 @@ mutation($vulnerabilityId: VulnerabilityID!, $comment: String, $dismissalReason:
             body=json.dumps({"query": mutation, "variables": variables}),
         )
 
-        response = self._process_http_response(response)
+        response = self._process_http_response(identifier="mutation", response=response)
 
         errors = response["data"]["vulnerabilityDismiss"]["errors"]
         if errors:
@@ -458,7 +460,9 @@ class CreateVulnerabilityIssue(DuoBaseTool):
         )
 
         try:
-            project_response = self._process_http_response(project_response)
+            project_response = self._process_http_response(
+                identifier="query", response=project_response
+            )
         except ValueError as e:
             return json.dumps({"error": str(e)})
 
@@ -511,7 +515,9 @@ class CreateVulnerabilityIssue(DuoBaseTool):
         )
 
         try:
-            response = self._process_http_response(response)
+            response = self._process_http_response(
+                identifier="mutation", response=response
+            )
         except ValueError as e:
             return json.dumps({"error": str(e)})
 
@@ -609,7 +615,9 @@ class LinkVulnerabilityToIssue(DuoBaseTool):
         )
 
         try:
-            response = self._process_http_response(response)
+            response = self._process_http_response(
+                identifier="mutation", response=response
+            )
         except ValueError as e:
             return json.dumps({"error": str(e)})
 
@@ -692,7 +700,9 @@ mutation($vulnerabilityId: VulnerabilityID!, $comment: String) {
             )
 
             try:
-                response = self._process_http_response(response)
+                response = self._process_http_response(
+                    identifier="mutation", response=response
+                )
             except ValueError as e:
                 return json.dumps({"error": str(e)})
 
@@ -783,7 +793,9 @@ class RevertToDetectedVulnerability(DuoBaseTool):
             )
 
             try:
-                response = self._process_http_response(response)
+                response = self._process_http_response(
+                    identifier="mutation", response=response
+                )
             except ValueError as e:
                 return json.dumps({"error": str(e)})
 

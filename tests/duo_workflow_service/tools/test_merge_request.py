@@ -666,6 +666,7 @@ async def test_create_merge_request_note(gitlab_client_mock, metadata):
     gitlab_client_mock.apost.assert_called_once_with(
         path="/api/v4/projects/1/merge_requests/123/notes",
         body='{"body": "Test note"}',
+        use_http_response=True,
     )
 
 
@@ -728,6 +729,7 @@ async def test_create_merge_request_note_with_url_success(
     gitlab_client_mock.apost.assert_called_once_with(
         path=expected_path,
         body=json.dumps({"body": "Test note"}),
+        use_http_response=True,
     )
 
 
@@ -835,6 +837,7 @@ async def test_create_merge_request_note_allows_regular_notes(
     gitlab_client_mock.apost.assert_called_once_with(
         path="/api/v4/projects/1/merge_requests/123/notes",
         body=json.dumps({"body": note}),
+        use_http_response=True,
     )
 
 

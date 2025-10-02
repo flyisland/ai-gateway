@@ -239,11 +239,11 @@ def test_process_http_response(response, expected_result, should_raise):
 
     if should_raise:
         with pytest.raises(
-            ValueError, match=r"Request failed \(dummy_tool\): HTTP \d+"
+            ValueError, match=r"Request failed \(test_identifier\): HTTP \d+"
         ):
-            tool._process_http_response(response)
+            tool._process_http_response("test_identifier", response)
     else:
-        result = tool._process_http_response(response)
+        result = tool._process_http_response("test_identifier", response)
         assert result == expected_result
 
 
@@ -255,11 +255,11 @@ def test_process_http_response_error_message_truncation():
     response = GitLabHttpResponse(500, long_error_body)
 
     with pytest.raises(ValueError) as exc_info:
-        tool._process_http_response(response)
+        tool._process_http_response("test_identifier", response)
 
     error_message = str(exc_info.value)
     # Verify the message contains the expected prefix and truncated body
-    expected_prefix = "Request failed (dummy_tool): HTTP 500: "
+    expected_prefix = "Request failed (test_identifier): HTTP 500: "
     truncated_body = "A" * 300  # Should be truncated to exactly 300 chars
     expected_message = expected_prefix + truncated_body
 

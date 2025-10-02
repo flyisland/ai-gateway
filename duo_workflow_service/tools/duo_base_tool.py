@@ -221,13 +221,14 @@ class DuoBaseTool(BaseTool):
 
         return f"Using {self.name}: {args_str}"
 
-    def _process_http_response(self, response: Any) -> Any:
+    @staticmethod
+    def _process_http_response(identifier: str, response: Any) -> Any:
         if not isinstance(response, GitLabHttpResponse):
             return response
 
         if response.status_code >= 400:
             raise ValueError(
-                f"Request failed ({self.name}): HTTP {response.status_code}: {str(response.body)[:300]}"
+                f"Request failed ({identifier}): HTTP {response.status_code}: {str(response.body)[:300]}"
             )
 
         return response.body

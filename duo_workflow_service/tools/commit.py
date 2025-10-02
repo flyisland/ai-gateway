@@ -603,7 +603,10 @@ class CreateCommit(DuoBaseTool):
                 body=json.dumps(params),
             )
 
-            response = self._process_http_response(response)
+            response = self._process_http_response(
+                identifier=f"/api/v4/projects/{project_id}/repository/commits",
+                response=response,
+            )
 
             return json.dumps(
                 {"status": "success", "data": params, "response": response}

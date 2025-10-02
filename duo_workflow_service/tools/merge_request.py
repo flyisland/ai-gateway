@@ -337,6 +337,7 @@ They are commands that are on their own line and start with a backslash. Example
                         "body": body,
                     },
                 ),
+                use_http_response=True,
             )
 
             if not response.is_success():
