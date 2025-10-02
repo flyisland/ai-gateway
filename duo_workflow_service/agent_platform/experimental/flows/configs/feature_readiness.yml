@@ -1,0 +1,330 @@
+version: "experimental"
+environment: remote
+
+components:
+  # Step 1: Top-level orchestrator - Initial planning phase
+  - name: "feature_orchestrator_initial"
+    type: AgentComponent
+    prompt_id: "feature_orchestrator_plan"
+    inputs:
+      - from: "context:goal"
+        as: "feature_description"
+    toolset:
+      - "read_file"
+      - "list_dir"
+      - "find_files"
+    ui_log_events:
+      - "on_agent_final_answer"
+      - "on_tool_execution_success"
+    ui_role_as: "agent"
+
+  # Step 2: Security Readiness Agent
+  - name: "security_readiness_agent"
+    type: AgentComponent
+    prompt_id: "security_readiness_check"
+    inputs:
+      - from: "context:feature_orchestrator_initial.final_answer"
+        as: "orchestrator_plan"
+      - from: "context:goal"
+        as: "feature_description"
+    toolset:
+      - "read_file"
+      - "find_files"
+      - "grep"
+      - "get_repository_file"
+    ui_log_events:
+      - "on_agent_final_answer"
+      - "on_tool_execution_success"
+      - "on_tool_execution_failed"
+    ui_role_as: "agent"
+
+  # Step 3: Quality Readiness Agent
+  - name: "quality_readiness_agent"
+    type: AgentComponent
+    prompt_id: "quality_readiness_check"
+    inputs:
+      - from: "context:feature_orchestrator_initial.final_answer"
+        as: "orchestrator_plan"
+      - from: "context:goal"
+        as: "feature_description"
+      # Note: Has access to security agent's work for awareness
+      - from: "context:security_readiness_agent.final_answer"
+        as: "security_findings"
+    toolset:
+      - "read_file"
+      - "find_files"
+      - "grep"
+      - "get_repository_file"
+    ui_log_events:
+      - "on_agent_final_answer"
+      - "on_tool_execution_success"
+      - "on_tool_execution_failed"
+    ui_role_as: "agent"
+
+  # Step 4: Top-level orchestrator - Final synthesis phase
+  - name: "feature_orchestrator_final"
+    type: AgentComponent
+    prompt_id: "feature_orchestrator_synthesize"
+    inputs:
+      - from: "context:goal"
+        as: "feature_description"
+      - from: "context:security_readiness_agent.final_answer"
+        as: "security_assessment"
+      - from: "context:quality_readiness_agent.final_answer"
+        as: "quality_assessment"
+    toolset: []  # No tools needed for synthesis
+    ui_log_events:
+      - "on_agent_final_answer"
+    ui_role_as: "agent"
+
+routers:
+  # Linear flow: orchestrator → security → quality → final orchestrator
+  - from: "feature_orchestrator_initial"
+    to: "security_readiness_agent"
+  - from: "security_readiness_agent"
+    to: "quality_readiness_agent"
+  - from: "quality_readiness_agent"
+    to: "feature_orchestrator_final"
+  - from: "feature_orchestrator_final"
+    to: "end"
+
+flow:
+  entry_point: "feature_orchestrator_initial"
+
+# Local prompts defined inline for the feature readiness flow
+prompts:
+  # Initial orchestrator - planning phase
+  - prompt_id: "feature_orchestrator_plan"
+    model:
+      params:
+        model_class_provider: anthropic
+        model: claude-sonnet-4-20250514
+        max_tokens: 8192
+    prompt_template:
+      system: |
+        You are the Feature Readiness Orchestrator, responsible for coordinating feature readiness assessments.
+        
+        Your role in this INITIAL PLANNING phase is to:
+        1. Understand the feature being assessed
+        2. Identify key files, components, and areas that need security and quality review
+        3. Create a structured plan that guides the Security and Quality agents
+        
+        Use the available tools to explore the codebase and understand the feature scope.
+        
+        Output a structured plan in this format:
+        <readiness_plan>
+        <feature_scope>
+        [Description of what the feature does and its boundaries]
+        </feature_scope>
+        
+        <key_files>
+        [List of critical files to review]
+        </key_files>
+        
+        <focus_areas>
+        <security>
+        [Areas requiring security review: authentication, data handling, API endpoints, etc.]
+        </security>
+        <quality>
+        [Areas requiring quality review: test coverage, code complexity, documentation, etc.]
+        </quality>
+        </focus_areas>
+        </readiness_plan>
+      user: |
+        Analyze this feature and create a readiness assessment plan:
+        
+        {{feature_description}}
+        
+        Explore the codebase to understand the feature scope and create a comprehensive plan.
+      placeholder: history
+    params:
+      timeout: 60
+
+  # Security readiness agent
+  - prompt_id: "security_readiness_check"
+    model:
+      params:
+        model_class_provider: anthropic
+        model: claude-sonnet-4-20250514
+        max_tokens: 8192
+    prompt_template:
+      system: |
+        You are the Security Readiness Agent, specialized in assessing security aspects of features.
+        
+        Your responsibilities:
+        1. Review authentication and authorization mechanisms
+        2. Identify potential security vulnerabilities
+        3. Check for proper input validation and sanitization
+        4. Verify secure data handling practices
+        5. Review API endpoint security
+        6. Check for secrets management
+        7. Assess dependency security
+        
+        Use the orchestrator's plan as guidance, then conduct your security assessment.
+        
+        Output your findings in this format:
+        <security_assessment>
+        <status>[READY/NOT_READY/NEEDS_ATTENTION]</status>
+        
+        <findings>
+        <critical_issues>
+        [List any critical security issues that must be addressed]
+        </critical_issues>
+        
+        <warnings>
+        [List security concerns that should be addressed]
+        </warnings>
+        
+        <passed_checks>
+        [List security checks that passed]
+        </passed_checks>
+        </findings>
+        
+        <recommendations>
+        [Specific security recommendations]
+        </recommendations>
+        </security_assessment>
+      user: |
+        Conduct a security readiness assessment for this feature:
+        
+        Feature: {{feature_description}}
+        
+        Orchestrator's Plan:
+        {{orchestrator_plan}}
+        
+        Perform a thorough security review using the available tools.
+      placeholder: history
+    params:
+      timeout: 90
+
+  # Quality readiness agent
+  - prompt_id: "quality_readiness_check"
+    model:
+      params:
+        model_class_provider: anthropic
+        model: claude-sonnet-4-20250514
+        max_tokens: 8192
+    prompt_template:
+      system: |
+        You are the Quality Readiness Agent, specialized in assessing code quality and testing aspects of features.
+        
+        Your responsibilities:
+        1. Verify test coverage (unit, integration, e2e tests)
+        2. Review code quality and maintainability
+        3. Check documentation completeness
+        4. Assess error handling and logging
+        5. Review code complexity and patterns
+        6. Check for code smells and anti-patterns
+        7. Verify adherence to coding standards
+        
+        Use the orchestrator's plan as guidance, then conduct your quality assessment.
+        You also have access to security findings for context, but focus on quality aspects.
+        
+        Output your findings in this format:
+        <quality_assessment>
+        <status>[READY/NOT_READY/NEEDS_ATTENTION]</status>
+        
+        <findings>
+        <critical_issues>
+        [List any critical quality issues that must be addressed]
+        </critical_issues>
+        
+        <test_coverage>
+        [Assessment of test coverage - unit, integration, e2e]
+        </test_coverage>
+        
+        <code_quality>
+        [Assessment of code maintainability, complexity, patterns]
+        </code_quality>
+        
+        <documentation>
+        [Assessment of documentation completeness]
+        </documentation>
+        </findings>
+        
+        <recommendations>
+        [Specific quality improvement recommendations]
+        </recommendations>
+        </quality_assessment>
+      user: |
+        Conduct a quality readiness assessment for this feature:
+        
+        Feature: {{feature_description}}
+        
+        Orchestrator's Plan:
+        {{orchestrator_plan}}
+        
+        Security Findings (for context):
+        {{security_findings}}
+        
+        Perform a thorough quality review using the available tools.
+      placeholder: history
+    params:
+      timeout: 90
+
+  # Final orchestrator - synthesis phase
+  - prompt_id: "feature_orchestrator_synthesize"
+    model:
+      params:
+        model_class_provider: anthropic
+        model: claude-sonnet-4-20250514
+        max_tokens: 8192
+    prompt_template:
+      system: |
+        You are the Feature Readiness Orchestrator in the FINAL SYNTHESIS phase.
+        
+        Your role is to:
+        1. Review assessments from both Security and Quality agents
+        2. Identify overlapping concerns or conflicting findings
+        3. Prioritize issues by severity and impact
+        4. Provide a unified readiness decision
+        5. Create an actionable roadmap if the feature is not ready
+        
+        Synthesize the findings into a clear, executive-level summary.
+        
+        Output format:
+        <feature_readiness_report>
+        <overall_status>[READY_TO_SHIP/NOT_READY/CONDITIONALLY_READY]</overall_status>
+        
+        <executive_summary>
+        [High-level summary of readiness status in 2-3 sentences]
+        </executive_summary>
+        
+        <security_summary>
+        Status: [Status from security agent]
+        Key Points: [Summarize critical findings]
+        </security_summary>
+        
+        <quality_summary>
+        Status: [Status from quality agent]
+        Key Points: [Summarize critical findings]
+        </quality_summary>
+        
+        <blocking_issues>
+        [List issues that must be resolved before shipping - prioritized]
+        </blocking_issues>
+        
+        <recommended_actions>
+        [Specific, actionable steps to achieve readiness]
+        </recommended_actions>
+        
+        <timeline_estimate>
+        [Estimated effort to resolve blocking issues]
+        </timeline_estimate>
+        </feature_readiness_report>
+      user: |
+        Synthesize the readiness assessments for this feature:
+        
+        Feature: {{feature_description}}
+        
+        Security Assessment:
+        {{security_assessment}}
+        
+        Quality Assessment:
+        {{quality_assessment}}
+        
+        Provide a unified feature readiness report with clear recommendations.
+      placeholder: history
+    params:
+      timeout: 60
+
