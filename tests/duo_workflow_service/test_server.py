@@ -225,6 +225,78 @@ async def test_list_flows(mock_list_configs):
 
 
 @pytest.mark.asyncio
+@patch("duo_workflow_service.server.flow_registry.list_configs")
+async def test_list_flows_with_filters(mock_list_configs):
+    mock_list_configs.return_value = [
+        {
+            "name": "flow1",
+            "version": "v1",
+            "environment": "prod",
+            "description": "First flow config",
+        },
+        {
+            "name": "flow2",
+            "version": "v2",
+            "environment": "test",
+            "description": "Second flow config",
+        },
+        {
+            "name": "flow3",
+            "version": "v1",
+            "environment": "dev",
+            "description": "Third flow config",
+        },
+    ]
+
+    mock_context = MagicMock(spec=grpc.ServicerContext)
+    service = DuoWorkflowService()
+
+    # Test filtering by name
+    filters = contract_pb2.ListFlowsRequestFilter(name=["flow1", "flow3"])
+    request = contract_pb2.ListFlowsRequest(filters=filters)
+    response = await service.ListFlows(request, mock_context)
+
+    assert len(response.configs) == 2
+    configs_dict = [MessageToDict(config) for config in response.configs]
+    assert all(config["name"] in ["flow1", "flow3"] for config in configs_dict)
+
+    # Test filtering by environment
+    filters = contract_pb2.ListFlowsRequestFilter(environment=["prod"])
+    request = contract_pb2.ListFlowsRequest(filters=filters)
+    response = await service.ListFlows(request, mock_context)
+
+    assert len(response.configs) == 1
+    configs_dict = [MessageToDict(config) for config in response.configs]
+    assert configs_dict[0]["environment"] == "prod"
+
+    # Test filtering by version
+    filters = contract_pb2.ListFlowsRequestFilter(version=["v1"])
+    request = contract_pb2.ListFlowsRequest(filters=filters)
+    response = await service.ListFlows(request, mock_context)
+
+    assert len(response.configs) == 2
+    configs_dict = [MessageToDict(config) for config in response.configs]
+    assert all(config["version"] == "v1" for config in configs_dict)
+
+    # Test multiple filters (name and environment)
+    filters = contract_pb2.ListFlowsRequestFilter(name=["flow1"], environment=["prod"])
+    request = contract_pb2.ListFlowsRequest(filters=filters)
+    response = await service.ListFlows(request, mock_context)
+
+    assert len(response.configs) == 1
+    configs_dict = [MessageToDict(config) for config in response.configs]
+    assert configs_dict[0]["name"] == "flow1"
+    assert configs_dict[0]["environment"] == "prod"
+
+    # Test filter that matches no flows
+    filters = contract_pb2.ListFlowsRequestFilter(environment=["staging"])
+    request = contract_pb2.ListFlowsRequest(filters=filters)
+    response = await service.ListFlows(request, mock_context)
+
+    assert len(response.configs) == 0
+
+
+@pytest.mark.asyncio
 @patch("duo_workflow_service.server.AbstractWorkflow")
 @patch("duo_workflow_service.server.resolve_workflow_class")
 async def test_execute_workflow_when_no_events_ends(
