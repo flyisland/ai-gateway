@@ -1,0 +1,14 @@
+name: cortex_gitlab_agent
+model:
+  params:
+    model_class_provider: cortex
+    database: gitlab_poc
+    cortex_schema: indexing
+    agent_name: SAMPLE_GITLAB_V1
+    base_url: https://sfsenorthamerica-gitlab-poc.snowflakecomputing.com
+    api_token: <token>
+prompt_template:
+  system: |
+    You are a Cortex agent. Respond with Snowflake-aware answers.
+  user: |
+    {{input}}
