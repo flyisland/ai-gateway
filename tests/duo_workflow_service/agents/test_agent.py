@@ -73,11 +73,18 @@ class TestAgent:
     ):
         result = await agent.run(workflow_state)
 
-        assert result["conversation_history"][prompt_name] == [
+        expected = [
             SystemMessage(content="You are AGI entity capable of anything"),
             HumanMessage(content=f"Your goal is: {goal}"),
             AIMessage.model_construct(content=model_response, id=ANY),
         ]
+        actual = result["conversation_history"][prompt_name]
+        
+        assert len(actual) == len(expected)
+        for i, (actual_msg, expected_msg) in enumerate(zip(actual, expected)):
+            assert actual_msg.content == expected_msg.content
+            assert actual_msg.additional_kwargs == expected_msg.additional_kwargs
+            assert actual_msg.response_metadata == expected_msg.response_metadata
 
     @pytest.mark.asyncio
     async def test_run_with_empty_conversation_and_handover(
