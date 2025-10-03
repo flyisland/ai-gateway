@@ -42,7 +42,12 @@ def main():
     with open(output_file_path, "w") as output_file:
         output_file.write(HEADER_TEXT)
         for graph_name in CategoryEnum:
-            if graph_name in ["software_development", "chat", "convert_to_gitlab_ci", "issue_to_merge_request"]:
+            if graph_name in [
+                "software_development",
+                "chat",
+                "convert_to_gitlab_ci",
+                "issue_to_merge_request",
+            ]:
                 # Dynamically import Workflow class. Equivalent to import statements in this format:
                 #     from duo_workflow_service.workflows.chat import Workflow
                 workflow_module = importlib.import_module(
