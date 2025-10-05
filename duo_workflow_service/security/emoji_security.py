@@ -7,7 +7,7 @@ from typing import Any, Dict, List, Union
 from duo_workflow_service.security.markdown_content_security import _apply_recursively
 
 _EMOJI_SURROGATE_PATTERN = re.compile(
-    r"\s*\\ud([89a-fA-F][0-9a-fA-F]{2})\\ud([c-fC-F][0-9a-fA-F]{2})\s*"
+    r"\\ud([89a-fA-F][0-9a-fA-F]{2})\s*\\ud([c-fC-F][0-9a-fA-F]{2})"
 )
 _UNICODE_4_DIGIT_PATTERN = re.compile(r"\\u([0-9A-Fa-f]{4})")
 _UNICODE_8_DIGIT_PATTERN = re.compile(r"\\U([0-9A-Fa-f]{8})")
@@ -70,30 +70,28 @@ def strip_emojis(
         if not text:
             return text
 
-        text = _EMOJI_SURROGATE_PATTERN.sub(" ", text)
+        # First, remove JSON-escaped emojis with optional whitespace between surrogate pairs
+        text = _EMOJI_SURROGATE_PATTERN.sub("", text)
 
-        if "\\u" in text:
-            text = _UNICODE_4_DIGIT_PATTERN.sub(
-                lambda m: chr(int(m.group(1), 16)), text
-            )
-            text = _UNICODE_8_DIGIT_PATTERN.sub(
-                lambda m: chr(int(m.group(1), 16)), text
-            )
-            text = _UNICODE_EMOJI_ESCAPE_PATTERN.sub(" ", text)
+        # Remove common emoji patterns that are JSON-escaped (no space between pairs)
+        for pattern in _COMMON_EMOJI_PATTERNS:
+            text = pattern.sub("", text)
+
+        # Remove JSON-escaped emoji patterns (e.g., \u1f600)
+        text = _UNICODE_EMOJI_ESCAPE_PATTERN.sub("", text)
 
         if any(char in text for char in _ZERO_WIDTH_CHARS):
             for char in _ZERO_WIDTH_CHARS:
                 text = text.replace(char, "")
                 text = text.replace(_ZERO_WIDTH_ESCAPED[char], "")
 
-        text = _EMOJI_MAIN_PATTERN.sub(" ", text)
+        # Remove actual emoji characters from the text
+        text = _EMOJI_MAIN_PATTERN.sub("", text)
         text = _SKIN_TONE_PATTERN.sub("", text)
 
-        for pattern in _COMMON_EMOJI_PATTERNS:
-            text = pattern.sub("", text)
-
-        text = _WHITESPACE_CLEANUP_PATTERN.sub(" ", text)
+        # Clean up excessive newlines and whitespace
         text = _NEWLINE_CLEANUP_PATTERN.sub("\n", text)
+        text = _WHITESPACE_CLEANUP_PATTERN.sub(" ", text)
         text = text.strip()
 
         try:
@@ -103,4 +101,10 @@ def strip_emojis(
 
         return text
 
-    return _apply_recursively(response, _strip_emojis_from_string)
+    processed = _apply_recursively(response, _strip_emojis_from_string)
+
+    # Wrap dict in list for ToolMessage compatibility
+    if isinstance(processed, dict):
+        return [processed]
+
+    return processed
