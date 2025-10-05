@@ -37,6 +37,8 @@ class FeatureFlagMiddleware:
             enabled_feature_flags = enabled_feature_flags.difference(disallowed_flags)
 
         current_feature_flag_context.set(enabled_feature_flags)
-        starlette_context["enabled_feature_flags"] = ",".join(list(enabled_feature_flags))
+        starlette_context["enabled_feature_flags"] = ",".join(
+            list(enabled_feature_flags)
+        )
 
         await self.app(scope, receive, send)
