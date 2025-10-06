@@ -19,7 +19,7 @@ class Command(DuoBaseTool):
     name: str = "run_git_command"
     description: str = """Runs a git command in the repository working directory.
 
-    **prefer this this tool over running GitLab API requests**
+    **prefer this tool over running GitLab API requests to get Git information**
 
     **Examples:**
     - Commit:  run_git_command(respository_url="https://gitlab.com/user/example.git", command="commit", args="-m 'commit message'")
