@@ -43,6 +43,7 @@ class WorkflowConfig(TypedDict):
     allow_agent_to_request_user: bool
     gitlab_host: str
     first_checkpoint: Optional[Checkpoint]
+    lease_id: Optional[str]
 
 
 GITLAB_18_2_QUERY = """
@@ -120,17 +121,66 @@ query($workflowId: AiDuoWorkflowsWorkflowID!) {
 }
 """
 
+GITLAB_18_5_OR_ABOVE_QUERY = """
+mutation aiDuoWorkflowWithLease($workflowId: AiDuoWorkflowsWorkflowID!) {
+    aiDuoWorkflowWithLease(input: { workflowId: $workflowId }) {
+        workflow {
+            statusName
+            projectId
+            project {
+                id
+                name
+                description
+                httpUrlToRepo
+                languages {
+                    name
+                    share
+                }
+                webUrl
+                statisticsDetailsPaths {
+                    repository
+                }
+                duoContextExclusionSettings {
+                    exclusionRules
+                }
+            }
+            namespaceId
+            namespace {
+                id
+                name
+                description
+                webUrl
+            }
+            agentPrivilegesNames
+            preApprovedAgentPrivilegesNames
+            mcpEnabled
+            allowAgentToRequestUser
+            firstCheckpoint {
+                checkpoint
+            }
+        }
+        leaseId
+        errors
+    }
+}
+"""
+
 version_18_2 = Version("18.2.0")
 version_18_3 = Version("18.3.0")
+version_18_5 = Version("18.5.0")
 FALLBACK_VERSION = version_18_2
 
 
 def fetch_workflow_and_container_query():
+
     try:
         gl_version = Version(gitlab_version.get())  # type: ignore[arg-type]
     except (InvalidVersion, TypeError) as ex:
         log_exception(ex)
         gl_version = FALLBACK_VERSION
+
+    if version_18_5 <= gl_version:
+        return GITLAB_18_5_OR_ABOVE_QUERY
 
     if version_18_3 <= gl_version:
         return GITLAB_18_3_OR_ABOVE_QUERY
@@ -147,13 +197,27 @@ async def fetch_workflow_and_container_data(
 
     response = await client.graphql(query, variables)
 
-    workflows = response.get("duoWorkflowWorkflows", {}).get("nodes", [])
+    workflow = None
+    lease_id = None
 
-    if not workflows:
-        raise Exception(f"No workflow found for workflow ID: {workflow_id}")
+    if response.get("DuoWorkflowsWorkflows"):
+        workflows = response.get("duoWorkflowWorkflows", {}).get("nodes", [])
 
-    # Get the first workflow (assuming there's at least one)
-    workflow = workflows[0]
+        if not workflows:
+            raise Exception(f"No workflow found for workflow ID: {workflow_id}")
+
+        # Get the first workflow (assuming there's at least one)
+        workflow = workflows[0]
+
+    elif response.get("aiDuoWorkflowWithLease"):
+        workflow = response.get("aiDuoWorkflowWithLease", {}).get("workflow")
+        lease_id = response.get("aiDuoWorkflowWithLease", {}).get("leaseId")
+
+        if not lease_id:
+            raise Exception(f"Failed to acquire lease with response {response}")
+
+    if not workflow:
+        raise Exception(f"No workflow found for workflow ID: {workflow_id} with response {response}")
 
     # Extract project data
     project_data = workflow.get("project")
@@ -209,6 +273,7 @@ async def fetch_workflow_and_container_data(
         allow_agent_to_request_user=workflow.get("allowAgentToRequestUser", False),
         first_checkpoint=workflow.get("firstCheckpoint", None),
         gitlab_host=gitlab_host,
+        lease_id=lease_id,
     )
 
     return project, namespace, workflow_config
