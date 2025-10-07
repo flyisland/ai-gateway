@@ -1,8 +1,9 @@
 import json
-from unittest.mock import AsyncMock
+from unittest.mock import AsyncMock, patch
 
 import pytest
 
+from duo_workflow_service.policies.file_exclusion_policy import FileExclusionPolicy
 from duo_workflow_service.tools.search import (
     BaseSearchInput,
     BlobSearch,
@@ -26,6 +27,10 @@ class TestSearch:
     @pytest.fixture(name="metadata")
     def metadata_fixture(self, gitlab_client_mock):
         return {"gitlab_client": gitlab_client_mock}
+
+    @pytest.fixture(name="project_mock")
+    def project_mock_fixture(self):
+        return {"exclusion_rules": ["*.log", "secrets/*", "*.secret"]}
 
     @pytest.mark.asyncio
     @pytest.mark.parametrize(
@@ -363,3 +368,239 @@ def test_wiki_blob_search_format_display_message():
 
     expected_message = "Search for files with term 'test search' in projects 123"
     assert message == expected_message
+
+
+class TestBlobSearchFileExclusion:
+    """Test FileExclusionPolicy integration with BlobSearch."""
+
+    @pytest.fixture(name="gitlab_client_mock")
+    def gitlab_client_mock_fixture(self):
+        return AsyncMock()
+
+    @pytest.fixture(name="project_with_exclusions")
+    def project_with_exclusions_fixture(self):
+        return {"exclusion_rules": ["*.log", "secrets/*", "*.secret"]}
+
+    @pytest.fixture(name="metadata_with_project")
+    def metadata_with_project_fixture(
+        self, gitlab_client_mock, project_with_exclusions
+    ):
+        return {
+            "gitlab_client": gitlab_client_mock,
+            "project": project_with_exclusions,
+        }
+
+    @pytest.fixture(name="blob_search_results")
+    def blob_search_results_fixture(self):
+        return [
+            {
+                "basename": "main",
+                "data": "def main():\n    print('hello')",
+                "path": "src/main.py",
+                "filename": "src/main.py",
+                "id": None,
+                "ref": "main",
+                "startline": 1,
+                "project_id": 6,
+            },
+            {
+                "basename": "debug",
+                "data": "DEBUG: Application started",
+                "path": "logs/debug.log",
+                "filename": "logs/debug.log",
+                "id": None,
+                "ref": "main",
+                "startline": 1,
+                "project_id": 6,
+            },
+            {
+                "basename": "config",
+                "data": "api_key = secret123",
+                "path": "secrets/config.secret",
+                "filename": "secrets/config.secret",
+                "id": None,
+                "ref": "main",
+                "startline": 1,
+                "project_id": 6,
+            },
+            {
+                "basename": "readme",
+                "data": "# Project README",
+                "path": "README.md",
+                "filename": "README.md",
+                "id": None,
+                "ref": "main",
+                "startline": 1,
+                "project_id": 6,
+            },
+        ]
+
+    @pytest.mark.asyncio
+    async def test_blob_search_filters_excluded_files(
+        self,
+        gitlab_client_mock,
+        metadata_with_project,
+        blob_search_results,
+    ):
+        """Test that BlobSearch filters out files matching exclusion patterns."""
+        gitlab_client_mock.aget.return_value = blob_search_results
+
+        tool = BlobSearch(metadata=metadata_with_project)
+
+        with patch(
+            "duo_workflow_service.policies.file_exclusion_policy.is_feature_enabled",
+            return_value=True,
+        ):
+            response = await tool._arun(
+                id="1",
+                search="test search",
+                search_type="projects",
+                ref="main",
+            )
+
+        response_data = json.loads(response)
+        search_results = response_data["search_results"]
+
+        # Should only include main.py and README.md (excluded: debug.log, config.secret)
+        assert len(search_results) == 2
+
+        included_paths = [result["path"] for result in search_results]
+        assert "src/main.py" in included_paths
+        assert "README.md" in included_paths
+        assert "logs/debug.log" not in included_paths
+        assert "secrets/config.secret" not in included_paths
+
+    @pytest.mark.asyncio
+    async def test_blob_search_no_exclusions_when_feature_disabled(
+        self,
+        gitlab_client_mock,
+        metadata_with_project,
+        blob_search_results,
+    ):
+        """Test that BlobSearch doesn't filter when feature flag is disabled."""
+        gitlab_client_mock.aget.return_value = blob_search_results
+
+        tool = BlobSearch(metadata=metadata_with_project)
+
+        with patch(
+            "duo_workflow_service.policies.file_exclusion_policy.is_feature_enabled",
+            return_value=False,
+        ):
+            response = await tool._arun(
+                id="1",
+                search="test search",
+                search_type="projects",
+                ref="main",
+            )
+
+        response_data = json.loads(response)
+        search_results = response_data["search_results"]
+
+        # Should include all files when feature is disabled
+        assert len(search_results) == 4
+
+    @pytest.mark.asyncio
+    async def test_blob_search_no_exclusions_when_no_project(
+        self,
+        gitlab_client_mock,
+        blob_search_results,
+    ):
+        """Test that BlobSearch doesn't filter when no project is available."""
+        gitlab_client_mock.aget.return_value = blob_search_results
+        metadata_no_project = {"gitlab_client": gitlab_client_mock, "project": None}
+
+        tool = BlobSearch(metadata=metadata_no_project)
+
+        with patch(
+            "duo_workflow_service.policies.file_exclusion_policy.is_feature_enabled",
+            return_value=True,
+        ):
+            response = await tool._arun(
+                id="1",
+                search="test search",
+                search_type="projects",
+                ref="main",
+            )
+
+        response_data = json.loads(response)
+        search_results = response_data["search_results"]
+
+        # Should include all files when no project is available
+        assert len(search_results) == 4
+
+    @pytest.mark.asyncio
+    async def test_blob_search_empty_results(
+        self,
+        gitlab_client_mock,
+        metadata_with_project,
+    ):
+        """Test that BlobSearch handles empty results correctly."""
+        gitlab_client_mock.aget.return_value = []
+
+        tool = BlobSearch(metadata=metadata_with_project)
+
+        with patch(
+            "duo_workflow_service.policies.file_exclusion_policy.is_feature_enabled",
+            return_value=True,
+        ):
+            response = await tool._arun(
+                id="1",
+                search="nonexistent",
+                search_type="projects",
+                ref="main",
+            )
+
+        response_data = json.loads(response)
+        search_results = response_data["search_results"]
+
+        assert len(search_results) == 0
+
+    @pytest.mark.asyncio
+    async def test_blob_search_handles_missing_path_fields(
+        self,
+        gitlab_client_mock,
+        metadata_with_project,
+    ):
+        """Test that BlobSearch handles results with missing path/filename fields."""
+        results_with_missing_paths = [
+            {
+                "basename": "main",
+                "data": "def main():\n    print('hello')",
+                "path": "src/main.py",
+                "filename": "src/main.py",
+                "id": None,
+                "ref": "main",
+                "startline": 1,
+                "project_id": 6,
+            },
+            {
+                "basename": "unknown",
+                "data": "some content",
+                # Missing path and filename fields
+                "id": None,
+                "ref": "main",
+                "startline": 1,
+                "project_id": 6,
+            },
+        ]
+
+        gitlab_client_mock.aget.return_value = results_with_missing_paths
+
+        tool = BlobSearch(metadata=metadata_with_project)
+
+        with patch(
+            "duo_workflow_service.policies.file_exclusion_policy.is_feature_enabled",
+            return_value=True,
+        ):
+            response = await tool._arun(
+                id="1",
+                search="test search",
+                search_type="projects",
+                ref="main",
+            )
+
+        response_data = json.loads(response)
+        search_results = response_data["search_results"]
+
+        # Should include main.py and the result without path (since it can't be filtered)
+        assert len(search_results) == 2

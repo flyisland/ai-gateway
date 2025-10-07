@@ -5,6 +5,7 @@ from typing import Any, Literal, Optional, Type
 from gitlab_cloud_connector import GitLabUnitPrimitive
 from pydantic import BaseModel, Field
 
+from duo_workflow_service.policies.file_exclusion_policy import FileExclusionPolicy
 from duo_workflow_service.tools.duo_base_tool import DuoBaseTool
 
 
@@ -368,6 +369,32 @@ class BlobSearch(GitLabSearchBase):
     description: str = GitLabSearchBase._get_description(unique_description)
     args_schema: Type[BaseModel] = RefSearchInput
 
+    def _filter_blob_results(self, results: list) -> list:
+        """Filter blob search results using FileExclusionPolicy."""
+        if not results:
+            return results
+
+        # Extract file paths from blob results
+        file_paths = []
+        for result in results:
+            # Blob results have 'path' or 'filename' field
+            file_path = result.get("path") or result.get("filename")
+            if file_path:
+                file_paths.append(file_path)
+
+        # Apply file exclusion policy
+        policy = FileExclusionPolicy(self.project)
+        allowed_files, _ = policy.filter_allowed(file_paths)
+
+        # Filter results to only include allowed files or results without path info
+        filtered_results = []
+        for result in results:
+            file_path = result.get("path") or result.get("filename")
+            if not file_path or file_path in allowed_files:
+                filtered_results.append(result)
+
+        return filtered_results
+
     async def _arun(
         self,
         *,
@@ -389,7 +416,14 @@ class BlobSearch(GitLabSearchBase):
         if sort:
             params["sort"] = sort
 
-        return await self._perform_search(id, params, search_type)
+        url = f"/api/v4/{search_type}/{id}/search"
+        try:
+            response = await self.gitlab_client.aget(path=url, params=params)
+            # Filter blob results using FileExclusionPolicy
+            filtered_response = self._filter_blob_results(response)
+            return json.dumps({"search_results": filtered_response})
+        except Exception as e:
+            return json.dumps({"error": str(e)})
 
 
 class CommitSearch(GitLabSearchBase):
