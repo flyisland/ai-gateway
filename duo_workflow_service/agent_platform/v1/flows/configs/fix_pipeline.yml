@@ -76,7 +76,8 @@ components:
       - "on_tool_execution_failed"
   - name: "fix_pipeline_git_push"
     type: OneOffComponent
-    prompt_id: "git_push_prompt"
+    prompt_id: "fix_pipeline_push_changes"
+    prompt_version: "^1.0.0"
     max_correction_attempts: 3
     inputs:
       - from: "context:goal"
@@ -119,25 +120,3 @@ flow:
       input_schema:
         source_branch:
           type: string
-prompts:
-  - name: Git Push Prompt
-    prompt_id: "git_push_prompt"
-    model:
-      params:
-        model_class_provider: anthropic
-        model: claude-sonnet-4-20250514
-        max_tokens: 8192
-    prompt_template:
-      system: |
-        You are an assistant that runs a single git command, exactly according to specifications. Do not run additional
-        commands beyond those assigned to you by the user.
-      user: |
-        Use the `run_git_command` tool to run this git command specified in the git_command XML tags:
-        <git_command>
-          git push -o merge_request.create
-            -o merge_request.title='Draft: fix failing pipeline'
-            {% if source_branch %}-o merge_request.target='{{source_branch}}'{% endif %}
-            -o merge_request.description='Fixes failing pipeline {{pipeline_url}}{% if merge_request_url %} on {{merge_request_url}}{% endif %}'
-        </git_command>
-    params:
-      timeout: 30
