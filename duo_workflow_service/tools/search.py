@@ -374,23 +374,12 @@ class BlobSearch(GitLabSearchBase):
         if not results:
             return results
 
-        # Extract file paths from blob results
-        file_paths = []
-        for result in results:
-            # Blob results have 'path' or 'filename' field
-            file_path = result.get("path") or result.get("filename")
-            if file_path:
-                file_paths.append(file_path)
-
-        # Apply file exclusion policy
+        # Apply file exclusion policy and filter results
         policy = FileExclusionPolicy(self.project)
-        allowed_files, _ = policy.filter_allowed(file_paths)
-
-        # Filter results to only include allowed files or results without path info
         filtered_results = []
         for result in results:
             file_path = result.get("path") or result.get("filename")
-            if not file_path or file_path in allowed_files:
+            if not file_path or policy.is_allowed(file_path):
                 filtered_results.append(result)
 
         return filtered_results
