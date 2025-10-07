@@ -1,3 +1,4 @@
+# pylint: disable=too-many-lines
 from datetime import datetime, timezone
 from unittest.mock import ANY, AsyncMock, Mock, patch
 
@@ -15,6 +16,7 @@ from duo_workflow_service.entities.state import (
     ToolStatus,
     UiChatLog,
 )
+from duo_workflow_service.errors.gitlab_docs_error_code import GitLabDocsErrorCode
 from duo_workflow_service.gitlab.gitlab_api import Project
 from duo_workflow_service.gitlab.gitlab_instance_info_service import GitLabInstanceInfo
 from duo_workflow_service.gitlab.gitlab_service_context import GitLabServiceContext
@@ -262,7 +264,32 @@ class TestChatAgentToolCallMessageOrdering:
 
 
 @pytest.mark.asyncio
-async def test_chat_agent_api_error_handling(chat_agent, input):
+async def test_chat_agent_generic_error_handling(chat_agent, input):
+    """Test that ChatAgent properly handles generic exceptions."""
+    chat_agent.prompt_adapter.get_response = AsyncMock(
+        side_effect=Exception("Test generic error")
+    )
+
+    result = await chat_agent.run(input)
+
+    # Verify error response structure
+    assert result["status"] == WorkflowStatusEnum.INPUT_REQUIRED
+    assert "conversation_history" in result
+    assert result["conversation_history"]["Chat Agent"][0].content.startswith(
+        "There was an error processing your request:"
+    )
+    assert len(result["ui_chat_log"]) == 1
+    assert result["ui_chat_log"][0]["message_type"] == MessageTypeEnum.AGENT
+    assert result["ui_chat_log"][0]["status"] == ToolStatus.FAILURE
+    # pylint: disable=line-too-long
+    assert (
+        result["ui_chat_log"][0]["content"]
+        == f"There was an error processing your request. Please try again or contact support if the issue persists. {GitLabDocsErrorCode("A1007")}"
+    )
+
+
+@pytest.mark.asyncio
+async def test_chat_agent_provider_error_handling(chat_agent, input):
     """Test that ChatAgent properly handles APIStatusError exceptions."""
     # Mock the prompt adapter to raise an APIStatusError
     chat_agent.prompt_adapter.get_response = AsyncMock(
@@ -284,9 +311,10 @@ async def test_chat_agent_api_error_handling(chat_agent, input):
     assert len(result["ui_chat_log"]) == 1
     assert result["ui_chat_log"][0]["message_type"] == MessageTypeEnum.AGENT
     assert result["ui_chat_log"][0]["status"] == ToolStatus.FAILURE
+    # pylint: disable=line-too-long
     assert (
         result["ui_chat_log"][0]["content"]
-        == "There was an error processing your request. Please try again or contact support if the issue persists."
+        == f"There was an error processing your request. Please try again or contact support if the issue persists. {GitLabDocsErrorCode("A1008")}"
     )
 
 

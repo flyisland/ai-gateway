@@ -15,6 +15,7 @@ from duo_workflow_service.entities.state import (
     UiChatLog,
     WorkflowStatusEnum,
 )
+from duo_workflow_service.errors.gitlab_docs_error_code import GitLabDocsErrorCode
 from duo_workflow_service.gitlab.gitlab_instance_info_service import (
     GitLabInstanceInfoService,
 )
@@ -179,13 +180,14 @@ class ChatAgent:
         error_message = HumanMessage(
             content=f"There was an error processing your request: {error}"
         )
+        docs_link = GitLabDocsErrorCode.from_exception(error)
 
         ui_chat_log = UiChatLog(
             message_type=MessageTypeEnum.AGENT,
             message_sub_type=None,
             content=(
                 "There was an error processing your request. Please try again or contact support if "
-                "the issue persists."
+                f"the issue persists. {docs_link}"
             ),
             timestamp=datetime.now(timezone.utc).isoformat(),
             status=ToolStatus.FAILURE,
