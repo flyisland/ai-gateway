@@ -258,3 +258,67 @@ def test_validate_default_model_not_in_selectable_models(fs: FakeFilesystem):
         "  - Feature 'another_config' has default model 'model_2' that is not in selectable_models."
     )
     assert error_message == expected_error
+
+
+def test_validate_selectable_models_not_in_alphabetical_order(fs: FakeFilesystem):
+    model_selection_dir = (
+        Path(__file__).parent.parent.parent / "ai_gateway" / "model_selection"
+    )
+
+    # editorconfig-checker-disable
+    fs.create_file(
+        model_selection_dir / "models.yml",
+        contents=dedent(
+            """
+            models:
+              - name: Claude 3.5 Sonnet
+                gitlab_identifier: claude_3_5_sonnet_20240620
+                params:
+                  model: claude-3-5-sonnet-20240620
+              - name: Claude Sonnet 3.7
+                gitlab_identifier: claude_sonnet_3_7_20250219
+                params:
+                  model: claude-sonnet-3-7-20250219
+              - name: Claude Sonnet 4
+                gitlab_identifier: claude_sonnet_4_20250514
+                params:
+                  model: claude-sonnet-4-20250514
+            """
+        ),
+    )
+
+    fs.create_file(
+        model_selection_dir / "unit_primitives.yml",
+        contents=dedent(
+            """
+            configurable_unit_primitives:
+              - feature_setting: "ordered_config"
+                unit_primitives:
+                  - "ask_commit"
+                default_model: "claude_sonnet_4_20250514"
+                selectable_models:
+                    - "claude_3_5_sonnet_20240620"
+                    - "claude_sonnet_3_7_20250219"
+                    - "claude_sonnet_4_20250514"
+              - feature_setting: "another_unordered_config"
+                unit_primitives:
+                  - "generate_code"
+                default_model: "claude_sonnet_4_20250514"
+                selectable_models:
+                    - "claude_3_5_sonnet_20240620"
+                    - "claude_sonnet_4_20250514"
+                    - "claude_sonnet_3_7_20250219"
+            """
+        ),
+    )
+    # editorconfig-checker-enable
+
+    with pytest.raises(ValueError) as excinfo:
+        ModelSelectionConfig().validate()
+
+    error_message = str(excinfo.value)
+    expected_error = (
+        "The following features have selectable_models not in alphabetical order:\n"
+        "  - Feature 'another_unordered_config' has selectable_models not in alphabetical order"
+    )
+    assert error_message == expected_error

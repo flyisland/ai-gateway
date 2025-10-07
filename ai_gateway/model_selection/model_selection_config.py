@@ -75,6 +75,7 @@ class ModelSelectionConfig:
 
         errors: set[str] = set()
         default_model_not_selectable_errors: list[str] = []
+        unordered_selectable_models_errors: list[str] = []
 
         for unit_primitive_config in unit_primitive_configs:
             ids = chain(
@@ -95,6 +96,13 @@ class ModelSelectionConfig:
                     f"'{unit_primitive_config.default_model}' that is not in selectable_models."
                 )
 
+            if unit_primitive_config.selectable_models != sorted(
+                unit_primitive_config.selectable_models
+            ):
+                unordered_selectable_models_errors.append(
+                    f"Feature '{unit_primitive_config.feature_setting}' has selectable_models not in alphabetical order"
+                )
+
         error_messages = []
         if errors:
             error_messages.append(
@@ -106,6 +114,13 @@ class ModelSelectionConfig:
                 "Default models must be included in selectable_models:\n"
                 + "\n".join(
                     f"  - {error}" for error in default_model_not_selectable_errors
+                )
+            )
+        if unordered_selectable_models_errors:
+            error_messages.append(
+                "The following features have selectable_models not in alphabetical order:\n"
+                + "\n".join(
+                    f"  - {error}" for error in unordered_selectable_models_errors
                 )
             )
 
