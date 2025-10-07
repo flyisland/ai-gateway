@@ -1,7 +1,10 @@
 import json
+import logging
 from typing import Any, Type
 
 from pydantic import BaseModel
+
+logger = logging.getLogger(__name__)
 
 from duo_workflow_service.tools.duo_base_tool import DuoBaseTool
 
@@ -25,13 +28,22 @@ class GetCurrentUser(DuoBaseTool):
     async def _arun(self) -> str:
         try:
             response = await self.gitlab_client.aget(
-                path="/api/v4/user", parse_json=True
+                path="/api/v4/user", parse_json=True, use_http_response=True
             )
 
+            if not response.is_success():
+                logger.error(
+                    f"Failed to get current user: status_code={response.status_code}, error={response.body}"
+                )
+                return json.dumps(
+                    {"error": f"Failed to get current user: {response.body}"}
+                )
+
+            user_data = response.body
             formatted_response = {
-                "user_name": response.get("username"),
-                "job_title": response.get("job_title"),
-                "preferred_language": response.get("preferred_language"),
+                "user_name": user_data.get("username"),
+                "job_title": user_data.get("job_title"),
+                "preferred_language": user_data.get("preferred_language"),
             }
 
             return json.dumps({"user": formatted_response})

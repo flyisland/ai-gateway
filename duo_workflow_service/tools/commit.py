@@ -1,10 +1,13 @@
 import base64
 import json
+import logging
 from typing import Any, List, NamedTuple, Optional, Type
 from urllib.parse import quote
 
 from gitlab_cloud_connector import GitLabUnitPrimitive
 from pydantic import BaseModel, Field
+
+logger = logging.getLogger(__name__)
 
 from duo_workflow_service.gitlab.url_parser import GitLabUrlParseError, GitLabUrlParser
 from duo_workflow_service.policies.diff_exclusion_policy import DiffExclusionPolicy
@@ -181,8 +184,16 @@ class ListCommits(CommitBaseTool):
                 path=f"/api/v4/projects/{project_id}/repository/commits",
                 params=params,
                 parse_json=False,
+                use_http_response=True,
             )
-            return json.dumps({"commits": response})
+
+            if not response.is_success():
+                logger.error(
+                    f"Failed to list commits: status_code={response.status_code}, error={response.body}"
+                )
+                return json.dumps({"error": f"Failed to list commits: {response.body}"})
+
+            return json.dumps({"commits": response.body})
         except Exception as e:
             return json.dumps({"error": str(e)})
 
@@ -236,8 +247,16 @@ For example:
                 path=f"/api/v4/projects/{validation_result.project_id}/repository/commits/{validation_result.commit_sha}",
                 params=params,
                 parse_json=False,
+                use_http_response=True,
             )
-            return json.dumps({"commit": response})
+
+            if not response.is_success():
+                logger.error(
+                    f"Failed to get commit: status_code={response.status_code}, error={response.body}"
+                )
+                return json.dumps({"error": f"Failed to get commit: {response.body}"})
+
+            return json.dumps({"commit": response.body})
         except Exception as e:
             return json.dumps({"error": str(e)})
 
@@ -279,10 +298,19 @@ class GetCommitDiff(CommitBaseTool):
             response = await self.gitlab_client.aget(
                 path=f"/api/v4/projects/{project_id}/repository/commits/{commit_sha}/diff",
                 parse_json=False,
+                use_http_response=True,
             )
 
+            if not response.is_success():
+                logger.error(
+                    f"Failed to get commit diff: status_code={response.status_code}, error={response.body}"
+                )
+                return json.dumps(
+                    {"error": f"Failed to get commit diff: {response.body}"}
+                )
+
             # Parse the response and apply diff exclusion policy
-            diff_data = json.loads(response)
+            diff_data = json.loads(response.body)
             diff_policy = DiffExclusionPolicy(self.project)
             filtered_diff, excluded_files = diff_policy.filter_allowed_diffs(diff_data)
 
@@ -344,8 +372,18 @@ class GetCommitComments(CommitBaseTool):
             response = await self.gitlab_client.aget(
                 path=f"/api/v4/projects/{project_id}/repository/commits/{commit_sha}/comments",
                 parse_json=False,
+                use_http_response=True,
             )
-            return json.dumps({"comments": response})
+
+            if not response.is_success():
+                logger.error(
+                    f"Failed to get commit comments: status_code={response.status_code}, error={response.body}"
+                )
+                return json.dumps(
+                    {"error": f"Failed to get commit comments: {response.body}"}
+                )
+
+            return json.dumps({"comments": response.body})
         except Exception as e:
             return json.dumps({"error": str(e)})
 
@@ -504,10 +542,23 @@ class CreateCommit(DuoBaseTool):
 
                 encoded_file_path = quote(action.file_path, safe="")
                 try:
-                    file_info = await self.gitlab_client.aget(
+                    response = await self.gitlab_client.aget(
                         f"/api/v4/projects/{project_id}/repository/files/{encoded_file_path}",
                         params={"ref": branch},
+                        use_http_response=True,
                     )
+
+                    if not response.is_success():
+                        logger.error(
+                            f"Failed to fetch file: status_code={response.status_code}, error={response.body}"
+                        )
+                        return json.dumps(
+                            {
+                                "error": f"Error fetching file '{action.file_path}': {response.body}"
+                            }
+                        )
+
+                    file_info = response.body
                     current_content = base64.b64decode(file_info["content"]).decode(
                         "utf-8"
                     )
@@ -556,9 +607,19 @@ class CreateCommit(DuoBaseTool):
             response = await self.gitlab_client.apost(
                 path=f"/api/v4/projects/{project_id}/repository/commits",
                 body=json.dumps(params),
+                use_http_response=True,
             )
+
+            if not response.is_success():
+                logger.error(
+                    f"Failed to create commit: status_code={response.status_code}, error={response.body}"
+                )
+                return json.dumps(
+                    {"error": f"Failed to create commit: {response.body}"}
+                )
+
             return json.dumps(
-                {"status": "success", "data": params, "response": response}
+                {"status": "success", "data": params, "response": response.body}
             )
         except Exception as e:
             return json.dumps({"error": str(e)})

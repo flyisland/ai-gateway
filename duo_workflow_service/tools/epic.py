@@ -1,8 +1,11 @@
 import json
+import logging
 from typing import Any, List, NamedTuple, Optional, Type, Union
 
 from gitlab_cloud_connector import GitLabUnitPrimitive
 from pydantic import BaseModel, Field
+
+logger = logging.getLogger(__name__)
 
 from duo_workflow_service.gitlab.url_parser import GitLabUrlParseError, GitLabUrlParser
 from duo_workflow_service.tools.duo_base_tool import (
@@ -217,8 +220,16 @@ class CreateEpic(EpicBaseTool):
             response = await self.gitlab_client.apost(
                 path=f"/api/v4/groups/{validation_result.group_id}/epics",
                 body=json.dumps(data),
+                use_http_response=True,
             )
-            return json.dumps({"created_epic": response})
+
+            if not response.is_success():
+                logger.error(
+                    f"Failed to create epic: status_code={response.status_code}, error={response.body}"
+                )
+                return json.dumps({"error": f"Failed to create epic: {response.body}"})
+
+            return json.dumps({"created_epic": response.body})
         except Exception as e:
             return json.dumps({"error": str(e)})
 
@@ -345,8 +356,16 @@ class ListEpics(EpicBaseTool):
                 path=f"/api/v4/groups/{validation_result.group_id}/epics",
                 params=params,
                 parse_json=False,
+                use_http_response=True,
             )
-            return json.dumps({"epics": response})
+
+            if not response.is_success():
+                logger.error(
+                    f"Failed to list epics: status_code={response.status_code}, error={response.body}"
+                )
+                return json.dumps({"error": f"Failed to list epics: {response.body}"})
+
+            return json.dumps({"epics": response.body})
         except Exception as e:
             return json.dumps({"error": str(e)})
 
@@ -389,8 +408,16 @@ class GetEpic(EpicBaseTool):
             response = await self.gitlab_client.aget(
                 path=f"/api/v4/groups/{validation_result.group_id}/epics/{validation_result.epic_iid}",
                 parse_json=False,
+                use_http_response=True,
             )
-            return json.dumps({"epic": response})
+
+            if not response.is_success():
+                logger.error(
+                    f"Failed to get epic: status_code={response.status_code}, error={response.body}"
+                )
+                return json.dumps({"error": f"Failed to get epic: {response.body}"})
+
+            return json.dumps({"epic": response.body})
         except Exception as e:
             return json.dumps({"error": str(e)})
 

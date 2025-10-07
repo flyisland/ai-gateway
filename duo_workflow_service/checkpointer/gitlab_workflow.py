@@ -568,10 +568,19 @@ class GitLabWorkflow(
                 endpoint="/api/v4/ai/duo_workflows/workflows/:id/checkpoints",
                 method="GET",
             ):
-                gl_checkpoints = await self._client.aget(
+                response = await self._client.aget(
                     path=endpoint,
                     object_hook=checkpoint_decoder,
+                    use_http_response=True,
                 )
+
+                if not response.is_success():
+                    self._logger.error(
+                        f"Failed to fetch checkpoints: status_code={response.status_code}, error={response.body}"
+                    )
+                    raise Exception(f"Failed to fetch checkpoints: {response.body}")
+
+                gl_checkpoints = response.body
             checkpoint = next(
                 (c for c in gl_checkpoints if c["thread_ts"] == checkpoint_id), None
             )
@@ -581,16 +590,19 @@ class GitLabWorkflow(
                 endpoint="/api/v4/ai/duo_workflows/workflows/:id/checkpoints?per_page=1",
                 method="GET",
             ):
-                gl_checkpoints = await self._client.aget(
+                response = await self._client.aget(
                     path=endpoint,
                     object_hook=checkpoint_decoder,
+                    use_http_response=True,
                 )
-            if (
-                isinstance(gl_checkpoints, dict)
-                and "status" in gl_checkpoints
-                and gl_checkpoints["status"] != 200
-            ):
-                raise Exception(f"Failed to fetch checkpoints: {gl_checkpoints}")
+
+                if not response.is_success():
+                    self._logger.error(
+                        f"Failed to fetch checkpoints: status_code={response.status_code}, error={response.body}"
+                    )
+                    raise Exception(f"Failed to fetch checkpoints: {response.body}")
+
+                gl_checkpoints = response.body
             checkpoint = gl_checkpoints[0] if gl_checkpoints else None
 
         if checkpoint:
@@ -609,10 +621,19 @@ class GitLabWorkflow(
         with duo_workflow_metrics.time_gitlab_response(
             endpoint="/api/v4/ai/duo_workflows/workflows/:id/checkpoints", method="GET"
         ):
-            gl_checkpoints = await self._client.aget(
+            response = await self._client.aget(
                 path=endpoint,
                 object_hook=checkpoint_decoder,
+                use_http_response=True,
             )
+
+            if not response.is_success():
+                self._logger.error(
+                    f"Failed to fetch checkpoints: status_code={response.status_code}, error={response.body}"
+                )
+                raise Exception(f"Failed to fetch checkpoints: {response.body}")
+
+            gl_checkpoints = response.body
         for gl_checkpoint in gl_checkpoints:
             try:
                 yield self._convert_gitlab_checkpoint_to_checkpoint_tuple(gl_checkpoint)
@@ -717,8 +738,9 @@ class GitLabWorkflow(
             endpoint="/api/v4/ai/duo_workflows/workflows/:id/checkpoint_writes_batch",
             method="POST",
         ):
-            result = await self._client.apost(
+            response = await self._client.apost(
                 path=endpoint,
+                use_http_response=True,
                 body=json.dumps(
                     {
                         "thread_ts": checkpoint_id,
@@ -726,6 +748,14 @@ class GitLabWorkflow(
                     }
                 ),
             )
+
+            if not response.is_success():
+                self._logger.error(
+                    f"Failed to save checkpoint writes: status_code={response.status_code}, error={response.body}"
+                )
+                raise Exception(f"Failed to save checkpoint writes: {response.body}")
+
+            result = response.body
         self._logger.info(
             "Checkpoint updated with pending writes",
             thread_ts=checkpoint_id,
