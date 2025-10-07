@@ -55,7 +55,6 @@ class FlowConfig(BaseModel):
     version: Literal["v1"]
     prompts: Optional[list[InMemoryPromptConfig]] = None
 
-
     def input_json_schemas_by_category(self):
         json_schemas_by_category: dict[str, dict] = {}
         if not self.flow.inputs:
@@ -80,7 +79,6 @@ class FlowConfig(BaseModel):
             json_schemas_by_category[item.category] = jsonschema
 
         return json_schemas_by_category
-
 
     @classmethod
     def from_yaml_config(cls, path: str) -> Self:
