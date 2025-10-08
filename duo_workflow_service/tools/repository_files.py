@@ -134,7 +134,16 @@ class GetRepositoryFile(RepositoryFileBaseTool):
                 parse_json=False,
             )
 
-            content = base64.b64decode(json.loads(response)["content"]).decode("utf-8")
+            response_data = json.loads(response)
+            
+            # Check if response contains an error message
+            if "message" in response_data and "content" not in response_data:
+                return json.dumps({"error": response_data["message"]})
+            
+            if "content" not in response_data:
+                return json.dumps({"error": "Missing content in response"})
+
+            content = base64.b64decode(response_data["content"]).decode("utf-8")
 
             return json.dumps({"content": content})
         except Exception as e:
@@ -227,6 +236,14 @@ class ListRepositoryTree(DuoBaseTool):
                 params=params,
             )
 
+            # Check if response contains an error message
+            if isinstance(response, dict) and "message" in response:
+                return json.dumps({"error": response["message"]})
+            
+            # Check if response is not a list (unexpected format)
+            if not isinstance(response, list):
+                return json.dumps({"error": f"Unexpected response format: {type(response).__name__}"})
+
             # Filter results based on file exclusion policy
             policy = FileExclusionPolicy(self.project)
 
@@ -234,13 +251,14 @@ class ListRepositoryTree(DuoBaseTool):
             file_paths: List[str] = [
                 item.get("path", "")
                 for item in response
-                if isinstance(item.get("path"), str)
+                if isinstance(item, dict) and isinstance(item.get("path"), str)
             ]
             allowed_paths, _excluded_paths = policy.filter_allowed(file_paths)
 
             # Filter the original response to only include allowed items
             filtered_response = [
-                item for item in response if item.get("path") in allowed_paths
+                item for item in response 
+                if isinstance(item, dict) and item.get("path") in allowed_paths
             ]
 
             return json.dumps({"tree": filtered_response})
