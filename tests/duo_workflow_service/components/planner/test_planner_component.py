@@ -206,7 +206,7 @@ class TestPlannerComponent:
         mock_agent.assert_called_once_with(
             planner_component.user,
             "workflow/planner",
-            "^1.0.0",
+            "^1.1.0",
             tools=planner_component.planner_toolset.bindable,
             workflow_id="test-workflow-123",
             workflow_type=workflow_type,

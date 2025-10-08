@@ -67,7 +67,7 @@ class PlannerComponent(BaseComponent):
         planner = self.prompt_registry.get_on_behalf(
             self.user,
             "workflow/planner",
-            "^1.0.0",
+            "^1.1.0",
             tools=planner_toolset.bindable,  # type: ignore[arg-type]
             workflow_id=self.workflow_id,
             workflow_type=self.workflow_type,
