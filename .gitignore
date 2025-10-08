@@ -312,3 +312,8 @@ infrastructure/ai-assist/charts
 # Docker Compose
 docker-compose.override.yaml
 tmp/
+
+
+# Ignore all files to patch model selectiion
+# Ref: https://gitlab.com/gitlab-org/modelops/ai-model-validation-and-research/ai-evaluation/prompt-library/-/issues/802
+patch_model_selection.json
