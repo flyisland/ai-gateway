@@ -3,6 +3,7 @@ from unittest.mock import AsyncMock, patch
 
 import pytest
 
+from duo_workflow_service.gitlab.http_client import GitLabHttpResponse
 from duo_workflow_service.policies.file_exclusion_policy import FileExclusionPolicy
 from duo_workflow_service.tools.search import (
     BaseSearchInput,
@@ -17,6 +18,21 @@ from duo_workflow_service.tools.search import (
     UserSearch,
     WikiBlobSearch,
 )
+
+
+def create_mock_aget(response_data):
+    """Create a mock aget function that returns GitLabHttpResponse when use_http_response=True."""
+
+    async def mock_aget(*args, **kwargs):
+        if kwargs.get("use_http_response", False):
+            return GitLabHttpResponse(
+                status_code=200,
+                body=response_data,
+            )
+        else:
+            return response_data
+
+    return mock_aget
 
 
 class TestSearch:
@@ -105,7 +121,10 @@ class TestSearch:
         metadata,
         gitlab_client_mock,
     ):
-        gitlab_client_mock.aget.return_value = mock_response
+        # Mock return values based on input parameters using side_effect
+        mock_aget = create_mock_aget(mock_response)
+
+        gitlab_client_mock.aget.side_effect = mock_aget
 
         tool = tool_class(metadata=metadata)  # type: ignore
 
@@ -130,10 +149,19 @@ class TestSearch:
                 expected_params["confidential"]
             ).lower()
 
-        gitlab_client_mock.aget.assert_called_once_with(
-            path=f"/api/v4/{search_type}/1/search",
-            params=expected_params,
-        )
+        # BlobSearch uses different parameters for aget call
+        if tool_class == BlobSearch:
+            gitlab_client_mock.aget.assert_called_once_with(
+                path=f"/api/v4/{search_type}/1/search",
+                params=expected_params,
+                use_http_response=True,
+                parse_json=True,
+            )
+        else:
+            gitlab_client_mock.aget.assert_called_once_with(
+                path=f"/api/v4/{search_type}/1/search",
+                params=expected_params,
+            )
 
     @pytest.mark.asyncio
     @pytest.mark.parametrize(
@@ -152,7 +180,10 @@ class TestSearch:
     async def test_search_no_results(
         self, tool_class, scope, search_type, extra_params, metadata, gitlab_client_mock
     ):
-        gitlab_client_mock.aget.return_value = []
+        # Mock return values based on input parameters using side_effect
+        mock_aget = create_mock_aget([])
+
+        gitlab_client_mock.aget.side_effect = mock_aget
 
         tool = tool_class(metadata=metadata)  # type: ignore
 
@@ -179,10 +210,19 @@ class TestSearch:
                 expected_params["confidential"]
             ).lower()
 
-        gitlab_client_mock.aget.assert_called_once_with(
-            path=f"/api/v4/{search_type}/1/search",
-            params=expected_params,
-        )
+        # BlobSearch uses different parameters for aget call
+        if tool_class == BlobSearch:
+            gitlab_client_mock.aget.assert_called_once_with(
+                path=f"/api/v4/{search_type}/1/search",
+                params=expected_params,
+                use_http_response=True,
+                parse_json=True,
+            )
+        else:
+            gitlab_client_mock.aget.assert_called_once_with(
+                path=f"/api/v4/{search_type}/1/search",
+                params=expected_params,
+            )
 
     @pytest.mark.asyncio
     @pytest.mark.parametrize(
@@ -219,7 +259,7 @@ class TestSearch:
         metadata,
         gitlab_client_mock,
     ):
-        gitlab_client_mock.aget.return_value = mock_response
+        gitlab_client_mock.aget.side_effect = create_mock_aget(mock_response)
 
         tool = GroupProjectSearch(
             name="gitlab_group_project_search",
@@ -244,7 +284,7 @@ class TestSearch:
 
     @pytest.mark.asyncio
     async def test_group_project_search_no_results(self, metadata, gitlab_client_mock):
-        gitlab_client_mock.aget.return_value = []
+        gitlab_client_mock.aget.side_effect = create_mock_aget([])
 
         tool = GroupProjectSearch(
             name="gitlab_group_project_search",
@@ -443,7 +483,7 @@ class TestBlobSearchFileExclusion:
         blob_search_results,
     ):
         """Test that BlobSearch filters out files matching exclusion patterns."""
-        gitlab_client_mock.aget.return_value = blob_search_results
+        gitlab_client_mock.aget.side_effect = create_mock_aget(blob_search_results)
 
         tool = BlobSearch(metadata=metadata_with_project)
 
@@ -478,7 +518,7 @@ class TestBlobSearchFileExclusion:
         blob_search_results,
     ):
         """Test that BlobSearch doesn't filter when feature flag is disabled."""
-        gitlab_client_mock.aget.return_value = blob_search_results
+        gitlab_client_mock.aget.side_effect = create_mock_aget(blob_search_results)
 
         tool = BlobSearch(metadata=metadata_with_project)
 
@@ -506,7 +546,7 @@ class TestBlobSearchFileExclusion:
         blob_search_results,
     ):
         """Test that BlobSearch doesn't filter when no project is available."""
-        gitlab_client_mock.aget.return_value = blob_search_results
+        gitlab_client_mock.aget.side_effect = create_mock_aget(blob_search_results)
         metadata_no_project = {"gitlab_client": gitlab_client_mock, "project": None}
 
         tool = BlobSearch(metadata=metadata_no_project)
@@ -535,7 +575,7 @@ class TestBlobSearchFileExclusion:
         metadata_with_project,
     ):
         """Test that BlobSearch handles empty results correctly."""
-        gitlab_client_mock.aget.return_value = []
+        gitlab_client_mock.aget.side_effect = create_mock_aget([])
 
         tool = BlobSearch(metadata=metadata_with_project)
 
@@ -584,7 +624,9 @@ class TestBlobSearchFileExclusion:
             },
         ]
 
-        gitlab_client_mock.aget.return_value = results_with_missing_paths
+        gitlab_client_mock.aget.side_effect = create_mock_aget(
+            results_with_missing_paths
+        )
 
         tool = BlobSearch(metadata=metadata_with_project)
 
@@ -604,3 +646,49 @@ class TestBlobSearchFileExclusion:
 
         # Should include main.py and the result without path (since it can't be filtered)
         assert len(search_results) == 2
+
+    @pytest.mark.asyncio
+    async def test_blob_search_logs_error_on_failed_response(
+        self, gitlab_client_mock, metadata_with_project
+    ):
+        """Test that BlobSearch logs error details when response fails."""
+        from structlog.testing import capture_logs
+
+        from duo_workflow_service.gitlab.http_client import GitLabHttpResponse
+
+        # Mock a failed response
+        failed_response = GitLabHttpResponse(
+            status_code=404,
+            body={"message": "404 Project Not Found"},
+            headers={"content-type": "application/json"},
+        )
+        gitlab_client_mock.aget.return_value = failed_response
+
+        tool = BlobSearch(metadata=metadata_with_project)
+
+        with capture_logs() as captured_logs:
+            response = await tool._arun(
+                id="999",
+                search="test search",
+                search_type="projects",
+                ref="main",
+            )
+
+        # Verify the response returns empty results
+        response_data = json.loads(response)
+        assert response_data == {"search_results": []}
+
+        # Verify error was logged
+        assert len(captured_logs) == 1
+        log_entry = captured_logs[0]
+        assert log_entry["event"] == "Blob search request failed"
+        assert log_entry["status_code"] == 404
+        assert log_entry["error"] == {"message": "404 Project Not Found"}
+
+        # Verify the API was called correctly
+        gitlab_client_mock.aget.assert_called_once_with(
+            path="/api/v4/projects/999/search",
+            params={"scope": "blobs", "search": "test search", "ref": "main"},
+            use_http_response=True,
+            parse_json=True,
+        )
