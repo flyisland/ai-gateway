@@ -114,9 +114,9 @@ class ModelMetadataEvalBasedInterceptor(grpc.aio.ServerInterceptor):
 class ModelMetadataInterceptor(grpc.aio.ServerInterceptor):
     def __init__(self):
         if interceptor := ModelMetadataEvalBasedInterceptor.try_enable():
-            self._selected_interceptor = interceptor
+            self.selected_interceptor = interceptor
         else:
-            self._selected_interceptor = ModelMetadataHeaderBasedInterceptor()
+            self.selected_interceptor = ModelMetadataHeaderBasedInterceptor()
 
     async def intercept_service(
         self,
@@ -125,6 +125,6 @@ class ModelMetadataInterceptor(grpc.aio.ServerInterceptor):
         ],
         handler_call_details: grpc.HandlerCallDetails,
     ) -> grpc.RpcMethodHandler:
-        return await self._selected_interceptor.intercept_service(
+        return await self.selected_interceptor.intercept_service(
             continuation, handler_call_details
         )
