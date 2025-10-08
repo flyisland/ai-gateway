@@ -1,7 +1,10 @@
 import json
+import logging
 from typing import Any, List, NamedTuple, Optional, Type
 
 from pydantic import BaseModel, Field
+
+logger = logging.getLogger(__name__)
 
 from duo_workflow_service.gitlab.url_parser import GitLabUrlParseError, GitLabUrlParser
 from duo_workflow_service.tools.duo_base_tool import DuoBaseTool
@@ -112,11 +115,21 @@ class GetLogsFromJob(DuoBaseTool):
             return json.dumps({"error": "; ".join(validation_result.errors)})
 
         try:
-            trace = await self.gitlab_client.aget(
+            response = await self.gitlab_client.aget(
                 path=f"/api/v4/projects/{validation_result.project_id}/jobs/{validation_result.job_id}/trace",
                 parse_json=False,
+                use_http_response=True,
             )
 
+            if not response.is_success():
+                logger.error(
+                    f"Failed to get job trace: status_code={response.status_code}, error={response.body}"
+                )
+                return json.dumps(
+                    {"error": f"Failed to get job trace: {response.body}"}
+                )
+
+            trace = response.body
             if not trace:
                 return "No job found"
 

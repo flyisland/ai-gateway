@@ -13,12 +13,18 @@ class GitLabStatusUpdater:
         self.workflow_api_path = "/api/v4/ai/duo_workflows/workflows"
 
     async def get_workflow_status(self, workflow_id: str) -> str:
-        result = await self._client.aget(
+        response = await self._client.aget(
             path=f"{self.workflow_api_path}/{workflow_id}",
             parse_json=True,
+            use_http_response=True,
         )
 
-        return result.get("status")
+        if not response.is_success():
+            raise Exception(
+                f"Failed to get workflow status: status_code={response.status_code}, error={response.body}"
+            )
+
+        return response.body.get("status")
 
     async def update_workflow_status(self, workflow_id: str, status_event: str) -> None:
         """Update the status of a workflow in GitLab.

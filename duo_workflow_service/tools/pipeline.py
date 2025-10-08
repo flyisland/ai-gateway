@@ -1,8 +1,11 @@
 import json
+import logging
 from typing import Any, Optional, Type
 
 from gitlab_cloud_connector import GitLabUnitPrimitive
 from pydantic import BaseModel, Field
+
+logger = logging.getLogger(__name__)
 
 from duo_workflow_service.tools.duo_base_tool import (
     DuoBaseTool,
@@ -79,26 +82,43 @@ class GetPipelineErrors(DuoBaseTool):
                 if validation_result.errors:
                     return json.dumps({"error": "; ".join(validation_result.errors)})
 
-                merge_request = await self.gitlab_client.aget(
+                response = await self.gitlab_client.aget(
                     path=f"/api/v4/projects/{validation_result.project_id}/merge_requests/"
-                    f"{validation_result.merge_request_iid}"
+                    f"{validation_result.merge_request_iid}",
+                    use_http_response=True,
                 )
 
-                if (
-                    isinstance(merge_request, dict)
-                    and merge_request.get("status") == 404
-                ):
+                if response.status_code == 404:
                     return json.dumps(
                         {
                             "error": f"Merge request with iid {validation_result.merge_request_iid} not found"
                         }
                     )
+                elif not response.is_success():
+                    logger.error(
+                        f"Failed to get merge request: status_code={response.status_code}, error={response.body}"
+                    )
+                    return json.dumps(
+                        {"error": f"Failed to get merge request: {response.body}"}
+                    )
 
-                pipelines = await self.gitlab_client.aget(
+                merge_request = response.body
+
+                response = await self.gitlab_client.aget(
                     path=f"/api/v4/projects/{validation_result.project_id}/merge_requests/"
-                    f"{validation_result.merge_request_iid}/pipelines"
+                    f"{validation_result.merge_request_iid}/pipelines",
+                    use_http_response=True,
                 )
 
+                if not response.is_success():
+                    logger.error(
+                        f"Failed to get pipelines: status_code={response.status_code}, error={response.body}"
+                    )
+                    return json.dumps(
+                        {"error": f"Failed to get pipelines: {response.body}"}
+                    )
+
+                pipelines = response.body
                 if not isinstance(pipelines, list) or len(pipelines) == 0:
                     return json.dumps(
                         {
@@ -109,10 +129,22 @@ class GetPipelineErrors(DuoBaseTool):
                 last_pipeline = pipelines[0]
                 pipeline_id = last_pipeline["id"]
 
-            jobs = await self.gitlab_client.aget(
-                path=f"/api/v4/projects/{validation_result.project_id}/pipelines/{pipeline_id}/jobs"
+            response = await self.gitlab_client.aget(
+                path=f"/api/v4/projects/{validation_result.project_id}/pipelines/{pipeline_id}/jobs",
+                use_http_response=True,
             )
 
+            if not response.is_success():
+                logger.error(
+                    f"Failed to get jobs: status_code={response.status_code}, error={response.body}"
+                )
+                return json.dumps(
+                    {
+                        "error": f"Failed to fetch jobs for pipeline {pipeline_id}: {response.body}"
+                    }
+                )
+
+            jobs = response.body
             if not isinstance(jobs, list):
                 return json.dumps(
                     {
@@ -127,11 +159,16 @@ class GetPipelineErrors(DuoBaseTool):
                     job_name = job["name"]
                     traces += f"Name: {job_name}\nJob ID: {job_id}\n"
                     try:
-                        trace = await self.gitlab_client.aget(
+                        response = await self.gitlab_client.aget(
                             path=f"/api/v4/projects/{validation_result.project_id}/jobs/{job_id}/trace",
                             parse_json=False,
+                            use_http_response=True,
                         )
-                        traces += f"Trace: {trace}\n"
+
+                        if not response.is_success():
+                            traces += f"Trace: {response.body}\n"
+                        else:
+                            traces += f"Error fetching trace: status_code={response.status_code}, error={response.body}\n"
                     except Exception as e:
                         traces += f"Error fetching trace: {str(e)}\n"
 

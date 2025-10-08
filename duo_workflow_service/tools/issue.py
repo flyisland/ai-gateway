@@ -1,8 +1,11 @@
 import json
+import logging
 from typing import Any, List, Optional, Tuple, Type
 
 from gitlab_cloud_connector import GitLabUnitPrimitive
 from pydantic import BaseModel, Field
+
+logger = logging.getLogger(__name__)
 
 from duo_workflow_service.gitlab.url_parser import GitLabUrlParseError, GitLabUrlParser
 from duo_workflow_service.tools.duo_base_tool import (
@@ -145,8 +148,16 @@ For example:
             response = await self.gitlab_client.apost(
                 path=f"/api/v4/projects/{project_id}/issues",
                 body=json.dumps(data),
+                use_http_response=True,
             )
-            return json.dumps({"created_issue": response})
+
+            if not response.is_success():
+                logger.error(
+                    f"Failed to create issue: status_code={response.status_code}, error={response.body}"
+                )
+                return json.dumps({"error": f"Failed to create issue: {response.body}"})
+
+            return json.dumps({"created_issue": response.body})
         except Exception as e:
             return json.dumps({"error": str(e)})
 
@@ -269,8 +280,16 @@ class ListIssues(IssueBaseTool):
                 path=f"/api/v4/projects/{project_id}/issues",
                 params=params,
                 parse_json=False,
+                use_http_response=True,
             )
-            return json.dumps({"issues": response})
+
+            if not response.is_success():
+                logger.error(
+                    f"Failed to list issues: status_code={response.status_code}, error={response.body}"
+                )
+                return json.dumps({"error": f"Failed to list issues: {response.body}"})
+
+            return json.dumps({"issues": response.body})
         except Exception as e:
             return json.dumps({"error": str(e)})
 
@@ -312,8 +331,16 @@ class GetIssue(IssueBaseTool):
             response = await self.gitlab_client.aget(
                 path=f"/api/v4/projects/{project_id}/issues/{issue_iid}",
                 parse_json=False,
+                use_http_response=True,
             )
-            return json.dumps({"issue": response})
+
+            if not response.is_success():
+                logger.error(
+                    f"Failed to get issue: status_code={response.status_code}, error={response.body}"
+                )
+                return json.dumps({"error": f"Failed to get issue: {response.body}"})
+
+            return json.dumps({"issue": response.body})
         except Exception as e:
             return json.dumps({"error": str(e)})
 
@@ -452,8 +479,20 @@ The body parameter is always required.
                         "body": body,
                     }
                 ),
+                use_http_response=True,
             )
-            return json.dumps({"status": "success", "body": body, "response": response})
+
+            if not response.is_success():
+                logger.error(
+                    f"Failed to create issue note: status_code={response.status_code}, error={response.body}"
+                )
+                return json.dumps(
+                    {"error": f"Failed to create issue note: {response.body}"}
+                )
+
+            return json.dumps(
+                {"status": "success", "body": body, "response": response.body}
+            )
         except Exception as e:
             return json.dumps({"error": str(e)})
 
@@ -514,8 +553,18 @@ class ListIssueNotes(IssueBaseTool):
                 path=f"/api/v4/projects/{project_id}/issues/{issue_iid}/notes",
                 params=params,
                 parse_json=False,
+                use_http_response=True,
             )
-            return json.dumps({"notes": response})
+
+            if not response.is_success():
+                logger.error(
+                    f"Failed to list issue notes: status_code={response.status_code}, error={response.body}"
+                )
+                return json.dumps(
+                    {"error": f"Failed to list issue notes: {response.body}"}
+                )
+
+            return json.dumps({"notes": response.body})
         except Exception as e:
             return json.dumps({"error": str(e)})
 
@@ -563,8 +612,18 @@ class GetIssueNote(IssueBaseTool):
             response = await self.gitlab_client.aget(
                 path=f"/api/v4/projects/{project_id}/issues/{issue_iid}/notes/{note_id}",
                 parse_json=False,
+                use_http_response=True,
             )
-            return json.dumps({"note": response})
+
+            if not response.is_success():
+                logger.error(
+                    f"Failed to get issue note: status_code={response.status_code}, error={response.body}"
+                )
+                return json.dumps(
+                    {"error": f"Failed to get issue note: {response.body}"}
+                )
+
+            return json.dumps({"note": response.body})
         except Exception as e:
             return json.dumps({"error": str(e)})
 

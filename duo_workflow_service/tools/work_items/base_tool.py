@@ -1,4 +1,5 @@
 import json
+import logging
 import urllib
 from enum import Enum
 from typing import (
@@ -15,6 +16,8 @@ from typing import (
 
 from gitlab_cloud_connector import GitLabUnitPrimitive
 from pydantic import StringConstraints
+
+logger = logging.getLogger(__name__)
 
 from duo_workflow_service.gitlab.url_parser import GitLabUrlParseError, GitLabUrlParser
 from duo_workflow_service.security.quick_actions import validate_no_quick_actions
@@ -132,9 +135,18 @@ class WorkItemBaseTool(DuoBaseTool):
         if identifier_str.isdigit():
             try:
                 endpoint = "projects" if parent_type == "project" else "groups"
-                data = await self.gitlab_client.aget(
-                    f"/api/v4/{endpoint}/{identifier_str}"
+                response = await self.gitlab_client.aget(
+                    f"/api/v4/{endpoint}/{identifier_str}",
+                    use_http_response=True,
                 )
+
+                if not response.is_success():
+                    logger.error(
+                        f"Failed to resolve {parent_type}: status_code={response.status_code}, error={response.body}"
+                    )
+                    return f"Failed to resolve {parent_type} from ID '{identifier_str}': {response.body}"
+
+                data = response.body
                 full_path = data.get(
                     "path_with_namespace" if parent_type == "project" else "full_path"
                 )

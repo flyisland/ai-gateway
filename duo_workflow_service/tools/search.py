@@ -1,9 +1,12 @@
 import json
+import logging
 from abc import ABC, abstractmethod
 from typing import Any, Literal, Optional, Type
 
 from gitlab_cloud_connector import GitLabUnitPrimitive
 from pydantic import BaseModel, Field
+
+logger = logging.getLogger(__name__)
 
 from duo_workflow_service.tools.duo_base_tool import DuoBaseTool
 
@@ -77,8 +80,19 @@ class GitLabSearchBase(DuoBaseTool, ABC):
     async def _perform_search(self, id: str, params: dict, search_type: str) -> str:
         url = f"/api/v4/{search_type}/{id}/search"
         try:
-            response = await self.gitlab_client.aget(path=url, params=params)
-            return json.dumps({"search_results": response})
+            response = await self.gitlab_client.aget(
+                path=url, params=params, use_http_response=True
+            )
+
+            if not response.is_success():
+                logger.error(
+                    f"Failed to perform search: status_code={response.status_code}, error={response.body}"
+                )
+                return json.dumps(
+                    {"error": f"Failed to perform search: {response.body}"}
+                )
+
+            return json.dumps({"search_results": response.body})
         except Exception as e:
             return json.dumps({"error": str(e)})
 

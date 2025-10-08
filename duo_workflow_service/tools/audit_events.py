@@ -1,7 +1,10 @@
 import json
+import logging
 from typing import Any, Dict, Optional, Tuple, Type
 
 from pydantic import BaseModel, Field
+
+logger = logging.getLogger(__name__)
 
 from duo_workflow_service.tools.duo_base_tool import DuoBaseTool
 from duo_workflow_service.tools.gitlab_resource_input import ProjectResourceInput
@@ -89,17 +92,23 @@ class BaseAuditEventsTool(DuoBaseTool):
                 path=api_path,
                 params=params,
                 parse_json=True,
+                use_http_response=True,
             )
 
-            if isinstance(response, dict) and (
-                "message" in response or "error" in response
+            if not response.is_success():
+                logger.error(
+                    f"Failed to fetch audit events: status_code={response.status_code}, error={response.body}"
+                )
+                return [], {"error": f"Failed to fetch audit events: {response.body}"}
+
+            audit_events = response.body
+            if isinstance(audit_events, dict) and (
+                "message" in audit_events or "error" in audit_events
             ):
-                error_msg = response.get(
-                    "message", response.get("error", "Unknown error")
+                error_msg = audit_events.get(
+                    "message", audit_events.get("error", "Unknown error")
                 )
                 return [], {"error": error_msg}
-
-            audit_events = response
             all_audit_events.extend(audit_events)
 
             # Get total pages from headers if available

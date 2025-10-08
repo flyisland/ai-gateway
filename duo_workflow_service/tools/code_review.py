@@ -1,12 +1,15 @@
 import base64
 import fnmatch
 import json
+import logging
 from typing import Any, Dict, List, Optional, Type
 from urllib.parse import quote
 
 import yaml
 from gitlab_cloud_connector import GitLabUnitPrimitive
 from pydantic import BaseModel, Field
+
+logger = logging.getLogger(__name__)
 
 from duo_workflow_service.policies.diff_exclusion_policy import DiffExclusionPolicy
 from duo_workflow_service.tools.duo_base_tool import DuoBaseTool
@@ -56,10 +59,19 @@ class PostDuoCodeReview(DuoBaseTool):
             "merge_request_iid": merge_request_iid,
             "review_output": review_output,
         }
-        return await self.gitlab_client.apost(
+        response = await self.gitlab_client.apost(
             path="/api/v4/ai/duo_workflows/code_review/add_comments",
             body=json.dumps(request_body),
+            use_http_response=True,
         )
+
+        if not response.is_success():
+            logger.error(
+                f"Failed to post review: status_code={response.status_code}, error={response.body}"
+            )
+            raise Exception(f"Failed to post review: {response.body}")
+
+        return response.body
 
     def _format_response(self, response: dict, merge_request_iid: int) -> str:
         """Format API response as JSON string."""
@@ -181,8 +193,17 @@ class BuildReviewMergeRequestContext(DuoBaseTool):
             f"/api/v4/projects/{validation_result.project_id}/"
             f"merge_requests/{validation_result.merge_request_iid}"
         )
-        response = await self.gitlab_client.aget(path, parse_json=False)
-        return json.loads(response)
+        response = await self.gitlab_client.aget(
+            path, parse_json=False, use_http_response=True
+        )
+
+        if not response.is_success():
+            logger.error(
+                f"Failed to fetch MR data: status_code={response.status_code}, error={response.body}"
+            )
+            raise Exception(f"Failed to fetch MR data: {response.body}")
+
+        return json.loads(response.body)
 
     async def _fetch_mr_diffs(self, validation_result) -> List[Dict[str, Any]]:
         """Fetch merge request diffs."""
@@ -190,8 +211,17 @@ class BuildReviewMergeRequestContext(DuoBaseTool):
             f"/api/v4/projects/{validation_result.project_id}/"
             f"merge_requests/{validation_result.merge_request_iid}/diffs"
         )
-        response = await self.gitlab_client.aget(path, parse_json=False)
-        return json.loads(response)
+        response = await self.gitlab_client.aget(
+            path, parse_json=False, use_http_response=True
+        )
+
+        if not response.is_success():
+            logger.error(
+                f"Failed to fetch MR diffs: status_code={response.status_code}, error={response.body}"
+            )
+            raise Exception(f"Failed to fetch MR diffs: {response.body}")
+
+        return json.loads(response.body)
 
     async def _fetch_original_files(
         self, project_id: int, branch: str, file_paths: List[str]
@@ -230,10 +260,16 @@ class BuildReviewMergeRequestContext(DuoBaseTool):
         path = f"/api/v4/projects/{project_id}/repository/files/{encoded_path}"
 
         response = await self.gitlab_client.aget(
-            path, params={"ref": branch}, parse_json=False
+            path, params={"ref": branch}, parse_json=False, use_http_response=True
         )
 
-        file_data = json.loads(response)
+        if not response.is_success():
+            logger.error(
+                f"Failed to fetch file content: status_code={response.status_code}, error={response.body}"
+            )
+            raise Exception(f"Failed to fetch file content: {response.body}")
+
+        file_data = json.loads(response.body)
         return base64.b64decode(file_data["content"]).decode("utf-8")
 
     def _process_filtered_diffs(

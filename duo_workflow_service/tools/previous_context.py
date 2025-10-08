@@ -1,7 +1,10 @@
 import json
+import logging
 from typing import Any, Optional, Type
 
 from pydantic import BaseModel, Field
+
+logger = logging.getLogger(__name__)
 
 from duo_workflow_service.entities.state import Context, WorkflowContext
 from duo_workflow_service.tools.duo_base_tool import DuoBaseTool
@@ -34,21 +37,28 @@ class GetSessionContext(DuoBaseTool):
             response = await self.gitlab_client.aget(
                 path=f"/api/v4/ai/duo_workflows/workflows/{previous_session_id}/checkpoints?per_page=1",
                 parse_json=True,
+                use_http_response=True,
             )
 
-            if (
-                isinstance(response, dict)
-                and "status" in response
-                and response["status"] != 200
-            ):
-                return json.dumps({"error": "API Error"})
+            if not response.is_success():
+                logger.error(
+                    f"Failed to get previous session context: status_code={response.status_code}, error={response.body}"
+                )
+                return json.dumps(
+                    {
+                        "error": f"Failed to get previous session context: {response.body}"
+                    }
+                )
 
-            if not response or len(response) == 0:
+            checkpoints = response.body
+            if not checkpoints or len(checkpoints) == 0:
                 return json.dumps(
                     {"error": "Unable to find checkpoint for this session"}
                 )
 
-            return json.dumps({"context": self._format_checkpoint_context(response[0])})
+            return json.dumps(
+                {"context": self._format_checkpoint_context(checkpoints[0])}
+            )
         except Exception as e:
             return json.dumps({"error": str(e)})
 

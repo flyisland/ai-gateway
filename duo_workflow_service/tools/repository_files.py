@@ -1,9 +1,12 @@
 import base64
 import json
+import logging
 from typing import Any, List, Optional, Tuple, Type
 from urllib.parse import quote
 
 from pydantic import BaseModel, Field
+
+logger = logging.getLogger(__name__)
 
 from duo_workflow_service.gitlab.url_parser import GitLabUrlParseError, GitLabUrlParser
 from duo_workflow_service.policies.file_exclusion_policy import FileExclusionPolicy
@@ -132,9 +135,20 @@ class GetRepositoryFile(RepositoryFileBaseTool):
                 path=f"/api/v4/projects/{project_id}/repository/files/{encoded_file_path}",
                 params={"ref": ref},
                 parse_json=False,
+                use_http_response=True,
             )
 
-            content = base64.b64decode(json.loads(response)["content"]).decode("utf-8")
+            if not response.is_success():
+                logger.error(
+                    f"Failed to get repository file: status_code={response.status_code}, error={response.body}"
+                )
+                return json.dumps(
+                    {"error": f"Failed to get repository file: {response.body}"}
+                )
+
+            content = base64.b64decode(json.loads(response.body)["content"]).decode(
+                "utf-8"
+            )
 
             return json.dumps({"content": content})
         except Exception as e:
@@ -225,22 +239,32 @@ class ListRepositoryTree(DuoBaseTool):
             response = await self.gitlab_client.aget(
                 path=f"/api/v4/projects/{project_id}/repository/tree",
                 params=params,
+                use_http_response=True,
             )
 
+            if not response.is_success():
+                logger.error(
+                    f"Failed to list repository tree: status_code={response.status_code}, error={response.body}"
+                )
+                return json.dumps(
+                    {"error": f"Failed to list repository tree: {response.body}"}
+                )
+
+            tree_data = response.body
             # Filter results based on file exclusion policy
             policy = FileExclusionPolicy(self.project)
 
             # Extract file paths from the response objects
             file_paths: List[str] = [
                 item.get("path", "")
-                for item in response
+                for item in tree_data
                 if isinstance(item.get("path"), str)
             ]
             allowed_paths, _excluded_paths = policy.filter_allowed(file_paths)
 
             # Filter the original response to only include allowed items
             filtered_response = [
-                item for item in response if item.get("path") in allowed_paths
+                item for item in tree_data if item.get("path") in allowed_paths
             ]
 
             return json.dumps({"tree": filtered_response})
