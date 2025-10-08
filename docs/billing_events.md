@@ -51,7 +51,7 @@ async def ai_completion_feature(
 The `track_billing_event` method accepts the following parameters:
 
 - **`event_type`** (required): The type of billable event (e.g., "ai_completion", "code_suggestions", "duo_chat")
-- **`unit_of_measure`** (optional, default: "request"): The unit used for measurement ("tokens", "requests", "messages", "executions") Used for accurate unit conversion and billing calculations.
+- **`unit_of_measure`** (optional, default: "request"): The unit used for measurement ("token", "request", "second", "message", "execution") Used for accurate unit conversion and billing calculations.
 - **`quantity`** (required): The quantity of usage for this billing record
 - **`metadata`** (optional): Dictionary containing additional billing-related data
 - **`category`** (optional, default: "default_category"): The location/class where the billing event occurred
