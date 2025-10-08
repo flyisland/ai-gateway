@@ -9,15 +9,16 @@ logger = structlog.get_logger("tools_executor")
 
 
 TOOL_RESPONSE_MAX_BYTES = 100 * 1024  # 100 KiB
-TOOL_RESPONSE_TRUNCATED_SIZE = 1024  # 1 KiB
+TOOL_RESPONSE_TRUNCATED_SIZE = 5 * 1024  # 5 KiB
 
 
-def _create_truncation_notice(original_length: int, truncated_length: int) -> str:
+def _add_truncation_instruction(
+    truncated_text: str, original_length: int, truncated_length: int
+) -> str:
     """Create a formatted truncation notice message."""
     percentage = (truncated_length / original_length) * 100
     return dedent(
         f"""
-
         <truncation_notice>
         IMPORTANT: This tool output has been truncated due to size limits.
 
@@ -27,11 +28,14 @@ def _create_truncation_notice(original_length: int, truncated_length: int) -> st
         - Percentage shown: {percentage:.1f}%
         </truncation_details>
 
-        <instructions>
-        Keep in mind that the tool results were truncated and may be incomplete.
+        <truncated_tool_output>
+        {truncated_text}
+        </truncated_tool_output>
 
-        If the you needs information that might be in the missing portion,
-        please try one of these actions:
+        <instructions>
+        When generating a response based on truncated tool output, explicitly inform the user by including a note such as: "Note: This response is based on truncated tool output and may be incomplete."
+
+        If you need information that might be in the missing portion, please try one of these actions:
         1. Refine your tool call to request a specific subset or filter the data
         2. Use alternative approaches to gather the necessary information
         </instructions>
@@ -47,20 +51,24 @@ def truncate_string(text: str) -> str:
     if len(encoded) <= TOOL_RESPONSE_MAX_BYTES:
         return text
 
-    logger.info(
-        f"Tool response ({len(encoded)} bytes) exceeds limit "
-        f"({TOOL_RESPONSE_MAX_BYTES} bytes). Truncating..."
-    )
-
     truncated_text = encoded[:TOOL_RESPONSE_TRUNCATED_SIZE].decode(
         "utf-8", errors="ignore"
     )
 
-    truncation_notice = _create_truncation_notice(
-        original_length=len(encoded), truncated_length=TOOL_RESPONSE_TRUNCATED_SIZE
+    truncated_length = len(truncated_text.encode("utf-8"))
+
+    logger.info(
+        f"Tool response ({len(encoded)} bytes) exceeds limit "
+        f"({TOOL_RESPONSE_MAX_BYTES} bytes). Truncating to ({truncated_length} bytes)..."
     )
 
-    return truncated_text + truncation_notice
+    truncated_output = _add_truncation_instruction(
+        truncated_text=truncated_text,
+        original_length=len(encoded),
+        truncated_length=truncated_length,
+    )
+
+    return truncated_output
 
 
 def truncate_tool_response(tool_response: Any) -> Any:

@@ -7,15 +7,18 @@ from langchain_core.messages import ToolMessage
 from langgraph.types import Command
 
 from duo_workflow_service.agents.tool_output_manager import (
-    _create_truncation_notice,
+    _add_truncation_instruction,
     truncate_tool_response,
 )
 
 
-def test_create_truncation_notice():
-    notice = _create_truncation_notice(original_length=77, truncated_length=54)
+def test_add_truncation_instruction():
+    notice = _add_truncation_instruction(
+        truncated_text="random ted unique", original_length=77, truncated_length=54
+    )
     assert "70.1%" in notice
     assert notice.endswith("\n</instructions>\n</truncation_notice>\n")
+    assert "random ted unique" in notice
 
 
 @pytest.mark.parametrize(
@@ -63,16 +66,11 @@ def test_create_truncation_notice():
     10,
 )
 @patch("duo_workflow_service.agents.tool_output_manager.logger")
-@patch("duo_workflow_service.agents.tool_output_manager._create_truncation_notice")
 def test_truncate_tool_response(
-    mock_create_notice: Mock,
     mock_logger: Mock,
     response: Any,
     should_truncated: bool,
 ):
-    truncated_message = "\nTRUNCATED"
-    mock_create_notice.return_value = truncated_message
-
     if isinstance(response, ToolMessage):
         expected_json_str = (
             json.dumps(response.content)
@@ -91,10 +89,13 @@ def test_truncate_tool_response(
     if should_truncated:
         mock_logger.info.assert_called_once_with(
             f"Tool response ({byte_size} bytes) exceeds limit "
-            f"(30 bytes). Truncating..."
+            f"(30 bytes). Truncating to (10 bytes)..."
         )
         result = result.content if isinstance(result, ToolMessage) else result
-        assert result == expected_json_str[:10] + truncated_message
+        assert expected_json_str[:10] in result
+        if isinstance(result, str):
+            assert result.startswith("\n<truncation_notice>")
+            assert result.endswith("</instructions>\n</truncation_notice>\n")
     else:
         assert result == response
 
