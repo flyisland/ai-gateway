@@ -61,6 +61,7 @@ class ModelMetadataEvalBasedInterceptor(grpc.aio.ServerInterceptor):
     enabling model selection for CEF flows and working around GoLang executor limitations.
 
     Example of the patch_model_selection.json file: {"provider": "gitlab", "name": "gpt_5"}
+
     Ref: https://gitlab.com/gitlab-org/modelops/ai-model-validation-and-research/ai-evaluation/prompt-library/-/issues/802
     """
 
@@ -68,6 +69,7 @@ class ModelMetadataEvalBasedInterceptor(grpc.aio.ServerInterceptor):
 
     @classmethod
     def try_enable(cls) -> Optional[Self]:
+        # pylint: disable-next=direct-environment-variable-reference
         if os.getenv("AIGW_ENVIRONMENT") != "evaluation":
             # Don't log any messages as the server may be running in prod
             return None
@@ -93,7 +95,9 @@ class ModelMetadataEvalBasedInterceptor(grpc.aio.ServerInterceptor):
         ],
         handler_call_details: grpc.HandlerCallDetails,
     ) -> grpc.RpcMethodHandler:
-        """Ref: https://gitlab.com/gitlab-org/modelops/ai-model-validation-and-research/ai-evaluation/prompt-library/-/issues/802"""
+        """
+        Ref: https://gitlab.com/gitlab-org/modelops/ai-model-validation-and-research/ai-evaluation/prompt-library/-/issues/802
+        """
 
         with open(ModelMetadataEvalBasedInterceptor.PATCH_LOOKUP_PATH, "r") as fp:
             data = json.load(fp)
