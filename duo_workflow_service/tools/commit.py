@@ -558,7 +558,7 @@ class CreateCommit(DuoBaseTool):
                 body=json.dumps(params),
             )
             return json.dumps(
-                {"status": "success", "data": params, "response": response}
+                {"status": "success"}
             )
         except Exception as e:
             return json.dumps({"error": str(e)})

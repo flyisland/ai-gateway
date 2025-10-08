@@ -820,8 +820,6 @@ async def test_create_commit(gitlab_client_mock, metadata, commit_data):
     expected_response = json.dumps(
         {
             "status": "success",
-            "data": expected_params,
-            "response": commit_data,
         }
     )
 
@@ -884,8 +882,6 @@ async def test_create_commit_with_url_success(
     expected_response = json.dumps(
         {
             "status": "success",
-            "data": expected_params,
-            "response": commit_data,
         }
     )
 
@@ -987,8 +983,6 @@ async def test_create_commit_with_all_optional_params(
     expected_response = json.dumps(
         {
             "status": "success",
-            "data": expected_params,
-            "response": commit_data,
         }
     )
 
@@ -1056,8 +1050,6 @@ async def test_create_commit_with_multiple_action_types(
     expected_response = json.dumps(
         {
             "status": "success",
-            "data": expected_params,
-            "response": commit_data,
         }
     )
 
@@ -1143,8 +1135,6 @@ async def test_create_commit_with_partial_edit(
     expected_response = json.dumps(
         {
             "status": "success",
-            "data": expected_params,
-            "response": commit_data,
         }
     )
 
