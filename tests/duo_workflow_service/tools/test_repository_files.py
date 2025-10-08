@@ -223,6 +223,22 @@ async def test_get_file_success(
             },
             "Missing file_path",
         ),
+        (
+            {"project_id": "gitlab-org/gitlab", "ref": "master", "file_path": "nonexistent.txt"},
+            {
+                "mock_type": "api_error_response",
+                "mock_value": json.dumps({"message": "404 File Not Found"}),
+            },
+            "404 File Not Found",
+        ),
+        (
+            {"project_id": "gitlab-org/gitlab", "ref": "master", "file_path": "test.txt"},
+            {
+                "mock_type": "missing_content_response",
+                "mock_value": json.dumps({"some_other_field": "value"}),
+            },
+            "Missing content in response",
+        ),
     ],
     ids=[
         "URL parsing error",
@@ -242,6 +258,10 @@ async def test_get_file_errors(
     elif mock_setup["mock_type"] == "api_error":
         gitlab_client_mock.aget.side_effect = mock_setup["mock_value"]
     elif mock_setup["mock_type"] == "binary_content":
+        gitlab_client_mock.aget.return_value = mock_setup["mock_value"]
+    elif mock_setup["mock_type"] == "api_error_response":
+        gitlab_client_mock.aget.return_value = mock_setup["mock_value"]
+    elif mock_setup["mock_type"] == "missing_content_response":
         gitlab_client_mock.aget.return_value = mock_setup["mock_value"]
 
     result = await tool._arun(**input_params)
@@ -441,12 +461,24 @@ async def test_list_repository_tree_success(
             {"mock_type": "api_error", "mock_value": Exception("Permission denied")},
             "Permission denied",
         ),
+        (
+            {"project_id": 3},
+            {"mock_type": "api_error_response", "mock_value": {"message": "404 Project Not Found"}},
+            "404 Project Not Found",
+        ),
+        (
+            {"project_id": 4},
+            {"mock_type": "unexpected_response", "mock_value": "Unexpected string response"},
+            "Unexpected response format: str",
+        ),
     ],
     ids=[
         "URL parsing error",
         "Missing project_id",
         "Repository not found",
         "Permission denied",
+        "API error response",
+        "Unexpected response format",
     ],
 )
 @pytest.mark.asyncio
@@ -459,6 +491,10 @@ async def test_list_repository_tree_errors(
         ]
     elif mock_setup["mock_type"] == "api_error":
         gitlab_client_mock.aget.side_effect = mock_setup["mock_value"]
+    elif mock_setup["mock_type"] == "api_error_response":
+        gitlab_client_mock.aget.return_value = mock_setup["mock_value"]
+    elif mock_setup["mock_type"] == "unexpected_response":
+        gitlab_client_mock.aget.return_value = mock_setup["mock_value"]
 
     result = await tree_tool._arun(**input_params)
     error_response = json.loads(result)
@@ -1108,3 +1144,81 @@ class TestListRepositoryTreeWithExclusion:
 
         # All files should be included when no project
         assert response["tree"] == mock_response
+
+
+# Test cases for string project ID handling
+@pytest.mark.parametrize(
+    "project_id,expected_project_id",
+    [
+        ("23", "23"),  # String numeric project ID
+        (23, "23"),    # Numeric project ID
+        ("gitlab-org/gitlab", "gitlab-org/gitlab"),  # Path-encoded project ID
+        ("gitlab-org%2Fgitlab", "gitlab-org%2Fgitlab"),  # URL-encoded project ID
+    ],
+    ids=[
+        "String numeric project ID",
+        "Numeric project ID", 
+        "Path-encoded project ID",
+        "URL-encoded project ID",
+    ],
+)
+@pytest.mark.asyncio
+async def test_list_repository_tree_project_id_types(
+    tree_tool, gitlab_client_mock, project_id, expected_project_id
+):
+    """Test that ListRepositoryTree handles different project ID types correctly."""
+    gitlab_client_mock.aget.return_value = []
+
+    await tree_tool._arun(project_id=project_id)
+
+    # Verify the API was called with the expected project ID
+    call_args = gitlab_client_mock.aget.call_args
+    expected_path = f"/api/v4/projects/{expected_project_id}/repository/tree"
+    assert call_args[1]["path"] == expected_path
+
+
+@pytest.mark.asyncio
+async def test_list_repository_tree_malformed_response_items(
+    tree_tool, gitlab_client_mock
+):
+    """Test ListRepositoryTree with malformed response items."""
+    # Mix of valid and invalid items in response
+    malformed_response = [
+        {"id": "1", "name": "valid.txt", "type": "blob", "path": "valid.txt"},
+        "invalid_string_item",  # This should be ignored
+        {"id": "2", "name": "no_path.txt", "type": "blob"},  # Missing path
+        {"id": "3", "name": "valid2.txt", "type": "blob", "path": "valid2.txt"},
+        None,  # This should be ignored
+        {"path": None, "name": "null_path.txt"},  # Null path
+    ]
+    
+    gitlab_client_mock.aget.return_value = malformed_response
+
+    result = await tree_tool._arun(project_id="test")
+    response = json.loads(result)
+
+    # Should only include valid items with string paths
+    expected_files = [
+        {"id": "1", "name": "valid.txt", "type": "blob", "path": "valid.txt"},
+        {"id": "3", "name": "valid2.txt", "type": "blob", "path": "valid2.txt"},
+    ]
+    assert response["tree"] == expected_files
+
+
+@pytest.mark.asyncio
+async def test_get_repository_file_project_id_types(
+    tool, gitlab_client_mock
+):
+    """Test that GetRepositoryFile handles different project ID types correctly."""
+    mock_content = json.dumps({
+        "content": base64.b64encode("file content".encode("utf-8")).decode("utf-8")
+    })
+    gitlab_client_mock.aget.return_value = mock_content
+
+    # Test with string numeric project ID (the problematic case from the issue)
+    await tool._arun(project_id="23", ref="main", file_path="README.md")
+
+    # Verify the API was called with the correct path
+    call_args = gitlab_client_mock.aget.call_args
+    expected_path = "/api/v4/projects/23/repository/files/README.md"
+    assert call_args[1]["path"] == expected_path
