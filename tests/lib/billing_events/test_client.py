@@ -333,7 +333,6 @@ class TestBillingEventsClient:
         self, client, user, mock_dependencies  # pylint: disable=unused-argument
     ):
         """Test that internal_events_client.track_event is called with correct parameters."""
-        current_event_context.set(EventContext())
         event_type = "ai_completion"
         category = "test_category"
 
@@ -371,8 +370,6 @@ class TestBillingEventsClient:
                 internal_event_client=MagicMock(spec=InternalEventsClient),
             )
 
-            current_event_context.set(EventContext())
-
             client.track_billing_event(
                 user=user,
                 event_type="ai_completion",
@@ -387,8 +384,6 @@ class TestBillingEventsClient:
         self, client, user, mock_dependencies
     ):
         """Test that internal_events_client.track_event is not called when tracker raises exception."""
-        current_event_context.set(EventContext())
-
         mock_dependencies["track"].side_effect = Exception("Network error")
 
         client.track_billing_event(
