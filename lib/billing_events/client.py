@@ -30,11 +30,11 @@ class BillingEventsClient:
         namespace: str,
         batch_size: int,
         thread_count: int,
-        internal_events_client: InternalEventsClient,
+        internal_event_client: InternalEventsClient,
     ) -> None:
         self._logger = structlog.stdlib.get_logger("billing_events_client")
         self.enabled = enabled
-        self.internal_events_client = internal_events_client
+        self.internal_event_client = internal_event_client
 
         self._logger.info(
             "Initializing BillingEventsClient",
@@ -147,16 +147,16 @@ class BillingEventsClient:
         try:
             self.snowplow_tracker.track(structured_event)
             self._logger.debug("Successfully called snowplow_tracker.track()")
-            if self.internal_events_client:
-                additional_properties = InternalEventAdditionalProperties(
-                    label=event_id,
-                    property=event_type,
-                )
-                self.internal_events_client.track_event(
-                    event_name="usage_billing_event",
-                    additional_properties=additional_properties,
-                    category=category,
-                )
+
+            additional_properties = InternalEventAdditionalProperties(
+                label=event_id,
+                property=event_type,
+            )
+            self.internal_event_client.track_event(
+                event_name="usage_billing_event",
+                additional_properties=additional_properties,
+                category=category,
+            )
         except Exception as e:
             self._logger.error(
                 "Failed to send billing event",

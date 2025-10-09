@@ -1,12 +1,18 @@
 from typing import Any, Dict
 from unittest import mock
+from unittest.mock import MagicMock
 
 import pytest
 from gitlab_cloud_connector import CloudConnectorUser, UserClaims
 from snowplow_tracker import SelfDescribingJson, Snowplow
 
 from lib.billing_events.client import BillingEventsClient
-from lib.internal_events.context import EventContext, current_event_context
+from lib.internal_events.client import InternalEventsClient
+from lib.internal_events.context import (
+    EventContext,
+    InternalEventAdditionalProperties,
+    current_event_context,
+)
 
 BASE_BILLING_CONTEXT_SCHEMA: Dict[str, Any] = {
     "event_id": None,
@@ -45,9 +51,6 @@ class TestBillingEventsClient:
             ) as mock_structured_event_init,
             mock.patch("lib.billing_events.client.uuid") as mock_uuid,
             mock.patch("lib.billing_events.client.datetime") as mock_datetime,
-            mock.patch(
-                "lib.internal_events.client.InternalEventsClient"
-            ) as mock_internal_events_client,
         ):
             mock_uuid.uuid4.return_value.__str__ = mock.Mock(
                 return_value="12345678-1234-5678-9012-123456789012"
@@ -60,7 +63,6 @@ class TestBillingEventsClient:
                 "structured_event_init": mock_structured_event_init,
                 "uuid": mock_uuid,
                 "datetime": mock_datetime,
-                "internal_events_client": mock_internal_events_client,
             }
 
     @pytest.fixture
@@ -71,9 +73,6 @@ class TestBillingEventsClient:
             mock.patch(
                 "snowplow_tracker.emitters.AsyncEmitter.__init__", return_value=None
             ),
-            mock.patch(
-                "lib.internal_events.client.InternalEventsClient"
-            ) as mock_internal_events,
         ):
             yield BillingEventsClient(
                 enabled=True,
@@ -82,7 +81,7 @@ class TestBillingEventsClient:
                 namespace="gl",
                 batch_size=3,
                 thread_count=2,
-                internal_events_client=mock_internal_events.return_value,
+                internal_event_client=MagicMock(spec=InternalEventsClient),
             )
 
     @pytest.fixture(name="user")
@@ -91,12 +90,9 @@ class TestBillingEventsClient:
             authenticated=True, claims=UserClaims(gitlab_instance_uid="abc")
         )
 
-    @mock.patch("lib.internal_events.client.InternalEventsClient")
     @mock.patch("snowplow_tracker.Tracker.__init__")
     @mock.patch("snowplow_tracker.emitters.AsyncEmitter.__init__")
-    def test_initialization(
-        self, mock_emitter_init, mock_tracker_init, mock_internal_events
-    ):
+    def test_initialization(self, mock_emitter_init, mock_tracker_init):
         mock_emitter_init.return_value = None
         mock_tracker_init.return_value = None
 
@@ -107,7 +103,7 @@ class TestBillingEventsClient:
             namespace="gl",
             batch_size=3,
             thread_count=2,
-            internal_events_client=mock_internal_events.return_value,
+            internal_event_client=MagicMock(spec=InternalEventsClient),
         )
 
         mock_emitter_init.assert_called_once()
@@ -218,8 +214,7 @@ class TestBillingEventsClient:
         assert context.schema == client.BILLING_CONTEXT_SCHEMA
         assert context.data == expected_context_data
 
-    @mock.patch("lib.internal_events.client.InternalEventsClient")
-    def test_track_billing_event_disabled_client(self, mock_internal_events, user):
+    def test_track_billing_event_disabled_client(self, user):
         client = BillingEventsClient(
             enabled=False,
             endpoint="https://billing.local",
@@ -227,7 +222,7 @@ class TestBillingEventsClient:
             namespace="gl",
             batch_size=3,
             thread_count=2,
-            internal_events_client=mock_internal_events.return_value,
+            internal_event_client=MagicMock(spec=InternalEventsClient),
         )
 
         assert not hasattr(client, "snowplow_tracker")
@@ -350,17 +345,13 @@ class TestBillingEventsClient:
             quantity=100.0,
         )
 
-        client.internal_events_client.track_event.assert_called_once()
-
-        call_args = client.internal_events_client.track_event.call_args
-
-        assert call_args[1]["event_name"] == "usage_billing_event"
-
-        assert call_args[1]["category"] == category
-
-        additional_properties = call_args[1]["additional_properties"]
-        assert additional_properties.property == event_type
-        assert additional_properties.label == "12345678-1234-5678-9012-123456789012"
+        client.internal_event_client.track_event.assert_called_once_with(
+            event_name="usage_billing_event",
+            category=category,
+            additional_properties=InternalEventAdditionalProperties(
+                property=event_type, label="12345678-1234-5678-9012-123456789012"
+            ),
+        )
 
     def test_internal_events_client_not_called_when_billing_disabled(self, user):
         """Test that internal_events_client.track_event is not called when billing is disabled."""
@@ -369,9 +360,6 @@ class TestBillingEventsClient:
             mock.patch(
                 "snowplow_tracker.emitters.AsyncEmitter.__init__", return_value=None
             ),
-            mock.patch(
-                "lib.internal_events.client.InternalEventsClient"
-            ) as mock_internal_events,
         ):
             client = BillingEventsClient(
                 enabled=False,
@@ -380,7 +368,7 @@ class TestBillingEventsClient:
                 namespace="gl",
                 batch_size=3,
                 thread_count=2,
-                internal_events_client=mock_internal_events.return_value,
+                internal_event_client=MagicMock(spec=InternalEventsClient),
             )
 
             current_event_context.set(EventContext())
@@ -393,7 +381,7 @@ class TestBillingEventsClient:
                 quantity=100.0,
             )
 
-            client.internal_events_client.track_event.assert_not_called()
+            client.internal_event_client.track_event.assert_not_called()
 
     def test_internal_events_client_not_called_on_tracker_exception(
         self, client, user, mock_dependencies
@@ -411,4 +399,4 @@ class TestBillingEventsClient:
             quantity=100.0,
         )
 
-        client.internal_events_client.track_event.assert_not_called()
+        client.internal_event_client.track_event.assert_not_called()

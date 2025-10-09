@@ -10,7 +10,7 @@ __all__ = [
 class ContainerBillingEvent(containers.DeclarativeContainer):
     config = providers.Configuration(strict=True)
 
-    internal_events = providers.DependenciesContainer()
+    internal_event = providers.DependenciesContainer()
 
     client = providers.Singleton(
         BillingEventsClient,
@@ -20,5 +20,5 @@ class ContainerBillingEvent(containers.DeclarativeContainer):
         endpoint=config.endpoint,
         app_id=config.app_id,
         namespace=config.namespace,
-        internal_events_client=internal_events.client,
+        internal_event_client=internal_event.client,
     )
