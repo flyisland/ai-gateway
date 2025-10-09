@@ -99,8 +99,16 @@ class ModelMetadataEvalBasedInterceptor(grpc.aio.ServerInterceptor):
         Ref: https://gitlab.com/gitlab-org/modelops/ai-model-validation-and-research/ai-evaluation/prompt-library/-/issues/802
         """
 
-        with open(ModelMetadataEvalBasedInterceptor.PATCH_LOOKUP_PATH, "r") as fp:
-            data = json.load(fp)
+        try:
+            with open(ModelMetadataEvalBasedInterceptor.PATCH_LOOKUP_PATH, "r") as fp:
+                data = json.load(fp)
+        except (FileNotFoundError, json.JSONDecodeError, PermissionError) as ex:
+            log.error(
+                "Failed to load the model metadata patch file",
+                error=str(ex),
+                path=str(ModelMetadataEvalBasedInterceptor.PATCH_LOOKUP_PATH),
+            )
+            return await continuation(handler_call_details)
 
         model_metadata = create_model_metadata(data)
 
