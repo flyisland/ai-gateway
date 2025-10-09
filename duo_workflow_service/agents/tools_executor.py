@@ -229,7 +229,7 @@ class ToolsExecutor:
                 tool_response = await tool.ainvoke(tool_call)
 
                 tool_response_truncated = truncate_tool_response(
-                    tool_response=tool_response
+                    tool_response=tool_response, tool_name=tool_name
                 )
 
             self._track_internal_event(

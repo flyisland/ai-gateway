@@ -14,7 +14,9 @@ from duo_workflow_service.agents.tool_output_manager import (
 
 def test_add_truncation_instruction():
     notice = _add_truncation_instruction(
-        truncated_text="random ted unique", original_length=77, truncated_length=54
+        truncated_text="random ted unique",
+        original_token_size=77,
+        truncated_token_size=54,
     )
     assert "70.1%" in notice
     assert notice.endswith("\n</instructions>\n</truncation_notice>\n")
@@ -65,9 +67,11 @@ def test_add_truncation_instruction():
     "duo_workflow_service.agents.tool_output_manager.TOOL_RESPONSE_TRUNCATED_SIZE",
     10,
 )
+@patch("duo_workflow_service.agents.tool_output_manager.token_counter")
 @patch("duo_workflow_service.agents.tool_output_manager.logger")
 def test_truncate_tool_response(
     mock_logger: Mock,
+    mock_token_counter: Mock,
     response: Any,
     should_truncated: bool,
 ):
@@ -82,14 +86,16 @@ def test_truncate_tool_response(
             json.dumps(response) if not isinstance(response, str) else response
         )
 
-    byte_size = len(expected_json_str.encode("utf-8"))
+    mock_token_counter.count_string_content.return_value = 1
 
-    result = truncate_tool_response(response)
+    result = truncate_tool_response(response, tool_name="test_tool")
 
     if should_truncated:
         mock_logger.info.assert_called_once_with(
-            f"Tool response ({byte_size} bytes) exceeds limit "
-            f"(30 bytes). Truncating to (10 bytes)..."
+            "Tool response exceeds max size and will be truncated",
+            tool_name="test_tool",
+            original_token_size=1,
+            truncated_token_size=1,
         )
         result = result.content if isinstance(result, ToolMessage) else result
         assert expected_json_str[:10] in result
@@ -112,7 +118,7 @@ def test_truncate_tool_response_exception(
             )
         }
     )
-    result = truncate_tool_response(tool_response)
+    result = truncate_tool_response(tool_response, tool_name="test_tool")
     mock_logger.error.assert_called_once_with(
         "Abort tool response truncation due to unexpected error: Object of type Command is not JSON serializable"
     )

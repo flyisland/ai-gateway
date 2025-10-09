@@ -84,20 +84,22 @@ class RunToolNode(Generic[WorkflowStateT]):
                 tool_name=self._tool.name, flow_type=self._flow_type.value
             ):
                 if output := await self._tool._arun(**tool_params):
-                    output_truncated = truncate_tool_response(tool_response=output)
+                    output = truncate_tool_response(
+                        tool_response=output, tool_name=self._tool.name
+                    )
                     try:
                         secure_output = PromptSecurity.apply_security_to_tool_response(
-                            response=output_truncated,
+                            response=output,
                             tool_name=self._tool.name,
                         )
-                        output_truncated = secure_output
+                        output = secure_output
                     except SecurityException as e:
                         self._logger.error(
                             f"Security validation failed for tool {self._tool.name}: {e}"
                         )
                         raise
 
-            outputs.append(output_truncated)
+            outputs.append(output)
             logs.append(
                 UiChatLog(
                     message_type=MessageTypeEnum.TOOL,
