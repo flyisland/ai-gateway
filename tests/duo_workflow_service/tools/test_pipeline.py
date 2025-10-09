@@ -3,6 +3,7 @@ from unittest.mock import AsyncMock, Mock, call
 
 import pytest
 
+from duo_workflow_service.gitlab.http_client import GitLabHttpResponse
 from duo_workflow_service.tools.pipeline import (
     GetPipelineErrors,
     GetPipelineErrorsInput,
@@ -25,13 +26,19 @@ def metadata_fixture(gitlab_client_mock):
 @pytest.mark.asyncio
 async def test_get_pipeline_errors(gitlab_client_mock, metadata):
     responses = [
-        {"id": 1, "title": "Merge Request 1"},
-        [{"id": 10, "status": "success"}, {"id": 11, "status": "failed"}],
-        [
-            {"id": 101, "name": "job1", "status": "success"},
-            {"id": 102, "name": "job2", "status": "failed"},
-        ],
-        "Job 102 trace log",
+        GitLabHttpResponse(status_code=200, body={"id": 1, "title": "Merge Request 1"}),
+        GitLabHttpResponse(
+            status_code=200,
+            body=[{"id": 10, "status": "success"}, {"id": 11, "status": "failed"}],
+        ),
+        GitLabHttpResponse(
+            status_code=200,
+            body=[
+                {"id": 101, "name": "job1", "status": "success"},
+                {"id": 102, "name": "job2", "status": "failed"},
+            ],
+        ),
+        GitLabHttpResponse(status_code=200, body="Job 102 trace log"),
     ]
 
     gitlab_client_mock.aget = AsyncMock(side_effect=responses)
@@ -49,10 +56,16 @@ async def test_get_pipeline_errors(gitlab_client_mock, metadata):
     assert json.loads(response) == expected_response
 
     assert gitlab_client_mock.aget.call_args_list == [
-        call(path="/api/v4/projects/1/merge_requests/1"),
-        call(path="/api/v4/projects/1/merge_requests/1/pipelines"),
-        call(path="/api/v4/projects/1/pipelines/10/jobs"),
-        call(path="/api/v4/projects/1/jobs/102/trace", parse_json=False),
+        call(path="/api/v4/projects/1/merge_requests/1", use_http_response=True),
+        call(
+            path="/api/v4/projects/1/merge_requests/1/pipelines", use_http_response=True
+        ),
+        call(path="/api/v4/projects/1/pipelines/10/jobs", use_http_response=True),
+        call(
+            path="/api/v4/projects/1/jobs/102/trace",
+            parse_json=False,
+            use_http_response=True,
+        ),
     ]
 
 

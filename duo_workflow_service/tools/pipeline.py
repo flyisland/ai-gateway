@@ -79,11 +79,20 @@ class GetPipelineErrors(DuoBaseTool):
                 if validation_result.errors:
                     return json.dumps({"error": "; ".join(validation_result.errors)})
 
-                merge_request = await self.gitlab_client.aget(
+                merge_request_response = await self.gitlab_client.aget(
                     path=f"/api/v4/projects/{validation_result.project_id}/merge_requests/"
-                    f"{validation_result.merge_request_iid}"
+                    f"{validation_result.merge_request_iid}",
+                    use_http_response=True,
                 )
 
+                if not merge_request_response.is_success():
+                    self.logger.error(
+                        "Failed to fetch merge request: status_code=%s, response=%s",
+                        merge_request_response.status_code,
+                        merge_request_response.body,
+                    )
+
+                merge_request = merge_request_response.body
                 if (
                     isinstance(merge_request, dict)
                     and merge_request.get("status") == 404
@@ -94,10 +103,20 @@ class GetPipelineErrors(DuoBaseTool):
                         }
                     )
 
-                pipelines = await self.gitlab_client.aget(
+                pipelines_response = await self.gitlab_client.aget(
                     path=f"/api/v4/projects/{validation_result.project_id}/merge_requests/"
-                    f"{validation_result.merge_request_iid}/pipelines"
+                    f"{validation_result.merge_request_iid}/pipelines",
+                    use_http_response=True,
                 )
+
+                if not pipelines_response.is_success():
+                    self.logger.error(
+                        "Failed to fetch pipelines: status_code=%s, response=%s",
+                        pipelines_response.status_code,
+                        pipelines_response.body,
+                    )
+
+                pipelines = pipelines_response.body
 
                 if not isinstance(pipelines, list) or len(pipelines) == 0:
                     return json.dumps(
@@ -109,10 +128,19 @@ class GetPipelineErrors(DuoBaseTool):
                 last_pipeline = pipelines[0]
                 pipeline_id = last_pipeline["id"]
 
-            jobs = await self.gitlab_client.aget(
-                path=f"/api/v4/projects/{validation_result.project_id}/pipelines/{pipeline_id}/jobs"
+            jobs_response = await self.gitlab_client.aget(
+                path=f"/api/v4/projects/{validation_result.project_id}/pipelines/{pipeline_id}/jobs",
+                use_http_response=True,
             )
 
+            if not jobs_response.is_success():
+                self.logger.error(
+                    "Failed to fetch jobs: status_code=%s, response=%s",
+                    jobs_response.status_code,
+                    jobs_response.body,
+                )
+
+            jobs = jobs_response.body
             if not isinstance(jobs, list):
                 return json.dumps(
                     {

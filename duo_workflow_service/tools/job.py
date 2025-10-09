@@ -112,11 +112,20 @@ class GetLogsFromJob(DuoBaseTool):
             return json.dumps({"error": "; ".join(validation_result.errors)})
 
         try:
-            trace = await self.gitlab_client.aget(
+            response = await self.gitlab_client.aget(
                 path=f"/api/v4/projects/{validation_result.project_id}/jobs/{validation_result.job_id}/trace",
                 parse_json=False,
+                use_http_response=True,
             )
 
+            if not response.is_success():
+                self.logger.error(
+                    "Failed to fetch job trace: status_code=%s, response=%s",
+                    response.status_code,
+                    response.body,
+                )
+
+            trace = response.body
             if not trace:
                 return "No job found"
 
