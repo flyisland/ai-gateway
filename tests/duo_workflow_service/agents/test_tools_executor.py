@@ -2,7 +2,7 @@
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from typing import Any, Dict, List, Type, cast
-from unittest.mock import MagicMock, Mock, call, patch
+from unittest.mock import AsyncMock, MagicMock, Mock, call, patch
 
 import pytest
 from langchain.tools import BaseTool
@@ -23,7 +23,7 @@ from duo_workflow_service.entities.state import (
     WorkflowState,
     WorkflowStatusEnum,
 )
-from duo_workflow_service.executor.outbox_queue import ActionRequest, OutboxQueue
+from duo_workflow_service.executor.outbox import Outbox
 from duo_workflow_service.tools import RunCommand, Toolset
 from duo_workflow_service.tools.planner import (
     AddNewTask,
@@ -1111,7 +1111,7 @@ def test_get_tool_display_message_unknown_tool(tools_executor: ToolsExecutor):
         {
             "run_command": RunCommand(
                 metadata={
-                    "outbox": MagicMock(spec=OutboxQueue),
+                    "outbox": MagicMock(spec=Outbox),
                 }
             )
         }
@@ -1121,10 +1121,9 @@ async def test_run_command_output(workflow_state, tools_executor, mock_client_ev
     # Configure the inbox mock to return the mock ClientEvent
     outbox_mock = tools_executor._toolset["run_command"].metadata["outbox"]
 
-    def set_result(item: ActionRequest):
-        item.result.set_result(mock_client_event)  # type: ignore[union-attr]
-
-    outbox_mock.put.side_effect = set_result
+    outbox_mock.put_action_and_wait_for_response = AsyncMock(
+        return_value=mock_client_event
+    )
 
     workflow_state["conversation_history"]["planner"] = [
         AIMessage(

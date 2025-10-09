@@ -10,7 +10,7 @@ import pytest
 from gitlab_cloud_connector import CloudConnectorUser
 
 from contract import contract_pb2
-from duo_workflow_service.executor.outbox_queue import OutboxSignal
+from duo_workflow_service.executor.outbox import OutboxSignal
 from duo_workflow_service.interceptors.authentication_interceptor import current_user
 from duo_workflow_service.server import DuoWorkflowService
 

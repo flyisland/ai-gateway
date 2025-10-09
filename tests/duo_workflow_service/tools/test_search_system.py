@@ -4,7 +4,6 @@ from unittest.mock import AsyncMock, MagicMock
 import pytest
 
 from contract import contract_pb2
-from duo_workflow_service.executor.outbox_queue import ActionRequest
 from duo_workflow_service.tools.search_system import (
     ExtractLinesFromText,
     ExtractLinesFromTextInput,
@@ -95,14 +94,9 @@ class TestGrep:
             Configured Grep tool instance with mocked dependencies
         """
         mock_outbox = MagicMock()
-        mock_outbox.put = AsyncMock()
-
-        def set_result(item: ActionRequest):
-            item.result.set_result(  # type: ignore[union-attr]
-                create_mock_client_event_with_response(mock_response)
-            )
-
-        mock_outbox.put.side_effect = set_result
+        mock_outbox.put_action_and_wait_for_response = AsyncMock(
+            return_value=create_mock_client_event_with_response(mock_response)
+        )
 
         metadata = {"outbox": mock_outbox}
         grep_tool = Grep()

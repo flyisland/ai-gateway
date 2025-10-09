@@ -32,11 +32,7 @@ from duo_workflow_service.checkpointer.gitlab_workflow_utils import (
 from duo_workflow_service.checkpointer.notifier import UserInterface
 from duo_workflow_service.components import ToolsRegistry
 from duo_workflow_service.entities import DuoWorkflowStateType
-from duo_workflow_service.executor.outbox_queue import (
-    ActionRequest,
-    OutboxQueue,
-    OutboxSignal,
-)
+from duo_workflow_service.executor.outbox import Outbox, OutboxSignal
 from duo_workflow_service.gitlab.events import get_event
 from duo_workflow_service.gitlab.gitlab_api import (
     Namespace,
@@ -67,7 +63,6 @@ MAX_TOKENS_TO_SAMPLE = 8192
 RECURSION_LIMIT = 300
 DEBUG = os.getenv("DEBUG")
 MAX_MESSAGES_TO_DISPLAY = 5
-MAX_MESSAGE_LENGTH = 200
 
 
 class InvocationMetadata(TypedDict):
@@ -81,7 +76,7 @@ class AbstractWorkflow(ABC):
     Provides a structure for creating workflow classes with common functionality.
     """
 
-    _outbox: OutboxQueue
+    _outbox: Outbox
     _workflow_id: str
     _project: Project | None
     _namespace: Namespace | None
@@ -121,7 +116,7 @@ class AbstractWorkflow(ABC):
         language_server_version: Optional[LanguageServerVersion] = None,
         preapproved_tools: Optional[list[str]] = [],
     ):
-        self._outbox = OutboxQueue()  # asyncio.Queue()
+        self._outbox = Outbox()
         self._workflow_id = workflow_id
         self._workflow_metadata = workflow_metadata
         self._user = user
@@ -169,7 +164,7 @@ class AbstractWorkflow(ABC):
                     # properly traced in Langsmith via the TraceableException
                     pass
                 finally:
-                    self._outbox.put_nowait(OutboxSignal.NO_MORE_OUTBOUND_REQUESTS)
+                    self._outbox.close()
 
     @abstractmethod
     async def _handle_workflow_failure(
@@ -197,10 +192,8 @@ class AbstractWorkflow(ABC):
 
         return self._last_gitlab_status in SUCCESSFUL_WORKFLOW_EXECUTION_STATUSES
 
-    async def get_from_outbox(self) -> ActionRequest | OutboxSignal:
-        item: ActionRequest | OutboxSignal = await self._outbox.get()
-        self._outbox.task_done()
-        return item
+    async def get_from_outbox(self) -> contract_pb2.Action | OutboxSignal:
+        return await self._outbox.get()
 
     def set_action_response(self, event: contract_pb2.ClientEvent):
         self._outbox.set_action_response(event)
@@ -320,7 +313,7 @@ class AbstractWorkflow(ABC):
         try:
             self.is_done = True
 
-            self._drain_queue(workflow_id, self._outbox, "outbox")
+            self._outbox.check_empty()
 
             self.log.info("Workflow cleanup completed.")
         except BaseException as cleanup_err:
@@ -329,36 +322,6 @@ class AbstractWorkflow(ABC):
                 extra={
                     "workflow_id": workflow_id,
                     "context": "Workflow cleanup failed",
-                },
-            )
-            raise
-
-    def _drain_queue(self, workflow_id, queue, queue_name: str):
-        try:
-            while True:
-                try:
-                    msg = queue.get_nowait()
-                except asyncio.QueueEmpty:
-                    # Queue is empty, exit loop
-                    break
-
-                queue.task_done()
-                content = str(msg)
-
-                if len(content) > MAX_MESSAGE_LENGTH:
-                    content = f"{content[:MAX_MESSAGE_LENGTH]}..."
-
-                self.log.info(
-                    f"Drained {queue_name} message during cleanup",
-                    workflow_id=workflow_id,
-                    content=content,
-                )
-        except Exception as e:
-            log_exception(
-                e,
-                extra={
-                    "workflow_id": workflow_id,
-                    "context": f"Error draining {queue_name} queue",
                 },
             )
             raise

@@ -23,7 +23,7 @@ from contract import contract_pb2
 from duo_workflow_service.agent_platform.experimental.flows.flow_config import (
     list_configs,
 )
-from duo_workflow_service.executor.outbox_queue import ActionRequest, OutboxSignal
+from duo_workflow_service.executor.outbox import OutboxSignal
 from duo_workflow_service.interceptors.authentication_interceptor import current_user
 from duo_workflow_service.server import (
     DuoWorkflowService,
@@ -473,16 +473,23 @@ async def test_execute_workflow(
     mock_workflow_instance.run = AsyncMock()
     mock_workflow_instance.cleanup = AsyncMock()
 
-    checkpoint_action = contract_pb2.Action(newCheckpoint=contract_pb2.NewCheckpoint())
-
     mock_workflow_instance.get_from_outbox = AsyncMock(
         side_effect=[
-            ActionRequest(action=checkpoint_action),
-            ActionRequest(action=contract_pb2.Action()),
-            ActionRequest(action=checkpoint_action),
-            ActionRequest(action=contract_pb2.Action()),
-            ActionRequest(action=checkpoint_action),
-            ActionRequest(action=checkpoint_action),
+            contract_pb2.Action(
+                newCheckpoint=contract_pb2.NewCheckpoint(), requestID="1"
+            ),
+            contract_pb2.Action(requestID="2"),
+            contract_pb2.Action(
+                newCheckpoint=contract_pb2.NewCheckpoint(), requestID="3"
+            ),
+            contract_pb2.Action(requestID="4"),
+            contract_pb2.Action(
+                newCheckpoint=contract_pb2.NewCheckpoint(), requestID="5"
+            ),
+            contract_pb2.Action(
+                newCheckpoint=contract_pb2.NewCheckpoint(), requestID="6"
+            ),
+            OutboxSignal.NO_MORE_OUTBOUND_REQUESTS,
         ]
     )
     mock_resolve_workflow.return_value = mock_abstract_workflow_class
@@ -515,6 +522,12 @@ async def test_execute_workflow(
     assert (await anext(result)).WhichOneof("action") != "newCheckpoint"
     assert (await anext(result)).WhichOneof("action") == "newCheckpoint"
     assert (await anext(result)).WhichOneof("action") == "newCheckpoint"
+    with pytest.raises(StopAsyncIteration):
+        await anext(result)
+
+    assert (
+        mock_workflow_instance.set_action_response.call_count == request_iterator_count
+    )
 
 
 @pytest.mark.asyncio

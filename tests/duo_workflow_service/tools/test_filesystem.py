@@ -5,7 +5,6 @@ import pytest
 from langchain.tools.base import ToolException
 
 from contract import contract_pb2
-from duo_workflow_service.executor.outbox_queue import ActionRequest, OutboxQueue
 from duo_workflow_service.gitlab.gitlab_api import Project
 from duo_workflow_service.policies.file_exclusion_policy import FileExclusionPolicy
 from duo_workflow_service.tools.filesystem import (  # Mkdir,
@@ -63,12 +62,9 @@ def mock_project():
 @pytest.fixture
 def metadata_with_project(mock_project):
     mock_outbox = MagicMock()
-    mock_outbox.put = AsyncMock()
-
-    def set_result(item: ActionRequest):
-        item.result.set_result(create_mock_client_event_with_response("test contents"))  # type: ignore[union-attr]
-
-    mock_outbox.put.side_effect = set_result
+    mock_outbox.put_action_and_wait_for_response = AsyncMock(
+        return_value=create_mock_client_event_with_response("test contents")
+    )
 
     return {"outbox": mock_outbox, "project": mock_project}
 
@@ -83,8 +79,9 @@ async def test_read_file(metadata_with_project):
 
     assert response == "test contents"
 
-    metadata_with_project["outbox"].put.assert_called_once()
-    action = metadata_with_project["outbox"].put.call_args[0][0].action
+    outbox = metadata_with_project["outbox"]
+    outbox.put_action_and_wait_for_response.assert_called_once()
+    action = outbox.put_action_and_wait_for_response.call_args[0][0]
     assert action.runReadFile.filepath == path
 
 
@@ -103,12 +100,9 @@ async def test_write_file(mock_project):
     )
 
     mock_outbox = MagicMock()
-    mock_outbox.put = AsyncMock()
-
-    def set_result(item: ActionRequest):
-        item.result.set_result(create_mock_client_event_with_response("done"))  # type: ignore[union-attr]
-
-    mock_outbox.put.side_effect = set_result
+    mock_outbox.put_action_and_wait_for_response = AsyncMock(
+        return_value=create_mock_client_event_with_response("done")
+    )
 
     metadata = {"outbox": mock_outbox, "project": mock_project}
 
@@ -121,8 +115,8 @@ async def test_write_file(mock_project):
 
     assert response == "done"
 
-    mock_outbox.put.assert_called_once()
-    action = mock_outbox.put.call_args[0][0].action
+    mock_outbox.put_action_and_wait_for_response.assert_called_once()
+    action = mock_outbox.put_action_and_wait_for_response.call_args[0][0]
     assert action.runWriteFile.filepath == path
     assert action.runWriteFile.contents == contents
 
@@ -143,14 +137,9 @@ class TestFindFiles:
         )
 
         mock_outbox = MagicMock()
-        mock_outbox.put = AsyncMock()
-
-        def set_result(item: ActionRequest):
-            item.result.set_result(  # type: ignore[union-attr]
-                create_mock_client_event_with_response("file1.py\nfile2.py")
-            )
-
-        mock_outbox.put.side_effect = set_result
+        mock_outbox.put_action_and_wait_for_response = AsyncMock(
+            return_value=create_mock_client_event_with_response("file1.py\nfile2.py")
+        )
 
         metadata = {"outbox": mock_outbox, "project": mock_project}
         tool = FindFiles()
@@ -193,14 +182,11 @@ class TestLsDir:
 
         # Set up the mock outbox
         mock_outbox = MagicMock()
-        mock_outbox.put = AsyncMock()
-
-        def set_result(item: ActionRequest):
-            item.result.set_result(  # type: ignore[union-attr]
-                create_mock_client_event_with_response("file1.txt file2.txt dir1 dir2")
+        mock_outbox.put_action_and_wait_for_response = AsyncMock(
+            return_value=create_mock_client_event_with_response(
+                "file1.txt file2.txt dir1 dir2"
             )
-
-        mock_outbox.put.side_effect = set_result
+        )
 
         metadata = {"outbox": mock_outbox, "project": mock_project}
 
@@ -215,10 +201,10 @@ class TestLsDir:
         assert result == "file1.txt file2.txt dir1 dir2"
 
         # Verify the outbox was used as expected
-        mock_outbox.put.assert_called_once()
+        mock_outbox.put_action_and_wait_for_response.assert_called_once()
 
         # You can add additional assertions to verify the details of what was put on the outbox
-        action = mock_outbox.put.call_args[0][0].action
+        action = mock_outbox.put_action_and_wait_for_response.call_args[0][0]
         assert action.listDirectory.directory == "."
 
     @pytest.mark.asyncio
@@ -250,18 +236,13 @@ class TestMkdir:
     @pytest.mark.asyncio
     async def test_mkdir_creates_directory(self):
         mock_outbox = MagicMock()
-        mock_outbox.put = AsyncMock()
-
-        def set_result(item: ActionRequest):
-            item.result.set_result(  # type: ignore[union-attr]
-                contract_pb2.ClientEvent(
-                    actionResponse=contract_pb2.ActionResponse(
-                        plainTextResponse=contract_pb2.PlainTextResponse(response="")
-                    )
+        mock_outbox.put_action_and_wait_for_response = AsyncMock(
+            return_value=contract_pb2.ClientEvent(
+                actionResponse=contract_pb2.ActionResponse(
+                    plainTextResponse=contract_pb2.PlainTextResponse(response="")
                 )
             )
-
-        mock_outbox.put.side_effect = set_result
+        )
 
         metadata = {"outbox": mock_outbox}
 
@@ -272,26 +253,21 @@ class TestMkdir:
         assert result == ""
 
         # Verify the action sent to outbox
-        mock_outbox.put.assert_called_once()
-        action = mock_outbox.put.call_args[0][0].action
+        mock_outbox.put_action_and_wait_for_response.assert_called_once()
+        action = mock_outbox.put_action_and_wait_for_response.call_args[0][0]
         assert action.mkdir.directory_path == "./test_dir"
 
     @pytest.mark.asyncio
     async def test_mkdir_creates_nested_directories(self):
         # Set up mock outbox following the pattern from other tests
         mock_outbox = MagicMock()
-        mock_outbox.put = AsyncMock()
-
-        def set_result(item: ActionRequest):
-            item.result.set_result(  # type: ignore[union-attr]
-                contract_pb2.ClientEvent(
-                    actionResponse=contract_pb2.ActionResponse(
-                        plainTextResponse=contract_pb2.PlainTextResponse(response="")
-                    )
+        mock_outbox.put_action_and_wait_for_response = AsyncMock(
+            return_value=contract_pb2.ClientEvent(
+                actionResponse=contract_pb2.ActionResponse(
+                    plainTextResponse=contract_pb2.PlainTextResponse(response="")
                 )
             )
-
-        mock_outbox.put.side_effect = set_result
+        )
 
         metadata = {"outbox": mock_outbox}
 
@@ -306,10 +282,10 @@ class TestMkdir:
         assert result == ""
 
         # Verify the outbox was called correctly
-        mock_outbox.put.assert_called_once()
+        mock_outbox.put_action_and_wait_for_response.assert_called_once()
 
         # Verify the action details
-        action = mock_outbox.put.call_args[0][0].action
+        action = mock_outbox.put_action_and_wait_for_response.call_args[0][0]
         assert action.mkdir.directory_path == "./test_dir/nested/dir"
 
     @pytest.mark.asyncio
@@ -330,12 +306,9 @@ class TestEditFile:
         )
 
         mock_outbox = MagicMock()
-        mock_outbox.put = AsyncMock()
-
-        def set_result(item: ActionRequest):
-            item.result.set_result(create_mock_client_event_with_response("success"))  # type: ignore[union-attr]
-
-        mock_outbox.put.side_effect = set_result
+        mock_outbox.put_action_and_wait_for_response = AsyncMock(
+            return_value=create_mock_client_event_with_response("success")
+        )
 
         metadata = {"outbox": mock_outbox, "project": mock_project}
 
@@ -348,8 +321,8 @@ class TestEditFile:
 
         assert response == "success"
 
-        mock_outbox.put.assert_called_once()
-        action = mock_outbox.put.call_args[0][0].action
+        mock_outbox.put_action_and_wait_for_response.assert_called_once()
+        action = mock_outbox.put_action_and_wait_for_response.call_args[0][0]
         assert action.runEditFile.filepath == path
         assert action.runEditFile.oldString == old_str
         assert action.runEditFile.newString == new_str
@@ -384,19 +357,15 @@ class TestReadFiles:
     @pytest.mark.asyncio
     async def test_read_files_with_mixed_valid_invalid_paths(self):
         mock_outbox = MagicMock()
-        mock_outbox.put = AsyncMock()
 
         # Mock response with mixed success and error
         mock_response = '{"file1.py": {"content": "print(\'hello\')"}, "nonexistent.py": {"error": "File not found"}}'
 
-        def set_result(item: ActionRequest):
-            item.result.set_result(  # type: ignore[union-attr]
-                contract_pb2.ClientEvent(
-                    actionResponse=contract_pb2.ActionResponse(response=mock_response)
-                )
+        mock_outbox.put_action_and_wait_for_response = AsyncMock(
+            return_value=contract_pb2.ClientEvent(
+                actionResponse=contract_pb2.ActionResponse(response=mock_response)
             )
-
-        mock_outbox.put.side_effect = set_result
+        )
 
         metadata = {"outbox": mock_outbox}
 
@@ -408,19 +377,16 @@ class TestReadFiles:
 
         assert response == mock_response
 
-        mock_outbox.put.assert_called_once()
-        action = mock_outbox.put.call_args[0][0].action
+        mock_outbox.put_action_and_wait_for_response.assert_called_once()
+        action = mock_outbox.put_action_and_wait_for_response.call_args[0][0]
         assert action.runReadFiles.filepaths == file_paths
 
     @pytest.mark.asyncio
     async def test_read_files_with_no_action_response(self):
         mock_outbox = MagicMock()
-        mock_outbox.put = AsyncMock()
-
-        def set_result(item: ActionRequest):
-            item.result.set_result(contract_pb2.ClientEvent(actionResponse=None))  # type: ignore[union-attr]
-
-        mock_outbox.put.side_effect = set_result
+        mock_outbox.put_action_and_wait_for_response = AsyncMock(
+            return_value=contract_pb2.ClientEvent(actionResponse=None)
+        )
 
         metadata = {"outbox": mock_outbox}
 
@@ -432,19 +398,16 @@ class TestReadFiles:
 
         assert response == "Could not read files"
 
-        mock_outbox.put.assert_called_once()
-        action = mock_outbox.put.call_args[0][0].action
+        mock_outbox.put_action_and_wait_for_response.assert_called_once()
+        action = mock_outbox.put_action_and_wait_for_response.call_args[0][0]
         assert action.runReadFiles.filepaths == file_paths
 
     @pytest.mark.asyncio
     async def test_read_files_with_none_response(self):
         mock_outbox = MagicMock()
-        mock_outbox.put = AsyncMock()
-
-        def set_result(item: ActionRequest):
-            item.result.set_result(contract_pb2.ClientEvent(actionResponse=None))  # type: ignore[union-attr]
-
-        mock_outbox.put.side_effect = set_result
+        mock_outbox.put_action_and_wait_for_response = AsyncMock(
+            return_value=contract_pb2.ClientEvent(actionResponse=None)
+        )
 
         metadata = {"outbox": mock_outbox}
 
@@ -456,28 +419,22 @@ class TestReadFiles:
 
         assert response == "Could not read files"
 
-        mock_outbox.put.assert_called_once()
-        action = mock_outbox.put.call_args[0][0].action
+        mock_outbox.put_action_and_wait_for_response.assert_called_once()
+        action = mock_outbox.put_action_and_wait_for_response.call_args[0][0]
         assert action.runReadFiles.filepaths == file_paths
 
     @pytest.mark.asyncio
     async def test_read_files_with_error_response(self):
         mock_outbox = MagicMock()
-        mock_outbox.put = AsyncMock()
-
-        # Mock response with mixed success and error
-        def set_result(item: ActionRequest):
-            item.result.set_result(  # type: ignore[union-attr]
-                contract_pb2.ClientEvent(
-                    actionResponse=contract_pb2.ActionResponse(
-                        plainTextResponse=contract_pb2.PlainTextResponse(
-                            error="Error reading files"
-                        )
+        mock_outbox.put_action_and_wait_for_response = AsyncMock(
+            return_value=contract_pb2.ClientEvent(
+                actionResponse=contract_pb2.ActionResponse(
+                    plainTextResponse=contract_pb2.PlainTextResponse(
+                        error="Error reading files"
                     )
                 )
             )
-
-        mock_outbox.put.side_effect = set_result
+        )
 
         metadata = {"outbox": mock_outbox}
 
@@ -549,18 +506,12 @@ class TestReadFiles:
     @pytest.mark.asyncio
     async def test_read_files_with_file_exclusion_policy(self, mock_project):
         mock_outbox = MagicMock()
-        mock_outbox.put = AsyncMock()
-
         mock_response = '{"allowed_file.py": {"content": "hi"}}'
-
-        def set_result(item: ActionRequest):
-            item.result.set_result(  # type: ignore[union-attr]
-                contract_pb2.ClientEvent(
-                    actionResponse=contract_pb2.ActionResponse(response=mock_response)
-                )
+        mock_outbox.put_action_and_wait_for_response = AsyncMock(
+            return_value=contract_pb2.ClientEvent(
+                actionResponse=contract_pb2.ActionResponse(response=mock_response)
             )
-
-        mock_outbox.put.side_effect = set_result
+        )
 
         tool = ReadFiles(description="Read multiple files")
         tool.metadata = {
@@ -588,7 +539,7 @@ class TestReadFiles:
             assert result_dict[".ssh/config"]["error"] == "excluded due to policy"
 
             # Should only call the action with allowed files
-            action = mock_outbox.put.call_args[0][0].action
+            action = mock_outbox.put_action_and_wait_for_response.call_args[0][0]
             assert set(action.runReadFiles.filepaths) == {"allowed_file.py"}
 
 
@@ -876,16 +827,11 @@ class TestFileExclusionPolicy:
         )
 
         mock_outbox = MagicMock()
-        mock_outbox.put = AsyncMock()
-
-        def set_result(item: ActionRequest):
-            item.result.set_result(  # type: ignore[union-attr]
-                create_mock_client_event_with_response(
-                    "file1.txt\nfile2.secret\nconfig/private/secret.txt\nconfig/private/allowed.txt\ntemp/cache.txt"
-                )
+        mock_outbox.put_action_and_wait_for_response = AsyncMock(
+            return_value=create_mock_client_event_with_response(
+                "file1.txt\nfile2.secret\nconfig/private/secret.txt\nconfig/private/allowed.txt\ntemp/cache.txt"
             )
-
-        mock_outbox.put.side_effect = set_result
+        )
 
         metadata = {
             "outbox": mock_outbox,
@@ -909,16 +855,11 @@ class TestFileExclusionPolicy:
         )
 
         mock_outbox = MagicMock()
-        mock_outbox.put = AsyncMock()
-
-        def set_result(item: ActionRequest):
-            item.result.set_result(  # type: ignore[union-attr]
-                create_mock_client_event_with_response(
-                    "file1.txt\nfile2.secret\nconfig/private/secret.txt\nconfig/private/allowed.txt"
-                )
+        mock_outbox.put_action_and_wait_for_response = AsyncMock(
+            return_value=create_mock_client_event_with_response(
+                "file1.txt\nfile2.secret\nconfig/private/secret.txt\nconfig/private/allowed.txt"
             )
-
-        mock_outbox.put.side_effect = set_result
+        )
 
         metadata = {
             "outbox": mock_outbox,
@@ -1000,20 +941,15 @@ class TestFileExclusionPolicy:
     async def test_list_dir_excluded_directory(self, project_with_exclusions):
         """Test ListDir tool with excluded directory."""
         mock_outbox = MagicMock()
-        mock_outbox.put = AsyncMock()
-
-        def set_result(item: ActionRequest):
-            item.result.set_result(  # type: ignore[union-attr]
-                contract_pb2.ClientEvent(
-                    actionResponse=contract_pb2.ActionResponse(
-                        plainTextResponse=contract_pb2.PlainTextResponse(
-                            response="temp/cache.txt\ntemp/log.txt"
-                        )
+        mock_outbox.put_action_and_wait_for_response = AsyncMock(
+            return_value=contract_pb2.ClientEvent(
+                actionResponse=contract_pb2.ActionResponse(
+                    plainTextResponse=contract_pb2.PlainTextResponse(
+                        response="temp/cache.txt\ntemp/log.txt"
                     )
                 )
             )
-
-        mock_outbox.put.side_effect = set_result
+        )
 
         metadata = {
             "outbox": mock_outbox,

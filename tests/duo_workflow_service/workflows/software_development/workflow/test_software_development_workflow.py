@@ -17,10 +17,7 @@ from duo_workflow_service.components.tools_registry import (
     ToolsRegistry,
 )
 from duo_workflow_service.entities import Plan, WorkflowStatusEnum
-from duo_workflow_service.executor.outbox_queue import (
-    ActionRequest,
-    UnknownResponseIDException,
-)
+from duo_workflow_service.executor.outbox import Outbox, UnknownResponseIDException
 from duo_workflow_service.gitlab.http_client import GitlabHttpClient
 from duo_workflow_service.llm_factory import AnthropicConfig, VertexConfig
 from duo_workflow_service.workflows.software_development.workflow import (
@@ -247,7 +244,7 @@ def mock_action():
 
 @pytest.mark.asyncio
 async def test_workflow_initialization(workflow):
-    assert isinstance(workflow._outbox, asyncio.Queue)
+    assert isinstance(workflow._outbox, Outbox)
 
 
 @pytest.mark.asyncio
@@ -876,43 +873,18 @@ async def test_workflow_run_without_plan_approval_component(
 
 
 @pytest.mark.asyncio
-async def test_get_from_outbox(workflow, mock_action):
-    workflow._outbox.put_nowait(ActionRequest(action=mock_action))
-    item = await workflow.get_from_outbox()
-    assert item.action == mock_action
+async def test_workflow_cleanup(workflow, mock_action):
+    assert workflow._outbox._queue.empty()
 
+    workflow._outbox.put_action(mock_action)
 
-def test_set_action_response(workflow):
-    action = contract_pb2.Action()
-    workflow._outbox.put_nowait(ActionRequest(action=action))
-
-    # Successfully set response
-    event = contract_pb2.ClientEvent(
-        actionResponse=contract_pb2.ActionResponse(
-            response="the response", requestID=action.requestID
-        ),
-    )
-    workflow.set_action_response(event)
-
-    # Failed to set response
-    event = contract_pb2.ClientEvent()
-    with pytest.raises(UnknownResponseIDException):
-        workflow.set_action_response(event)
-
-
-@pytest.mark.asyncio
-async def test_workflow_cleanup(workflow):
-    assert workflow._outbox.empty()
-
-    workflow._outbox.put_nowait("test_outbox_item_1")
-
-    assert workflow._outbox.qsize() == 1
+    assert workflow._outbox._queue.qsize() == 1
     assert not workflow.is_done
 
     await workflow.cleanup("123")
 
     assert workflow.is_done
-    assert workflow._outbox.qsize() == 0
+    assert workflow._outbox._queue.qsize() == 0
 
 
 @pytest.mark.parametrize(

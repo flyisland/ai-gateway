@@ -6,7 +6,7 @@ from pydantic import BaseModel
 
 from ai_gateway.code_suggestions.language_server import LanguageServerVersion
 from duo_workflow_service import tools
-from duo_workflow_service.executor.outbox_queue import OutboxQueue
+from duo_workflow_service.executor.outbox import Outbox
 from duo_workflow_service.gitlab.gitlab_api import Project, WorkflowConfig
 from duo_workflow_service.gitlab.http_client import GitlabHttpClient
 from duo_workflow_service.tools import Toolset, ToolType
@@ -21,7 +21,7 @@ from duo_workflow_service.tools.vulnerabilities.get_vulnerability_details import
 
 
 class ToolMetadata(TypedDict):
-    outbox: OutboxQueue
+    outbox: Outbox
     gitlab_client: GitlabHttpClient
     gitlab_host: str
     project: Optional[Project]
@@ -152,7 +152,7 @@ class ToolsRegistry:
         cls,
         workflow_config: WorkflowConfig,
         gl_http_client: GitlabHttpClient,
-        outbox: OutboxQueue,
+        outbox: Outbox,
         project: Optional[Project],
         mcp_tools: Optional[list[type[BaseTool]]] = None,
         user: Optional[CloudConnectorUser] = None,

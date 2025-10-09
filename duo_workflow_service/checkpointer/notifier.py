@@ -16,7 +16,7 @@ from duo_workflow_service.entities.state import (
     UiChatLog,
     WorkflowStatusEnum,
 )
-from duo_workflow_service.executor.outbox_queue import ActionRequest, OutboxQueue
+from duo_workflow_service.executor.outbox import Outbox
 from duo_workflow_service.json_encoder.encoder import CustomEncoder
 from lib.feature_flags.context import FeatureFlag, is_feature_enabled
 
@@ -24,7 +24,7 @@ from lib.feature_flags.context import FeatureFlag, is_feature_enabled
 class UserInterface:
     def __init__(
         self,
-        outbox: OutboxQueue,
+        outbox: Outbox,
         goal: str,
     ):
         self.outbox = outbox
@@ -77,13 +77,11 @@ class UserInterface:
         )
 
         log = structlog.stdlib.get_logger("workflow")
-        log.info("Attempting to add NewCheckpoint to streaming outbox")
+        log.info("Attempting to add NewCheckpoint to outbox")
 
-        request = ActionRequest(action=action)
+        self.outbox.put_action(action)
 
-        await self.outbox.put(request)
-
-        log.info("Added NewCheckpoint to streaming outbox")
+        log.info("Added NewCheckpoint to outbox")
 
     def _append_chunk_to_ui_chat_log(self, message: BaseMessage) -> bool:
         """Append a message chunk to the UI chat log.

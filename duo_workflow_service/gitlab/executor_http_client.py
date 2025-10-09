@@ -9,7 +9,7 @@ from duo_workflow_service.executor.action import (
     _execute_action,
     _execute_action_and_get_action_response,
 )
-from duo_workflow_service.executor.outbox_queue import OutboxQueue
+from duo_workflow_service.executor.outbox import Outbox
 from duo_workflow_service.gitlab.http_client import GitlabHttpClient, GitLabHttpResponse
 
 logger = logging.getLogger(__name__)
@@ -18,7 +18,7 @@ logger = logging.getLogger(__name__)
 class ExecutorGitLabHttpClient(GitlabHttpClient):
     """GitLab HTTP client implementation that uses the executor service."""
 
-    def __init__(self, outbox: OutboxQueue):
+    def __init__(self, outbox: Outbox):
         self.outbox = outbox
 
     async def _call(

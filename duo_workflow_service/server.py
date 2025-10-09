@@ -29,7 +29,7 @@ from ai_gateway.config import Config
 from ai_gateway.container import ContainerApplication
 from contract import contract_pb2, contract_pb2_grpc
 from duo_workflow_service.components import tools_registry
-from duo_workflow_service.executor.outbox_queue import ActionRequest, OutboxSignal
+from duo_workflow_service.executor.outbox import OutboxSignal
 from duo_workflow_service.gitlab.connection_pool import connection_pool
 from duo_workflow_service.interceptors.authentication_interceptor import (
     AuthenticationInterceptor,
@@ -354,25 +354,32 @@ class DuoWorkflowService(contract_pb2_grpc.DuoWorkflowServicer):
 
         async def send_events() -> AsyncIterator[contract_pb2.Action]:
             while True:
-                item: ActionRequest | OutboxSignal = await workflow.get_from_outbox()
+                item: contract_pb2.Action | OutboxSignal = (
+                    await workflow.get_from_outbox()
+                )
 
                 if item == OutboxSignal.NO_MORE_OUTBOUND_REQUESTS:
                     log.info("No more outbound requests. End send_events loop.")
                     break
 
+                if not isinstance(item, contract_pb2.Action):
+                    raise RuntimeError(
+                        "Can not send an action that is not the Action type"
+                    )
+
                 log.info(
                     "Sending an outgoing action",
-                    requestID=item.action.requestID,
-                    payload_size=item.action.ByteSize(),
-                    action_class=item.action.WhichOneof("action"),
+                    requestID=item.requestID,
+                    payload_size=item.ByteSize(),
+                    action_class=item.WhichOneof("action"),
                 )
 
-                yield item.action
+                yield item
 
                 log.info(
                     "Sent an outgoing action",
-                    requestID=item.action.requestID,
-                    action_class=item.action.WhichOneof("action"),
+                    requestID=item.requestID,
+                    action_class=item.WhichOneof("action"),
                 )
 
         async def receive_events():
@@ -386,8 +393,8 @@ class DuoWorkflowService(contract_pb2_grpc.DuoWorkflowServicer):
 
                 log.info(
                     "Received a client event.",
-                    response=event.WhichOneof("response"),
-                    request_id=event.actionResponse.requestID,
+                    responseType=event.WhichOneof("response"),
+                    requestID=event.actionResponse.requestID,
                 )
 
                 if event.HasField("heartbeat"):
@@ -402,7 +409,6 @@ class DuoWorkflowService(contract_pb2_grpc.DuoWorkflowServicer):
                         "Stopping workflow...",
                         reason=event.stopWorkflow.reason,
                     )
-                    # Schedule to raise asyncio.CancelledError inside the coroutinue task
                     workflow_task.cancel(AIO_CANCEL_STOP_WORKFLOW_REQUEST)
                     continue
 
@@ -605,7 +611,6 @@ async def next_client_event(
     try:
         log.info("Waiting for next ClientEvent")
         event = await anext(aiter(request_iterator))
-        log.info("Received next ClientEvent")
     except StopAsyncIteration:
         log.info("Client-side streaming has been closed.")
         return None

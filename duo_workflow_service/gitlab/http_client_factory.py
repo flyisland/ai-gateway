@@ -1,13 +1,13 @@
 import os
 
-from duo_workflow_service.executor.outbox_queue import OutboxQueue
+from duo_workflow_service.executor.outbox import Outbox
 from duo_workflow_service.gitlab.direct_http_client import DirectGitLabHttpClient
 from duo_workflow_service.gitlab.executor_http_client import ExecutorGitLabHttpClient
 from duo_workflow_service.gitlab.http_client import GitlabHttpClient
 
 
 def get_http_client(
-    outbox: OutboxQueue,
+    outbox: Outbox,
     base_url: str,
     gitlab_token: str,
 ) -> GitlabHttpClient:

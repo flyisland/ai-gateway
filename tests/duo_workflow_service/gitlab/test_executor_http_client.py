@@ -6,7 +6,7 @@ import pytest
 from langchain_core.tools import ToolException
 
 from contract import contract_pb2
-from duo_workflow_service.executor.outbox_queue import OutboxQueue
+from duo_workflow_service.executor.outbox import Outbox
 from duo_workflow_service.gitlab.executor_http_client import ExecutorGitLabHttpClient
 from duo_workflow_service.gitlab.http_client import GitLabHttpResponse
 
@@ -18,7 +18,7 @@ def mock_execute_action_fixture():
 
 @pytest.fixture(name="client")
 def client_fixture():
-    outbox = OutboxQueue()
+    outbox = Outbox()
     return ExecutorGitLabHttpClient(outbox)
 
 

@@ -13,11 +13,7 @@ from duo_workflow_service.components.tools_registry import (
     Toolset,
     ToolsRegistry,
 )
-from duo_workflow_service.executor.outbox_queue import (
-    ActionRequest,
-    OutboxQueue,
-    OutboxSignal,
-)
+from duo_workflow_service.executor.outbox import Outbox
 from duo_workflow_service.gitlab.http_client import GitlabHttpClient
 from duo_workflow_service.tools.code_review import (
     BuildReviewMergeRequestContext,
@@ -52,7 +48,7 @@ def mcp_tools_fixture():
     return convert_mcp_tools_to_langchain_tool_classes(mcp_tools=[mcp_tool_mock])
 
 
-_outbox = MagicMock(spec=OutboxQueue)
+_outbox = MagicMock(spec=Outbox)
 
 
 @pytest.mark.parametrize(

@@ -9,12 +9,12 @@ from duo_workflow_service.executor.action import (
     _execute_action,
     _execute_action_and_get_action_response,
 )
-from duo_workflow_service.executor.outbox_queue import ActionRequest, OutboxQueue
+from duo_workflow_service.executor.outbox import Outbox
 
 
 @pytest.fixture
 def metadata():
-    outbox = OutboxQueue()
+    outbox = Outbox()
     return {"outbox": outbox}
 
 
@@ -32,11 +32,9 @@ async def test_execute_action_success_http_response(metadata):
     # Set up action type for logging
     action.runHTTPRequest.path = "https://example.com"
 
-    def set_result(item: ActionRequest):
-        item.result.set_result(client_event)  # type: ignore[union-attr]
-
-    metadata["outbox"].put = AsyncMock(side_effect=set_result)
-    await metadata["outbox"].put(ActionRequest(action=action, result=asyncio.Future()))
+    metadata["outbox"].put_action_and_wait_for_response = AsyncMock(
+        return_value=client_event
+    )
 
     with patch(
         "duo_workflow_service.executor.action.structlog.stdlib.get_logger"
@@ -64,11 +62,9 @@ async def test_execute_action_success_plaintext_response(metadata):
     client_event.actionResponse.plainTextResponse.response = "plaintext success"
     client_event.actionResponse.plainTextResponse.error = ""
 
-    def set_result(item: ActionRequest):
-        item.result.set_result(client_event)  # type: ignore[union-attr]
-
-    metadata["outbox"].put = AsyncMock(side_effect=set_result)
-    await metadata["outbox"].put(ActionRequest(action=action, result=asyncio.Future()))
+    metadata["outbox"].put_action_and_wait_for_response = AsyncMock(
+        return_value=client_event
+    )
 
     with patch(
         "duo_workflow_service.executor.action.structlog.stdlib.get_logger"
@@ -101,11 +97,9 @@ async def test__execute_action_and_get_action_response_http_error_raises_tool_ex
     # Set up HTTP response with error
     client_event.actionResponse.httpResponse.error = "Connection timeout"
 
-    def set_result(item: ActionRequest):
-        item.result.set_result(client_event)  # type: ignore[union-attr]
-
-    metadata["outbox"].put = AsyncMock(side_effect=set_result)
-    await metadata["outbox"].put(ActionRequest(action=action, result=asyncio.Future()))
+    metadata["outbox"].put_action_and_wait_for_response = AsyncMock(
+        return_value=client_event
+    )
 
     with pytest.raises(ToolException, match="HTTP action error: Connection timeout"):
         await _execute_action_and_get_action_response(metadata, action)
@@ -122,11 +116,9 @@ async def test__execute_action_and_get_action_response_plaintext_error_raises_to
     # Set up plaintext response with error
     client_event.actionResponse.plainTextResponse.error = "File not found"
 
-    def set_result(item: ActionRequest):
-        item.result.set_result(client_event)  # type: ignore[union-attr]
-
-    metadata["outbox"].put = AsyncMock(side_effect=set_result)
-    await metadata["outbox"].put(ActionRequest(action=action, result=asyncio.Future()))
+    metadata["outbox"].put_action_and_wait_for_response = AsyncMock(
+        return_value=client_event
+    )
 
     with pytest.raises(ToolException, match="Action error: File not found"):
         await _execute_action_and_get_action_response(metadata, action)
@@ -152,11 +144,9 @@ async def test__execute_action_and_get_action_response_missing_legacy_response_f
     client_event.actionResponse.httpResponse.body = '{"result": "ok"}'
     client_event.actionResponse.httpResponse.error = ""
 
-    def set_result(item: ActionRequest):
-        item.result.set_result(client_event)  # type: ignore[union-attr]
-
-    metadata["outbox"].put = AsyncMock(side_effect=set_result)
-    await metadata["outbox"].put(ActionRequest(action=action, result=asyncio.Future()))
+    metadata["outbox"].put_action_and_wait_for_response = AsyncMock(
+        return_value=client_event
+    )
 
     response = await _execute_action_and_get_action_response(metadata, action)
 
@@ -177,11 +167,9 @@ async def test__execute_action_and_get_action_response_missing_legacy_response_f
     client_event.actionResponse.httpResponse.body = ""
     client_event.actionResponse.httpResponse.error = ""
 
-    def set_result(item: ActionRequest):
-        item.result.set_result(client_event)  # type: ignore[union-attr]
-
-    metadata["outbox"].put = AsyncMock(side_effect=set_result)
-    await metadata["outbox"].put(ActionRequest(action=action, result=asyncio.Future()))
+    metadata["outbox"].put_action_and_wait_for_response = AsyncMock(
+        return_value=client_event
+    )
 
     response = await _execute_action_and_get_action_response(metadata, action)
 
@@ -202,11 +190,9 @@ async def test__execute_action_and_get_action_response_missing_legacy_response_f
     client_event.actionResponse.httpResponse.body = ""
     client_event.actionResponse.httpResponse.error = "Some HTTP error"
 
-    def set_result(item: ActionRequest):
-        item.result.set_result(client_event)  # type: ignore[union-attr]
-
-    metadata["outbox"].put = AsyncMock(side_effect=set_result)
-    await metadata["outbox"].put(ActionRequest(action=action, result=asyncio.Future()))
+    metadata["outbox"].put_action_and_wait_for_response = AsyncMock(
+        return_value=client_event
+    )
 
     # This should now raise ToolException instead of returning a response
     with pytest.raises(ToolException, match="HTTP action error: Some HTTP error"):
@@ -224,11 +210,9 @@ async def test__execute_action_and_get_action_response_missing_legacy_response_f
     client_event.actionResponse.plainTextResponse.response = "Response"
     client_event.actionResponse.plainTextResponse.error = ""
 
-    def set_result(item: ActionRequest):
-        item.result.set_result(client_event)  # type: ignore[union-attr]
-
-    metadata["outbox"].put = AsyncMock(side_effect=set_result)
-    await metadata["outbox"].put(ActionRequest(action=action, result=asyncio.Future()))
+    metadata["outbox"].put_action_and_wait_for_response = AsyncMock(
+        return_value=client_event
+    )
 
     response = await _execute_action_and_get_action_response(metadata, action)
 
@@ -247,11 +231,9 @@ async def test__execute_action_and_get_action_response_missing_legacy_response_f
     client_event.actionResponse.plainTextResponse.response = ""
     client_event.actionResponse.plainTextResponse.error = "file not found"
 
-    def set_result(item: ActionRequest):
-        item.result.set_result(client_event)  # type: ignore[union-attr]
-
-    metadata["outbox"].put = AsyncMock(side_effect=set_result)
-    await metadata["outbox"].put(ActionRequest(action=action, result=asyncio.Future()))
+    metadata["outbox"].put_action_and_wait_for_response = AsyncMock(
+        return_value=client_event
+    )
 
     # This should now raise ToolException instead of returning a response
     with pytest.raises(ToolException, match="Action error: file not found"):
@@ -268,11 +250,9 @@ async def test_execute_action_only_legacy_response(metadata):
     client_event.actionResponse.response = "some legacy response"
     # Don't set either plainTextResponse or httpResponse, so WhichOneof("response_type") returns None
 
-    def set_result(item: ActionRequest):
-        item.result.set_result(client_event)  # type: ignore[union-attr]
-
-    metadata["outbox"].put = AsyncMock(side_effect=set_result)
-    await metadata["outbox"].put(ActionRequest(action=action, result=asyncio.Future()))
+    metadata["outbox"].put_action_and_wait_for_response = AsyncMock(
+        return_value=client_event
+    )
 
     response = await _execute_action(metadata, action)
 

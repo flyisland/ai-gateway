@@ -3,19 +3,15 @@ from unittest.mock import patch
 
 import pytest
 
-from duo_workflow_service.executor.outbox_queue import (
-    ActionRequest,
-    OutboxQueue,
-    OutboxSignal,
-)
+from duo_workflow_service.executor.outbox import Outbox
 from duo_workflow_service.gitlab.direct_http_client import DirectGitLabHttpClient
 from duo_workflow_service.gitlab.executor_http_client import ExecutorGitLabHttpClient
 from duo_workflow_service.gitlab.http_client_factory import get_http_client
 
 
 @pytest.fixture(name="queues")
-def queues_fixture() -> OutboxQueue:
-    return OutboxQueue()
+def queues_fixture() -> Outbox:
+    return Outbox()
 
 
 def test_get_http_client_custom_gitlab(queues):
