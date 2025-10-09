@@ -61,7 +61,7 @@ def http_client_for_retry_fixture(http_client, workflow_id):
             ]
         elif path == f"/api/v4/ai/duo_workflows/workflows/{workflow_id}":
             # Return status for workflow completion
-            return {"status": "finished"}
+            return GitLabHttpResponse(status_code=200, body={"status": "finished"})
         else:
             raise ValueError(f"Unexpected path: {path}")
 
