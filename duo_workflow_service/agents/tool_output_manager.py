@@ -58,8 +58,10 @@ def truncate_string(text: str) -> str:
     truncated_length = len(truncated_text.encode("utf-8"))
 
     logger.info(
-        f"Tool response ({len(encoded)} bytes) exceeds limit "
-        f"({TOOL_RESPONSE_MAX_BYTES} bytes). Truncating to ({truncated_length} bytes)..."
+        f"Tool response exceeds max size and will be truncated",
+        tool_name=tool_name,
+        original_length=len(encoded),
+        truncated_length=truncated_length,
     )
 
     truncated_output = _add_truncation_instruction(
