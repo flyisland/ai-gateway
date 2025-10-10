@@ -68,9 +68,13 @@ class Outbox:
 
             del self._action_response[event.actionResponse.requestID]
         else:
-            raise UnknownResponseIDException(
-                f"Response ID {event.actionResponse.requestID} is not found"
-            )
+            requestID, future = next(((k, v) for k, v in self._action_response.items() if v is not None), (None, None))
+
+            if future and requestID:
+                event.actionResponse.requestID = requestID
+                future.set_result(event)
+
+            del self._action_response[event.actionResponse.requestID]
 
     def close(self) -> None:
         """Close the outbox for exiting send events loop."""
