@@ -18,6 +18,7 @@ class BillingEventContext(BaseModel):
     event_type: str
     unit_of_measure: str
     quantity: float
+    entity_id: Optional[str] = None
     realm: Optional[str] = None
     timestamp: str
     instance_id: Optional[str] = None

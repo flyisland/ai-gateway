@@ -1,3 +1,4 @@
+import logging
 import uuid
 from datetime import datetime
 from typing import Any, Dict, Optional
@@ -15,6 +16,8 @@ from lib.internal_events.context import (
 )
 
 __all__ = ["BillingEventsClient"]
+
+logger = logging.getLogger("billing_events")
 
 
 class BillingEventsClient:

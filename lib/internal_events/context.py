@@ -1,3 +1,4 @@
+import hashlib
 from contextvars import ContextVar
 from dataclasses import dataclass, field
 from typing import Any, Dict, List, Optional, Set
@@ -50,6 +51,15 @@ class EventContext(BaseModel):
     model_engine: Optional[str] = None
     model_name: Optional[str] = None
     model_provider: Optional[str] = None
+
+    def to_cache_key(self) -> str:
+        """Generate a stable cache key from this event context"""
+        json_str = self.model_dump_json(
+            include={"source", "realm", "instance_id", "project_id", "namespace_id"},
+            exclude_none=True,
+            exclude_unset=True,
+        )
+        return hashlib.sha256(json_str.encode()).hexdigest()
 
 
 @dataclass

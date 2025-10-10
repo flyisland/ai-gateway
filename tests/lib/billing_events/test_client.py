@@ -17,6 +17,7 @@ from lib.internal_events.context import (
 BASE_BILLING_CONTEXT_SCHEMA: Dict[str, Any] = {
     "event_id": None,
     "event_type": None,
+    "entity_id": None,
     "unit_of_measure": None,
     "quantity": None,
     "realm": None,
