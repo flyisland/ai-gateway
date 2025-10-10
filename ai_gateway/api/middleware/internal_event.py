@@ -17,6 +17,7 @@ from ai_gateway.api.middleware.headers import (
     X_GITLAB_INSTANCE_ID_HEADER,
     X_GITLAB_INTERFACE,
     X_GITLAB_REALM_HEADER,
+    X_GITLAB_ROOT_NAMESPACE_ID,
     X_GITLAB_SAAS_DUO_PRO_NAMESPACE_IDS_HEADER,
     X_GITLAB_TEAM_MEMBER_HEADER,
     X_GITLAB_VERSION_HEADER,
@@ -51,6 +52,15 @@ class InternalEventMiddleware:
         # This is relevant for requests from gitlab.com, not for self-managed/dedicated instances
         feature_enabled_by_namespace_ids = self._extract_namespace_ids(request)
 
+        ultimate_parent_namespace_id_str = request.headers.get(
+            X_GITLAB_ROOT_NAMESPACE_ID
+        )
+        ultimate_parent_namespace_id = (
+            int(ultimate_parent_namespace_id_str)
+            if ultimate_parent_namespace_id_str
+            else None
+        )
+
         # EventContext uses Pydantic which coerces int and string to boolean type
         # Reference: https://docs.pydantic.dev/latest/api/standard_library_types/#booleans
         context = EventContext(
@@ -72,6 +82,7 @@ class InternalEventMiddleware:
             ),
             context_generated_at=datetime.now().isoformat(),
             correlation_id=correlation_id.get(),
+            ultimate_parent_namespace_id=ultimate_parent_namespace_id,
         )
         current_event_context.set(context)
         tracked_internal_events.set(set())
