@@ -20,6 +20,16 @@ components:
       - "on_agent_final_answer"
       - "on_tool_execution_success"
       - "on_tool_execution_failed"
+  - name: "fix_pipeline_decide_approach"
+    type: AgentComponent
+    prompt_id: "fix_pipeline_decide_approach"
+    prompt_version: "^1.0.0"
+    inputs:
+      - from: "context:fix_pipeline_context.final_answer"
+        as: "fix_pipeline_context_results"
+    toolset: []
+    ui_log_events:
+      - "on_agent_final_answer"
   - name: "fix_pipeline_create_plan"
     type: AgentComponent
     prompt_id: "fix_pipeline_create_plan"
@@ -100,6 +110,13 @@ components:
       - "on_tool_execution_success"
       - "on_tool_execution_failed"
 routers:
+#  - from: "decision_maker"
+#    condition:
+#      input: "context:decision_maker.final_answer"
+#      routes:
+#        "approve": "approval_handler"
+#        "reject": "rejection_handler"
+#        "default_route": "manual_review"
   - from: "fix_pipeline_context"
     to: "fix_pipeline_create_plan"
   - from: "fix_pipeline_create_plan"
