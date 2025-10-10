@@ -2,7 +2,7 @@ from abc import ABC, abstractmethod
 from datetime import datetime
 from typing import Any, Optional, Union
 
-from langchain_core.messages import BaseMessage, HumanMessage, SystemMessage
+from langchain_core.messages import BaseMessage, HumanMessage, SystemMessage, ToolMessage, AIMessage
 from langchain_core.prompt_values import ChatPromptValue, PromptValue
 from langchain_core.runnables import Runnable, RunnableConfig
 
@@ -16,6 +16,7 @@ from duo_workflow_service.gitlab.gitlab_api import Namespace, Project
 from duo_workflow_service.gitlab.gitlab_service_context import GitLabServiceContext
 from duo_workflow_service.slash_commands.goal_parser import parse as slash_command_parse
 
+from dataclasses import replace
 
 class ChatAgentPromptTemplate(Runnable[ChatWorkflowState, PromptValue]):
     def __init__(self, prompt_template: dict[str, str]):
@@ -66,13 +67,8 @@ class ChatAgentPromptTemplate(Runnable[ChatWorkflowState, PromptValue]):
             # Always cache static system prompt for Anthropic models
             is_anthropic = _kwargs.get("is_anthropic_model", False)
             if is_anthropic:
-                cached_static_content: list[Union[str, dict]] = [
-                    {
-                        "text": static_content_text,
-                        "type": "text",
-                        "cache_control": {"type": "ephemeral", "ttl": "1h"},
-                    }
-                ]
+                cached_static_content = self._create_cached_content(static_content_text)
+
                 messages.append(SystemMessage(content=cached_static_content))
             else:
                 messages.append(SystemMessage(content=static_content_text))
@@ -81,12 +77,13 @@ class ChatAgentPromptTemplate(Runnable[ChatWorkflowState, PromptValue]):
             dynamic_content = jinja2_formatter(
                 self.prompt_template["system_dynamic"],
                 current_date=datetime.now().strftime("%Y-%m-%d"),
-                current_time=datetime.now().strftime("%H:%M:%S"),
+                current_time=datetime.now().strftime("%H"),
                 current_timezone=datetime.now().astimezone().tzname(),
                 project=project,
                 namespace=namespace,
             )
-            messages.append(SystemMessage(content=dynamic_content))
+            cached_dynamic_content = self._create_cached_content(dynamic_content)
+            messages.append(SystemMessage(content=cached_dynamic_content))
 
         for m in input["conversation_history"][agent_name]:
             if isinstance(m, HumanMessage):
@@ -111,8 +108,33 @@ class ChatAgentPromptTemplate(Runnable[ChatWorkflowState, PromptValue]):
             else:
                 messages.append(m)  # AIMessage or ToolMessage
 
+        if is_anthropic and len(messages) > 2:  # More than just system prompts
+            last_msg = messages[-1]
+            if isinstance(last_msg.content, str):
+                cached_content = self._create_cached_content(last_msg.content)
+                try:
+                    messages[-1] = replace(last_msg, content=cached_content)
+                except Exception:
+                    if isinstance(last_msg, ToolMessage):
+                        messages[-1] = ToolMessage(
+                            content=cached_content,
+                            tool_call_id=last_msg.tool_call_id
+                        )
+                    elif isinstance(last_msg, AIMessage):
+                        messages[-1] = AIMessage(content=cached_content)
+                    elif isinstance(last_msg, HumanMessage):
+                        messages[-1] = HumanMessage(content=cached_content)
+
         return ChatPromptValue(messages=messages)
 
+    def _create_cached_content(self, content_text: str) -> list[Union[str, dict]]:
+        return [
+            {
+                "text": content_text,
+                "type": "text",
+                "cache_control": {"type": "ephemeral", "ttl": "5m"},
+            }
+        ]
 
 class ChatPrompt(BaseAgent[ChatWorkflowState, BaseMessage]):
     @classmethod
