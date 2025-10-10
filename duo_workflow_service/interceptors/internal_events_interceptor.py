@@ -61,8 +61,8 @@ class InternalEventsInterceptor(grpc.aio.ServerInterceptor):
         namespace_id = metadata.get(X_GITLAB_NAMESPACE_ID)
         namespace_id = int(namespace_id) if namespace_id else None
 
-        root_namespace_id = metadata.get(X_GITLAB_ROOT_NAMESPACE_ID)
-        root_namespace_id = int(root_namespace_id) if root_namespace_id else None
+        ultimate_parent_namespace_id = metadata.get(X_GITLAB_ROOT_NAMESPACE_ID)
+        ultimate_parent_namespace_id = int(ultimate_parent_namespace_id) if ultimate_parent_namespace_id else None
 
         context = EventContext(
             realm=metadata.get(X_GITLAB_REALM_HEADER),
@@ -80,7 +80,7 @@ class InternalEventsInterceptor(grpc.aio.ServerInterceptor):
                 enabled_features=feature_enabled_by_namespace_ids
             ),
             namespace_id=namespace_id,
-            root_namespace_id=root_namespace_id,
+            ultimate_parent_namespace_id=ultimate_parent_namespace_id,
             is_gitlab_team_member=is_gitlab_member,
         )
 

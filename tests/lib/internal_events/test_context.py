@@ -16,7 +16,7 @@ def test_event_context_default_values():
     assert context.global_user_id is None
     assert context.namespace_id is None
     assert context.project_id is None
-    assert context.root_namespace_id is None
+    assert context.ultimate_parent_namespace_id is None
 
 
 def test_event_context_custom_values():
@@ -30,7 +30,7 @@ def test_event_context_custom_values():
         global_user_id="user123",
         namespace_id=1,
         project_id=2,
-        root_namespace_id=3,
+        ultimate_parent_namespace_id=3,
     )
     assert context.environment == "production"
     assert context.source == "gitlab"
@@ -41,7 +41,7 @@ def test_event_context_custom_values():
     assert context.global_user_id == "user123"
     assert context.namespace_id == 1
     assert context.project_id == 2
-    assert context.root_namespace_id == 3
+    assert context.ultimate_parent_namespace_id == 3
 
 
 def test_current_event_context_default():

@@ -86,7 +86,7 @@ async def test_interceptor_removes_duplicate_namespace_ids(
     assert event_context.host_name == "test-gitlab-host"
     assert event_context.project_id == 1
     assert event_context.namespace_id == 2
-    assert event_context.root_namespace_id == 3
+    assert event_context.ultimate_parent_namespace_id == 3
     assert event_context.is_gitlab_team_member is True
 
 
@@ -118,7 +118,7 @@ async def test_interceptor_with_internal_events_disabled(
     assert event_context.feature_enabled_by_namespace_ids == [1, 2, 3]
     assert event_context.project_id == 1
     assert event_context.namespace_id == 2
-    assert event_context.root_namespace_id == 3
+    assert event_context.ultimate_parent_namespace_id == 3
     assert event_context.is_gitlab_team_member is True
 
 
@@ -137,7 +137,7 @@ async def test_interceptor_with_empty_feature_enabled_attribute(
     assert event_context.feature_enabled_by_namespace_ids is None
     assert event_context.project_id == 1
     assert event_context.namespace_id == 2
-    assert event_context.root_namespace_id == 3
+    assert event_context.ultimate_parent_namespace_id == 3
     assert event_context.is_gitlab_team_member is True
 
 
@@ -158,7 +158,7 @@ async def test_interceptor_with_empty_project_and_namespace_ids(
     assert event_context.feature_enabled_by_namespace_ids is None
     assert event_context.project_id is None
     assert event_context.namespace_id is None
-    assert event_context.root_namespace_id == 3
+    assert event_context.ultimate_parent_namespace_id == 3
 
 
 @pytest.mark.asyncio
