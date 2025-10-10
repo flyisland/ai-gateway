@@ -1,5 +1,4 @@
 # pylint: disable=direct-environment-variable-reference,too-many-lines
-import asyncio
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from typing import Any, Dict, List, Type, cast
@@ -24,6 +23,7 @@ from duo_workflow_service.entities.state import (
     WorkflowState,
     WorkflowStatusEnum,
 )
+from duo_workflow_service.executor.outbox_queue import ActionRequest, OutboxQueue
 from duo_workflow_service.tools import RunCommand, Toolset
 from duo_workflow_service.tools.planner import (
     AddNewTask,
@@ -1111,8 +1111,7 @@ def test_get_tool_display_message_unknown_tool(tools_executor: ToolsExecutor):
         {
             "run_command": RunCommand(
                 metadata={
-                    "outbox": MagicMock(spec=asyncio.Queue),
-                    "inbox": MagicMock(spec=asyncio.Queue),
+                    "outbox": MagicMock(spec=OutboxQueue),
                 }
             )
         }
@@ -1120,8 +1119,12 @@ def test_get_tool_display_message_unknown_tool(tools_executor: ToolsExecutor):
 )
 async def test_run_command_output(workflow_state, tools_executor, mock_client_event):
     # Configure the inbox mock to return the mock ClientEvent
-    inbox_mock = tools_executor._toolset["run_command"].metadata["inbox"]
-    inbox_mock.get.return_value = mock_client_event
+    outbox_mock = tools_executor._toolset["run_command"].metadata["outbox"]
+
+    def set_result(item: ActionRequest):
+        item.result.set_result(mock_client_event)  # type: ignore[union-attr]
+
+    outbox_mock.put.side_effect = set_result
 
     workflow_state["conversation_history"]["planner"] = [
         AIMessage(

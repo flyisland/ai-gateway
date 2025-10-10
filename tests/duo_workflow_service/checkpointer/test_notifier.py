@@ -11,13 +11,18 @@ from duo_workflow_service.checkpointer.gitlab_workflow import (
 )
 from duo_workflow_service.checkpointer.notifier import UserInterface
 from duo_workflow_service.entities.state import MessageTypeEnum, WorkflowStatusEnum
+from duo_workflow_service.executor.outbox_queue import (
+    ActionRequest,
+    OutboxQueue,
+    OutboxSignal,
+)
 from duo_workflow_service.workflows.type_definitions import AdditionalContext
 from lib.feature_flags.context import current_feature_flag_context
 
 
 @pytest.fixture(name="outbox")
-def outbox_fixture():
-    return asyncio.Queue()
+def outbox_fixture() -> OutboxQueue:
+    return OutboxQueue()
 
 
 @pytest.fixture(name="checkpoint_notifier")
@@ -55,7 +60,7 @@ async def test_send_event_with_values_type(checkpoint_notifier):
     assert checkpoint_notifier.status == WorkflowStatusEnum.COMPLETED
     assert checkpoint_notifier.steps == ["step1", "step2"]
     assert not checkpoint_notifier.outbox.empty()
-    action = await checkpoint_notifier.outbox.get()
+    action = (await checkpoint_notifier.outbox.get()).action
     assert action.newCheckpoint.goal == "test_goal"
     assert action.newCheckpoint.status == "FINISHED"
     expected_checkpoint = dumps(
@@ -90,7 +95,7 @@ async def test_send_event_with_missing_plan_steps(checkpoint_notifier):
         "plan": {},
     }
     await checkpoint_notifier.send_event("values", state, False)
-    action = await checkpoint_notifier.outbox.get()
+    action = (await checkpoint_notifier.outbox.get()).action
     expected_checkpoint = dumps(
         {
             "channel_values": {
@@ -310,7 +315,7 @@ async def test_send_event_messages_stream(
 
         if should_execute_action:
             assert not checkpoint_notifier.outbox.empty()
-            action = await checkpoint_notifier.outbox.get()
+            action = (await checkpoint_notifier.outbox.get()).action
             assert action.newCheckpoint.goal == "test_goal"
             assert action.newCheckpoint.checkpoint is not None
         else:

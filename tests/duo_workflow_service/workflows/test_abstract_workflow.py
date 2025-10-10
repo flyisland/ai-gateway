@@ -1,9 +1,14 @@
+import asyncio
 import os
 from unittest.mock import AsyncMock, MagicMock, Mock, patch
 
 import pytest
 
 from contract import contract_pb2
+from duo_workflow_service.executor.outbox_queue import (
+    ActionRequest,
+    UnknownResponseIDException,
+)
 from duo_workflow_service.llm_factory import AnthropicConfig, VertexConfig
 from duo_workflow_service.workflows.abstract_workflow import (
     AbstractWorkflow,
@@ -76,6 +81,11 @@ def mock_namespace_fixture():
     }
 
 
+@pytest.fixture
+def mock_action():
+    return contract_pb2.Action()
+
+
 @pytest.mark.asyncio
 async def test_init():
     # Test initialization
@@ -97,8 +107,7 @@ async def test_init():
     assert workflow._workflow_id == workflow_id
     assert workflow._workflow_metadata == metadata
     assert workflow.is_done is False
-    assert workflow._outbox.maxsize == 1
-    assert workflow._inbox.maxsize == 1
+    assert workflow._outbox.maxsize == 0
     assert len(workflow._mcp_tools) == 1
     tool = workflow._mcp_tools[0](metadata={})
     assert tool.name == "get_issue"
@@ -107,58 +116,41 @@ async def test_init():
 
 
 @pytest.mark.asyncio
-async def test_outbox_empty(workflow):
-    await workflow._outbox.put("test_item")
-    assert not workflow.outbox_empty()
-
-    item = await workflow.get_from_outbox()
-
-    assert item == "test_item"
-    assert workflow.outbox_empty()
-
-
-@pytest.mark.asyncio
-async def test_get_from_outbox(workflow):
+async def test_get_from_outbox(workflow, mock_action):
     # Put an item in the outbox
-    await workflow._outbox.put("test_item")
+    await workflow._outbox.put(ActionRequest(action=mock_action))
 
     # Get the item
     item = await workflow.get_from_outbox()
 
-    assert item == "test_item"
+    assert item.action == mock_action
     assert workflow._outbox.empty()
 
 
 @pytest.mark.asyncio
-async def test_get_from_outbox_wait_for(workflow):
-    assert workflow._outbox.empty()
+async def test_set_action_response(workflow):
+    request = ActionRequest(action=contract_pb2.Action())
 
-    item = await workflow.get_from_outbox()
+    await workflow._outbox.put(request)
 
-    assert item == None
+    # Set action response that has the corresponding request ID
+    workflow.set_action_response(
+        contract_pb2.ClientEvent(
+            actionResponse=contract_pb2.ActionResponse(
+                response="the response", requestID=request.action.requestID
+            )
+        )
+    )
 
-
-@pytest.mark.asyncio
-async def test_get_from_streaming_outbox(workflow):
-    await workflow._streaming_outbox.put("test_item")
-
-    item = workflow.get_from_streaming_outbox()
-
-    assert item == "test_item"
-    assert workflow._streaming_outbox.empty()
-
-
-@pytest.mark.asyncio
-async def test_add_to_inbox(workflow):
-    # Create a mock event
-    mock_event = MagicMock()
-
-    # Add to inbox
-    workflow.add_to_inbox(mock_event)
-
-    # Check if it was added
-    assert workflow._inbox.qsize() == 1
-    assert await workflow._inbox.get() == mock_event
+    # Set action response that does not have the corresponding request ID
+    with pytest.raises(UnknownResponseIDException):
+        workflow.set_action_response(
+            contract_pb2.ClientEvent(
+                actionResponse=contract_pb2.ActionResponse(
+                    response="the response", requestID="unknown-request-id"
+                )
+            )
+        )
 
 
 @pytest.mark.asyncio
@@ -214,7 +206,6 @@ async def test_compile_and_run_graph(
     mock_fetch_workflow.assert_called_once()
     mock_tools_registry.assert_called_once_with(
         outbox=workflow._outbox,
-        inbox=workflow._inbox,
         workflow_config=workflow._workflow_config,
         gl_http_client=workflow._http_client,
         mcp_tools=[mcp_tool] if mcp_enabled else [],
@@ -229,14 +220,12 @@ async def test_compile_and_run_graph(
 async def test_cleanup(mock_log_exception, workflow):
     # Add items to queues
     await workflow._outbox.put("outbox_item")
-    await workflow._inbox.put("inbox_item")
 
     # Run cleanup
     await workflow.cleanup(workflow._workflow_id)
 
     # Check queues are empty
     assert workflow._outbox.empty()
-    assert workflow._inbox.empty()
     assert workflow.is_done is True
     mock_log_exception.assert_not_called()
 
@@ -310,10 +299,6 @@ async def test_compile_and_run_graph_with_exception(
     # Setup mocks to raise an exception
     mock_tools_registry.side_effect = Exception("Test exception")
     mock_fetch_workflow.return_value = (mock_project, None, {"project_id": 1})
-    workflow._inbox.get = AsyncMock(
-        return_value=MagicMock(actionResponse=MagicMock(requestID="", response=""))
-    )
-    workflow._inbox.task_done = AsyncMock()
 
     with pytest.raises(TraceableException) as exc_info:
         await workflow._compile_and_run_graph("Test goal")

@@ -4,6 +4,7 @@ from unittest.mock import AsyncMock, MagicMock
 import pytest
 
 from contract import contract_pb2
+from duo_workflow_service.executor.outbox_queue import ActionRequest
 from duo_workflow_service.tools.search_system import (
     ExtractLinesFromText,
     ExtractLinesFromTextInput,
@@ -85,10 +86,10 @@ class TestGrep:
     ]
 
     def _setup_grep_tool_with_mocks(self, mock_response: str) -> Grep:
-        """Helper method to set up Grep tool with mocked outbox and inbox.
+        """Helper method to set up Grep tool with mocked outbox.
 
         Args:
-            mock_response: The response string to return from the mocked inbox
+            mock_response: The response string to return from the mocked outbox
 
         Returns:
             Configured Grep tool instance with mocked dependencies
@@ -96,12 +97,14 @@ class TestGrep:
         mock_outbox = MagicMock()
         mock_outbox.put = AsyncMock()
 
-        mock_inbox = MagicMock()
-        mock_inbox.get = AsyncMock(
-            return_value=create_mock_client_event_with_response(mock_response)
-        )
+        def set_result(item: ActionRequest):
+            item.result.set_result(  # type: ignore[union-attr]
+                create_mock_client_event_with_response(mock_response)
+            )
 
-        metadata = {"outbox": mock_outbox, "inbox": mock_inbox}
+        mock_outbox.put.side_effect = set_result
+
+        metadata = {"outbox": mock_outbox}
         grep_tool = Grep()
         grep_tool.metadata = metadata
 

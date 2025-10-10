@@ -5,6 +5,7 @@ from unittest.mock import AsyncMock, MagicMock
 import pytest
 
 from contract import contract_pb2
+from duo_workflow_service.executor.outbox_queue import ActionRequest, OutboxQueue
 from duo_workflow_service.tools.command import RunCommand, RunCommandInput
 
 
@@ -30,10 +31,12 @@ async def test_run_command_success(
     mock_outbox = MagicMock()
     mock_outbox.put = AsyncMock()
 
-    mock_inbox = MagicMock()
-    mock_inbox.get = AsyncMock(return_value=mock_success_client_event)
+    def set_result(item: ActionRequest):
+        item.result.set_result(mock_success_client_event)  # type: ignore[union-attr]
 
-    metadata = {"outbox": mock_outbox, "inbox": mock_inbox}
+    mock_outbox.put.side_effect = set_result
+
+    metadata = {"outbox": mock_outbox}
 
     run_command = RunCommand(name="run_command", description="Run a shell command")
     run_command.metadata = metadata
@@ -43,7 +46,7 @@ async def test_run_command_success(
     assert response == "done"
 
     mock_outbox.put.assert_called_once()
-    action = mock_outbox.put.call_args[0][0]
+    action = mock_outbox.put.call_args[0][0].action
     assert action.runCommand.program == program
     assert action.runCommand.arguments == expected_action_args
     assert action.runCommand.flags == []

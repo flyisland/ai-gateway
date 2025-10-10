@@ -1,4 +1,3 @@
-import asyncio
 from typing import Optional, Type, TypedDict, Union
 
 from gitlab_cloud_connector import CloudConnectorUser
@@ -7,6 +6,7 @@ from pydantic import BaseModel
 
 from ai_gateway.code_suggestions.language_server import LanguageServerVersion
 from duo_workflow_service import tools
+from duo_workflow_service.executor.outbox_queue import OutboxQueue
 from duo_workflow_service.gitlab.gitlab_api import Project, WorkflowConfig
 from duo_workflow_service.gitlab.http_client import GitlabHttpClient
 from duo_workflow_service.tools import Toolset, ToolType
@@ -21,8 +21,7 @@ from duo_workflow_service.tools.vulnerabilities.get_vulnerability_details import
 
 
 class ToolMetadata(TypedDict):
-    outbox: asyncio.Queue
-    inbox: asyncio.Queue
+    outbox: OutboxQueue
     gitlab_client: GitlabHttpClient
     gitlab_host: str
     project: Optional[Project]
@@ -153,8 +152,7 @@ class ToolsRegistry:
         cls,
         workflow_config: WorkflowConfig,
         gl_http_client: GitlabHttpClient,
-        outbox: asyncio.Queue,
-        inbox: asyncio.Queue,
+        outbox: OutboxQueue,
         project: Optional[Project],
         mcp_tools: Optional[list[type[BaseTool]]] = None,
         user: Optional[CloudConnectorUser] = None,
@@ -174,7 +172,6 @@ class ToolsRegistry:
         )
         tool_metadata = ToolMetadata(
             outbox=outbox,
-            inbox=inbox,
             gitlab_client=gl_http_client,
             gitlab_host=workflow_config.get("gitlab_host", ""),
             project=project,

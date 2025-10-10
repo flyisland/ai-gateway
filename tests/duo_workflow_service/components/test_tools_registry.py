@@ -13,6 +13,11 @@ from duo_workflow_service.components.tools_registry import (
     Toolset,
     ToolsRegistry,
 )
+from duo_workflow_service.executor.outbox_queue import (
+    ActionRequest,
+    OutboxQueue,
+    OutboxSignal,
+)
 from duo_workflow_service.gitlab.http_client import GitlabHttpClient
 from duo_workflow_service.tools.code_review import (
     BuildReviewMergeRequestContext,
@@ -47,8 +52,7 @@ def mcp_tools_fixture():
     return convert_mcp_tools_to_langchain_tool_classes(mcp_tools=[mcp_tool_mock])
 
 
-_inbox = MagicMock(spec=asyncio.Queue)
-_outbox = MagicMock(spec=asyncio.Queue)
+_outbox = MagicMock(spec=OutboxQueue)
 
 
 @pytest.mark.parametrize(
@@ -401,7 +405,6 @@ async def test_registry_configuration(gl_http_client, mcp_tools, project_mock):
         workflow_config=workflow_config,
         gl_http_client=gl_http_client,
         outbox=_outbox,
-        inbox=_inbox,
         project=project_mock,
         mcp_tools=mcp_tools,
     )
@@ -576,7 +579,6 @@ async def test_registry_configuration_with_preapproved_tools(
         workflow_config=workflow_config,
         gl_http_client=gl_http_client,
         outbox=_outbox,
-        inbox=_inbox,
         project=project_mock,
     )
 
@@ -618,7 +620,6 @@ async def test_registry_configuration_error(
             workflow_config=workflow_config,
             gl_http_client=gl_http_client,
             outbox=_outbox,
-            inbox=_inbox,
             project=project_mock,
         )
 
