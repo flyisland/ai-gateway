@@ -25,6 +25,7 @@ from starlette_context.middleware import RawContextMiddleware
 from ai_gateway.api.middleware import (
     AccessLogMiddleware,
     DistributedTraceMiddleware,
+    EntitlementsMiddleware,
     FeatureFlagMiddleware,
     InternalEventMiddleware,
     MiddlewareAuthentication,
@@ -156,6 +157,13 @@ def create_fast_api_server(config: Config):
                 enabled=config.internal_event.enabled,
                 environment=config.environment,
             ),
+            Middleware(
+                EntitlementsMiddleware,
+                enabled=config.billing_event.enabled,
+                skip_endpoints=_SKIP_ENDPOINTS,
+                environment=config.environment,
+                customersdot_url=config.customer_portal_url,
+            ),
             Middleware(ModelConfigMiddleware),
         ],
         extra={"config": config},
@@ -210,7 +218,8 @@ async def model_api_exception_handler(request: Request, exc: ModelAPIError) -> R
 
 
 async def validation_exception_handler(
-    request: Request, exc: RequestValidationError  # pylint: disable=unused-argument
+    request: Request,
+    exc: RequestValidationError,  # pylint: disable=unused-argument
 ) -> JSONResponse:
     if can_log_request_data():
         context["exception_message"] = str(exc)
