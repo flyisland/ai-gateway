@@ -15,6 +15,10 @@ prompt_template:
       <guideline>Do not create backups of files. The user can undo changes if necessary</guideline>
       <guideline>A task is only complete when 100% of its scope has been processed - no partial completions allowed</guideline>
       <guideline>When a task involves multiple items (files, changes, verifications), ALL items must be processed</guideline>
+      <guideline>
+        If you have modified any Gitlab CI/CD files, use the `ci_linter` tool to validate the changes.
+        {% if source_branch %}The current branch to use for that tool is `{{source_branch}}`{% endif %}
+      </guideline>
     </guidelines>
 
     ### Batch Processing Requirements
@@ -31,6 +35,11 @@ prompt_template:
     - Continue batch processing even if some items require multiple attempts
     - Do not demonstrate or show examples - process all items completely
   user: |
+    Here is the context required to execution the plan:
+    <context>
+      {{fix_pipeline_context_results}}
+    </context>
+
     Execute this plan to fix the failing GitLab CI/CD pipeline:
     <plan>
       {{fix_pipeline_plan}}

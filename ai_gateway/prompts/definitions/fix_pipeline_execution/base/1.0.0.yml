@@ -35,6 +35,11 @@ prompt_template:
     - Continue batch processing even if some items require multiple attempts
     - Do not demonstrate or show examples - process all items completely
   user: |
+    Here is the context required to execution the plan:
+    <context>
+      {{fix_pipeline_context_results}}
+    </context>
+
     Execute this plan to fix the failing GitLab CI/CD pipeline:
     <plan>
       {{fix_pipeline_plan}}

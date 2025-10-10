@@ -22,6 +22,7 @@ prompt_template:
       {% endif %}
 
       <guideline>Be specific and concise</guideline>
+      <guideline>Do not include any plans to use `git` in your plan. This will be handled later by another agent</guideline>
       <guideline>Output your plan in structured XML format</guideline>
     </guidelines>
   user: |
