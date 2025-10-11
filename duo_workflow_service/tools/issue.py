@@ -117,6 +117,10 @@ If a label does not already exist, this creates a new project label and assigns 
         default=None,
         description="The type of issue. One of issue, incident, test_case or task. Default is issue.",
     )
+    epic_id: Optional[int] = Field(
+        default=None,
+        description="The ID of an epic to add the issue to as a child issue. Use only when epic id is available.",
+    )
 
 
 class CreateIssue(IssueBaseTool):
@@ -243,6 +247,10 @@ None lists all issues with no labels. Any lists all issues with at least one lab
     page: Optional[int] = Field(
         default=1,
         description="Page number. Default is 1.",
+    )
+    epic_id: Optional[int] = Field(
+        default=None,
+        description="The ID of an epic to filter issues by. Use only when epic id is available.",
     )
 
 
@@ -379,6 +387,10 @@ class UpdateIssueInput(IssueResourceInput):
         default=None,
         description="Flag indicating if the issue's discussion is locked. If the discussion is locked only project "
         "members can add or edit comments.",
+    )
+    epic_id: Optional[int] = Field(
+        default=None,
+        description="The ID of an epic to add the issue to as a child issue. Use only when epic id is available.",
     )
 
 
