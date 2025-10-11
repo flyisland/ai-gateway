@@ -255,6 +255,86 @@ class ChatAmazonQ(BaseChatModel):
 
         return message, history
 
+    def _process_code_reference_event(self, event: StreamEvent) -> StreamResponse:
+        """
+        Processes a code reference event and extracts code reference information.
+        Args:
+            event (StreamEvent): The code reference event to process
+        Returns:
+            StreamResponse: A response containing the code reference information
+        
+        Example:
+            Input event:
+            {
+                "codeReferenceEvent": {
+                    "references": [
+                        {
+                            "repository": {"shape": "example-repo"},
+                            "licenseName": {"shape": "MIT"},
+                            "url": {"shape": "https://github.com/example/repo"},
+                            "recommendationContentSpan": {"shape": "lines 10-20"}
+                        },
+                        {
+                            "repository": {"shape": "another-repo"},
+                            "licenseName": {"shape": "Apache-2.0"},
+                            "url": {"shape": "https://github.com/another/repo"},
+                            "recommendationContentSpan": {"shape": "lines 5-15"}
+                        }
+                    ]
+                }
+            }
+        
+        Output:
+            StreamResponse with content:
+            "example-repo [MIT]: https://github.com/example/repo (lines 10-20)
+            another-repo [Apache-2.0]: https://github.com/another/repo (lines 5-15)"
+        """
+        references = event.get("codeReferenceEvent")
+        if not references:
+            return StreamResponse(content="", error="Invalid references event: codeReferenceEvent is empty or missing")
+
+        if not isinstance(references, dict):
+            return StreamResponse(content="", error=f"Invalid references format: expected dict, got {type(references)}")
+
+        content = references.get("references", "")
+        if not content:
+            return StreamResponse(content="")
+
+        if not isinstance(content, (list, tuple)):
+            return StreamResponse(content="", error=f"Invalid content format: expected list or tuple, got {type(content)}")
+
+        formatted_references = []
+        for item in content:
+            if isinstance(item, dict):
+                # Extract values, handling nested dictionary structure
+                repository = item.get('repository', {}).get('shape') if isinstance(item.get('repository'), dict) else item.get('repository', '')
+                license_name = item.get('licenseName', {}).get('shape') if isinstance(item.get('licenseName'), dict) else item.get('licenseName', '')
+                url = item.get('url', {}).get('shape') if isinstance(item.get('url'), dict) else item.get('url', '')
+                span = item.get('recommendationContentSpan', {}).get('shape') if isinstance(item.get('recommendationContentSpan'), dict) else item.get('recommendationContentSpan', '')
+
+                # Build the reference string part by part
+                parts = []
+                if repository:
+                    parts.append(repository)
+                if license_name:
+                    parts.append(f"[{license_name}]")
+                if url:
+                    parts.append(f": {url}")
+                if span:
+                    parts.append(f"({span})")
+
+                # Join the parts with spaces, only if they exist
+                formatted_ref = " ".join(parts)
+                if formatted_ref:
+                    formatted_references.append(f"\n{formatted_ref}")
+            else:
+                formatted_references.append(f"\n{str(item)}")
+
+        referenceContent = "\n".join(formatted_references)
+        return ChatGenerationChunk(
+            message=AIMessageChunk(content=referenceContent)
+        )
+    
     @property
     def _identifying_params(self) -> Dict[str, Any]:
         return {

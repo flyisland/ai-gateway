@@ -6,6 +6,7 @@ from langchain_core.outputs import ChatGenerationChunk
 
 from ai_gateway.integrations.amazon_q.chat import ChatAmazonQ, Reference, ReferenceSpan
 from ai_gateway.integrations.amazon_q.client import AmazonQClientFactory
+from langchain_core.messages import AIMessageChunk
 
 
 class TestChatAmazonQ:
@@ -472,3 +473,170 @@ class TestChatAmazonQ:
 
     def test_llm_type(self, chat_amazon_q):
         assert chat_amazon_q._llm_type == "amazon_q"
+
+    def test_valid_single_reference(self, chat_amazon_q):
+        """Test with a valid event containing a single reference."""
+        event = {
+            "codeReferenceEvent": {
+                "references": [
+                    {
+                        "repository": {"shape": "example-repo"},
+                        "licenseName": {"shape": "MIT"},
+                        "url": {"shape": "https://github.com/example/repo"},
+                        "recommendationContentSpan": {"shape": "lines 10-20"}
+                    }
+                ]
+            }
+        }
+        
+        result = chat_amazon_q._process_code_reference_event(event)
+        
+        assert isinstance(result, ChatGenerationChunk)
+        assert isinstance(result.message, AIMessageChunk)
+        assert "example-repo [MIT]: https://github.com/example/repo (lines 10-20)" in result.message.content
+        
+    def test_valid_multiple_references(self, chat_amazon_q):
+        """Test with a valid event containing multiple references."""
+        event = {
+            "codeReferenceEvent": {
+                "references": [
+                    {
+                        "repository": {"shape": "repo1"},
+                        "licenseName": {"shape": "MIT"},
+                        "url": {"shape": "https://github.com/repo1"},
+                        "recommendationContentSpan": {"shape": "lines 1-10"}
+                    },
+                    {
+                        "repository": {"shape": "repo2"},
+                        "licenseName": {"shape": "Apache-2.0"},
+                        "url": {"shape": "https://github.com/repo2"},
+                        "recommendationContentSpan": {"shape": "lines 5-15"}
+                    }
+                ]
+            }
+        }
+        
+        result = chat_amazon_q._process_code_reference_event(event)
+        
+        assert isinstance(result, ChatGenerationChunk)
+        assert "repo1 [MIT]: https://github.com/repo1 (lines 1-10)" in result.message.content
+        assert "repo2 [Apache-2.0]: https://github.com/repo2 (lines 5-15)" in result.message.content
+        
+    def test_missing_optional_fields(self, chat_amazon_q):
+        """Test with missing optional fields in references."""
+        event = {
+            "codeReferenceEvent": {
+                "references": [
+                    {
+                        "repository": {"shape": "example-repo"},
+                        # Missing licenseName
+                        "url": {"shape": "https://github.com/example/repo"},
+                        # Missing recommendationContentSpan
+                    }
+                ]
+            }
+        }
+        
+        result = chat_amazon_q._process_code_reference_event(event)
+        
+        assert isinstance(result, ChatGenerationChunk)
+        assert "example-repo: https://github.com/example/repo" in result.message.content
+        
+    def test_empty_references_list(self, chat_amazon_q):
+        """Test with an empty references list."""
+        event = {
+            "codeReferenceEvent": {
+                "references": []
+            }
+        }
+        
+        result = chat_amazon_q._process_code_reference_event(event)
+        
+        assert isinstance(result, ChatGenerationChunk)
+        assert result.message.content == ""
+        
+    def test_missing_references_key(self, chat_amazon_q):
+        """Test with missing references key."""
+        event = {
+            "codeReferenceEvent": {}
+        }
+        
+        result = chat_amazon_q._process_code_reference_event(event)
+        
+        assert isinstance(result, ChatGenerationChunk)
+        assert result.message.content == ""
+        
+    def test_missing_code_reference_event(self, chat_amazon_q):
+        """Test with missing codeReferenceEvent."""
+        event = {}
+        
+        result = chat_amazon_q._process_code_reference_event(event)
+        
+        assert isinstance(result, ChatGenerationChunk)
+        assert result.message.content == ""
+        
+    def test_invalid_references_type(self, chat_amazon_q):
+        """Test with invalid references type (string instead of list)."""
+        event = {
+            "codeReferenceEvent": {
+                "references": "not a list"
+            }
+        }
+        
+        result = chat_amazon_q._process_code_reference_event(event)
+        
+        assert isinstance(result, ChatGenerationChunk)
+        assert result.message.content == ""
+        
+    def test_invalid_reference_item_type(self, chat_amazon_q):
+        """Test with invalid reference item type (string instead of dict)."""
+        event = {
+            "codeReferenceEvent": {
+                "references": ["not a dict"]
+            }
+        }
+        
+        result = chat_amazon_q._process_code_reference_event(event)
+        
+        assert isinstance(result, ChatGenerationChunk)
+        assert result.message.content == ""
+        
+    def test_missing_shape_in_fields(self, chat_amazon_q):
+        """Test with missing shape in fields."""
+        event = {
+            "codeReferenceEvent": {
+                "references": [
+                    {
+                        "repository": "missing-shape",
+                        "licenseName": {"shape": "MIT"},
+                        "url": {"shape": "https://github.com/example/repo"}
+                    }
+                ]
+            }
+        }
+        
+        result = chat_amazon_q._process_code_reference_event(event)
+        
+        assert isinstance(result, ChatGenerationChunk)
+        # The method should handle this gracefully, either by skipping the field or using a default
+        assert result.message.content != ""
+        
+    def test_null_values_in_fields(self, chat_amazon_q):
+        """Test with null values in fields."""
+        event = {
+            "codeReferenceEvent": {
+                "references": [
+                    {
+                        "repository": {"shape": None},
+                        "licenseName": {"shape": "MIT"},
+                        "url": {"shape": "https://github.com/example/repo"}
+                    }
+                ]
+            }
+        }
+        
+        result = chat_amazon_q._process_code_reference_event(event)
+        
+        assert isinstance(result, ChatGenerationChunk)
+        # The method should handle this gracefully
+        assert result.message.content != ""
