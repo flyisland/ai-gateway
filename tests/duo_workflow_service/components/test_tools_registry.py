@@ -1,8 +1,10 @@
 import asyncio
+from typing import Any
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 from gitlab_cloud_connector import CloudConnectorUser
+from langchain.tools import BaseTool
 
 from ai_gateway.code_suggestions.language_server import LanguageServerVersion
 from duo_workflow_service import tools
@@ -12,6 +14,7 @@ from duo_workflow_service.components.tools_registry import (
     NO_OP_TOOLS,
     Toolset,
     ToolsRegistry,
+    get_all_op_tools,
 )
 from duo_workflow_service.gitlab.http_client import GitlabHttpClient
 from duo_workflow_service.tools.code_review import (
@@ -738,3 +741,40 @@ def test_toolset_method(
             pre_approved=expected_preapproved, all_tools=expected_all_tools
         )
         assert toolset == mock_toolset
+
+
+def test_get_all_op_tools(monkeypatch):
+
+    def create_mock_tool(tool_name: str):
+        class T1(BaseTool):
+            name: str = tool_name
+            description: str = ""
+
+            def _run(self, *args: Any, **kwargs: Any) -> str:
+                return ""
+
+            async def _arun(self, *args: Any, **kwargs: Any) -> str:
+                return ""
+
+        return T1
+
+    tool1 = create_mock_tool("tool1")
+    tool2 = create_mock_tool("tool2")
+    tool3 = create_mock_tool("tool3")
+    monkeypatch.setattr(
+        "duo_workflow_service.components.tools_registry._DEFAULT_TOOLS", [tool1]
+    )
+    monkeypatch.setattr(
+        "duo_workflow_service.components.tools_registry._READ_ONLY_GITLAB_TOOLS",
+        [tool1, tool2],
+    )
+    monkeypatch.setattr(
+        "duo_workflow_service.components.tools_registry._AGENT_PRIVILEGES",
+        {"run_commands": [tool3, tool1]},
+    )
+
+    tools = set(
+        get_all_op_tools(),
+    )
+    assert len(tools) == 3
+    assert tools == set([tool1, tool2, tool3])
