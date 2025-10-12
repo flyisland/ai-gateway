@@ -1,6 +1,38 @@
+import re
 from typing import Any, Dict, List, Union
 
 import bleach
+
+
+def decode_unicode_escapes(text: str) -> str:
+    """Decode JSON Unicode escape sequences at multiple levels.
+
+    Handles single and multi-level encoded sequences like:
+    - \\u003c -> <
+    - \\\\u003c -> <
+    - \\u0026 -> &
+    - \\\\u0026lt; -> &lt; -> (sanitized by Bleach)
+
+    This is needed because Bleach doesn't decode JSON Unicode escapes.
+    We decode iteratively to handle multiple levels of encoding.
+    """
+    if not text or not isinstance(text, str):
+        return text
+
+    # Decode iteratively up to 3 times to handle multiple levels of encoding
+    # This handles cases like \\\\u0026lt; -> \\&lt; -> &lt;
+    for _ in range(3):
+        prev_text = text
+        # Decode: \u003c, \u003e, \u0026
+        text = re.sub(r"\\+u003c", "<", text, flags=re.IGNORECASE)
+        text = re.sub(r"\\+u003e", ">", text, flags=re.IGNORECASE)
+        text = re.sub(r"\\+u0026", "&", text, flags=re.IGNORECASE)
+
+        # If nothing changed, we're done
+        if text == prev_text:
+            break
+
+    return text
 
 
 def sanitize_html_content(
@@ -20,11 +52,8 @@ def sanitize_html_content(
         if not text or not isinstance(text, str):
             return text
 
-        decoded_text = text.replace("\\u003c", "<").replace("\\u003e", ">")
-        decoded_text = decoded_text.replace("\\u003C", "<").replace("\\u003E", ">")
-
-        if "<" not in decoded_text and "&lt;" not in decoded_text:
-            return text
+        # Decode JSON Unicode escapes that could be used to bypass sanitization
+        decoded_text = decode_unicode_escapes(text)
 
         allowed_tags = [
             "b",
