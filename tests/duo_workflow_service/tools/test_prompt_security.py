@@ -280,8 +280,8 @@ class TestPromptSecurity:
     def test_encoded_ampersand_bypass_prevented(self):
         """Test that encoded &lt; variations are properly sanitized.
 
-        This prevents bypass attacks where &lt; is encoded as \\u0026lt; or similar
-        variations to evade the early exit check.
+        This prevents bypass attacks where &lt; is encoded as \\u0026lt; or similar variations to evade the early exit
+        check.
         """
         # Unicode-encoded ampersand with lt/gt
         result = PromptSecurity.apply_security_to_tool_response(
