@@ -204,7 +204,7 @@ class PromptSecurity:
                         PromptSecurity.TOOL_SPECIFIC_FUNCTIONS[tool_name]
                     )
 
-                secured_response = response
+                secured_response: Union[str, List[Union[str, Dict[str, Any]]]] = response
                 for func in all_functions:
                     try:
                         secured_response = func(secured_response)
