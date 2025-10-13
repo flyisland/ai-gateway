@@ -473,7 +473,7 @@ def test_tools_registry_interaction(
 @pytest.mark.asyncio
 async def test_get_graph_input_start(workflow_with_project):
     result = await workflow_with_project.get_graph_input(
-        "Test goal", WorkflowStatusEventEnum.START
+        "Test goal", WorkflowStatusEventEnum.START, None
     )
 
     assert result["status"] == WorkflowStatusEnum.NOT_STARTED
@@ -490,7 +490,7 @@ async def test_get_graph_input_start(workflow_with_project):
     "status", [WorkflowStatusEventEnum.RETRY, WorkflowStatusEventEnum.RESUME]
 )
 async def test_get_graph_input(workflow_with_project, status):
-    result = await workflow_with_project.get_graph_input("New input", status)
+    result = await workflow_with_project.get_graph_input("New input", status, None)
 
     assert result.goto == "agent"
     assert result.update["status"] == WorkflowStatusEnum.EXECUTION
@@ -513,7 +513,7 @@ async def test_get_graph_input(workflow_with_project, status):
 async def test_get_graph_input_resume_with_approval(workflow_with_approval):
     """Test graph input with approved tool calls."""
     result = await workflow_with_approval.get_graph_input(
-        "", WorkflowStatusEventEnum.RESUME
+        "", WorkflowStatusEventEnum.RESUME, None
     )
 
     assert result.goto == "run_tools"
@@ -539,7 +539,7 @@ async def test_get_graph_input_resume_with_rejected_approval(
     )
 
     result = await workflow_with_rejected_approval.get_graph_input(
-        "", WorkflowStatusEventEnum.RESUME
+        "", WorkflowStatusEventEnum.RESUME, None
     )
 
     assert result.goto == "agent"
@@ -806,7 +806,7 @@ async def test_agent_resume_with_updated_preapproved_tools(workflow_with_project
 
     # Resume the workflow
     result = await workflow_with_project.get_graph_input(
-        "", WorkflowStatusEventEnum.RESUME
+        "", WorkflowStatusEventEnum.RESUME, None
     )
 
     # Verify the state update includes the new preapproved_tools
