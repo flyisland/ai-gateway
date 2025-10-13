@@ -1,0 +1,106 @@
+name: "Readiness Evidence Collector"
+description: |
+  This flow verifies and completes checklist requirements by gathering evidence from GitLab entities.
+  Given a checklist template and links to epics/issues/blueprints, it:
+  1. Reads the checklist template from a structured folder (e.g., service_architecture/)
+  2. Scans provided GitLab links (epics, issues, architecture blueprints) for relevant evidence
+  3. Analyzes the evidence against checklist requirements
+  4. Generates a completed checklist with verification status and evidence citations
+product_group: agent_foundations
+version: "experimental"
+environment: ambient
+
+components:
+  # Component 1: Discover and read checklist templates
+  - name: "template_reader"
+    type: AgentComponent
+    prompt_id: "prep_template_reader"
+    prompt_version: "^1.0.0"
+    inputs: 
+      - from: "context:goal"
+        as: "user_request"
+    toolset:
+      - "read_file"
+      - "list_dir"
+      - "find_files"
+      - "list_repository_tree"
+    ui_log_events:
+      - "on_agent_final_answer"
+      - "on_tool_execution_success"
+      - "on_tool_execution_failed"
+    
+  # Component 2: Scan GitLab entities for evidence
+  - name: "evidence_scanner"
+    type: AgentComponent
+    prompt_id: "prep_evidence_scanner"
+    prompt_version: "^1.0.0"
+    inputs:
+      - from: "context:template_reader.final_answer"
+        as: "template_data"
+      - from: "context:goal"
+        as: "user_request"
+    toolset:
+      - "get_epic"
+      - "list_epics"
+      - "list_epic_notes"
+      - "get_issue"
+      - "list_issues"
+      - "get_issue_note"
+      - "list_issue_notes"
+      - "get_repository_file"
+      - "list_repository_tree"
+      - "documentation_search"
+      - "blob_search"
+    ui_log_events:
+      - "on_agent_final_answer"
+      - "on_tool_execution_success"
+      - "on_tool_execution_failed"
+      
+  # Component 3: Analyze the evidence
+  - name: "evidence_analyzer"
+    type: AgentComponent
+    prompt_id: "prep_evidence_analyzer"
+    prompt_version: "^1.0.0"
+    inputs:
+      - from: "context:template_reader.final_answer"
+        as: "checklist_items"
+      - from: "context:evidence_scanner.final_answer"
+        as: "discovered_evidence"
+      - from: "context:goal"
+        as: "user_request"
+    toolset: []  # Pure analysis, no tools needed
+    ui_log_events:
+      - "on_agent_final_answer"
+    
+  # Component 4: Fill the checklist
+  - name: "checklist_filler"
+    type: AgentComponent
+    prompt_id: "prep_checklist_filler"
+    prompt_version: "^1.0.0"
+    inputs:
+      - from: "context:template_reader.final_answer"
+        as: "template_content"
+      - from: "context:evidence_analyzer.final_answer"
+        as: "evidence_mapping"
+      - from: "context:goal"
+        as: "user_request"
+    toolset:
+      - "create_file_with_contents"
+    ui_log_events:
+      - "on_agent_final_answer"
+      - "on_tool_execution_success"
+      - "on_tool_execution_failed"
+
+routers:
+  - from: "template_reader"
+    to: "evidence_scanner"
+  - from: "evidence_scanner"
+    to: "evidence_analyzer"
+  - from: "evidence_analyzer"
+    to: "checklist_filler"
+  - from: "checklist_filler"
+    to: "end"
+
+flow:
+  entry_point: "template_reader"
+
