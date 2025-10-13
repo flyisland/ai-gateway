@@ -1,0 +1,222 @@
+"""Enhanced chat agent with improved error handling.
+
+This module provides an enhanced version of the ChatAgent class that uses the new
+structured error handling system instead of generic error messages.
+"""
+
+from datetime import datetime, timezone
+from typing import Any, Dict, List
+import structlog
+from langchain_core.messages import AIMessage, BaseMessage, HumanMessage, ToolMessage
+from langchain_core.output_parsers.string import StrOutputParser
+
+from duo_workflow_service.components.tools_registry import ToolsRegistry
+from duo_workflow_service.entities.state import (
+    ApprovalStateRejection,
+    ChatWorkflowState,
+    MessageTypeEnum,
+    ToolInfo,
+    ToolStatus,
+    UiChatLog,
+    WorkflowStatusEnum,
+)
+from duo_workflow_service.errors.enhanced_error_handler import handle_agent_error
+from duo_workflow_service.gitlab.gitlab_instance_info_service import (
+    GitLabInstanceInfoService,
+)
+from duo_workflow_service.gitlab.gitlab_service_context import GitLabServiceContext
+from duo_workflow_service.llm_factory import AnthropicStopReason
+
+log = structlog.stdlib.get_logger("enhanced_chat_agent")
+
+
+class EnhancedChatAgent:
+    """Enhanced chat agent with improved error handling."""
+    
+    def __init__(self, name: str, prompt_adapter, tools_registry: ToolsRegistry):
+        self.name = name
+        self.prompt_adapter = prompt_adapter
+        self.tools_registry = tools_registry
+
+    def _get_approvals(
+        self, message: AIMessage, preapproved_tools: List[str]
+    ) -> tuple[bool, list[UiChatLog]]:
+        approval_required = False
+        approval_messages = []
+        for call in message.tool_calls:
+            if (
+                self.tools_registry
+                and self.tools_registry.approval_required(call["name"])
+                and call["name"] not in preapproved_tools
+                and not getattr(
+                    self.prompt_adapter.get_model(), "_is_agentic_mock_model", False
+                )
+            ):
+                approval_required = True
+                approval_messages.append(
+                    UiChatLog(
+                        message_type=MessageTypeEnum.REQUEST,
+                        message_sub_type=None,
+                        content=f"Tool {call['name']} requires approval. Please confirm if you want to proceed.",
+                        timestamp=datetime.now(timezone.utc).isoformat(),
+                        status=ToolStatus.SUCCESS,
+                        correlation_id=None,
+                        tool_info=ToolInfo(name=call["name"], args=call["args"]),
+                        additional_context=None,
+                    )
+                )
+        return approval_required, approval_messages
+
+    def _handle_wrong_messages_order_for_tool_execution(self, input: ChatWorkflowState):
+        # A special fix for the following use case:
+        #
+        # - A user is asked to approve/deny a tool execution
+        # - The user stops the chat instead and specifies a follow up message
+        #
+        # LLM returns an error because a tool call execution was followed by a human message instead of a tool result
+        #
+        # Expected to be refactored in:
+        # - https://gitlab.com/gitlab-org/modelops/applied-ml/code-suggestions/ai-assist/-/issues/1461
+        if (
+            self.name in input["conversation_history"]
+            and len(input["conversation_history"][self.name]) > 1
+        ):
+            tool_call_message = input["conversation_history"][self.name][-2]
+            user_message = input["conversation_history"][self.name][-1]
+            if (
+                isinstance(tool_call_message, AIMessage)
+                and len(tool_call_message.tool_calls) > 0
+                and isinstance(user_message, HumanMessage)
+            ):
+                messages: list[BaseMessage] = [
+                    ToolMessage(
+                        content="Tool is cancelled and a user will provide a follow up message.",
+                        tool_call_id=tool_call.get("id"),
+                    )
+                    for tool_call in getattr(tool_call_message, "tool_calls", [])
+                ]
+                input["conversation_history"][self.name][-2:] = [
+                    tool_call_message,
+                    *messages,
+                    user_message,
+                ]
+
+    def _handle_approval_rejection(
+        self, input: ChatWorkflowState, approval_state: ApprovalStateRejection
+    ) -> list[BaseMessage]:
+        last_message = input["conversation_history"][self.name][-1]
+        # An empty text box for tool cancellation results in a 'null' message. Converting to None
+        # todo: remove this line once we have fixed the frontend to return None instead of 'null'
+        # https://gitlab.com/gitlab-org/modelops/applied-ml/code-suggestions/ai-assist/-/issues/1259
+        normalized_message = (
+            None if approval_state.message == "null" else approval_state.message
+        )
+        tool_message = (
+            f"Tool is cancelled temporarily as user has a comment. Comment: {normalized_message}"
+            if normalized_message
+            else "Tool is cancelled by user. Don't run the command and stop tool execution in progress."
+        )
+        messages: list[BaseMessage] = [
+            ToolMessage(
+                content=tool_message,
+                tool_call_id=tool_call.get("id"),
+            )
+            for tool_call in getattr(last_message, "tool_calls", [])
+        ]
+        # update history
+        input["conversation_history"][self.name].extend(messages)
+        return messages
+
+    async def _get_agent_response(self, input: ChatWorkflowState) -> BaseMessage:
+        return await self.prompt_adapter.get_response(input)
+
+    def _build_response(
+        self, agent_response: BaseMessage, input: ChatWorkflowState
+    ) -> Dict[str, Any]:
+        if not isinstance(agent_response, AIMessage) or not agent_response.tool_calls:
+            return self._build_text_response(agent_response)
+        return self._build_tool_response(agent_response, input)
+
+    def _build_text_response(self, agent_response: BaseMessage) -> Dict[str, Any]:
+        ui_chat_log = UiChatLog(
+            message_type=MessageTypeEnum.AGENT,
+            message_sub_type=None,
+            content=StrOutputParser().invoke(agent_response) or "",
+            timestamp=datetime.now(timezone.utc).isoformat(),
+            status=ToolStatus.SUCCESS,
+            correlation_id=None,
+            tool_info=None,
+            additional_context=None,
+        )
+        return {
+            "conversation_history": {self.name: [agent_response]},
+            "status": WorkflowStatusEnum.INPUT_REQUIRED,
+            "ui_chat_log": [ui_chat_log],
+        }
+
+    def _build_tool_response(
+        self, agent_response: AIMessage, input: ChatWorkflowState
+    ) -> Dict[str, Any]:
+        result: Dict[str, Any] = {
+            "conversation_history": {self.name: [agent_response]},
+            "status": WorkflowStatusEnum.EXECUTION,
+        }
+        preapproved_tools = input.get("preapproved_tools") or []
+        tools_need_approval, approval_messages = self._get_approvals(
+            agent_response, preapproved_tools
+        )
+        if len(agent_response.tool_calls) > 0 and tools_need_approval:
+            result["status"] = WorkflowStatusEnum.TOOL_CALL_APPROVAL_REQUIRED
+            result["ui_chat_log"] = approval_messages
+        return result
+
+    def _create_error_response(self, error: Exception) -> Dict[str, Any]:
+        """Create enhanced error response with structured error information."""
+        
+        enhanced_response = handle_agent_error(
+            exception=error,
+            agent_name=self.name,
+            additional_context={
+                "operation": "chat_agent_processing",
+            }
+        )
+        
+        # Create error message for conversation history
+        error_message = HumanMessage(
+            content=enhanced_response["ui_chat_log"][0]["content"]
+        )
+        
+        # Override status to INPUT_REQUIRED for chat agents
+        enhanced_response["status"] = WorkflowStatusEnum.INPUT_REQUIRED
+        
+        return {
+            "conversation_history": {self.name: [error_message]},
+            **enhanced_response,
+        }
+
+    async def run(self, input: ChatWorkflowState) -> Dict[str, Any]:
+        approval_state = input.get("approval", None)
+        self._handle_wrong_messages_order_for_tool_execution(input)
+
+        # Handle approval rejection
+        if isinstance(approval_state, ApprovalStateRejection):
+            self._handle_approval_rejection(input, approval_state)
+
+        try:
+            with GitLabServiceContext(
+                GitLabInstanceInfoService(),
+                project=input.get("project"),
+                namespace=input.get("namespace"),
+            ):
+                agent_response = await self._get_agent_response(input)
+
+                # Check for abnormal stop reasons
+                stop_reason = agent_response.response_metadata.get("stop_reason")
+                if stop_reason in AnthropicStopReason.abnormal_values():
+                    log.warning(f"LLM stopped abnormally with reason: {stop_reason}")
+
+                return self._build_response(agent_response, input)
+
+        except Exception as error:
+            log.warning(f"Error processing chat agent: {error}")
+            return self._create_error_response(error)
