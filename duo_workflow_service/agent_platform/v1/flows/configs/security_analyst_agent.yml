@@ -1,0 +1,41 @@
+version: "v1"
+environment: chat-partial
+components:
+  # Step 1: Fetch and format all MR data
+  - name: "security_analysis"
+    type: AgentComponent
+    prompt_id: "security_analyst_agent"
+    prompt_version: "^1.0.0"
+    inputs:
+      - from: "context:goal"
+        as: "goal"
+    toolset:
+      - "create_issue_note"
+      - "create_merge_request"
+      - "create_merge_request_note"
+      - "get_issue"
+      - "get_merge_request"
+      - "list_all_merge_request_notes"
+      - "list_dir"
+      - "list_merge_request_diffs"
+      - "gitlab_merge_request_search"
+      - "update_issue"
+      - "update_merge_request"
+      - "create_vulnerability_issue"
+      - "read_files"
+      - "revert_to_detected_vulnerability"
+      - "update_vulnerability_severity"
+      - "link_vulnerability_to_issue"
+      - "get_vulnerability_details"
+      - "dismiss_vulnerability"
+      - "confirm_vulnerability"
+      - "list_vulnerabilities"
+    ui_log_events:
+      - "on_agent_final_answer"
+      - "on_tool_execution_success"
+      - "on_tool_execution_failed"
+routers:
+  - from: "security_analysis"
+    to: "end"
+flow:
+  entry_point: "security_analysis"
