@@ -256,7 +256,9 @@ class Workflow(AbstractWorkflow):
             preapproved_tools=self._preapproved_tools,
         )
 
-    async def get_graph_input(self, goal: str, status_event: str) -> Any:
+    async def get_graph_input(
+        self, goal: str, status_event: str, checkpoint_tuple
+    ) -> Any:
         new_chat_message = goal
 
         match status_event:

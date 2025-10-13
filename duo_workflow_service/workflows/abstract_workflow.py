@@ -275,8 +275,8 @@ class AbstractWorkflow(ABC):
             ) as checkpointer:
                 set_workflow_checkpointer(checkpointer)
                 status_event = getattr(checkpointer, "initial_status_event", None)
+                checkpoint_tuple = await checkpointer.aget_tuple(graph_config)
                 if not status_event:
-                    checkpoint_tuple = await checkpointer.aget_tuple(graph_config)
                     status_event = (
                         "" if checkpoint_tuple else WorkflowStatusEventEnum.START
                     )
@@ -287,7 +287,9 @@ class AbstractWorkflow(ABC):
                 compiled_graph = await asyncio.to_thread(
                     self._compile, goal, tools_registry, checkpointer
                 )
-                graph_input = await self.get_graph_input(goal, status_event)
+                graph_input = await self.get_graph_input(
+                    goal, status_event, checkpoint_tuple
+                )
 
                 async for type, state in compiled_graph.astream(
                     input=graph_input,
@@ -311,7 +313,9 @@ class AbstractWorkflow(ABC):
             await asyncio.sleep(self.OUTBOX_CHECK_INTERVAL * 2)
             self.is_done = True
 
-    async def get_graph_input(self, goal: str, status_event: str) -> Any:
+    async def get_graph_input(
+        self, goal: str, status_event: str, checkpoint_tuple
+    ) -> Any:
         match status_event:
             case WorkflowStatusEventEnum.START:
                 return self.get_workflow_state(goal)
@@ -320,6 +324,12 @@ class AbstractWorkflow(ABC):
                 if not event:
                     return None
                 return Command(resume=event)
+            case WorkflowStatusEventEnum.RETRY:
+                if checkpoint_tuple is None:
+                    return None  # retry from last checkpoint
+                return self.get_workflow_state(
+                    goal
+                )  # no saved checkpoints from last run
             case _:
                 return None
 
