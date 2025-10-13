@@ -1,5 +1,6 @@
 import base64
 import json
+from datetime import datetime
 from unittest.mock import AsyncMock, Mock, patch
 
 import pytest
@@ -17,6 +18,13 @@ from duo_workflow_service.tools.commit import (
     ListCommits,
     ListCommitsInput,
 )
+
+
+def create_http_response(data, status_code=200):
+    """Helper function to create a GitLabHttpResponse from data."""
+    from duo_workflow_service.gitlab.http_client import GitLabHttpResponse
+
+    return GitLabHttpResponse(status_code=status_code, body=data)
 
 
 @pytest.fixture(name="gitlab_client_mock")
@@ -815,7 +823,7 @@ def test_get_commit_comments_format_display_message(input_data, expected_message
 @pytest.mark.asyncio
 async def test_create_commit(gitlab_client_mock, metadata, commit_data):
     """Test basic functionality of CreateCommit._arun method."""
-    gitlab_client_mock.apost = AsyncMock(return_value=commit_data)
+    gitlab_client_mock.apost = AsyncMock(return_value=create_http_response(commit_data))
 
     tool = CreateCommit(metadata=metadata)
 
@@ -851,19 +859,14 @@ async def test_create_commit(gitlab_client_mock, metadata, commit_data):
         "author_name": "Test User",
     }
 
-    expected_response = json.dumps(
-        {
-            "status": "success",
-            "data": expected_params,
-            "response": commit_data,
-        }
-    )
+    expected_response = json.dumps({"status": "success", "branch": "main"})
 
     assert response == expected_response
 
     gitlab_client_mock.apost.assert_called_once_with(
         path="/api/v4/projects/24/repository/commits",
         body=json.dumps(expected_params),
+        use_http_response=True,
     )
 
 
@@ -887,7 +890,7 @@ async def test_create_commit_with_url_success(
     url, project_id, expected_path, gitlab_client_mock, metadata, commit_data
 ):
     """Test CreateCommit._arun method with URL parameter."""
-    gitlab_client_mock.apost = AsyncMock(return_value=commit_data)
+    gitlab_client_mock.apost = AsyncMock(return_value=create_http_response(commit_data))
 
     tool = CreateCommit(metadata=metadata)
 
@@ -915,19 +918,12 @@ async def test_create_commit_with_url_success(
         "actions": actions_list,
     }
 
-    expected_response = json.dumps(
-        {
-            "status": "success",
-            "data": expected_params,
-            "response": commit_data,
-        }
-    )
+    expected_response = json.dumps({"status": "success", "branch": "main"})
 
     assert response == expected_response
 
     gitlab_client_mock.apost.assert_called_once_with(
-        path=expected_path,
-        body=json.dumps(expected_params),
+        path=expected_path, body=json.dumps(expected_params), use_http_response=True
     )
 
 
@@ -981,7 +977,7 @@ async def test_create_commit_with_all_optional_params(
     gitlab_client_mock, metadata, commit_data
 ):
     """Test CreateCommit._arun method with all optional parameters."""
-    gitlab_client_mock.apost = AsyncMock(return_value=commit_data)
+    gitlab_client_mock.apost = AsyncMock(return_value=create_http_response(commit_data))
 
     tool = CreateCommit(metadata=metadata)
 
@@ -1018,19 +1014,14 @@ async def test_create_commit_with_all_optional_params(
         "author_name": "Author Name",
     }
 
-    expected_response = json.dumps(
-        {
-            "status": "success",
-            "data": expected_params,
-            "response": commit_data,
-        }
-    )
+    expected_response = json.dumps({"status": "success", "branch": "feature-branch"})
 
     assert response == expected_response
 
     gitlab_client_mock.apost.assert_called_once_with(
         path="/api/v4/projects/24/repository/commits",
         body=json.dumps(expected_params),
+        use_http_response=True,
     )
 
 
@@ -1039,7 +1030,7 @@ async def test_create_commit_with_multiple_action_types(
     gitlab_client_mock, metadata, commit_data
 ):
     """Test CreateCommit._arun method with different action types."""
-    gitlab_client_mock.apost = AsyncMock(return_value=commit_data)
+    gitlab_client_mock.apost = AsyncMock(return_value=create_http_response(commit_data))
 
     tool = CreateCommit(metadata=metadata)
 
@@ -1087,19 +1078,14 @@ async def test_create_commit_with_multiple_action_types(
         "actions": actions_list,
     }
 
-    expected_response = json.dumps(
-        {
-            "status": "success",
-            "data": expected_params,
-            "response": commit_data,
-        }
-    )
+    expected_response = json.dumps({"status": "success", "branch": "main"})
 
     assert response == expected_response
 
     gitlab_client_mock.apost.assert_called_once_with(
         path="/api/v4/projects/24/repository/commits",
         body=json.dumps(expected_params),
+        use_http_response=True,
     )
 
 
@@ -1126,7 +1112,7 @@ async def test_create_commit_exception(gitlab_client_mock, metadata):
         actions=actions,
     )
 
-    expected_response = json.dumps({"error": error_message})
+    expected_response = json.dumps({"status": "error", "message": error_message})
     assert response == expected_response
 
 
@@ -1140,7 +1126,7 @@ async def test_create_commit_with_partial_edit(
         body=file_content_response,
     )
     gitlab_client_mock.aget = AsyncMock(return_value=mock_file_response)
-    gitlab_client_mock.apost = AsyncMock(return_value=commit_data)
+    gitlab_client_mock.apost = AsyncMock(return_value=create_http_response(commit_data))
 
     tool = CreateCommit(metadata=metadata)
 
@@ -1178,13 +1164,7 @@ async def test_create_commit_with_partial_edit(
         "actions": expected_actions,
     }
 
-    expected_response = json.dumps(
-        {
-            "status": "success",
-            "data": expected_params,
-            "response": commit_data,
-        }
-    )
+    expected_response = json.dumps({"status": "success", "branch": "main"})
 
     assert response == expected_response
 
@@ -1197,6 +1177,7 @@ async def test_create_commit_with_partial_edit(
     gitlab_client_mock.apost.assert_called_once_with(
         path="/api/v4/projects/24/repository/commits",
         body=json.dumps(expected_params),
+        use_http_response=True,
     )
 
 
@@ -1294,7 +1275,7 @@ async def test_create_commit_with_partial_edit_error(gitlab_client_mock, metadat
                     ),
                 ],
             ),
-            "Create commit in project 24 with 1 file action (create)",
+            "Create commit in project 24 on main with 1 file action (create)",
         ),
         (
             CreateCommitInput(
@@ -1318,7 +1299,7 @@ async def test_create_commit_with_partial_edit_error(gitlab_client_mock, metadat
                     ),
                 ],
             ),
-            "Create commit in project 24 with 3 file actions (create, update, delete)",
+            "Create commit in project 24 on main with 3 file actions (create, update, delete)",
         ),
         (
             CreateCommitInput(
@@ -1333,7 +1314,7 @@ async def test_create_commit_with_partial_edit_error(gitlab_client_mock, metadat
                     ),
                 ],
             ),
-            "Create commit in https://gitlab.com/namespace/project with 1 file action (create)",
+            "Create commit in project https://gitlab.com/namespace/project on main with 1 file action (create)",
         ),
         (
             CreateCommitInput(
@@ -1349,7 +1330,7 @@ async def test_create_commit_with_partial_edit_error(gitlab_client_mock, metadat
                     ),
                 ],
             ),
-            "Create commit in project 24 with 1 file action (update)",
+            "Create commit in project 24 on main with 1 file action (update)",
         ),
     ],
 )
@@ -1496,3 +1477,177 @@ async def test_get_commit_diff_with_no_excluded_files(
         parse_json=False,
         use_http_response=True,
     )
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    "kwargs, project_info, expected_branch, expected_start_branch",
+    [
+        (
+            {"branch": None, "start_branch": None},
+            {"default_branch": "main"},
+            "duo-edit-20250501-123045",
+            "main",
+        ),
+        (
+            {"branch": None, "start_branch": "feature-base"},
+            None,
+            "duo-edit-20250501-123045",
+            "feature-base",
+        ),
+        (
+            {"branch": None, "start_branch": None},
+            {"name": "test-project"},
+            "duo-edit-20250501-123045",
+            "main",
+        ),
+        (
+            {"branch": "feature-branch", "start_branch": None},
+            None,
+            "feature-branch",
+            None,
+        ),
+        (
+            {"branch": "feature-branch", "start_branch": "main"},
+            None,
+            "feature-branch",
+            "main",
+        ),
+    ],
+    ids=[
+        "auto_from_default",
+        "auto_with_explicit_start",
+        "fallback_to_main",
+        "explicit_branch",
+        "explicit_with_start_branch",
+    ],
+)
+async def test_create_commit_branch_params(
+    kwargs,
+    project_info,
+    expected_branch,
+    expected_start_branch,
+    gitlab_client_mock,
+    metadata,
+    commit_data,
+):
+    gitlab_client_mock.aget = AsyncMock(return_value=project_info or {})
+    gitlab_client_mock.apost = AsyncMock(return_value=create_http_response(commit_data))
+
+    with patch("duo_workflow_service.tools.commit.datetime") as mock_datetime:
+        mock_datetime.now.return_value = datetime(2025, 5, 1, 12, 30, 45)
+
+        tool = CreateCommit(metadata=metadata)
+        actions = [
+            CreateCommitAction(action="create", file_path="test.txt", content="Hello")
+        ]
+
+        call_args = {
+            "project_id": 24,
+            "commit_message": "Test",
+            "actions": actions,
+            **{k: v for k, v in kwargs.items() if v is not None},
+        }
+
+        await tool._arun(**call_args)
+
+    _, call_kwargs = gitlab_client_mock.apost.call_args
+    commit_params = json.loads(call_kwargs["body"])
+
+    assert commit_params["branch"] == expected_branch
+    assert commit_params.get("start_branch") == expected_start_branch
+
+
+@pytest.mark.asyncio
+async def test_partial_edit_auto_branch_fetches_from_default_branch(
+    gitlab_client_mock, metadata, commit_data, file_content_response
+):
+    gitlab_client_mock.aget = AsyncMock(
+        side_effect=[
+            {"default_branch": "main"},
+            create_http_response(file_content_response),
+        ]
+    )
+    gitlab_client_mock.apost = AsyncMock(return_value=create_http_response(commit_data))
+
+    with patch("duo_workflow_service.tools.commit.datetime") as mock_datetime:
+        mock_datetime.utcnow.return_value = datetime(2025, 5, 1, 12, 30, 45)
+        mock_datetime.side_effect = lambda *a, **kw: datetime(*a, **kw)
+
+        tool = CreateCommit(metadata=metadata)
+        actions = [
+            CreateCommitAction(
+                action="update",
+                file_path="README.md",
+                old_str="# Title\n\nThis is a test file.\nWith multiple lines.\n",
+                new_str="# Title\n\nThis is an updated test file.\nWith multiple lines.\n",
+            )
+        ]
+        await tool._arun(project_id=24, commit_message="Test", actions=actions)
+
+    gitlab_client_mock.aget.assert_any_call("/api/v4/projects/24")
+    assert gitlab_client_mock.aget.call_args_list[1][1]["params"] == {"ref": "main"}
+    gitlab_client_mock.apost.assert_called_once()
+
+
+@pytest.mark.asyncio
+async def test_partial_edit_explicit_branch_fetches_from_itself(
+    gitlab_client_mock, metadata, commit_data, file_content_response
+):
+    gitlab_client_mock.aget = AsyncMock(
+        return_value=create_http_response(file_content_response)
+    )
+    gitlab_client_mock.apost = AsyncMock(return_value=create_http_response(commit_data))
+
+    with patch("duo_workflow_service.tools.commit.datetime") as mock_datetime:
+        mock_datetime.utcnow.return_value = datetime(2025, 5, 1, 12, 30, 45)
+        mock_datetime.side_effect = lambda *a, **kw: datetime(*a, **kw)
+
+        tool = CreateCommit(metadata=metadata)
+        actions = [
+            CreateCommitAction(
+                action="update",
+                file_path="README.md",
+                old_str="# Title\n\nThis is a test file.\nWith multiple lines.\n",
+                new_str="# Title\n\nThis is an updated test file.\nWith multiple lines.\n",
+            )
+        ]
+        await tool._arun(
+            project_id=24,
+            commit_message="Test",
+            actions=actions,
+            branch="feature-branch",
+        )
+
+    assert gitlab_client_mock.aget.call_count == 1
+    assert gitlab_client_mock.aget.call_args_list[0][1]["params"] == {
+        "ref": "feature-branch"
+    }
+    gitlab_client_mock.apost.assert_called_once()
+
+
+@pytest.mark.asyncio
+async def test_project_info_api_error(gitlab_client_mock, metadata):
+    gitlab_client_mock.aget = AsyncMock(side_effect=Exception("API error"))
+
+    tool = CreateCommit(metadata=metadata)
+
+    actions = [
+        CreateCommitAction(
+            action="create",
+            file_path="test.txt",
+            content="This is a test file",
+        ),
+    ]
+
+    result = await tool._arun(
+        project_id=24,
+        commit_message="Test API error",
+        actions=actions,
+    )
+
+    data = json.loads(result)
+
+    assert data["status"] == "error"
+    assert "Failed to resolve default branch" in data["message"]
+    assert "API error" in data["message"]

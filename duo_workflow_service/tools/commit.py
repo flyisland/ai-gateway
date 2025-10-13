@@ -1,7 +1,8 @@
 import base64
 import json
 import logging
-from typing import Any, List, NamedTuple, Optional, Type
+from datetime import datetime, timezone
+from typing import Any, List, NamedTuple, Optional, Type, cast
 from urllib.parse import quote
 
 from gitlab_cloud_connector import GitLabUnitPrimitive
@@ -98,6 +99,79 @@ class CommitBaseTool(DuoBaseTool):
             return CommitURLValidationResult(
                 str(project_id) if project_id is not None else None, commit_sha, errors
             )
+
+    async def _get_default_branch(self, project_id: str) -> Optional[str]:
+        """Fetch default branch name for a project."""
+        project_info = await self.gitlab_client.aget(f"/api/v4/projects/{project_id}")
+        return project_info.get("default_branch")
+
+    async def _get_file_content(self, project_id: str, ref: str, file_path: str) -> str:
+        """Fetch file content from GitLab and decode it."""
+        encoded_file_path = quote(file_path, safe="")
+        response = await self.gitlab_client.aget(
+            f"/api/v4/projects/{project_id}/repository/files/{encoded_file_path}",
+            params={"ref": ref},
+            use_http_response=True,
+        )
+
+        if not response.is_success():
+            logger.error(
+                "API error - Status: {file_info.status_code}, Body: {file_info.body}"
+            )
+            raise RuntimeError(
+                f"GitLab API error while fetching {file_path}: {response.status_code}"
+            )
+
+        return base64.b64decode(response.body["content"]).decode("utf-8")
+
+    async def _prepare_actions_data(
+        self,
+        project_id: str,
+        actions: List["CreateCommitAction"],
+        branch: str,
+        start_branch: Optional[str],
+        auto_branch: Optional[str],
+    ) -> List[dict[str, Any]]:
+        """Prepare list of action dicts for the commit API request."""
+        actions_data: list[dict[str, Any]] = []
+
+        for action in actions:
+            if action.action not in {"create", "update", "delete", "move"}:
+                continue
+
+            if (
+                action.action == "update"
+                and not action.content
+                and action.old_str is not None
+                and action.new_str is not None
+            ):
+                old_str = action.old_str
+                new_str = action.new_str
+                ref = (start_branch if auto_branch else branch) or "main"
+
+                try:
+                    current_content = await self._get_file_content(
+                        project_id, ref, action.file_path
+                    )
+                except Exception as e:
+                    raise RuntimeError(
+                        f"Error fetching file '{action.file_path}': {str(e)}"
+                    ) from e
+
+                if old_str not in current_content:
+                    raise ValueError(f"old_str not found in {action.file_path}")
+
+                new_content = current_content.replace(old_str, new_str, 1)
+                action_dict = action.model_dump(exclude_none=True)
+                action_dict["content"] = new_content
+            else:
+                action_dict = action.model_dump(exclude_none=True)
+
+            action_dict.pop("old_str", None)
+            action_dict.pop("new_str", None)
+            actions_data.append(action_dict)
+
+        return actions_data
 
 
 class ListCommitsInput(ProjectResourceInput):
@@ -442,9 +516,14 @@ class CreateCommitAction(BaseModel):
 class CreateCommitInput(ProjectResourceInput):
     """Input model for creating a commit in a GitLab repository."""
 
-    branch: str = Field(
-        description="Name of the branch to commit into. To create a new branch, also provide either start_branch or "
-        "start_sha, and optionally start_project."
+    branch: Optional[str] = Field(
+        default=None,
+        description=(
+            "Name of the branch to commit into. "
+            "If not provided, the tool automatically creates a new branch based on "
+            "`start_branch`, `start_sha`, or the project’s default branch. "
+            "Optionally, you can also specify `start_project`."
+        ),
     )
     commit_message: str = Field(description="Commit message.")
     actions: List[CreateCommitAction] = Field(
@@ -468,7 +547,7 @@ class CreateCommitInput(ProjectResourceInput):
     author_name: Optional[str] = Field(default=None, description="Author's name.")
 
 
-class CreateCommit(DuoBaseTool):
+class CreateCommit(CommitBaseTool):
     """Tool to create a commit with multiple file actions in a GitLab repository."""
 
     name: str = "create_commit"
@@ -504,6 +583,9 @@ class CreateCommit(DuoBaseTool):
         - 'file_path': 'README.md'
         - 'old_str': "# Getting started\n\nTo make it easy for you to get started with GitLab..."
         - 'new_str': "# Start\n\nTo make it easy for you to get started with GitLab..."
+
+    After successfully creating a commit, you must automatically create a new merge request
+    from the resulting branch, without asking for confirmation, unless explicitly instructed not to.
     """
     # editorconfig-checker-enable
 
@@ -511,108 +593,81 @@ class CreateCommit(DuoBaseTool):
 
     async def _arun(
         self,
-        branch: str,
         commit_message: str,
         actions: List[CreateCommitAction],
+        branch: Optional[str] = None,
         **kwargs: Any,
     ) -> str:
         url = kwargs.pop("url", None)
         project_id = kwargs.pop("project_id", None)
 
         project_id, errors = self._validate_project_url(url, project_id)
+        project_id = cast(str, project_id)
 
         if errors:
             return json.dumps({"error": "; ".join(errors)})
 
-        # Convert actions to dictionary format for API
-        actions_data = []
-        for action in actions:
-            if action.action not in {"create", "update", "delete", "move"}:
-                continue
+        auto_branch = None
+        start_branch = kwargs.get("start_branch")
+        start_sha = kwargs.get("start_sha")
 
-            if (
-                action.action == "update"
-                and not action.content
-                and action.old_str is not None
-                and action.new_str is not None
-            ):
+        if not branch:
+            timestamp = datetime.now(timezone.utc).strftime("%Y%m%d-%H%M%S")
+            auto_branch = f"duo-edit-{timestamp}"
+            branch = auto_branch
 
-                old_str = action.old_str
-                new_str = action.new_str
-
-                encoded_file_path = quote(action.file_path, safe="")
+            if not (start_branch or start_sha):
                 try:
-                    file_info = await self.gitlab_client.aget(
-                        f"/api/v4/projects/{project_id}/repository/files/{encoded_file_path}",
-                        params={"ref": branch},
-                        use_http_response=True,
-                    )
-
-                    if not file_info.is_success():
-                        logger.error(
-                            "API error - Status: {file_info.status_code}, Body: {file_info.body}"
-                        )
-
-                    current_content = base64.b64decode(
-                        file_info.body["content"]
-                    ).decode("utf-8")
+                    default_branch = await self._get_default_branch(project_id)
                 except Exception as e:
                     return json.dumps(
-                        {"error": f"Error fetching file '{action.file_path}': {str(e)}"}
+                        {
+                            "status": "error",
+                            "message": f"Failed to resolve default branch for project {project_id}: {e}",
+                        }
                     )
+                start_branch = default_branch or "main"
 
-                if old_str not in current_content:
-                    return json.dumps(
-                        {"error": f"old_str not found in {action.file_path}"}
-                    )
-
-                new_content = current_content.replace(old_str, new_str, 1)
-                action_dict = action.model_dump(exclude_none=True)
-                action_dict["content"] = new_content
-
-            else:
-                action_dict = action.model_dump(exclude_none=True)
-
-            action_dict.pop("old_str", None)
-            action_dict.pop("new_str", None)
-            actions_data.append(action_dict)
+        try:
+            actions_data = await self._prepare_actions_data(
+                project_id=project_id,
+                actions=actions,
+                branch=branch,
+                start_branch=start_branch,
+                auto_branch=auto_branch,
+            )
+        except Exception as e:
+            return json.dumps({"error": str(e)})
 
         # Prepare request parameters
+        commit_branch = auto_branch or branch
         params = {
-            "branch": branch,
+            "branch": commit_branch,
             "commit_message": commit_message,
             "actions": actions_data,
         }
+        if start_branch:
+            params["start_branch"] = start_branch
 
-        # Add optional parameters if provided
-        optional_params = [
-            "start_branch",
-            "start_sha",
-            "start_project",
-            "author_email",
-            "author_name",
-        ]
-
-        for param in optional_params:
-            if param in kwargs and kwargs[param] is not None:
+        for param in ["start_sha", "start_project", "author_email", "author_name"]:
+            if kwargs.get(param) is not None:
                 params[param] = kwargs[param]
 
         try:
             response = await self.gitlab_client.apost(
                 path=f"/api/v4/projects/{project_id}/repository/commits",
                 body=json.dumps(params),
+                use_http_response=True,
             )
 
-            response = self._process_http_response(
+            self._process_http_response(
                 identifier=f"/api/v4/projects/{project_id}/repository/commits",
                 response=response,
             )
 
-            return json.dumps(
-                {"status": "success", "data": params, "response": response}
-            )
+            return json.dumps({"status": "success", "branch": commit_branch})
         except Exception as e:
-            return json.dumps({"error": str(e)})
+            return json.dumps({"status": "error", "message": str(e)})
 
     def format_display_message(
         self, args: CreateCommitInput, _tool_response: Any = None
@@ -620,15 +675,10 @@ class CreateCommit(DuoBaseTool):
         """Format a user-friendly message describing the action being performed."""
         action_types = [action.action for action in args.actions]
         file_count = len(args.actions)
-
-        if args.url:
-            return (
-                f"Create commit in {args.url} with {file_count} file "
-                f"{self._pluralize('action', file_count)} ({', '.join(action_types)})"
-            )
+        branch_info = args.branch or "new auto-created branch"
         return (
-            f"Create commit in project {args.project_id} with {file_count} file "
-            f"{self._pluralize('action', file_count)} ({', '.join(action_types)})"
+            f"Create commit in project {args.project_id or args.url} on {branch_info} "
+            f"with {file_count} file {self._pluralize('action', file_count)} ({', '.join(action_types)})"
         )
 
     def _pluralize(self, word: str, count: int) -> str:
