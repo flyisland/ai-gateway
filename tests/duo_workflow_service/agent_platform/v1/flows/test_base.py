@@ -234,8 +234,8 @@ class TestFlow:  # pylint: disable=too-many-public-methods
         [
             (WorkflowStatusEventEnum.START, "test goal", dict, False),
             ("unknown_event", "test goal", type(None), False),
-            (WorkflowStatusEventEnum.RETRY, "test goal", dict, True),
-            (WorkflowStatusEventEnum.RETRY, "test goal", type(None), False),
+            (WorkflowStatusEventEnum.RETRY, "test goal", type(None), True),
+            (WorkflowStatusEventEnum.RETRY, "test goal", dict, False),
         ],
         ids=[
             "start_event",

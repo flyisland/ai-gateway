@@ -14,6 +14,7 @@ from langchain_core.runnables import RunnableConfig
 # https://gitlab.com/gitlab-org/duo-workflow/duo-workflow-service/-/issues/78
 from langgraph.checkpoint.base import (  # pylint: disable=no-langgraph-langchain-imports
     BaseCheckpointSaver,
+    CheckpointTuple,
 )
 from langgraph.types import Command
 from langsmith import traceable, tracing_context
@@ -296,7 +297,7 @@ class AbstractWorkflow(ABC):
             self.is_done = True
 
     async def get_graph_input(
-        self, goal: str, status_event: str, checkpoint_tuple
+        self, goal: str, status_event: str, checkpoint_tuple: Optional[CheckpointTuple]
     ) -> Any:
         match status_event:
             case WorkflowStatusEventEnum.START:
@@ -308,10 +309,10 @@ class AbstractWorkflow(ABC):
                 return Command(resume=event)
             case WorkflowStatusEventEnum.RETRY:
                 if checkpoint_tuple is None:
-                    return None  # retry from last checkpoint
-                return self.get_workflow_state(
-                    goal
-                )  # no saved checkpoints from last run
+                    return self.get_workflow_state(
+                        goal
+                    )  # no saved checkpoints from last run
+                return None  # retry from last checkpoint
             case _:
                 return None
 

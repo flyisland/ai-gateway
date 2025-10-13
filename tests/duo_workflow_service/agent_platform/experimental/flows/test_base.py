@@ -109,6 +109,7 @@ class TestFlow:  # pylint: disable=too-many-public-methods
     def mock_checkpointer_fixture(self):
         mock_checkpointer = Mock()
         mock_checkpointer.initial_status_event = WorkflowStatusEventEnum.START
+        mock_checkpointer.aget_tuple = AsyncMock(return_value=None)
         mock_gitlab_workflow = AsyncMock()
         mock_gitlab_workflow.__aenter__ = AsyncMock(return_value=mock_checkpointer)
         mock_gitlab_workflow.__aexit__ = AsyncMock(return_value=None)
@@ -237,8 +238,8 @@ class TestFlow:  # pylint: disable=too-many-public-methods
         [
             (WorkflowStatusEventEnum.START, "test goal", dict, False),
             ("unknown_event", "test goal", type(None), False),
-            (WorkflowStatusEventEnum.RETRY, "test goal", dict, True),
-            (WorkflowStatusEventEnum.RETRY, "test goal", type(None), False),
+            (WorkflowStatusEventEnum.RETRY, "test goal", type(None), True),
+            (WorkflowStatusEventEnum.RETRY, "test goal", dict, False),
         ],
         ids=[
             "start_event",
