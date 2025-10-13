@@ -1,6 +1,7 @@
 import base64
 import json
 import logging
+from datetime import datetime
 from typing import Any, List, NamedTuple, Optional, Type
 from urllib.parse import quote
 
@@ -442,9 +443,13 @@ class CreateCommitAction(BaseModel):
 class CreateCommitInput(ProjectResourceInput):
     """Input model for creating a commit in a GitLab repository."""
 
-    branch: str = Field(
-        description="Name of the branch to commit into. To create a new branch, also provide either start_branch or "
-        "start_sha, and optionally start_project."
+    branch: Optional[str] = Field(
+        default=None,
+        description=(
+            "Name of the branch to commit into. "
+            "If not provided, the tool automatically creates a new branch based on "
+            "`start_branch` or the project’s default branch."
+        ),
     )
     commit_message: str = Field(description="Commit message.")
     actions: List[CreateCommitAction] = Field(
@@ -511,9 +516,9 @@ class CreateCommit(DuoBaseTool):
 
     async def _arun(
         self,
-        branch: str,
         commit_message: str,
         actions: List[CreateCommitAction],
+        branch: Optional[str] = None,
         **kwargs: Any,
     ) -> str:
         url = kwargs.pop("url", None)
@@ -523,6 +528,27 @@ class CreateCommit(DuoBaseTool):
 
         if errors:
             return json.dumps({"error": "; ".join(errors)})
+
+        default_branch = None
+        if not branch and not kwargs.get("start_branch"):
+            try:
+                project_info = await self.gitlab_client.aget(
+                    f"/api/v4/projects/{project_id}"
+                )
+                default_branch = project_info.get("default_branch")
+            except Exception as e:
+                raise RuntimeError(
+                    f"Failed to resolve default branch for project {project_id}: {e}"
+                )
+
+        auto_branch = None
+        start_branch = kwargs.get("start_branch")
+        if not branch:
+            timestamp = datetime.utcnow().strftime("%Y%m%d-%H%M%S")
+            auto_branch = f"duo-edit-{timestamp}"
+            branch = auto_branch
+            if not start_branch:
+                start_branch = default_branch or "main"
 
         # Convert actions to dictionary format for API
         actions_data = []
@@ -542,9 +568,11 @@ class CreateCommit(DuoBaseTool):
 
                 encoded_file_path = quote(action.file_path, safe="")
                 try:
+                    ref = start_branch if auto_branch else branch
+
                     file_info = await self.gitlab_client.aget(
                         f"/api/v4/projects/{project_id}/repository/files/{encoded_file_path}",
-                        params={"ref": branch},
+                        params={"ref": ref},
                         use_http_response=True,
                     )
 
@@ -578,35 +606,35 @@ class CreateCommit(DuoBaseTool):
             actions_data.append(action_dict)
 
         # Prepare request parameters
+        commit_branch = auto_branch or branch
         params = {
-            "branch": branch,
+            "branch": commit_branch,
             "commit_message": commit_message,
             "actions": actions_data,
         }
+        if start_branch:
+            params["start_branch"] = start_branch
 
-        # Add optional parameters if provided
-        optional_params = [
-            "start_branch",
-            "start_sha",
-            "start_project",
-            "author_email",
-            "author_name",
-        ]
-
-        for param in optional_params:
-            if param in kwargs and kwargs[param] is not None:
+        for param in ["start_sha", "start_project", "author_email", "author_name"]:
+            if kwargs.get(param) is not None:
                 params[param] = kwargs[param]
 
         try:
             response = await self.gitlab_client.apost(
                 path=f"/api/v4/projects/{project_id}/repository/commits",
                 body=json.dumps(params),
+                use_http_response=True,
             )
-            return json.dumps(
-                {"status": "success", "data": params, "response": response}
-            )
+            if not response.is_success():
+                logger.error(
+                    "API error - Status: %s, Body: %s",
+                    response.status_code,
+                    response.body,
+                )
+
+            return json.dumps({"status": "success"})
         except Exception as e:
-            return json.dumps({"error": str(e)})
+            return json.dumps({"status": "error", "message": str(e)})
 
     def format_display_message(
         self, args: CreateCommitInput, _tool_response: Any = None
@@ -614,15 +642,10 @@ class CreateCommit(DuoBaseTool):
         """Format a user-friendly message describing the action being performed."""
         action_types = [action.action for action in args.actions]
         file_count = len(args.actions)
-
-        if args.url:
-            return (
-                f"Create commit in {args.url} with {file_count} file "
-                f"{self._pluralize('action', file_count)} ({', '.join(action_types)})"
-            )
+        branch_info = args.branch or "new auto-created branch"
         return (
-            f"Create commit in project {args.project_id} with {file_count} file "
-            f"{self._pluralize('action', file_count)} ({', '.join(action_types)})"
+            f"Create commit in project {args.project_id or args.url} on {branch_info} "
+            f"with {file_count} file {self._pluralize('action', file_count)} ({', '.join(action_types)})"
         )
 
     def _pluralize(self, word: str, count: int) -> str:
