@@ -1,0 +1,402 @@
+# Enhanced Error Monitoring Configuration for Duo Workflow Service
+# This configuration defines monitoring, alerting, and dashboard setup for the enhanced error handling system
+
+# Prometheus Metrics Configuration
+prometheus_metrics:
+  # Error rate metrics by error code
+  - name: duo_workflow_error_rate_by_code
+    type: counter
+    description: "Rate of workflow errors by error code"
+    labels:
+      - error_code
+      - workflow_type
+      - severity
+      - category
+    
+  # Error rate metrics by component
+  - name: duo_workflow_error_rate_by_component
+    type: counter
+    description: "Rate of workflow errors by component"
+    labels:
+      - component
+      - operation
+      - workflow_type
+      - error_code
+    
+  # Retry success rate for retryable errors
+  - name: duo_workflow_retry_success_rate
+    type: histogram
+    description: "Success rate of retried operations"
+    labels:
+      - error_code
+      - retry_attempt
+      - workflow_type
+    buckets: [0.1, 0.25, 0.5, 0.75, 0.9, 0.95, 0.99, 1.0]
+    
+  # Error resolution time
+  - name: duo_workflow_error_resolution_time
+    type: histogram
+    description: "Time from error occurrence to resolution"
+    labels:
+      - error_code
+      - severity
+      - resolution_method
+    buckets: [1, 5, 10, 30, 60, 300, 600, 1800, 3600]
+
+# Alert Rules Configuration
+alert_rules:
+  # Critical error rate alerts
+  - name: DuoWorkflowCriticalErrorRate
+    condition: |
+      rate(duo_workflow_error_rate_by_code{severity="critical"}[5m]) > 0.01
+    duration: 2m
+    severity: critical
+    description: "Critical errors in Duo Workflow Service are occurring at high rate"
+    annotations:
+      summary: "High rate of critical workflow errors"
+      description: "Critical errors ({{ $labels.error_code }}) are occurring at {{ $value }} per second"
+      runbook_url: "https://docs.gitlab.com/ee/development/duo_workflow_service/troubleshooting.html#critical-errors"
+    
+  # High error rate alerts
+  - name: DuoWorkflowHighErrorRate
+    condition: |
+      rate(duo_workflow_error_rate_by_code{severity="high"}[10m]) > 0.05
+    duration: 5m
+    severity: warning
+    description: "High severity errors in Duo Workflow Service are occurring at elevated rate"
+    annotations:
+      summary: "Elevated rate of high severity workflow errors"
+      description: "High severity errors ({{ $labels.error_code }}) are occurring at {{ $value }} per second"
+      runbook_url: "https://docs.gitlab.com/ee/development/duo_workflow_service/troubleshooting.html#high-errors"
+    
+  # LLM service errors
+  - name: DuoWorkflowLLMServiceErrors
+    condition: |
+      rate(duo_workflow_error_rate_by_code{error_code=~"llm_.*"}[5m]) > 0.02
+    duration: 3m
+    severity: warning
+    description: "LLM service errors are occurring at high rate"
+    annotations:
+      summary: "High rate of LLM service errors"
+      description: "LLM errors ({{ $labels.error_code }}) are occurring at {{ $value }} per second"
+      runbook_url: "https://docs.gitlab.com/ee/development/duo_workflow_service/troubleshooting.html#llm-errors"
+    
+  # GitLab API errors
+  - name: DuoWorkflowGitLabAPIErrors
+    condition: |
+      rate(duo_workflow_error_rate_by_code{error_code=~"gitlab_.*"}[5m]) > 0.02
+    duration: 3m
+    severity: warning
+    description: "GitLab API errors are occurring at high rate"
+    annotations:
+      summary: "High rate of GitLab API errors"
+      description: "GitLab API errors ({{ $labels.error_code }}) are occurring at {{ $value }} per second"
+      runbook_url: "https://docs.gitlab.com/ee/development/duo_workflow_service/troubleshooting.html#gitlab-api-errors"
+    
+  # Tool execution errors
+  - name: DuoWorkflowToolExecutionErrors
+    condition: |
+      rate(duo_workflow_error_rate_by_code{error_code=~"tool_.*"}[10m]) > 0.03
+    duration: 5m
+    severity: warning
+    description: "Tool execution errors are occurring at elevated rate"
+    annotations:
+      summary: "Elevated rate of tool execution errors"
+      description: "Tool errors ({{ $labels.error_code }}) are occurring at {{ $value }} per second"
+      runbook_url: "https://docs.gitlab.com/ee/development/duo_workflow_service/troubleshooting.html#tool-errors"
+    
+  # Low retry success rate
+  - name: DuoWorkflowLowRetrySuccessRate
+    condition: |
+      rate(duo_workflow_retry_success_rate_bucket{le="0.5"}[15m]) / 
+      rate(duo_workflow_retry_success_rate_count[15m]) > 0.3
+    duration: 10m
+    severity: warning
+    description: "Retry success rate for workflow operations is low"
+    annotations:
+      summary: "Low retry success rate for workflow operations"
+      description: "Retry success rate is {{ $value }} for error code {{ $labels.error_code }}"
+      runbook_url: "https://docs.gitlab.com/ee/development/duo_workflow_service/troubleshooting.html#retry-failures"
+
+# Dashboard Configuration
+dashboards:
+  - name: "Duo Workflow Service - Enhanced Error Monitoring"
+    description: "Comprehensive error monitoring for Duo Workflow Service"
+    panels:
+      # Error rate overview
+      - title: "Error Rate by Severity"
+        type: graph
+        targets:
+          - expr: |
+              sum(rate(duo_workflow_error_rate_by_code[5m])) by (severity)
+        legend: "{{ severity }}"
+        y_axis:
+          unit: "errors/sec"
+          min: 0
+        
+      # Error rate by code
+      - title: "Top Error Codes"
+        type: graph
+        targets:
+          - expr: |
+              topk(10, sum(rate(duo_workflow_error_rate_by_code[5m])) by (error_code))
+        legend: "{{ error_code }}"
+        y_axis:
+          unit: "errors/sec"
+          min: 0
+        
+      # Error rate by category
+      - title: "Error Rate by Category"
+        type: pie_chart
+        targets:
+          - expr: |
+              sum(rate(duo_workflow_error_rate_by_code[5m])) by (category)
+        legend: "{{ category }}"
+        
+      # Error rate by component
+      - title: "Error Rate by Component"
+        type: graph
+        targets:
+          - expr: |
+              sum(rate(duo_workflow_error_rate_by_component[5m])) by (component)
+        legend: "{{ component }}"
+        y_axis:
+          unit: "errors/sec"
+          min: 0
+        
+      # Retry success rate
+      - title: "Retry Success Rate"
+        type: graph
+        targets:
+          - expr: |
+              histogram_quantile(0.95, 
+                sum(rate(duo_workflow_retry_success_rate_bucket[5m])) by (le, error_code)
+              )
+        legend: "{{ error_code }} (95th percentile)"
+        y_axis:
+          unit: "percent"
+          min: 0
+          max: 100
+        
+      # Error resolution time
+      - title: "Error Resolution Time"
+        type: graph
+        targets:
+          - expr: |
+              histogram_quantile(0.95, 
+                sum(rate(duo_workflow_error_resolution_time_bucket[5m])) by (le, severity)
+              )
+        legend: "{{ severity }} (95th percentile)"
+        y_axis:
+          unit: "seconds"
+          min: 0
+        
+      # LLM service errors breakdown
+      - title: "LLM Service Errors"
+        type: graph
+        targets:
+          - expr: |
+              sum(rate(duo_workflow_error_rate_by_code{error_code=~"llm_.*"}[5m])) by (error_code)
+        legend: "{{ error_code }}"
+        y_axis:
+          unit: "errors/sec"
+          min: 0
+        
+      # GitLab API errors breakdown
+      - title: "GitLab API Errors"
+        type: graph
+        targets:
+          - expr: |
+              sum(rate(duo_workflow_error_rate_by_code{error_code=~"gitlab_.*"}[5m])) by (error_code)
+        legend: "{{ error_code }}"
+        y_axis:
+          unit: "errors/sec"
+          min: 0
+        
+      # Tool execution errors breakdown
+      - title: "Tool Execution Errors"
+        type: graph
+        targets:
+          - expr: |
+              sum(rate(duo_workflow_error_rate_by_code{error_code=~"tool_.*"}[5m])) by (error_code)
+        legend: "{{ error_code }}"
+        y_axis:
+          unit: "errors/sec"
+          min: 0
+        
+      # Error correlation matrix
+      - title: "Error Correlation by Workflow Type"
+        type: heatmap
+        targets:
+          - expr: |
+              sum(rate(duo_workflow_error_rate_by_code[5m])) by (workflow_type, error_code)
+        x_axis: "workflow_type"
+        y_axis: "error_code"
+
+# Log-based Monitoring Configuration
+log_monitoring:
+  # Error pattern detection
+  patterns:
+    - name: "critical_error_pattern"
+      pattern: 'severity="critical"'
+      alert_threshold: 5
+      time_window: "5m"
+      description: "Critical errors detected in logs"
+      
+    - name: "authentication_failure_pattern"
+      pattern: 'error_code=".*_authentication_error"'
+      alert_threshold: 10
+      time_window: "10m"
+      description: "Authentication failures detected"
+      
+    - name: "rate_limit_pattern"
+      pattern: 'error_code=".*_rate_limit"'
+      alert_threshold: 20
+      time_window: "5m"
+      description: "Rate limiting detected"
+  
+  # Log aggregation rules
+  aggregations:
+    - name: "error_summary_by_hour"
+      query: |
+        SELECT 
+          date_trunc('hour', timestamp) as hour,
+          error_code,
+          severity,
+          category,
+          count(*) as error_count
+        FROM workflow_error_logs 
+        WHERE timestamp >= NOW() - INTERVAL '24 hours'
+        GROUP BY hour, error_code, severity, category
+        ORDER BY hour DESC, error_count DESC
+      
+    - name: "top_errors_by_component"
+      query: |
+        SELECT 
+          component,
+          error_code,
+          count(*) as error_count,
+          avg(resolution_time) as avg_resolution_time
+        FROM workflow_error_logs 
+        WHERE timestamp >= NOW() - INTERVAL '1 hour'
+        GROUP BY component, error_code
+        ORDER BY error_count DESC
+        LIMIT 20
+
+# Event Tracking Configuration
+event_tracking:
+  # Enhanced failure event schema
+  request_duo_workflow_failure:
+    required_fields:
+      - workflow_id
+      - error_code
+      - error_category
+      - error_severity
+      - error_message
+      - is_retryable
+    optional_fields:
+      - component
+      - operation
+      - tool_name
+      - agent_name
+      - correlation_id
+      - retry_after
+      - resolution_time
+      - user_impact_level
+    
+  # Event aggregation rules
+  aggregations:
+    - name: "failure_rate_by_error_code"
+      event: "request_duo_workflow_failure"
+      group_by: ["error_code", "workflow_type"]
+      time_window: "5m"
+      
+    - name: "failure_impact_analysis"
+      event: "request_duo_workflow_failure"
+      group_by: ["error_severity", "user_impact_level"]
+      time_window: "1h"
+
+# SLI/SLO Configuration
+sli_slo:
+  # Error rate SLI
+  - name: "workflow_error_rate"
+    description: "Percentage of workflow requests that result in errors"
+    sli_query: |
+      (
+        sum(rate(duo_workflow_error_rate_by_code[5m])) /
+        sum(rate(duo_workflow_requests_total[5m]))
+      ) * 100
+    slo_target: 5.0  # Less than 5% error rate
+    slo_window: "30d"
+    
+  # Critical error rate SLI
+  - name: "workflow_critical_error_rate"
+    description: "Percentage of workflow requests that result in critical errors"
+    sli_query: |
+      (
+        sum(rate(duo_workflow_error_rate_by_code{severity="critical"}[5m])) /
+        sum(rate(duo_workflow_requests_total[5m]))
+      ) * 100
+    slo_target: 0.1  # Less than 0.1% critical error rate
+    slo_window: "30d"
+    
+  # Retry success rate SLI
+  - name: "workflow_retry_success_rate"
+    description: "Percentage of retried operations that succeed"
+    sli_query: |
+      histogram_quantile(0.95, 
+        sum(rate(duo_workflow_retry_success_rate_bucket[5m])) by (le)
+      ) * 100
+    slo_target: 80.0  # At least 80% retry success rate
+    slo_window: "7d"
+
+# Notification Configuration
+notifications:
+  # Slack notifications for critical errors
+  - name: "critical_errors_slack"
+    type: "slack"
+    webhook_url: "${SLACK_WEBHOOK_URL}"
+    channel: "#duo-workflow-alerts"
+    conditions:
+      - alert: "DuoWorkflowCriticalErrorRate"
+      - alert: "DuoWorkflowLLMServiceErrors"
+        severity: "critical"
+    template: |
+      🚨 *Critical Duo Workflow Error*
+      
+      *Alert:* {{ .AlertName }}
+      *Severity:* {{ .Severity }}
+      *Error Code:* {{ .Labels.error_code }}
+      *Workflow Type:* {{ .Labels.workflow_type }}
+      *Rate:* {{ .Value }} errors/second
+      
+      *Description:* {{ .Description }}
+      *Runbook:* {{ .RunbookURL }}
+      
+      *Time:* {{ .StartsAt }}
+  
+  # PagerDuty for critical alerts
+  - name: "critical_errors_pagerduty"
+    type: "pagerduty"
+    service_key: "${PAGERDUTY_SERVICE_KEY}"
+    conditions:
+      - alert: "DuoWorkflowCriticalErrorRate"
+      - severity: "critical"
+    
+  # Email notifications for high error rates
+  - name: "high_errors_email"
+    type: "email"
+    recipients:
+      - "duo-workflow-team@gitlab.com"
+    conditions:
+      - alert: "DuoWorkflowHighErrorRate"
+      - alert: "DuoWorkflowLowRetrySuccessRate"
+
+# Runbook Links
+runbooks:
+  critical_errors: "https://docs.gitlab.com/ee/development/duo_workflow_service/troubleshooting.html#critical-errors"
+  high_errors: "https://docs.gitlab.com/ee/development/duo_workflow_service/troubleshooting.html#high-errors"
+  llm_errors: "https://docs.gitlab.com/ee/development/duo_workflow_service/troubleshooting.html#llm-errors"
+  gitlab_api_errors: "https://docs.gitlab.com/ee/development/duo_workflow_service/troubleshooting.html#gitlab-api-errors"
+  tool_errors: "https://docs.gitlab.com/ee/development/duo_workflow_service/troubleshooting.html#tool-errors"
+  retry_failures: "https://docs.gitlab.com/ee/development/duo_workflow_service/troubleshooting.html#retry-failures"
