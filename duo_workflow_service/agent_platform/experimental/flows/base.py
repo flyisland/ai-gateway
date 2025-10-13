@@ -195,12 +195,18 @@ class Flow(AbstractWorkflow):
 
         return Command(resume=event)
 
-    async def get_graph_input(self, goal: str, status_event: str) -> Any:
+    async def get_graph_input(
+        self, goal: str, status_event: str, checkpoint_tuple
+    ) -> Any:
         match status_event:
             case WorkflowStatusEventEnum.START:
                 return self.get_workflow_state(goal)
             case WorkflowStatusEventEnum.RESUME:
                 return self._resume_command(goal)
+            case WorkflowStatusEventEnum.RETRY:
+                if checkpoint_tuple is None:
+                    return None
+                return self.get_workflow_state(goal)
             case _:
                 return None
 

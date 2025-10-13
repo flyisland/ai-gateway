@@ -1,7 +1,9 @@
 from contextlib import contextmanager
 from unittest.mock import AsyncMock, MagicMock, Mock, patch
+from uuid import uuid4
 
 import pytest
+from langgraph.checkpoint.base import CheckpointTuple
 from langgraph.graph import StateGraph
 from langgraph.types import Command
 
@@ -185,6 +187,26 @@ class TestFlow:  # pylint: disable=too-many-public-methods
             version="experimental",
         )
 
+    @pytest.fixture(name="checkpoint_tuple")
+    def checkpoint_tuple_fixture(self):
+        """Fixture providing a CheckpointTuple for testing."""
+        return CheckpointTuple(
+            config={
+                "configurable": {"thread_id": "123", "checkpoint_id": str(uuid4())}
+            },
+            checkpoint={
+                "channel_values": {"status": WorkflowStatusEnum.NOT_STARTED},
+                "id": str(uuid4()),
+                "channel_versions": {},
+                "pending_sends": [],
+                "versions_seen": {},
+                "ts": "",
+                "v": 0,
+            },
+            metadata={"step": 0},
+            parent_config={"configurable": {"thread_id": "123", "checkpoint_id": None}},
+        )
+
     @pytest.fixture(name="flow_instance")
     def flow_instance_fixture(
         self,
@@ -211,12 +233,19 @@ class TestFlow:  # pylint: disable=too-many-public-methods
 
     @pytest.mark.asyncio
     @pytest.mark.parametrize(
-        "status_event,goal,expected_type",
+        "status_event,goal,expected_type,checkpoint_tuple_present",
         [
-            (WorkflowStatusEventEnum.START, "test goal", dict),
-            ("unknown_event", "test goal", type(None)),
+            (WorkflowStatusEventEnum.START, "test goal", dict, False),
+            ("unknown_event", "test goal", type(None), False),
+            (WorkflowStatusEventEnum.RETRY, "test goal", dict, True),
+            (WorkflowStatusEventEnum.RETRY, "test goal", type(None), False),
         ],
-        ids=["start_event", "unknown_event"],
+        ids=[
+            "start_event",
+            "unknown_event",
+            "retry_with_checkpoint",
+            "retry_without_checkpoint",
+        ],
     )
     async def test_graph_input(
         self,
@@ -224,12 +253,16 @@ class TestFlow:  # pylint: disable=too-many-public-methods
         status_event,
         goal,
         expected_type,
+        checkpoint_tuple_present,
         mock_checkpointer,
         mock_state_graph,
         mock_project,
+        checkpoint_tuple,
     ):
         """Test get_graph_input returns appropriate input based on status event."""
         mock_checkpointer.initial_status_event = status_event
+        if checkpoint_tuple_present:
+            mock_checkpointer.aget_tuple = AsyncMock(return_value=checkpoint_tuple)
 
         await flow_instance.run(goal)
 
