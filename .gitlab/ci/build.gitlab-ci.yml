@@ -1,3 +1,9 @@
+.fips_base:
+  extends:
+    - .kaniko_base
+  tags:
+    - docker
+
 install:
   extends: .poetry
   stage: build
@@ -47,5 +53,18 @@ build:self-hosted-ai-gateway-latest-image:
       --build-arg SRC_IMAGE="${TARGET_IMAGE}"
   rules:
     - if: $CI_COMMIT_BRANCH && $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
+  needs:
+    - build-docker-model-gateway
+
+build:self-hosted-ai-gateway-fips-image:
+  stage: build
+  extends:
+    - .fips_base
+  variables:
+    KANIKO_BUILD_FILE: Dockerfile.fips
+    KANIKO_DESTINATION: "${TARGET_IMAGE}-fips"
+  rules:
+    - if: $CI_COMMIT_TAG =~ /^self-hosted-/ && $FIPS_BUILD == "true"
+    - if: $CI_COMMIT_TAG =~ /^self-hosted-.*-fips$/
   needs:
     - build-docker-model-gateway
