@@ -5,7 +5,6 @@ from unittest.mock import AsyncMock, MagicMock, Mock, patch
 import pytest
 
 from contract import contract_pb2
-from duo_workflow_service.executor.outbox import UnknownResponseIDException
 from duo_workflow_service.llm_factory import AnthropicConfig, VertexConfig
 from duo_workflow_service.workflows.abstract_workflow import (
     AbstractWorkflow,
@@ -135,16 +134,6 @@ async def test_set_action_response(workflow):
             )
         )
     )
-
-    # Set action response that does not have the corresponding request ID
-    with pytest.raises(UnknownResponseIDException):
-        workflow.set_action_response(
-            contract_pb2.ClientEvent(
-                actionResponse=contract_pb2.ActionResponse(
-                    response="the response", requestID="unknown-request-id"
-                )
-            )
-        )
 
 
 @pytest.mark.asyncio

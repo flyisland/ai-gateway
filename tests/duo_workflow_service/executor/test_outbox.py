@@ -10,7 +10,6 @@ from duo_workflow_service.executor.outbox import (
     MAX_MESSAGE_LENGTH,
     Outbox,
     OutboxSignal,
-    UnknownResponseIDException,
 )
 
 
@@ -67,19 +66,16 @@ class TestOutbox:
 
     @pytest.mark.asyncio
     @pytest.mark.parametrize(
-        ("result", "response_id_override", "expected_exception"),
+        ("result"),
         [
-            (None, None, None),
-            (asyncio.Future(), None, None),
-            (None, "unknown-id", UnknownResponseIDException),
+            (None),
+            (asyncio.Future()),
         ],
     )
     async def test_set_action_response(
         self,
         outbox: Outbox,
         result,
-        response_id_override: str | None,
-        expected_exception: type[Exception] | None,
     ):
         action = contract_pb2.Action()
 
@@ -91,15 +87,51 @@ class TestOutbox:
             actionResponse=contract_pb2.ActionResponse(requestID=action.requestID)
         )
 
-        if response_id_override:
-            response.actionResponse.requestID = response_id_override
-
-        if expected_exception:
-            with pytest.raises(expected_exception):
-                outbox.set_action_response(response)
-            return
-
         outbox.set_action_response(response)
+
+        if result:
+            assert result.result() is response
+
+        assert action.requestID not in outbox._action_response
+
+    @pytest.mark.asyncio
+    @pytest.mark.parametrize(
+        ("action", "response", "result"),
+        [
+            (
+                contract_pb2.Action(newCheckpoint=contract_pb2.NewCheckpoint()),
+                contract_pb2.ClientEvent(
+                    actionResponse=contract_pb2.ActionResponse(
+                        httpResponse=contract_pb2.HttpResponse()
+                    )
+                ),
+                None,
+            ),
+            (
+                contract_pb2.Action(runCommand=contract_pb2.RunCommandAction()),
+                contract_pb2.ClientEvent(
+                    actionResponse=contract_pb2.ActionResponse(
+                        plainTextResponse=contract_pb2.PlainTextResponse()
+                    )
+                ),
+                asyncio.Future(),
+            ),
+        ],
+    )
+    async def test_legacy_set_action_response(
+        self,
+        action: contract_pb2.Action,
+        response: contract_pb2.ClientEvent,
+        outbox: Outbox,
+        result,
+    ):
+        outbox.put_action(action, result=result)
+
+        with capture_logs() as cap_logs:
+            outbox.set_action_response(response)
+
+            assert len(cap_logs) == 3
+            assert cap_logs[0]["event"] == "Request ID not found."
 
         if result:
             assert result.result() is response
