@@ -25,6 +25,7 @@ WORKDIR /home/aigateway/app
 
 COPY poetry.lock pyproject.toml ./
 RUN pip install "poetry==$POETRY_VERSION"
+RUN microdnf install -y --nodocs findutils && microdnf clean all
 RUN mkdir -p -m 777 $POETRY_CONFIG_DIR $POETRY_DATA_DIR $POETRY_CACHE_DIR
 
 COPY README.md README.md
@@ -34,9 +35,6 @@ COPY lib/ lib/
 COPY contract/ contract/
 COPY scripts/ scripts/
 COPY vendor/ vendor/
-
-# Make scripts executable
-RUN chmod +x scripts/*.sh
 
 ##
 ## Intermediate image contains build dependencies
@@ -67,10 +65,10 @@ USER aigateway
 
 COPY --chown=aigateway:aigateway --from=install-image /home/aigateway/app/venv/ /home/aigateway/app/venv/
 
-# Use venv python directly
-RUN /home/aigateway/app/venv/bin/python -c "import ssl; print('FIPS mode active:', ssl.FIPS_mode())" || echo "FIPS verification failed"
+# Use poetry run python
+RUN poetry run python -c "import ssl; print('FIPS mode active:', ssl.FIPS_mode())" || echo "FIPS verification failed"
 
-RUN /home/aigateway/app/venv/bin/python scripts/bootstrap.py
+RUN poetry run python scripts/bootstrap.py
 
 EXPOSE 5052
 
