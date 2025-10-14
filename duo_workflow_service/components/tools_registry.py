@@ -15,11 +15,14 @@ from duo_workflow_service.tools.code_review import (
     PostDuoCodeReview,
 )
 from duo_workflow_service.tools.duo_base_tool import DuoBaseTool
+from duo_workflow_service.tools.findings.get_security_finding_details import (
+    GetSecurityFindingDetails,
+)
+from duo_workflow_service.tools.findings.list_security_findings import (
+    ListSecurityFindings,
+)
 from duo_workflow_service.tools.vulnerabilities.get_vulnerability_details import (
     GetVulnerabilityDetails,
-)
-from duo_workflow_service.tools.vulnerabilities.post_sast_fp_analysis_to_gitlab import (
-    PostSastFpAnalysisToGitlab,
 )
 
 
@@ -96,6 +99,8 @@ _READ_ONLY_GITLAB_TOOLS: list[Type[BaseTool]] = [
     GetVulnerabilityDetails,
     tools.ExtractLinesFromText,
     BuildReviewMergeRequestContext,
+    GetSecurityFindingDetails,
+    ListSecurityFindings,
 ]
 
 _RUN_MCP_TOOLS_PRIVILEGE = "run_mcp_tools"
@@ -135,7 +140,6 @@ _AGENT_PRIVILEGES: dict[str, list[Type[BaseTool]]] = {
         tools.UpdateWorkItem,
         tools.RevertToDetectedVulnerability,
         tools.CreateVulnerabilityIssue,
-        PostSastFpAnalysisToGitlab,
         PostDuoCodeReview,
         *_READ_ONLY_GITLAB_TOOLS,
     ],

@@ -18,14 +18,17 @@ from duo_workflow_service.tools.code_review import (
     BuildReviewMergeRequestContext,
     PostDuoCodeReview,
 )
+from duo_workflow_service.tools.findings.get_security_finding_details import (
+    GetSecurityFindingDetails,
+)
+from duo_workflow_service.tools.findings.list_security_findings import (
+    ListSecurityFindings,
+)
 from duo_workflow_service.tools.mcp_tools import (
     convert_mcp_tools_to_langchain_tool_classes,
 )
 from duo_workflow_service.tools.vulnerabilities.get_vulnerability_details import (
     GetVulnerabilityDetails,
-)
-from duo_workflow_service.tools.vulnerabilities.post_sast_fp_analysis_to_gitlab import (
-    PostSastFpAnalysisToGitlab,
 )
 from duo_workflow_service.tools.work_item import (
     GetWorkItem,
@@ -137,6 +140,8 @@ _outbox = MagicMock(spec=asyncio.Queue)
                 "get_work_item_notes",
                 "extract_lines_from_text",
                 "build_review_merge_request_context",
+                "get_security_finding_details",
+                "list_security_findings",
             },
         ),
         (
@@ -210,8 +215,9 @@ _outbox = MagicMock(spec=asyncio.Queue)
                 "get_work_item_notes",
                 "post_duo_code_review",
                 "extract_lines_from_text",
-                "post_sast_fp_analysis_to_gitlab",
                 "build_review_merge_request_context",
+                "get_security_finding_details",
+                "list_security_findings",
             },
         ),
         (
@@ -384,13 +390,14 @@ def test_registry_initialization_initialises_tools_with_correct_attributes(
         "get_work_item_notes": tools.GetWorkItemNotes(metadata=tool_metadata),
         "post_duo_code_review": PostDuoCodeReview(metadata=tool_metadata),
         "extract_lines_from_text": tools.ExtractLinesFromText(metadata=tool_metadata),
-        "post_sast_fp_analysis_to_gitlab": PostSastFpAnalysisToGitlab(
-            metadata=tool_metadata
-        ),
         "run_tests": tools.RunTests(metadata=tool_metadata),
         "build_review_merge_request_context": BuildReviewMergeRequestContext(
             metadata=tool_metadata
         ),
+        "get_security_finding_details": GetSecurityFindingDetails(
+            metadata=tool_metadata
+        ),
+        "list_security_findings": ListSecurityFindings(metadata=tool_metadata),
     }
 
     assert registry._enabled_tools == expected_tools
