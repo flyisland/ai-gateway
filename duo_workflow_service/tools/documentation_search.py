@@ -48,7 +48,7 @@ class DocumentationSearch(DuoBaseTool):
     - The question is exploratory ("how would X affect Y in GitLab?")
 
     Parameters:
-      - search: A concise search query optimized for documentation retrieval (required)
+    - search: A concise search query optimized for documentation retrieval (required)
 
     ## Guidelines for Creating Effective Search Queries:
 
