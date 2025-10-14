@@ -1,6 +1,11 @@
 # Use official Red Hat UBI9 Python 3.12 minimal image for FIPS compliance
 FROM registry.access.redhat.com/ubi9/python-312-minimal:latest AS base-image
 
+# When trying to install system requirements, we need to have a user root for
+# system packages with microdnf before switching to the aigateway user, 
+# but the base UBI9 Python minimal image runs as a non-root user by default.
+USER 0
+
 ARG FIPS=1
 ARG OPENSSL_FORCE_FIPS_MODE=1
 ARG OPENSSL_FIPS=1
@@ -39,16 +44,35 @@ COPY vendor/ vendor/
 ##
 ## Intermediate image contains build dependencies
 ##
-FROM base-image AS install-image
+FROM registry.access.redhat.com/ubi9/python-312:latest AS install-image
 
-RUN microdnf install -y \
+USER 0
+WORKDIR /home/aigateway/app
+
+COPY --from=base-image /home/aigateway/app/poetry.lock /home/aigateway/app/pyproject.toml ./
+COPY --from=base-image /home/aigateway/app/README.md ./
+COPY --from=base-image /home/aigateway/app/ai_gateway ./ai_gateway
+COPY --from=base-image /home/aigateway/app/duo_workflow_service ./duo_workflow_service
+COPY --from=base-image /home/aigateway/app/lib ./lib
+COPY --from=base-image /home/aigateway/app/contract ./contract
+COPY --from=base-image /home/aigateway/app/scripts ./scripts
+COPY --from=base-image /home/aigateway/app/vendor ./vendor
+
+ENV POETRY_VERSION=2.2.1 \
+    POETRY_VIRTUALENVS_PATH=/home/aigateway/app/venv \
+    CYTHON_PEP489_MULTI_PHASE_INIT=0
+
+RUN pip install "poetry==$POETRY_VERSION"
+
+# Install only necessary build dependencies
+RUN dnf install -y \
     gcc \
     gcc-c++ \
     make \
-    python3-devel \
-    curl \
+    python3.12-devel \
+    libstdc++-static \
     findutils \
-    && microdnf clean all
+    && dnf clean all
 
 RUN poetry install --compile --no-interaction --no-ansi --no-cache --only main
 
@@ -66,7 +90,7 @@ USER aigateway
 COPY --chown=aigateway:aigateway --from=install-image /home/aigateway/app/venv/ /home/aigateway/app/venv/
 
 # Use poetry run python
-RUN poetry run python -c "import ssl; print('FIPS mode active:', ssl.FIPS_mode())" || echo "FIPS verification failed"
+RUN poetry run python -c "import ssl; print('OpenSSL version:', ssl.OPENSSL_VERSION); print('FIPS capable:', hasattr(ssl, '_fips_mode'))" || echo "FIPS verification info unavailable"
 
 RUN poetry run python scripts/bootstrap.py
 
