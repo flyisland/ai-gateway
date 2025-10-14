@@ -80,6 +80,7 @@ async def test_send_event_with_values_type(checkpoint_notifier):
         }
     )
     assert action.newCheckpoint.checkpoint == expected_checkpoint
+    assert len(action.requestID) == 36
 
 
 @pytest.mark.asyncio

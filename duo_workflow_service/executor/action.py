@@ -1,6 +1,7 @@
 import asyncio
 import time
 from typing import Any, Dict
+from uuid import uuid4
 
 import structlog
 from langchain_core.tools import ToolException
@@ -29,6 +30,9 @@ async def _execute_action_and_get_action_response(
     log = structlog.stdlib.get_logger("workflow")
 
     action_class = action.WhichOneof("action")
+
+    action.requestID = action.requestID or str(uuid4())
+
     log.info(
         "Attempting action from the egress queue",
         requestID=action.requestID,
