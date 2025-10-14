@@ -3,6 +3,7 @@ from copy import deepcopy
 from datetime import datetime, timezone
 from json import dumps
 from typing import Union
+from uuid import uuid4
 
 import structlog
 from langchain_core.messages import BaseMessage
@@ -63,6 +64,7 @@ class UserInterface:
     async def _execute_action(self):
 
         action = contract_pb2.Action(
+            requestID=str(uuid4()),
             newCheckpoint=contract_pb2.NewCheckpoint(
                 goal=self.goal,
                 status=WORKFLOW_STATUS_TO_CHECKPOINT_STATUS[self.status],

@@ -76,6 +76,7 @@ async def test_execute_action_success_plaintext_response(metadata):
         put_action = await metadata["outbox"].get()
         metadata["outbox"].task_done()
         assert put_action == action
+        assert len(put_action.requestID) == 36
         assert response == "plaintext success"
         assert metadata["inbox"].empty()
 
