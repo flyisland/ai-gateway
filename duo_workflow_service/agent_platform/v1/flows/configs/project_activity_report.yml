@@ -1,0 +1,494 @@
+name: "Project Activity Report"
+description: |
+  Project Activity Report flow generates a comprehensive activity summary for a GitLab project 
+  within a specified time range. It collects all issues, commits, epics, and merge requests 
+  that were created, updated, or closed/merged during the period, including activity from 
+  comments and discussions. The flow creates a new GitLab issue containing the activity report.
+product_group: agent_foundations
+version: "v1"
+environment: ambient
+components:
+  - name: "parse_time_range_and_project"
+    type: AgentComponent
+    prompt_id: "activity_report_parse_inputs"
+    prompt_version: "^1.0.0"
+    inputs:
+      - from: "context:goal"
+        as: "user_request"
+      - from: "context:inputs.time_range.start_date"
+        as: "start_date"
+      - from: "context:inputs.time_range.end_date"
+        as: "end_date"
+      - from: "context:inputs.project.id"
+        as: "project_id"
+    toolset: []
+    ui_log_events:
+      - "on_agent_final_answer"
+
+  - name: "fetch_project_issues"
+    type: OneOffComponent
+    prompt_id: "activity_report_fetch_issues"
+    prompt_version: "^1.0.0"
+    max_correction_attempts: 3
+    inputs:
+      - from: "context:parse_time_range_and_project.final_answer"
+        as: "parsed_params"
+      - from: "context:inputs.project.id"
+        as: "project_id"
+    toolset:
+      - "list_issues"
+      - "gitlab_issue_search"
+    ui_log_events:
+      - "on_tool_execution_success"
+      - "on_tool_execution_failed"
+
+  - name: "fetch_project_commits"
+    type: OneOffComponent
+    prompt_id: "activity_report_fetch_commits"
+    prompt_version: "^1.0.0"
+    max_correction_attempts: 3
+    inputs:
+      - from: "context:parse_time_range_and_project.final_answer"
+        as: "parsed_params"
+      - from: "context:inputs.project.id"
+        as: "project_id"
+    toolset:
+      - "list_commits"
+    ui_log_events:
+      - "on_tool_execution_success"
+      - "on_tool_execution_failed"
+
+  - name: "fetch_project_epics"
+    type: OneOffComponent
+    prompt_id: "activity_report_fetch_epics"
+    prompt_version: "^1.0.0"
+    max_correction_attempts: 3
+    inputs:
+      - from: "context:parse_time_range_and_project.final_answer"
+        as: "parsed_params"
+      - from: "context:inputs.project.id"
+        as: "project_id"
+    toolset:
+      - "list_epics"
+    ui_log_events:
+      - "on_tool_execution_success"
+      - "on_tool_execution_failed"
+
+  - name: "fetch_project_merge_requests"
+    type: OneOffComponent
+    prompt_id: "activity_report_fetch_merge_requests"
+    prompt_version: "^1.0.0"
+    max_correction_attempts: 3
+    inputs:
+      - from: "context:parse_time_range_and_project.final_answer"
+        as: "parsed_params"
+      - from: "context:inputs.project.id"
+        as: "project_id"
+    toolset:
+      - "gitlab_merge_request_search"
+      - "get_merge_request"
+    ui_log_events:
+      - "on_tool_execution_success"
+      - "on_tool_execution_failed"
+
+  - name: "get_issue_notes_for_activity"
+    type: OneOffComponent
+    prompt_id: "activity_report_fetch_issue_notes"
+    prompt_version: "^1.0.0"
+    max_correction_attempts: 3
+    inputs:
+      - from: "context:parse_time_range_and_project.final_answer"
+        as: "parsed_params"
+      - from: "context:fetch_project_issues.tool_responses"
+        as: "issues_data"
+    toolset:
+      - "list_issue_notes"
+      - "get_issue_note"
+    ui_log_events:
+      - "on_tool_execution_success"
+      - "on_tool_execution_failed"
+
+  - name: "get_epic_notes_for_activity"
+    type: OneOffComponent
+    prompt_id: "activity_report_fetch_epic_notes"
+    prompt_version: "^1.0.0"
+    max_correction_attempts: 3
+    inputs:
+      - from: "context:parse_time_range_and_project.final_answer"
+        as: "parsed_params"
+      - from: "context:fetch_project_epics.tool_responses"
+        as: "epics_data"
+    toolset:
+      - "list_epic_notes"
+    ui_log_events:
+      - "on_tool_execution_success"
+      - "on_tool_execution_failed"
+
+  - name: "get_mr_notes_for_activity"
+    type: OneOffComponent
+    prompt_id: "activity_report_fetch_mr_notes"
+    prompt_version: "^1.0.0"
+    max_correction_attempts: 3
+    inputs:
+      - from: "context:parse_time_range_and_project.final_answer"
+        as: "parsed_params"
+      - from: "context:fetch_project_merge_requests.tool_responses"
+        as: "merge_requests_data"
+    toolset:
+      - "list_all_merge_request_notes"
+    ui_log_events:
+      - "on_tool_execution_success"
+      - "on_tool_execution_failed"
+
+  - name: "filter_items_by_timerange"
+    type: AgentComponent
+    prompt_id: "activity_report_filter_data"
+    prompt_version: "^1.0.0"
+    inputs:
+      - from: "context:parse_time_range_and_project.final_answer"
+        as: "time_range_params"
+      - from: "context:fetch_project_issues.tool_responses"
+        as: "issues_data"
+      - from: "context:fetch_project_commits.tool_responses"
+        as: "commits_data"
+      - from: "context:fetch_project_epics.tool_responses"
+        as: "epics_data"
+      - from: "context:fetch_project_merge_requests.tool_responses"
+        as: "merge_requests_data"
+      - from: "context:get_issue_notes_for_activity.tool_responses"
+        as: "issue_notes_data"
+      - from: "context:get_epic_notes_for_activity.tool_responses"
+        as: "epic_notes_data"
+      - from: "context:get_mr_notes_for_activity.tool_responses"
+        as: "mr_notes_data"
+    toolset: []
+    ui_log_events:
+      - "on_agent_final_answer"
+
+  - name: "compile_activity_report"
+    type: AgentComponent
+    prompt_id: "activity_report_compile_report"
+    prompt_version: "^1.0.0"
+    inputs:
+      - from: "context:parse_time_range_and_project.final_answer"
+        as: "time_range_params"
+      - from: "context:filter_items_by_timerange.final_answer"
+        as: "filtered_activity_data"
+      - from: "context:inputs.project.name"
+        as: "project_name"
+    toolset: []
+    ui_log_events:
+      - "on_agent_final_answer"
+
+  - name: "create_activity_issue"
+    type: OneOffComponent
+    prompt_id: "activity_report_create_issue"
+    prompt_version: "^1.0.0"
+    max_correction_attempts: 3
+    inputs:
+      - from: "context:compile_activity_report.final_answer"
+        as: "activity_report"
+      - from: "context:inputs.project.id"
+        as: "project_id"
+      - from: "context:parse_time_range_and_project.final_answer"
+        as: "time_range_params"
+    toolset:
+      - "create_file_with_contents"
+    ui_log_events:
+      - "on_tool_call_input"
+      - "on_tool_execution_success"
+      - "on_tool_execution_failed"
+
+routers:
+  - from: "parse_time_range_and_project"
+    to: "fetch_project_issues"
+  - from: "fetch_project_issues"
+    to: "fetch_project_commits"
+  - from: "fetch_project_commits"
+    to: "fetch_project_epics"
+  - from: "fetch_project_epics"
+    to: "fetch_project_merge_requests"
+  - from: "fetch_project_merge_requests"
+    to: "get_issue_notes_for_activity"
+  - from: "get_issue_notes_for_activity"
+    to: "get_epic_notes_for_activity"
+  - from: "get_epic_notes_for_activity"
+    to: "get_mr_notes_for_activity"
+  - from: "get_mr_notes_for_activity"
+    to: "filter_items_by_timerange"
+  - from: "filter_items_by_timerange"
+    to: "compile_activity_report"
+  - from: "compile_activity_report"
+    to: "create_activity_issue"
+  - from: "create_activity_issue"
+    to: "end"
+
+flow:
+  entry_point: "parse_time_range_and_project"
+  inputs:
+    - category: project
+      input_schema:
+        id:
+          type: string
+          description: The GitLab project ID or path
+        name:
+          type: string
+          description: The GitLab project name
+    - category: time_range
+      input_schema:
+        start_date:
+          type: string
+          format: date-time
+          description: Start date of the activity report period (ISO 8601 format)
+        end_date:
+          type: string
+          format: date-time
+          description: End date of the activity report period (ISO 8601 format)
+prompts:
+  - prompt_id: "activity_report_parse_inputs"
+    model:
+      params:
+        model_class_provider: anthropic
+        model: claude-sonnet-4-20250514
+        max_tokens: 4096
+    prompt_template:
+      system: |
+        You are an assistant that parses user requests to extract time range and project information for activity reports.
+      user: |
+        Parse the following request to extract the time range (start and end dates) and validate the project information:
+        
+        User Request: {{user_request}}
+        Project ID: {{project_id}}
+        Start Date: {{start_date}}
+        End Date: {{end_date}}
+        
+        Output a summary with:
+        - Parsed start and end dates in ISO 8601 format
+        - Project identifier
+        - Any clarifications or assumptions made
+    params:
+      timeout: 30
+
+  - prompt_id: "activity_report_fetch_issues"
+    model:
+      params:
+        model_class_provider: anthropic
+        model: claude-sonnet-4-20250514
+        max_tokens: 8192
+    prompt_template:
+      system: |
+        You are an assistant that fetches GitLab issues using available tools. Use list_issues or gitlab_issue_search 
+        to retrieve all issues for the specified project.
+      user: |
+        Fetch all issues for project {{project_id}}.
+        
+        Time range parameters: {{parsed_params}}
+        
+        Use the available tools to get issues. Focus on retrieving issue IDs, titles, states, and timestamps.
+    params:
+      timeout: 60
+
+  - prompt_id: "activity_report_fetch_commits"
+    model:
+      params:
+        model_class_provider: anthropic
+        model: claude-sonnet-4-20250514
+        max_tokens: 8192
+    prompt_template:
+      system: |
+        You are an assistant that fetches Git commits using the list_commits tool for a specified time range.
+      user: |
+        Fetch all commits for project {{project_id}} within the time range.
+        
+        Time range parameters: {{parsed_params}}
+        
+        Use list_commits to retrieve commit data including IDs, messages, authors, and timestamps.
+    params:
+      timeout: 60
+
+  - prompt_id: "activity_report_fetch_epics"
+    model:
+      params:
+        model_class_provider: anthropic
+        model: claude-sonnet-4-20250514
+        max_tokens: 8192
+    prompt_template:
+      system: |
+        You are an assistant that fetches GitLab epics using the list_epics tool.
+      user: |
+        Fetch all epics for project {{project_id}}.
+        
+        Time range parameters: {{parsed_params}}
+        
+        Use list_epics to retrieve epic data including IDs, titles, states, and timestamps.
+    params:
+      timeout: 60
+
+  - prompt_id: "activity_report_fetch_merge_requests"
+    model:
+      params:
+        model_class_provider: anthropic
+        model: claude-sonnet-4-20250514
+        max_tokens: 8192
+    prompt_template:
+      system: |
+        You are an assistant that fetches GitLab merge requests using available tools.
+      user: |
+        Fetch all merge requests for project {{project_id}}.
+        
+        Time range parameters: {{parsed_params}}
+        
+        Use gitlab_merge_request_search or get_merge_request to retrieve MR data including IDs, titles, 
+        states, and timestamps.
+    params:
+      timeout: 60
+
+  - prompt_id: "activity_report_fetch_issue_notes"
+    model:
+      params:
+        model_class_provider: anthropic
+        model: claude-sonnet-4-20250514
+        max_tokens: 16384
+    prompt_template:
+      system: |
+        You are an assistant that fetches notes/comments from GitLab issues to detect activity within a time range.
+      user: |
+        Fetch notes for the issues retrieved earlier.
+        
+        Time range parameters: {{parsed_params}}
+        Issues data: {{issues_data}}
+        
+        Use list_issue_notes to retrieve all comments/discussions for each issue. Focus on note timestamps 
+        to identify activity within the target time range.
+    params:
+      timeout: 120
+
+  - prompt_id: "activity_report_fetch_epic_notes"
+    model:
+      params:
+        model_class_provider: anthropic
+        model: claude-sonnet-4-20250514
+        max_tokens: 16384
+    prompt_template:
+      system: |
+        You are an assistant that fetches notes/comments from GitLab epics to detect activity within a time range.
+      user: |
+        Fetch notes for the epics retrieved earlier.
+        
+        Time range parameters: {{parsed_params}}
+        Epics data: {{epics_data}}
+        
+        Use list_epic_notes to retrieve all comments/discussions for each epic. Focus on note timestamps 
+        to identify activity within the target time range.
+    params:
+      timeout: 120
+
+  - prompt_id: "activity_report_fetch_mr_notes"
+    model:
+      params:
+        model_class_provider: anthropic
+        model: claude-sonnet-4-20250514
+        max_tokens: 16384
+    prompt_template:
+      system: |
+        You are an assistant that fetches notes/discussions from GitLab merge requests to detect activity 
+        within a time range.
+      user: |
+        Fetch notes for the merge requests retrieved earlier.
+        
+        Time range parameters: {{parsed_params}}
+        Merge requests data: {{merge_requests_data}}
+        
+        Use list_all_merge_request_notes to retrieve all comments/discussions for each MR. Focus on note 
+        timestamps to identify activity within the target time range.
+    params:
+      timeout: 120
+
+  - prompt_id: "activity_report_filter_data"
+    model:
+      params:
+        model_class_provider: anthropic
+        model: claude-sonnet-4-20250514
+        max_tokens: 32768
+    prompt_template:
+      system: |
+        You are an assistant that filters GitLab activity data based on time ranges. Filter items that were 
+        created, updated, closed, or had comment activity within the specified time range.
+      user: |
+        Filter all collected data to include only items with activity within the time range.
+        
+        Time range: {{time_range_params}}
+        
+        Data to filter:
+        - Issues: {{issues_data}}
+        - Commits: {{commits_data}}
+        - Epics: {{epics_data}}
+        - Merge Requests: {{merge_requests_data}}
+        - Issue Notes: {{issue_notes_data}}
+        - Epic Notes: {{epic_notes_data}}
+        - MR Notes: {{mr_notes_data}}
+        
+        Include items where:
+        - Created timestamp is within range, OR
+        - Updated timestamp is within range, OR
+        - Closed/merged timestamp is within range, OR
+        - Any comment/note was created within range
+        
+        Output the filtered results organized by type.
+    params:
+      timeout: 60
+
+  - prompt_id: "activity_report_compile_report"
+    model:
+      params:
+        model_class_provider: anthropic
+        model: claude-sonnet-4-20250514
+        max_tokens: 32768
+    prompt_template:
+      system: |
+        You are an assistant that compiles comprehensive activity reports from filtered GitLab data. 
+        Create a well-structured, readable report summarizing all activity.
+      user: |
+        Compile an activity report for project {{project_name}}.
+        
+        Time range: {{time_range_params}}
+        Filtered activity data: {{filtered_activity_data}}
+        
+        Create a report with:
+        1. Executive summary with key metrics (total issues, commits, MRs, epics)
+        2. Issues section: list created, updated, and closed issues with titles and links
+        3. Commits section: summarize commit activity with authors and messages
+        4. Merge Requests section: list opened, updated, and merged MRs
+        5. Epics section: list epic activity
+        6. Notable discussions: highlight significant comment threads
+        
+        Format as clear markdown suitable for a GitLab issue description.
+    params:
+      timeout: 90
+
+  - prompt_id: "activity_report_create_issue"
+    model:
+      params:
+        model_class_provider: anthropic
+        model: claude-sonnet-4-20250514
+        max_tokens: 8192
+    prompt_template:
+      system: |
+        You are an assistant that creates markdown files with specified content. Use the create_file_with_contents 
+        tool to save the activity report to a file.
+      user: |
+        Create a markdown file with the activity report in the current directory.
+        
+        Time range: {{time_range_params}}
+        
+        Report content:
+        {{activity_report}}
+        
+        Use create_file_with_contents to create a file named "activity_report_[start_date]_to_[end_date].md" 
+        (use the dates from time_range_params to construct the filename).
+        
+        The file should contain:
+        - A title header with the time range
+        - The full activity report content
+    params:
+      timeout: 30
