@@ -19,6 +19,7 @@ class ContainerPrompts(containers.DeclarativeContainer):
         LocalPromptRegistry.from_local_yaml,
         class_overrides={
             "chat/react": chat.ReActAgent,
+            "chat/react/amazon_q": chat.ReActAgent,
             "chat/agent": "duo_workflow_service.agents.prompt_adapter.ChatPrompt",
             "workflow/convert_to_gitlab_ci": "duo_workflow_service.agents.Agent",
             "workflow/executor": "duo_workflow_service.agents.Agent",

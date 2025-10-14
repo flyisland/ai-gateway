@@ -199,6 +199,8 @@ class TestAmazonQClient:
                 {"assistantResponseMessage": {"content": "response"}},
             ],
             "conversationId": "conversation_id",
+            "tools": None,
+            "toolResults": None,
         }
 
     @pytest.fixture(name="mock_credentials")
