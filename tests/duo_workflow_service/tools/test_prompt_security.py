@@ -358,41 +358,64 @@ class TestSanitizeHtmlContent:
     malicious attributes, etc.
 
     This is separate from prompt injection protection (see TestPromptSecurity).
+
+    Note: Most tests use PromptSecurity.apply_security_to_tool_response() to reflect
+    real usage where inputs are JSON-serialized strings from tool responses.
     """
 
-    def test_malformed_attributes_attack_vector(self):
-        """Test that malformed attributes are properly stripped."""
-        # Malformed attributes that could render invisibly
+    def test_direct_function_call_example(self):
+        """Example test showing direct sanitize_html_content call (non-JSON input)."""
+        # This is kept as one example of direct function usage
         result = sanitize_html_content("<div this is injected>content</div>")
         assert result == "<div>content</div>"
 
-        # Multiple malformed attributes
-        result = sanitize_html_content('<p random="value" another>text</p>')
-        assert result == "<p>text</p>"
+    def test_malformed_attributes_attack_vector(self):
+        """Test that malformed attributes are properly stripped via JSON input."""
+        import json
+
+        # Malformed attributes that could render invisibly
+        result = PromptSecurity.apply_security_to_tool_response(
+            json.dumps({"content": '<p random="value" another>text</p>'}),
+            "test_tool"
+        )
+        result_dict = json.loads(result)
+        assert result_dict == {"content": "<p>text</p>"}
 
         # All attributes stripped (including valid ones like class, id)
-        result = sanitize_html_content(
-            '<div class="valid" onclick="alert(1)" id="test">content</div>'
+        result = PromptSecurity.apply_security_to_tool_response(
+            json.dumps({"html": '<div class="valid" onclick="alert(1)" id="test">content</div>'}),
+            "test_tool"
         )
-        assert result == "<div>content</div>"
+        result_dict = json.loads(result)
+        assert result_dict == {"html": "<div>content</div>"}
 
     def test_dangerous_script_attributes(self):
-        """Test that dangerous script attributes are stripped."""
-        # onclick handler
-        result = sanitize_html_content('<span onclick="alert(1)">click me</span>')
-        assert result == "<span>click me</span>"
+        """Test that dangerous script attributes are stripped via JSON input."""
+        import json
 
-        # All attributes stripped
-        result = sanitize_html_content(
-            '<img src="image.jpg" onerror="alert(1)" alt="test">'
+        # onclick handler
+        result = PromptSecurity.apply_security_to_tool_response(
+            json.dumps({"html": '<span onclick="alert(1)">click me</span>'}),
+            "test_tool"
         )
-        assert result == "<img>"
+        result_dict = json.loads(result)
+        assert result_dict == {"html": "<span>click me</span>"}
+
+        # All attributes stripped (including onerror)
+        result = PromptSecurity.apply_security_to_tool_response(
+            json.dumps({"img": '<img src="image.jpg" onerror="alert(1)" alt="test">'}),
+            "test_tool"
+        )
+        result_dict = json.loads(result)
+        assert result_dict == {"img": "<img>"}
 
         # style attribute (potential for CSS injection)
-        result = sanitize_html_content(
-            '<div style="display:none" hidden>hidden content</div>'
+        result = PromptSecurity.apply_security_to_tool_response(
+            json.dumps({"div": '<div style="display:none" hidden>hidden content</div>'}),
+            "test_tool"
         )
-        assert result == "<div>hidden content</div>"
+        result_dict = json.loads(result)
+        assert result_dict == {"div": "<div>hidden content</div>"}
 
     def test_unauthorized_attributes_stripped(self):
         """Test that unauthorized attributes are stripped."""
