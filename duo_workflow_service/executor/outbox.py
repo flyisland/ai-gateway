@@ -37,9 +37,13 @@ class Outbox:
         """Put an item into the outbox queue."""
 
         action.requestID = str(uuid4())
-        self._action_response[action.requestID] = result
-        self._legacy_action_response[action.requestID] = action.WhichOneof("action")
+
+        if action.WhichOneof("action") != "newCheckpoint":
+            self._action_response[action.requestID] = result
+            self._legacy_action_response[action.requestID] = action.WhichOneof("action")
+
         self._queue.put_nowait(action)
+
         return action.requestID
 
     async def put_action_and_wait_for_response(
@@ -104,9 +108,11 @@ class Outbox:
                 break
 
             if action_type in ["newCheckpoint", "runHTTPRequest"]:
-                request_id_expecting_http_response = request_id
+                if not request_id_expecting_http_response:
+                    request_id_expecting_http_response = request_id
             else:
-                request_id_expecting_plain_response = request_id
+                if not request_id_expecting_plain_response:
+                    request_id_expecting_plain_response = request_id
 
         if response_type == "httpResponse" and request_id_expecting_http_response:
             self._set_action_response_for_request_id(

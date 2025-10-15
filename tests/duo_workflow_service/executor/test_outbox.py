@@ -19,19 +19,35 @@ class TestOutbox:
         return Outbox()
 
     @pytest.mark.parametrize(
-        ("action", "future"),
+        ("action", "future", "expected_to_receive_response"),
         [
-            (contract_pb2.Action(), None),
-            (contract_pb2.Action(), asyncio.Future()),
+            (contract_pb2.Action(), None, True),
+            (contract_pb2.Action(), asyncio.Future(), True),
+            (
+                contract_pb2.Action(newCheckpoint=contract_pb2.NewCheckpoint()),
+                asyncio.Future(),
+                False,
+            ),
         ],
     )
-    def test_put_action(self, outbox: Outbox, action, future):
+    def test_put_action(
+        self, outbox: Outbox, action, future, expected_to_receive_response
+    ):
         assert action.requestID == ""
 
         request_id = outbox.put_action(action, result=future)
 
         assert action.requestID == request_id
         assert UUID(request_id)
+        assert outbox._queue.qsize() == 1
+
+        if not expected_to_receive_response:
+            assert len(outbox._action_response) == 0
+            assert len(outbox._legacy_action_response) == 0
+            return
+
+        assert len(outbox._action_response) == 1
+        assert len(outbox._legacy_action_response) == 1
         assert request_id in outbox._action_response
 
         if future:
@@ -99,7 +115,7 @@ class TestOutbox:
         ("action", "response", "result"),
         [
             (
-                contract_pb2.Action(newCheckpoint=contract_pb2.NewCheckpoint()),
+                contract_pb2.Action(runHTTPRequest=contract_pb2.RunHTTPRequest()),
                 contract_pb2.ClientEvent(
                     actionResponse=contract_pb2.ActionResponse(
                         httpResponse=contract_pb2.HttpResponse()
