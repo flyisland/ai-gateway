@@ -19,16 +19,13 @@ def decode_unicode_escapes(text: str) -> str:
     if not text or not isinstance(text, str):
         return text
 
-    # Decode iteratively up to 3 times to handle multiple levels of encoding
-    # This handles cases like \\\\u0026lt; -> \\&lt; -> &lt;
+    # Decode iteratively to handle multiple levels of encoding
     for _ in range(3):
         prev_text = text
-        # Decode: \u003c, \u003e, \u0026
         text = re.sub(r"\\+u003c", "<", text, flags=re.IGNORECASE)
         text = re.sub(r"\\+u003e", ">", text, flags=re.IGNORECASE)
         text = re.sub(r"\\+u0026", "&", text, flags=re.IGNORECASE)
 
-        # If nothing changed, we're done
         if text == prev_text:
             break
 
@@ -85,17 +82,10 @@ def sanitize_html_content(
             "th",
         ]
 
-        allowed_attributes = {
-            "*": ["class", "id"],
-            "a": ["href", "title"],
-            "img": ["src", "alt", "width", "height"],
-            "table": ["border", "cellpadding", "cellspacing"],
-        }
-
         return bleach.clean(
             decoded_text,
             tags=allowed_tags,
-            attributes=allowed_attributes,
+            attributes={},
             strip=True,
             strip_comments=True,
         )
