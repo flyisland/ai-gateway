@@ -374,7 +374,7 @@ class TestSanitizeHtmlContent:
         result = sanitize_html_content(
             '<div class="valid" onclick="alert(1)" id="test">content</div>'
         )
-        assert result == '<div>content</div>'
+        assert result == "<div>content</div>"
 
     def test_dangerous_script_attributes(self):
         """Test that dangerous script attributes are stripped."""
@@ -386,7 +386,7 @@ class TestSanitizeHtmlContent:
         result = sanitize_html_content(
             '<img src="image.jpg" onerror="alert(1)" alt="test">'
         )
-        assert result == '<img>'
+        assert result == "<img>"
 
         # style attribute (potential for CSS injection)
         result = sanitize_html_content(
@@ -404,7 +404,7 @@ class TestSanitizeHtmlContent:
         result = sanitize_html_content(
             '<a href="http://example.com" target="_blank">link</a>'
         )
-        assert result == '<a>link</a>'
+        assert result == "<a>link</a>"
 
         # unknown attributes
         result = sanitize_html_content('<p align="center" bgcolor="red">text</p>')
@@ -416,25 +416,25 @@ class TestSanitizeHtmlContent:
         result = sanitize_html_content(
             '<a href="http://example.com" title="Example">link</a>'
         )
-        assert result == '<a>link</a>'
+        assert result == "<a>link</a>"
 
         # All attributes stripped from images
         result = sanitize_html_content(
             '<img src="image.jpg" alt="test" width="100" height="100">'
         )
-        assert result == '<img>'
+        assert result == "<img>"
 
         # All attributes stripped from tables
         result = sanitize_html_content(
             '<table border="1" cellpadding="5"><tr><td>cell</td></tr></table>'
         )
-        assert result == '<table><tr><td>cell</td></tr></table>'
+        assert result == "<table><tr><td>cell</td></tr></table>"
 
         # All attributes stripped from divs
         result = sanitize_html_content(
             '<div class="valid" id="also-valid">normal content</div>'
         )
-        assert result == '<div>normal content</div>'
+        assert result == "<div>normal content</div>"
 
     def test_dangerous_tags_stripped(self):
         """Test that dangerous tags are completely removed."""
@@ -526,13 +526,15 @@ class TestSanitizeHtmlContent:
         assert "<a>click</a>" == result
 
         # All src attributes stripped
-        result = sanitize_html_content('<img src="data:text/html,<script>alert(1)</script>">')
-        assert result == '<img>'
+        result = sanitize_html_content(
+            '<img src="data:text/html,<script>alert(1)</script>">'
+        )
+        assert result == "<img>"
 
         # Even safe URLs are stripped
         result = sanitize_html_content('<a href="http://example.com">link</a>')
-        assert result == '<a>link</a>'
+        assert result == "<a>link</a>"
 
         # Relative URLs also stripped
         result = sanitize_html_content('<a href="/path/to/page">link</a>')
-        assert result == '<a>link</a>'
+        assert result == "<a>link</a>"

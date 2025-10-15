@@ -174,6 +174,39 @@ class PromptSecurity:
     }
 
     @staticmethod
+    def _apply_security_functions(
+        response: Union[str, Dict[str, Any], List[Any]], tool_name: str
+    ) -> Union[str, List[Union[str, Dict[str, Any]]]]:
+        """Apply all security functions to the response.
+
+        Args:
+            response: The response to secure
+            tool_name: Name of the tool being used
+
+        Returns:
+            Secured response
+
+        Raises:
+            SecurityException: If any security validation fails
+        """
+        all_functions = list(PromptSecurity.DEFAULT_SECURITY_FUNCTIONS)
+        if tool_name in PromptSecurity.TOOL_SPECIFIC_FUNCTIONS:
+            all_functions.extend(PromptSecurity.TOOL_SPECIFIC_FUNCTIONS[tool_name])
+
+        secured_response: Union[str, List[Union[str, Dict[str, Any]]]] = response
+        for func in all_functions:
+            try:
+                secured_response = func(secured_response)
+            except SecurityException:
+                raise
+            except Exception as e:
+                raise SecurityException(
+                    f"Security function {func.__name__} failed for tool '{tool_name}': {str(e)}"
+                ) from e
+
+        return secured_response
+
+    @staticmethod
     def apply_security_to_tool_response(
         response: Union[str, Dict[str, Any], List[Any]], tool_name: str
     ) -> Union[str, List[Union[str, Dict[str, Any]]]]:
@@ -198,45 +231,14 @@ class PromptSecurity:
                 parsed_response = json.loads(response)
                 is_json_input = True
             except json.JSONDecodeError:
-                all_functions = list(PromptSecurity.DEFAULT_SECURITY_FUNCTIONS)
-                if tool_name in PromptSecurity.TOOL_SPECIFIC_FUNCTIONS:
-                    all_functions.extend(
-                        PromptSecurity.TOOL_SPECIFIC_FUNCTIONS[tool_name]
-                    )
-
-                secured_response: Union[str, List[Union[str, Dict[str, Any]]]] = (
-                    response
-                )
-                for func in all_functions:
-                    try:
-                        secured_response = func(secured_response)
-                    except SecurityException:
-                        raise
-                    except Exception as e:
-                        raise SecurityException(
-                            f"Security function {func.__name__} failed for tool '{tool_name}': {str(e)}"
-                        ) from e
-                return secured_response
+                return PromptSecurity._apply_security_functions(response, tool_name)
         else:
             parsed_response = response
             is_json_input = False
 
-        all_functions = list(PromptSecurity.DEFAULT_SECURITY_FUNCTIONS)
-        if tool_name in PromptSecurity.TOOL_SPECIFIC_FUNCTIONS:
-            all_functions.extend(PromptSecurity.TOOL_SPECIFIC_FUNCTIONS[tool_name])
-
-        secured_response = parsed_response
-        for func in all_functions:
-            try:
-                secured_response = func(secured_response)
-
-            except SecurityException:
-                raise
-
-            except Exception as e:
-                raise SecurityException(
-                    f"Security function {func.__name__} failed for tool '{tool_name}': {str(e)}"
-                ) from e
+        secured_response = PromptSecurity._apply_security_functions(
+            parsed_response, tool_name
+        )
 
         if is_json_input:
             return json.dumps(secured_response)
