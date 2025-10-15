@@ -410,8 +410,8 @@ class TestSanitizeHtmlContent:
         result = sanitize_html_content('<p align="center" bgcolor="red">text</p>')
         assert result == "<p>text</p>"
 
-    def test_authorized_attributes_preserved(self):
-        """Test that no attributes are preserved (all stripped)."""
+    def test_all_safe_attributes_stripped(self):
+        """Test that all attributes are stripped (including safe ones)."""
         # All attributes stripped from links
         result = sanitize_html_content(
             '<a href="http://example.com" title="Example">link</a>'

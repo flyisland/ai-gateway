@@ -37,7 +37,7 @@ def encode_dangerous_tags(
     """
 
     def _encode_recursive(data: Any) -> Any:
-        """Internal recursive function that doesn't change top-level structure."""
+        """Recursively encode dangerous tags in nested data structures."""
         DANGEROUS_TAGS = {
             "goal": "goal",
             "system": "system",
@@ -48,7 +48,9 @@ def encode_dangerous_tags(
         elif isinstance(data, list):
             return [_encode_recursive(item) for item in data]
 
+        # Encode tags in multiple formats to prevent bypass attacks
         for tag_name, replacement in DANGEROUS_TAGS.items():
+            # Standard HTML tags: <system>, </system>
             data = re.sub(
                 rf"<\s*(/?)\s*{re.escape(tag_name)}\s*>",
                 f"&lt;\\1{replacement}&gt;",
@@ -56,6 +58,7 @@ def encode_dangerous_tags(
                 flags=re.IGNORECASE,
             )
 
+            # Single-escaped Unicode: \u003csystem\u003e
             data = re.sub(
                 rf"\\u003c\s*(/?)\s*{re.escape(tag_name)}\s*\\u003e",
                 f"&lt;\\1{replacement}&gt;",
@@ -63,6 +66,7 @@ def encode_dangerous_tags(
                 flags=re.IGNORECASE,
             )
 
+            # Double-escaped Unicode: \\u003csystem\\u003e
             data = re.sub(
                 rf"\\\\u003c\s*(/?)\s*{re.escape(tag_name)}\s*\\\\u003e",
                 f"&lt;\\1{replacement}&gt;",
@@ -74,6 +78,7 @@ def encode_dangerous_tags(
 
     processed = _encode_recursive(response)
 
+    # Wrap dict responses in a list for ToolMessage.content compatibility
     if isinstance(processed, dict):
         return [processed]
 
@@ -104,20 +109,18 @@ def strip_hidden_unicode_tags(
         if not text or not isinstance(text, str):
             return text
 
-        # First handle JSON-escaped Unicode tag characters
-        # Unicode Tag Characters (U+E0000-E007F) get encoded as UTF-16 surrogates:
-        # U+E0000-E007F -> surrogate pairs starting with \udb40
-        # U+E0100-E01EF -> surrogate pairs starting with \udb40
         import re
 
-        # Remove JSON-escaped Unicode tag characters (UTF-16 surrogate pairs)
+        # Handle JSON-escaped Unicode tag characters (UTF-16 surrogate pairs)
+        # Unicode Tag Characters (U+E0000-E007F) get encoded as UTF-16 surrogates
         # These appear as \\udb40\\udc?? in JSON output
         text = re.sub(
             r"\\udb40\\ud[c-f][0-9a-f][0-9a-f]", "", text, flags=re.IGNORECASE
         )
 
-        # Also remove direct Unicode Tag Characters if they exist
-        # These ranges contain invisible characters that can be used for steganographic attacks
+        # Remove direct Unicode Tag Characters if present
+        # These invisible characters (U+E0000-E007F, U+E0100-E01EF) can be used
+        # for steganographic attacks to hide malicious instructions
         return "".join(
             char
             for char in text

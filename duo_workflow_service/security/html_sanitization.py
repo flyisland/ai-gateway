@@ -20,12 +20,14 @@ def decode_unicode_escapes(text: str) -> str:
         return text
 
     # Decode iteratively to handle multiple levels of encoding
+    # Pattern \\+ matches one or more backslashes to handle variable encoding levels
     for _ in range(3):
         prev_text = text
         text = re.sub(r"\\+u003c", "<", text, flags=re.IGNORECASE)
         text = re.sub(r"\\+u003e", ">", text, flags=re.IGNORECASE)
         text = re.sub(r"\\+u0026", "&", text, flags=re.IGNORECASE)
 
+        # Stop early if no more replacements were made
         if text == prev_text:
             break
 
@@ -82,6 +84,8 @@ def sanitize_html_content(
             "th",
         ]
 
+        # Strip all HTML attributes for maximum security
+        # Empty dict means no attributes are allowed on any tags
         return bleach.clean(
             decoded_text,
             tags=allowed_tags,
