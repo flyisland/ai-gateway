@@ -70,7 +70,7 @@ models:
       max_tokens: 4_096
 
   - name: "Claude Haiku 4.5 20251001 - Vertex"
-    gitlab_identifier: "vertex" # For backwards compatibility with requests asking for [prompt_id]/vertex
+    gitlab_identifier: "claude_haiku_4_5_20251001_vertex"
     family:
       - vertex
     params:
@@ -78,6 +78,7 @@ models:
       custom_llm_provider: "vertex_ai"
       temperature: 0.0
       max_tokens: 4_096
+      max_retries: 1
 
   - name: "Claude Sonnet 4.0 - Anthropic"
     gitlab_identifier: "claude_sonnet_4_20250514"
