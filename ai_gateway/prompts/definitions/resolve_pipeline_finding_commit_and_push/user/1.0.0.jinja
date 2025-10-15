@@ -1,0 +1,41 @@
+<instructions>
+<step number="1" name="parse_and_validate">
+Parse the finding_context JSON string to extract:
+- finding_uuid (the security finding UUID)
+- pipeline_id (numeric part only, strip "gid://gitlab/Ci::Pipeline/" prefix if present)
+- finding_type or scanner name
+
+Validate that finding_uuid and pipeline_id exist and are non-empty before proceeding.
+</step>
+
+<step number="2" name="construct_commit_message">
+Create a conventional commit message using this format:
+fix(security): Resolve <TYPE> finding from pipeline <PIPELINE_ID>
+
+Where:
+- <TYPE> = finding type (in title case) or scanner name
+- <PIPELINE_ID> = numeric pipeline ID
+
+Example: "fix(security): Resolve SQL Injection finding from pipeline 3626"
+</step>
+
+<step number="3" name="stage_and_commit">
+Call run_git_command to stage all changes:
+<git_command>git add .</git_command>
+
+Then commit with the constructed message:
+<git_command>git commit -m "<your_constructed_message>"</git_command>
+</step>
+
+<step number="4" name="push_to_new_branch">
+Construct a unique branch name using first 8 characters of finding UUID:
+<branch_name_format>security/resolve-pipeline-finding-<PIPELINE_ID>-<WORKFLOW_ID></branch_name_format>
+
+Example: security/pipeline-3626-1e9a2bf7-workflow123
+
+Call run_git_command to push and create a merge request:
+<git_command>
+git push -u origin HEAD:refs/heads/<branch_name> -o merge_request.create -o merge_request.title="<commit_message>"
+</git_command>
+</step>
+</instructions>

@@ -62,6 +62,7 @@ class CategoryEnum(StrEnum):
     WORKFLOW_ISSUE_TO_MERGE_REQUEST = "issue_to_merge_request"
     CODE_REVIEW = "code_review"
     FIX_PIPELINE = "fix_pipeline"
+    RESOLVE_PIPELINE_SECURITY_FINDING = "resolve_pipeline_security_finding"
     RESOLVE_SAST_VULNERABILITY = "resolve_sast_vulnerability"
     SAST_FP_DETECTION = "sast_fp_detection"
     AI_CATALOG_AGENT = "ai_catalog_agent"

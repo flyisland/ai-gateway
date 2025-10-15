@@ -1,0 +1,23 @@
+name: Resolve Single Pipeline Finding
+model:
+  params:
+    model_class_provider: anthropic
+    max_tokens: 32_768
+prompt_template:
+  system: |
+    {% include 'resolve_pipeline_finding_context/system/1.0.0.jinja' %}
+  user: |
+    {% include 'resolve_pipeline_finding_context/user/1.0.0.jinja' %}
+
+    <pipeline_id>
+    gid://gitlab/Ci::Pipeline/{{pipeline_id}}
+    </pipeline_id>
+
+    <finding_uuid>
+    {{finding_uuid}}
+    </finding_uuid>
+
+    <repository_context>
+    Repository: {{repository_url}}
+    </repository_context>
+  placeholder: history
