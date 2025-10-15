@@ -1,0 +1,18 @@
+---
+name: Amazon Q Chat Agent
+model:
+  config_file: amazon_q
+  params:
+    # FIXME: confirm this number
+    max_tokens: 20_480
+unit_primitives:
+  - amazon_q_integration
+prompt_template:
+  system_static: |
+    {% include 'chat/agent/partials/amazon_q_static/1.0.0.jinja' %}
+  system_dynamic: |
+    {% include 'chat/agent/partials/system_dynamic/1.0.0.jinja' %}
+  user: |
+    {% include 'chat/agent/partials/user/1.0.0.jinja' %}
+params:
+  timeout: 30
