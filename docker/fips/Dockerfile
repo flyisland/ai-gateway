@@ -92,7 +92,7 @@ COPY --chown=aigateway:aigateway --from=install-image /home/aigateway/app/venv/ 
 # Use poetry run python
 RUN poetry run python -c "import ssl; print('OpenSSL version:', ssl.OPENSSL_VERSION); print('FIPS capable:', hasattr(ssl, '_fips_mode'))" || echo "FIPS verification info unavailable"
 
-RUN poetry run python scripts/bootstrap.py
+# RUN poetry run python scripts/bootstrap.py
 
 EXPOSE 5052
 
