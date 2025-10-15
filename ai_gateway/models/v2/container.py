@@ -1,3 +1,4 @@
+import structlog
 from dependency_injector import containers, providers
 from langchain_openai import ChatOpenAI
 from litellm.llms.custom_httpx.http_handler import AsyncHTTPHandler
@@ -6,6 +7,7 @@ from ai_gateway.integrations.amazon_q.chat import ChatAmazonQ
 from ai_gateway.models import mock
 from ai_gateway.models.base import init_anthropic_client, log_request
 from ai_gateway.models.v2.anthropic_claude import ChatAnthropic
+from ai_gateway.models.v2.chat_fireworks import ChatFireworks
 from ai_gateway.models.v2.chat_litellm import ChatLiteLLM
 from ai_gateway.prompts.typing import Model
 
@@ -18,6 +20,10 @@ def _litellm_factory(*args, **kwargs) -> Model:
 
     if kwargs.get("custom_llm_provider", "") == "vertex_ai":
         kwargs["client"] = AsyncHTTPHandler(event_hooks={"request": [log_request]})
+
+    # Use ChatFireworks for Fireworks models
+    if kwargs.get("custom_llm_provider", "") == "fireworks_ai":
+        return ChatFireworks(*args, **kwargs)
 
     return ChatLiteLLM(*args, **kwargs)
 
@@ -60,7 +66,17 @@ class ContainerModels(containers.DeclarativeContainer):
 
     openai_chat_fn = providers.Factory(ChatOpenAI, output_version="responses/v1")
 
-    lite_llm_chat_fn = providers.Factory(_litellm_factory)
+    lite_llm_chat_fn = providers.Selector(
+        _mock_selector,
+        original=providers.Factory(
+            _litellm_factory,
+            model_keys=config.model_keys,
+            model_endpoints=config.model_endpoints,
+        ),
+        mocked=providers.Factory(mock.FakeModel),
+        agentic=providers.Factory(mock.AgenticFakeModel),
+    )
+
     amazon_q_chat_fn = providers.Factory(
         ChatAmazonQ,
         amazon_q_client_factory=integrations.amazon_q_client_factory,

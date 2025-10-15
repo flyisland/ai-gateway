@@ -8,6 +8,7 @@ from pydantic import HttpUrl
 
 from ai_gateway.model_metadata import (
     AmazonQModelMetadata,
+    FireworksModelMetadata,
     ModelMetadata,
     create_model_metadata,
 )
