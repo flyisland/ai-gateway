@@ -374,48 +374,50 @@ class TestSanitizeHtmlContent:
         import json
 
         # Malformed attributes that could render invisibly
+        # JSON dict input is wrapped in list for ToolMessage compatibility
         result = PromptSecurity.apply_security_to_tool_response(
             json.dumps({"content": '<p random="value" another>text</p>'}),
             "test_tool"
         )
-        result_dict = json.loads(result)
-        assert result_dict == {"content": "<p>text</p>"}
+        result_list = json.loads(result)
+        assert result_list == [{"content": "<p>text</p>"}]
 
         # All attributes stripped (including valid ones like class, id)
         result = PromptSecurity.apply_security_to_tool_response(
             json.dumps({"html": '<div class="valid" onclick="alert(1)" id="test">content</div>'}),
             "test_tool"
         )
-        result_dict = json.loads(result)
-        assert result_dict == {"html": "<div>content</div>"}
+        result_list = json.loads(result)
+        assert result_list == [{"html": "<div>content</div>"}]
 
     def test_dangerous_script_attributes(self):
         """Test that dangerous script attributes are stripped via JSON input."""
         import json
 
         # onclick handler
+        # JSON dict input is wrapped in list for ToolMessage compatibility
         result = PromptSecurity.apply_security_to_tool_response(
             json.dumps({"html": '<span onclick="alert(1)">click me</span>'}),
             "test_tool"
         )
-        result_dict = json.loads(result)
-        assert result_dict == {"html": "<span>click me</span>"}
+        result_list = json.loads(result)
+        assert result_list == [{"html": "<span>click me</span>"}]
 
         # All attributes stripped (including onerror)
         result = PromptSecurity.apply_security_to_tool_response(
             json.dumps({"img": '<img src="image.jpg" onerror="alert(1)" alt="test">'}),
             "test_tool"
         )
-        result_dict = json.loads(result)
-        assert result_dict == {"img": "<img>"}
+        result_list = json.loads(result)
+        assert result_list == [{"img": "<img>"}]
 
         # style attribute (potential for CSS injection)
         result = PromptSecurity.apply_security_to_tool_response(
             json.dumps({"div": '<div style="display:none" hidden>hidden content</div>'}),
             "test_tool"
         )
-        result_dict = json.loads(result)
-        assert result_dict == {"div": "<div>hidden content</div>"}
+        result_list = json.loads(result)
+        assert result_list == [{"div": "<div>hidden content</div>"}]
 
     def test_unauthorized_attributes_stripped(self):
         """Test that unauthorized attributes are stripped."""

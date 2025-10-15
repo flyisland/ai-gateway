@@ -6,7 +6,7 @@ class TestHtmlSanitization:
     """Test suite for HTML sanitization module."""
 
     def test_malformed_attributes_attack_vector(self):
-        """Test that malformed attributes are properly stripped."""
+        """Test that all attributes are stripped (including malformed ones)."""
         # Primary attack vector: malformed attributes that could render invisibly
         result = sanitize_html_content("<div this is injected>content</div>")
         assert result == "<div>content</div>"
@@ -15,23 +15,23 @@ class TestHtmlSanitization:
         result = sanitize_html_content('<p random="value" another>text</p>')
         assert result == "<p>text</p>"
 
-        # Mixed valid and invalid attributes
+        # All attributes stripped (valid and invalid)
         result = sanitize_html_content(
             '<div class="valid" onclick="alert(1)" id="test">content</div>'
         )
-        assert result == '<div class="valid" id="test">content</div>'
+        assert result == '<div>content</div>'
 
     def test_dangerous_script_attributes(self):
-        """Test that dangerous script attributes are stripped."""
+        """Test that all attributes are stripped (including dangerous ones)."""
         # onclick handler
         result = sanitize_html_content('<span onclick="alert(1)">click me</span>')
         assert result == "<span>click me</span>"
 
-        # onerror handler
+        # All attributes stripped
         result = sanitize_html_content(
             '<img src="image.jpg" onerror="alert(1)" alt="test">'
         )
-        assert result == '<img src="image.jpg" alt="test">'
+        assert result == '<img>'
 
         # style attribute (potential for CSS injection)
         result = sanitize_html_content(
@@ -40,48 +40,46 @@ class TestHtmlSanitization:
         assert result == "<div>hidden content</div>"
 
     def test_unauthorized_attributes_stripped(self):
-        """Test that unauthorized attributes are stripped."""
-        # data-* attributes not in allowlist
+        """Test that all attributes are stripped."""
+        # data-* attributes stripped
         result = sanitize_html_content('<div data-custom="value">custom data</div>')
         assert result == "<div>custom data</div>"
 
-        # target attribute not allowed for links (not in allowlist)
+        # All attributes stripped from links
         result = sanitize_html_content(
             '<a href="http://example.com" target="_blank">link</a>'
         )
-        assert result == '<a href="http://example.com">link</a>'
+        assert result == '<a>link</a>'
 
-        # unknown attributes
+        # All attributes stripped
         result = sanitize_html_content('<p align="center" bgcolor="red">text</p>')
         assert result == "<p>text</p>"
 
     def test_authorized_attributes_preserved(self):
-        """Test that authorized attributes are preserved."""
-        # Global attributes: class, id
+        """Test that all attributes are stripped (maximum security policy)."""
+        # All attributes stripped (including class, id)
         result = sanitize_html_content(
             '<div class="valid" id="also-valid">normal content</div>'
         )
-        assert result == '<div class="valid" id="also-valid">normal content</div>'
+        assert result == '<div>normal content</div>'
 
-        # Link attributes: href, title
+        # All link attributes stripped
         result = sanitize_html_content(
             '<a href="http://example.com" title="Example">link</a>'
         )
-        assert result == '<a href="http://example.com" title="Example">link</a>'
+        assert result == '<a>link</a>'
 
-        # Image attributes: src, alt, width, height
+        # All image attributes stripped
         result = sanitize_html_content(
             '<img src="image.jpg" alt="test" width="100" height="100">'
         )
-        assert result == '<img src="image.jpg" alt="test" width="100" height="100">'
+        assert result == '<img>'
 
-        # Table attributes
+        # All table attributes stripped
         result = sanitize_html_content(
             '<table border="1" cellpadding="5"><tr><td>cell</td></tr></table>'
         )
-        assert (
-            result == '<table border="1" cellpadding="5"><tr><td>cell</td></tr></table>'
-        )
+        assert result == '<table><tr><td>cell</td></tr></table>'
 
     def test_dangerous_tags_stripped(self):
         """Test that dangerous tags are completely removed."""
@@ -175,7 +173,7 @@ class TestHtmlSanitization:
         assert "<span>content</span>" in result
 
     def test_allowlist_completeness(self):
-        """Test that the allowlist covers common HTML formatting needs."""
+        """Test that the allowlist covers common HTML formatting needs (tags only, no attributes)."""
         # Basic formatting tags
         html_content = """
         <b>bold</b> <i>italic</i> <u>underline</u> <strong>strong</strong> <em>emphasis</em>
@@ -191,7 +189,7 @@ class TestHtmlSanitization:
 
         result = sanitize_html_content(html_content)
 
-        # Verify all allowed elements are preserved
+        # Verify all allowed elements are preserved (but attributes are stripped)
         assert "<b>bold</b>" in result
         assert "<i>italic</i>" in result
         assert "<strong>strong</strong>" in result
@@ -200,8 +198,9 @@ class TestHtmlSanitization:
         assert "<p>paragraph</p>" in result
         assert "<h1>header1</h1>" in result
         assert "<ul><li>list item</li></ul>" in result
-        assert 'href="http://example.com"' in result
-        assert 'src="image.jpg"' in result
+        # Attributes are stripped, so only tags remain
+        assert "<a>link</a>" in result
+        assert "<img>" in result
         assert "<code>inline code</code>" in result
         assert "<pre>preformatted</pre>" in result
         assert "<blockquote>quote</blockquote>" in result
