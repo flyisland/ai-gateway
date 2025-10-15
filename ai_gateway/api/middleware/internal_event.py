@@ -52,15 +52,6 @@ class InternalEventMiddleware:
         # This is relevant for requests from gitlab.com, not for self-managed/dedicated instances
         feature_enabled_by_namespace_ids = self._extract_namespace_ids(request)
 
-        ultimate_parent_namespace_id_str = request.headers.get(
-            X_GITLAB_ROOT_NAMESPACE_ID
-        )
-        ultimate_parent_namespace_id = (
-            int(ultimate_parent_namespace_id_str)
-            if ultimate_parent_namespace_id_str
-            else None
-        )
-
         # EventContext uses Pydantic which coerces int and string to boolean type
         # Reference: https://docs.pydantic.dev/latest/api/standard_library_types/#booleans
         context = EventContext(
@@ -82,7 +73,7 @@ class InternalEventMiddleware:
             ),
             context_generated_at=datetime.now().isoformat(),
             correlation_id=correlation_id.get(),
-            ultimate_parent_namespace_id=ultimate_parent_namespace_id,
+            ultimate_parent_namespace_id=request.headers.get(X_GITLAB_ROOT_NAMESPACE_ID),  # type: ignore[arg-type]
         )
         current_event_context.set(context)
         tracked_internal_events.set(set())
