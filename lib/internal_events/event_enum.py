@@ -64,4 +64,5 @@ class CategoryEnum(StrEnum):
     RESOLVE_SAST_VULNERABILITY = "resolve_sast_vulnerability"
     SAST_FP_DETECTION = "sast_fp_detection"
     AI_CATALOG_AGENT = "ai_catalog_agent"
+    SECURITY_ANALYST_AGENT = "security_analyst_agent"
     UNKNOWN = "unknown"

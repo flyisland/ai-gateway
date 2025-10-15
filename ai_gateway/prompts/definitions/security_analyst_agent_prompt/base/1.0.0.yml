@@ -2,6 +2,7 @@ name: Security Analyst Agent Prompt
 model:
   params:
     model_class_provider: anthropic
+    custom_llm_provider: anthropic
     max_tokens: 32_768
 prompt_template:
   system: |
