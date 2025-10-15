@@ -1,0 +1,20 @@
+version: "v1"
+environment: chat-partial
+components:
+  # Step 1: Fetch and format all MR data
+  - name: "foundational_pirate_agent"
+    type: AgentComponent
+    prompt_id: "foundational_pirate_agent"
+    prompt_version: "^1.0.0"
+    inputs:
+      - from: "context:goal"
+        as: "goal"
+      - from: "context:project_id"
+        as: "project_id"
+    toolset: []
+    ui_log_events: []
+routers:
+  - from: "foundational_pirate_agent"
+    to: "end"
+flow:
+  entry_point: "foundational_pirate_agent"
