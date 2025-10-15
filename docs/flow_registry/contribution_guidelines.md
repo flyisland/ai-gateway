@@ -32,13 +32,19 @@ For detailed version information, see the [versions documentation](index.md#vers
 ### Version Guidelines
 
 **For `v1` (Stable Version):**
+
 - All changes MUST be backwards compatible
-- Existing component interfaces cannot be modified in breaking ways
+- Existing component interfaces cannot be modified in breaking ways:
+  - Renaming of the component.
+  - Removing or renaming a parameter.
+  - Non backwards compatible change of the type of the parameter value.
+  - Adding a new parameter if it is required.
 - New optional parameters can be added
 - Deprecation warnings should precede removal of functionality (follow GitLab deprecation process)
 - Documentation must be updated with all changes
 
 **For `experimental` Version:**
+
 - Breaking changes are allowed
 - Suitable for prototyping and experimentation
 - NOT suitable for external feature development
@@ -63,12 +69,12 @@ The state includes the following top-level attributes:
 
 1. **Fixed Top-Level Structure**: The top-level attributes (`context`, `conversation_history`, `status`, `ui_chat_log`) must remain fixed to ensure cross-component and router compatibility.
 
-2. **Dynamic Content Placement**: All dynamic content should be placed within the `context` attribute. This includes:
+1. **Dynamic Content Placement**: All dynamic content should be placed within the `context` attribute. This includes:
    - Data generated during flow execution
    - Input provided via [additional context](index.md#additional-context) at session start
    - Component outputs and intermediate results
 
-3. **Avoid Direct State Access**: Components and routers should not access state directly. Instead, use the `IOKey` and `IOKeyTemplate` abstractions (see next section).
+1. **Avoid Direct State Access**: Components and routers should not access state directly. Instead, use the `IOKey` and `IOKeyTemplate` abstractions (see next section).
 
 ### IOKey and IOKeyTemplate Abstraction
 
@@ -79,6 +85,7 @@ To abstract state interactions and prevent tight coupling across the codebase, F
 An `IOKey` object wraps a single leaf in the flow session state, providing a clean interface for reading from and writing to specific state locations.
 
 **Example:**
+
 ```python
 # Project ID stored at context.project_id
 project_id_key = IOKey(
@@ -94,6 +101,7 @@ project_id_key = IOKey(
 When a component generates data dynamically and cannot declaratively specify the complete state path at design time, use `IOKeyTemplate`. This abstraction defines `IOKey` instances with dynamic parts.
 
 **Why Use IOKeyTemplate?**
+
 - Prevents naming collisions when multiple instances of the same component exist in a flow
 - Enables component-scoped data storage
 - Maintains clean separation between component instances
@@ -118,7 +126,7 @@ iokey = template.to_iokey({
 
 #### Design Principle
 
-**All Flow Registry elements (components, routers, etc.) MUST use `IOKey` and `IOKeyTemplate` for state interactions.** Never access the state dictionary directly. 
+**All Flow Registry elements (components, routers, etc.) MUST use `IOKey` and `IOKeyTemplate` for state interactions.** Never access the state dictionary directly.
 
 ## Contributing Components
 
@@ -141,7 +149,7 @@ Every component must implement the following methods:
      - `router`: Router instance controlling graph exit from the component
    - Should add nodes, edges, and conditional edges as needed
 
-2. **`__entry_hook__(self) -> str`**
+1. **`__entry_hook__(self) -> str`**
    - Property that returns the name of the LangGraph node serving as the entry point
    - Used by the framework to connect components in the flow
 
@@ -154,12 +162,12 @@ Components must override these class attributes:
    - Enables framework validation and documentation generation
    - Example: `[IOKeyTemplate(target='context', subkeys=[IOKeyTemplate.COMPONENT_NAME_TEMPLATE, 'result'])]`
 
-2. **`_allowed_input_targets: List[str]`**
+1. **`_allowed_input_targets: List[str]`**
    - Lists top-level state keys the component can read from
    - Typically includes `['context', 'status', 'conversation_history']`
    - Used for input validation
 
-3. **`supported_environments: List[str]`**
+1. **`supported_environments: List[str]`**
    - Specifies environment types compatible with this component
    - Options: `['ambient', 'chat', 'chat-partial']` (or subset), see the current version environment [documentation](v1.md#environment)
    - Prevents component usage in incompatible environments
@@ -200,7 +208,7 @@ class MyComponent(BaseComponent):
             subkeys=[IOKeyTemplate.COMPONENT_NAME_TEMPLATE, 'metadata']
         ),
     ]
-``` 
+```
 
 ### Routing Out of Components
 
@@ -213,7 +221,7 @@ For components with a single exit point, connect directly to the router:
 ```python
 def attach(self, graph: StateGraph, router: RouterProtocol) -> None:
     # ... component setup ...
-    
+
     # Connect final node to router
     graph.add_conditional_edges(
         node_final_response.name,
@@ -228,7 +236,7 @@ For components requiring internal routing logic before delegating to the externa
 ```python
 def attach(self, graph: StateGraph, router: RouterProtocol) -> None:
     # ... component setup ...
-    
+
     # Add conditional edge with wrapped router
     graph.add_conditional_edges(
         f"{self.name}#tools",
@@ -256,12 +264,13 @@ def _tools_router(
     # Delegate to outgoing router when conditions are met
     if self._should_exit(last_message):
         return outgoing_router.route(state)
-    
+
     # Continue internal component processing
     return self._get_internal_node_name()
 ```
 
 **Key Principles:**
+
 - Always delegate to the injected router for final exit routing
 - Use internal routing logic only for component-specific flow control
 - Raise `RoutingError` for exceptional conditions
@@ -281,11 +290,11 @@ Components can extract node execution logic into separate Node classes for bette
 ```python
 class MyComponentNode:
     """Internal node implementation for MyComponent."""
-    
+
     def __init__(self, component_name: str, config: dict):
         self.component_name = component_name
         self.config = config
-    
+
     def execute(self, state: FlowState) -> FlowState:
         """Execute node logic and return updated state."""
         # Node implementation
@@ -308,15 +317,15 @@ Before implementing a new component:
 - **Determine environment compatibility**: Which environments support this component?
 - **Check for existing components**: Can existing components be extended instead?
 
-### 2. Implementation Phase
+### 1. Implementation Phase
 
-1. **Create the component class** in `duo_workflow_service/agent_platform/v1/components/`
-2. **Inherit from `BaseComponent`**
-3. **Implement required methods and attributes**
-4. **Add comprehensive docstrings** explaining usage and configuration
-5. **Implement node logic** (extract to Node classes if complex)
+1. **Create the component class** in `duo_workflow_service/agent_platform/experimental/components/`. Implementing **new components within experimental version** grants required time to verify stability and quality of it, before it gets released into stable version
+1. **Inherit from `BaseComponent`**
+1. **Implement required methods and attributes**
+1. **Add comprehensive docstrings** explaining usage and configuration
+1. **Implement node logic** (extract to Node classes if complex)
 
-### 3. Testing Phase
+### 1. Testing Phase
 
 Comprehensive testing ensures Flow Registry components are reliable and maintainable. Follow these testing principles when contributing components or improving framework functionality.
 
@@ -324,13 +333,13 @@ Comprehensive testing ensures Flow Registry components are reliable and maintain
 
 1. **Test the Public Interface**: Test components through their public methods (`__init__`, `attach`, `__entry_hook__`) rather than private methods (prefixed with `_`). Assert on return values and calls to other classes.
 
-2. **Integration-Style Testing**: Test components by attaching them to real `StateGraph` instances and executing the compiled graph. This validates the complete component behavior including graph structure, node execution, and state management.
+1. **Integration-Style Testing**: Test components by attaching them to real `StateGraph` instances and executing the compiled graph. This validates the complete component behavior including graph structure, node execution, and state management.
 
-3. **Extract Complex Node Logic**: If component nodes contain complex logic requiring in-depth testing, extract the node into a separate class and test it independently.
+1. **Extract Complex Node Logic**: If component nodes contain complex logic requiring in-depth testing, extract the node into a separate class and test it independently.
 
 #### Component Testing Pattern
 
-The recommended approach for testing components is demonstrated in `TestOneOffComponentToolsRouter` from [`tests/duo_workflow_service/agent_platform/experimental/components/one_off/test_component.py`](../../tests/duo_workflow_service/agent_platform/experimental/components/one_off/test_component.py).
+The recommended approach for testing components is demonstrated in `TestOneOffComponentToolsRouter` from [`tests/duo_workflow_service/agent_platform/v1/components/one_off/test_v1_one_off_component.py`](../../tests/duo_workflow_service/agent_platform/v1/components/one_off/test_v1_one_off_component.py).
 
 **Example Test Structure:**
 
@@ -396,7 +405,7 @@ def test_successful_execution_flow(
 
 When nodes contain complex logic (error handling, retry logic, multiple operations), extract the node class and test it independently.
 
-**Example:** See [`tests/duo_workflow_service/agent_platform/experimental/components/one_off/nodes/test_tool_node_with_error_correction.py`](../../tests/duo_workflow_service/agent_platform/experimental/components/one_off/nodes/test_tool_node_with_error_correction.py)
+**Example:** See [`tests/duo_workflow_service/agent_platform/v1/components/one_off/nodes/test_v1_tool_node_with_error_correction.py`](../../tests/duo_workflow_service/agent_platform/v1/components/one_off/nodes/test_v1_tool_node_with_error_correction.py)
 
 ```python
 class TestMyNodeClass:
@@ -429,18 +438,18 @@ Every component contribution must include tests for:
    - IOKeyTemplate replacement with component names
    - Default values for optional parameters
 
-2. **Graph Structure Creation**
+1. **Graph Structure Creation**
    - Correct nodes added to graph via `attach` method
    - Edges between nodes
    - Entry point hook returns correct node name
 
-3. **Execution Flow and Routing**
+1. **Execution Flow and Routing**
    - Successful execution paths
    - Error handling and retry logic
    - Routing decisions (internal and external)
    - State management throughout execution
 
-4. **Node-Specific Logic** (when extracted)
+1. **Node-Specific Logic** (when extracted)
    - Complex error handling
    - Retry mechanisms
    - Security and validation
@@ -488,18 +497,16 @@ def mock_toolset_fixture():
     return toolset
 ```
 
+### 1. Documentation Phase
 
-### 4. Documentation Phase
+1. **Update component documentation** within appropriate version page
+1. **Add example configurations** showing common use cases
+1. **Document all configuration parameters**
 
-1. **Update component documentation** in `docs/flow_registry/v1.md`
-2. **Add example configurations** showing common use cases
-3. **Document all configuration parameters**
-
-### 5. Review and Merge
+### 1. Review and Merge
 
 1. **Create merge request** following GitLab contribution guidelines
-2. **Request review** from Flow Registry experts (agent foundations group)
-
+1. **Request review** from Flow Registry experts (agent foundations group)
 
 ## Code Style and Conventions
 
@@ -518,7 +525,7 @@ def mock_toolset_fixture():
 
 ### Code Organization
 
-```
+```plaintext
 duo_workflow_service/agent_platform/v1
 ├── __init__.py
 ├── components
@@ -564,14 +571,14 @@ duo_workflow_service/agent_platform/v1
 
 When contributing components, you must:
 
-1. **Update the components section** in `docs/flow_registry/v1.md` with:
+1. **Update the components section** within appropriate version page (use `experimental` for new components) with:
    - Component name and purpose
    - Configuration parameters
    - Input/output specifications
    - Example YAML configuration
    - Supported environments
 
-2. **Provide usage examples** demonstrating:
+1. **Provide usage examples** demonstrating:
    - Basic configuration
    - Advanced features
    - Common patterns
@@ -602,12 +609,12 @@ Before submitting, ensure:
 ## Common Pitfalls to Avoid
 
 1. **Direct state access**: Always use IOKey/IOKeyTemplate
-2. **Missing output declarations**: Declare all state mutations in `_outputs`
-3. **Hardcoded values**: Use configuration parameters for flexibility
-4. **Poor error messages**: Provide actionable error information
-5. **Incomplete documentation**: Document all parameters and behaviors
-6. **Breaking changes in v1**: Never break backwards compatibility
-7. **Missing environment checks**: Validate environment compatibility
+1. **Missing output declarations**: Declare all state mutations in `_outputs`
+1. **Hardcoded values**: Use configuration parameters for flexibility
+1. **Poor error messages**: Provide actionable error information
+1. **Incomplete documentation**: Document all parameters and behaviors
+1. **Breaking changes in v1**: Never break backwards compatibility
+1. **Missing environment checks**: Validate environment compatibility
 
 ## Getting Help
 
