@@ -195,6 +195,7 @@ async def test_compile_and_run_graph(
         project=mock_project,
         user=None,
         language_server_version=None,
+        gitlab_version=None,
     )
 
 

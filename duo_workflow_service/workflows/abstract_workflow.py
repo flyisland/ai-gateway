@@ -44,6 +44,7 @@ from duo_workflow_service.gitlab.gitlab_api import (
 from duo_workflow_service.gitlab.http_client import GitlabHttpClient
 from duo_workflow_service.gitlab.http_client_factory import get_http_client
 from duo_workflow_service.gitlab.url_parser import SESSION_URL_PATH
+from duo_workflow_service.interceptors.gitlab_version_interceptor import gitlab_version
 from duo_workflow_service.llm_factory import AnthropicConfig, VertexConfig
 from duo_workflow_service.monitoring import duo_workflow_metrics
 from duo_workflow_service.tools import convert_mcp_tools_to_langchain_tool_classes
@@ -244,6 +245,7 @@ class AbstractWorkflow(ABC):
                 ),
                 user=user_for_registry,
                 language_server_version=self._language_server_version,
+                gitlab_version=gitlab_version.get(),
             )
             checkpoint_notifier = UserInterface(outbox=self._outbox, goal=goal)
 

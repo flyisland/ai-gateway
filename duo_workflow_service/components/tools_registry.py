@@ -2,6 +2,7 @@ from typing import Optional, Type, TypedDict, Union
 
 from gitlab_cloud_connector import CloudConnectorUser
 from langchain.tools import BaseTool
+from packaging import version
 from pydantic import BaseModel
 
 from ai_gateway.code_suggestions.language_server import LanguageServerVersion
@@ -161,6 +162,7 @@ class ToolsRegistry:
         mcp_tools: Optional[list[type[BaseTool]]] = None,
         user: Optional[CloudConnectorUser] = None,
         language_server_version: Optional[LanguageServerVersion] = None,
+        gitlab_version: Optional[str] = None,
     ):
         if not workflow_config:
             raise RuntimeError("Failed to find tools configuration for workflow")
@@ -188,6 +190,7 @@ class ToolsRegistry:
             mcp_tools=mcp_tools,
             user=user,
             language_server_version=language_server_version,
+            gitlab_version=gitlab_version,
         )
 
     def __init__(
@@ -198,6 +201,7 @@ class ToolsRegistry:
         mcp_tools: Optional[list[type[BaseTool]]] = None,
         user: Optional[CloudConnectorUser] = None,
         language_server_version: Optional[LanguageServerVersion] = None,
+        gitlab_version: Optional[str] = None,
     ):
         tools_for_agent_privileges = _AGENT_PRIVILEGES
 
@@ -228,6 +232,21 @@ class ToolsRegistry:
                 # If language server client was detected, restrict tool versions
                 if isinstance(tool, DuoBaseTool) and language_server_version:
                     if not language_server_version.supports_node_executor_tools():
+                        continue
+
+                # If GitLab version is available and tool has minimum version requirement, check version
+                if (
+                    isinstance(tool, DuoBaseTool)
+                    and tool.gitlab_minimum_version
+                    and gitlab_version
+                ):
+                    try:
+                        if version.parse(gitlab_version) < version.parse(
+                            tool.gitlab_minimum_version
+                        ):
+                            continue
+                    except Exception:
+                        # If version parsing fails, skip the tool to be safe
                         continue
 
                 self._enabled_tools[tool.name] = tool

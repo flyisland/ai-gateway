@@ -51,6 +51,7 @@ def format_tool_display_message(
 class DuoBaseTool(BaseTool):
     unit_primitive: Optional[GitLabUnitPrimitive] = None
     eval_prompts: Optional[List[str]] = None
+    gitlab_minimum_version: Optional[str] = None
 
     @property
     def gitlab_client(self) -> GitlabHttpClient:
