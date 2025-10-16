@@ -916,8 +916,10 @@ def test_string_to_category_enum():
     # Test Flow Registry flows:
     for config in list_configs():
         assert (
-            string_to_category_enum(getattr(CategoryEnum, config["name"].upper()))
-            == config["name"]
+            string_to_category_enum(
+                getattr(CategoryEnum, config["flow_identifier"].upper())
+            )
+            == config["flow_identifier"]
         )
 
 
