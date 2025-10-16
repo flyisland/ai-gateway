@@ -224,12 +224,12 @@ class DuoWorkflowService(contract_pb2_grpc.DuoWorkflowServicer):
 
         monitoring_context: MonitoringContext = current_monitoring_context.get()
 
-        await self.authorize_additional_context(
-            current_user=user,
-            client_event=start_workflow_request,
-            context=context,
-            internal_event_client=internal_event_client,
-        )
+        # await self.authorize_additional_context(
+        #     current_user=user,
+        #     client_event=start_workflow_request,
+        #     context=context,
+        #     internal_event_client=internal_event_client,
+        # )
 
         workflow_id = start_workflow_request.startRequest.workflowID
         set_workflow_id(workflow_id)
@@ -291,15 +291,15 @@ class DuoWorkflowService(contract_pb2_grpc.DuoWorkflowServicer):
         duo_workflow_metrics.count_agent_platform_receive_start_counter(
             flow_type=workflow_type
         )
-        internal_event_client.track_event(
-            event_name=EventEnum.RECEIVE_START_REQUEST.value,
-            additional_properties=InternalEventAdditionalProperties(
-                label=EventLabelEnum.WORKFLOW_RECEIVE_START_REQUEST_LABEL.value,
-                property=EventPropertyEnum.WORKFLOW_ID.value,
-                value=workflow_id,
-            ),
-            category=workflow_type.value,
-        )
+        # internal_event_client.track_event(
+        #     event_name=EventEnum.RECEIVE_START_REQUEST.value,
+        #     additional_properties=InternalEventAdditionalProperties(
+        #         label=EventLabelEnum.WORKFLOW_RECEIVE_START_REQUEST_LABEL.value,
+        #         property=EventPropertyEnum.WORKFLOW_ID.value,
+        #         value=workflow_id,
+        #     ),
+        #     category=workflow_type.value,
+        # )
 
         goal = start_workflow_request.startRequest.goal
 
@@ -315,6 +315,15 @@ class DuoWorkflowService(contract_pb2_grpc.DuoWorkflowServicer):
             ]
         else:
             additional_context = None
+
+        # Mocking the client sending the `agents_md` additional_context
+        additional_context = (additional_context or []) + [
+            AdditionalContext(
+                category="agents_md",
+                content="All file content must be written in ALL CAPS except the last character",
+                metadata={},
+            )
+        ]
 
         workflow_metadata = {}
         monitoring_context.workflow_id = workflow_id
@@ -334,7 +343,7 @@ class DuoWorkflowService(contract_pb2_grpc.DuoWorkflowServicer):
         )
 
         workflow_class: FlowFactory = resolve_workflow_class(
-            workflow_definition, flow_config, flow_config_schema_version
+            "prototype/v1", flow_config, flow_config_schema_version
         )
 
         invocation_metadata = dict(context.invocation_metadata())

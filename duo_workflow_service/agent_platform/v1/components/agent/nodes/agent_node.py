@@ -7,6 +7,7 @@ from pydantic import BaseModel, ConfigDict, Field
 from pydantic_core import ValidationError
 
 from ai_gateway.prompts import Prompt
+from duo_workflow_service.agent_platform.v1.components.base import IncludeContext
 from duo_workflow_service.agent_platform.v1.state import (
     FlowState,
     FlowStateKeys,
@@ -68,6 +69,7 @@ class AgentNode:
         inputs: list[IOKey],
         component_name: str,
         internal_event_client: InternalEventsClient,
+        include_context: list[IncludeContext],
     ):
         self._flow_id = flow_id
         self._flow_type = flow_type
@@ -78,15 +80,26 @@ class AgentNode:
         self._internal_event_client = internal_event_client
         self._approximate_token_counter = ApproximateTokenCounter(component_name)
         self._error_handler = ModelErrorHandler()
+        self._include_context = include_context
 
     async def run(self, state: FlowState) -> dict:
-        history = state[FlowStateKeys.CONVERSATION_HISTORY].get(
-            self._component_name, []
-        )
         variables = get_vars_from_state(self._inputs, state)
         model_name = getattr(self._prompt.model, "model_name", "unknown")
         request_type = f"{self._component_name}_completion"
         model_provider = self._prompt.model_provider
+
+        prompt_inputs = {**variables}
+        if IncludeContext.HISTORY in self._include_context:
+            history = state[FlowStateKeys.CONVERSATION_HISTORY].get(
+                self._component_name, []
+            )
+            prompt_inputs["history"] = history
+        if IncludeContext.AGENTS_MD in self._include_context:
+            agents_md = state["context"].get("inputs", {}).get("agents_md", "")
+            if agents_md:
+                prompt_inputs["agents_md"] = [
+                    AIMessage(content=agents_md, name="AGENTS.md", role="context")
+                ]
 
         while True:
             try:
@@ -94,7 +107,7 @@ class AgentNode:
                     model=model_name, request_type=request_type
                 ):
                     completion: AIMessage = await self._prompt.ainvoke(
-                        input={**variables, "history": history}
+                        input=prompt_inputs,
                     )
                     stop_reason = completion.response_metadata.get("stop_reason")
                     if stop_reason in AnthropicStopReason.abnormal_values():

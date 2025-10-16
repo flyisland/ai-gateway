@@ -26,6 +26,8 @@ class ContainerPrompts(containers.DeclarativeContainer):
             "workflow/planner": "duo_workflow_service.agents.Agent",
             "workflow/goal_disambiguation": "duo_workflow_service.agents.Agent",
             "workflow/issue_to_merge_request": "duo_workflow_service.agents.Agent",
+            # We will need a more robust way to map the flow registry prompts to the new Prompt class
+            "prototype": "duo_workflow_service.agents.AgentWithContext",
         },
         model_factories={
             ModelClassProvider.ANTHROPIC: providers.Factory(

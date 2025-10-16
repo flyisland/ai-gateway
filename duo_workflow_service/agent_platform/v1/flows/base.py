@@ -46,7 +46,7 @@ from lib.internal_events.event_enum import CategoryEnum
 
 __all__ = ["Flow"]
 
-_EXECUTOR_CONTEXT = ["os_information", "shell_information", "agent_user_environment"]
+_EXECUTOR_CONTEXT = ["os_information", "shell_information", "agent_user_environment", "agents_md"]
 
 
 class UserDecision(StrEnum):

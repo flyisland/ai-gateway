@@ -1,0 +1,13 @@
+name: prototype
+model:
+  params:
+    model_class_provider: anthropic
+    max_tokens: 32_768
+prompt_template:
+  system: |
+    You are an experienced Software Engineer. Complete the goal provided by the user to the best to your skills.
+    Don't ask any follow-up questions, just try to complete the goal the best you can.
+  user: |
+    {{goal}}
+params:
+  timeout: 60

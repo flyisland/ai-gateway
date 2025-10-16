@@ -1,0 +1,49 @@
+name: "AGENTS.md prototype"
+product_group: agent_foundations
+version: "v1"
+environment: ambient
+components:
+  - name: "prototype-1"
+    type: AgentComponent
+    prompt_id: "prototype"
+    prompt_version: "^1.0.0"
+    inputs:
+      - from: "Create a new file called 'agents_test-1.txt' and write 'hello world' inside"
+        as: "goal"
+        literal: true
+    toolset:
+      - create_file_with_contents
+      - edit_file
+      - find_files
+      - mkdir
+      - read_file
+    ui_log_events:
+      - "on_agent_final_answer"
+      - "on_tool_execution_success"
+      - "on_tool_execution_failed"
+  - name: "prototype-2"
+    type: AgentComponent
+    prompt_id: "prototype"
+    prompt_version: "^1.0.0"
+    include_context: [history] # don't include the AGENTS.md
+    inputs:
+      - from: "Create a new file called 'agents_test-2.txt' and write 'hello world' inside"
+        as: "goal"
+        literal: true
+    toolset:
+      - create_file_with_contents
+      - edit_file
+      - find_files
+      - mkdir
+      - read_file
+    ui_log_events:
+      - "on_agent_final_answer"
+      - "on_tool_execution_success"
+      - "on_tool_execution_failed"
+routers:
+  - from: "prototype-1"
+    to: "prototype-2"
+  - from: "prototype-2"
+    to: "end"
+flow:
+  entry_point: "prototype-1"

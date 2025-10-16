@@ -392,3 +392,9 @@ configurable_unit_primitives:
     selectable_models:
       - "claude_sonnet_3_7_20250219"
       - "claude_sonnet_4_20250514"
+  - feature_setting: "prototype"
+    unit_primitives: [ ]
+    default_model: "claude_sonnet_4_20250514"
+    selectable_models:
+      - "claude_sonnet_3_7_20250219"
+      - "claude_sonnet_4_20250514"

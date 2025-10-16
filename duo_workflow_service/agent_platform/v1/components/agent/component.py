@@ -125,6 +125,7 @@ class AgentComponent(BaseComponent):
             flow_id=self.flow_id,
             flow_type=self.flow_type,
             internal_event_client=self.internal_event_client,
+            include_context=self.include_context,
         )
         node_tools = ToolNode(
             name=f"{self.name}#tools",
