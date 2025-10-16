@@ -1,3 +1,4 @@
+import shlex
 from typing import Any, Optional, Type
 
 from pydantic import BaseModel, Field
@@ -7,7 +8,7 @@ from duo_workflow_service.executor.action import _execute_action
 from duo_workflow_service.tools.duo_base_tool import DuoBaseTool
 
 _DISALLOWED_COMMANDS = ["git"]
-_DISALLOWED_OPERATORS = ["&&", "||", "|"]
+_DISALLOWED_OPERATORS = ["&&", "||"]
 
 
 class RunCommandInput(BaseModel):
@@ -43,20 +44,44 @@ class RunCommand(DuoBaseTool):
                 return f"""'{disallowed_operator}' operators are not supported with {self.name} tool.
 Instead of '{disallowed_operator}' please use {self.name} multiple times consecutively to emulate '{disallowed_operator}' behaviour
 """
+
         for disallowed_command in _DISALLOWED_COMMANDS:
             if program.startswith(disallowed_command):
                 return f"{disallowed_command} commands are not supported with {self.name} tool."
 
-        return await _execute_action(
-            self.metadata,  # type: ignore
-            contract_pb2.Action(
-                runCommand=contract_pb2.RunCommandAction(
-                    program=program,
-                    arguments=args.split(),
-                    flags=[],
-                )
-            ),
-        )
+        # Detect shell operators that require 'sh -c'
+        # This list includes operators that the Go os/exec won't handle directly
+        # and that we want to allow via a shell.
+        shell_operators_requiring_shell = [">", "<", ">>", "2>", "&>", "|", ";"]
+
+        # Check if any of these operators are present in the arguments string.
+        needs_shell = any(op in args for op in shell_operators_requiring_shell)
+
+        if needs_shell:
+            full_command = f"{program} {args}"
+            return await _execute_action(
+                self.metadata,  # type: ignore
+                contract_pb2.Action(
+                    runCommand=contract_pb2.RunCommandAction(
+                        program="sh",
+                        arguments=["-c", full_command],
+                        flags=[],
+                    )
+                ),
+            )
+        else:
+            # Direct execution (existing behavior for commands without shell operators)
+            # Use shlex.split() to correctly handle quoted arguments.
+            return await _execute_action(
+                self.metadata,  # type: ignore
+                contract_pb2.Action(
+                    runCommand=contract_pb2.RunCommandAction(
+                        program=program,
+                        arguments=shlex.split(args),
+                        flags=[],
+                    )
+                ),
+            )
 
     def format_display_message(
         self, args: RunCommandInput, _tool_response: Any = None
