@@ -2,7 +2,7 @@ version: "v1"
 environment: chat-partial
 components:
   # Step 1: Fetch and format all MR data
-  - name: "duo_planner_agent"
+  - name: "duo_planner"
     type: AgentComponent
     prompt_id: "duo_planner_agent"
     prompt_version: "^1.0.0"
