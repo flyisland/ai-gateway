@@ -1,3 +1,4 @@
+import shlex
 from typing import Any, Optional, Type
 
 from pydantic import BaseModel, Field
@@ -7,7 +8,7 @@ from duo_workflow_service.executor.action import _execute_action
 from duo_workflow_service.tools.duo_base_tool import DuoBaseTool
 
 _DISALLOWED_COMMANDS = ["git"]
-_DISALLOWED_OPERATORS = ["&&", "||", "|"]
+_SHELL_TOKENS = ("|", "&&", "||", ">", ">>", "<", "2>", "&>", ";", "$(", "`")
 
 
 class RunCommandInput(BaseModel):
@@ -37,22 +38,25 @@ class RunCommand(DuoBaseTool):
     ) -> str:
         args = args or ""
 
-        for disallowed_operator in _DISALLOWED_OPERATORS:
-            if disallowed_operator in program or disallowed_operator in args:
-                # pylint: disable=line-too-long
-                return f"""'{disallowed_operator}' operators are not supported with {self.name} tool.
-Instead of '{disallowed_operator}' please use {self.name} multiple times consecutively to emulate '{disallowed_operator}' behaviour
-"""
         for disallowed_command in _DISALLOWED_COMMANDS:
             if program.startswith(disallowed_command):
                 return f"{disallowed_command} commands are not supported with {self.name} tool."
+
+        needs_shell = any(tok in program or tok in args for tok in _SHELL_TOKENS)
+
+        if needs_shell:
+            exec_program = "bash"
+            exec_args = ["-lc", f"set -o pipefail; {program} {args}".strip()]
+        else:
+            argv = [program] + (shlex.split(args) if args else [])
+            exec_program, exec_args = argv[0], argv[1:]
 
         return await _execute_action(
             self.metadata,  # type: ignore
             contract_pb2.Action(
                 runCommand=contract_pb2.RunCommandAction(
-                    program=program,
-                    arguments=args.split(),
+                    program=exec_program,
+                    arguments=exec_args,
                     flags=[],
                 )
             ),
