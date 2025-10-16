@@ -141,7 +141,13 @@ def apply_security_unicode_only(
 class PromptSecurity:
     """Security class with configurable security functions."""
 
-    # Default security functions to apply to ALL tools
+    # Tools that need to preserve raw UTF-8 content (diffs, files, etc.)
+    # These tools skip ALL security sanitization to preserve non-ASCII characters
+    PRESERVE_RAW_CONTENT_TOOLS = {
+        "build_review_merge_request_context",
+    }
+
+    # Default security functions to apply to ALL tools (except those in PRESERVE_RAW_CONTENT_TOOLS)
     DEFAULT_SECURITY_FUNCTIONS: List[
         Callable[
             [Union[str, Dict[str, Any], List[Any]]],
@@ -189,6 +195,9 @@ class PromptSecurity:
         Raises:
             SecurityException: If any security validation fails
         """
+        if tool_name in PromptSecurity.PRESERVE_RAW_CONTENT_TOOLS:
+            return response  # type: ignore[return-value]
+
         all_functions = list(PromptSecurity.DEFAULT_SECURITY_FUNCTIONS)
         if tool_name in PromptSecurity.TOOL_SPECIFIC_FUNCTIONS:
             all_functions.extend(PromptSecurity.TOOL_SPECIFIC_FUNCTIONS[tool_name])
