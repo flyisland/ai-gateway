@@ -1,0 +1,14 @@
+name: commit_changes
+model:
+  params:
+    model_class_provider: anthropic
+    max_tokens: 32_768
+    max_retries: 1
+prompt_template:
+  system: |
+    {% include 'commit_changes/system/1.0.0.jinja' %}
+  user: |
+    {% include 'commit_changes/user/1.0.0.jinja' %}
+  placeholder: history
+params:
+  timeout: 30

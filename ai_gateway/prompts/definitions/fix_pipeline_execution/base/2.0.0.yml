@@ -1,0 +1,14 @@
+name: fix_pipeline_execution
+model:
+  params:
+    model_class_provider: anthropic
+    max_tokens: 32_768
+    max_retries: 3
+prompt_template:
+  system: |
+    {% include 'fix_pipeline_execution/system/1.0.0.jinja' %}
+  user: |
+    {% include 'fix_pipeline_execution/user/2.0.0.jinja' %}
+  placeholder: history
+params:
+  timeout: 60
