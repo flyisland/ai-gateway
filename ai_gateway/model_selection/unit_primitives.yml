@@ -396,3 +396,12 @@ configurable_unit_primitives:
     selectable_models:
       - "claude_sonnet_3_7_20250219"
       - "claude_sonnet_4_20250514"
+  - feature_setting: "duo_planner_agent"
+    unit_primitives: []
+    default_model: "claude_sonnet_4_5_20250929"
+    selectable_models:
+      - "claude_sonnet_4_20250514"
+      - "claude_sonnet_4_20250514_vertex"
+      - "claude_sonnet_4_5_20250929"
+      - "claude_sonnet_3_7_20250219"
+      - "claude_3_5_sonnet_20240620"
