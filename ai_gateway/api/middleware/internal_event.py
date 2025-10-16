@@ -73,7 +73,7 @@ class InternalEventMiddleware:
             ),
             context_generated_at=datetime.now().isoformat(),
             correlation_id=correlation_id.get(),
-            ultimate_parent_namespace_id=request.headers.get(X_GITLAB_ROOT_NAMESPACE_ID),  # type: ignore[arg-type]
+            ultimate_parent_namespace_id=request.headers.get(X_GITLAB_ROOT_NAMESPACE_ID, None) or None,  # type: ignore[arg-type]
         )
         current_event_context.set(context)
         tracked_internal_events.set(set())
