@@ -30,6 +30,7 @@ from duo_workflow_service.checkpointer.gitlab_workflow import (
 from duo_workflow_service.checkpointer.notifier import UserInterface
 from duo_workflow_service.components import ToolsRegistry
 from duo_workflow_service.entities import DuoWorkflowStateType
+from duo_workflow_service.heartbeat import Heartbeat
 from duo_workflow_service.gitlab.events import get_event
 from duo_workflow_service.gitlab.gitlab_api import (
     Namespace,
@@ -148,11 +149,12 @@ class AbstractWorkflow(ABC):
 
             with tracing_context(enabled=extended_logging):
                 try:
-                    # pylint: disable=unexpected-keyword-arg
-                    await self._compile_and_run_graph(
-                        goal=goal,
-                        langsmith_extra={"metadata": tracing_metadata},
-                    )
+                    async with asyncio.TaskGroup() as tg:
+                        tg.create_task(self._start_heartbeat())
+                        tg.create_task(self._compile_and_run_graph(
+                            goal=goal,
+                            langsmith_extra={"metadata": tracing_metadata},
+                        ))
                 except TraceableException:
                     # Intentionally suppressing the exception here after it has been
                     # properly traced in Langsmith via the TraceableException
@@ -194,6 +196,14 @@ class AbstractWorkflow(ABC):
 
     def _recursion_limit(self):
         return RECURSION_LIMIT
+
+    async def _start_heartbeat(self) -> None:
+        self.heartbeat = Heartbeat(
+            workflow_id=workflow_id,
+            lease_id=self.flow_config.get("lease_id"),
+            http_client=self._http_client,
+        )
+        await self.heartbeat.start()
 
     @traceable
     async def _compile_and_run_graph(self, goal: str) -> None:
