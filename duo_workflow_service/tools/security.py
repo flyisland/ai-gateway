@@ -3,9 +3,12 @@ from collections import Counter
 from enum import StrEnum
 from typing import Any, Optional, Type
 
+from packaging.version import InvalidVersion, Version
 from pydantic import BaseModel, Field, field_validator
 
+from duo_workflow_service.interceptors.gitlab_version_interceptor import gitlab_version
 from duo_workflow_service.tools.duo_base_tool import DuoBaseTool
+from duo_workflow_service.tracking.errors import log_exception
 
 PROJECT_IDENTIFICATION_DESCRIPTION = """
 The project must be specified using its full path (e.g., 'namespace/project' or 'group/subgroup/project').
@@ -659,9 +662,10 @@ class LinkVulnerabilityToMergeRequest(DuoBaseTool):
     This creates a relationship between the vulnerability and the merge request that addresses it.
     The Merge Request ID used is the global ID, not the IID.
 
-    The merge request ID and IID can look similar if they don't include `gid://gitlab/MergeRequest/` as a prefix.
-    If it is unclear whether the user has given you a global ID or the IID, do the following:
+    The merge request ID given must include `gid://gitlab/MergeRequest/` in the prefix.
+    If the ID does not include `gid://gitlab/MergeRequest/` in the prefix:
         - ASK THE USER WHAT THEY HAVE GIVEN YOU
+        - If they have given you the MR IID (which is what is shown in the UI), fetch the ID
 
     For example:
     - Link vulnerability with ID 123 to merge request with ID 456 (IID 245):
@@ -673,6 +677,18 @@ class LinkVulnerabilityToMergeRequest(DuoBaseTool):
     args_schema: Type[BaseModel] = LinkVulnerabilityToMergeRequestInput
 
     async def _arun(self, **kwargs: Any) -> str:
+        version_18_2 = Version("18.2.0")
+        version_18_5 = Version("18.5.0")
+
+        try:
+            gl_version = Version(gitlab_version.get())  # type: ignore[arg-type]
+        except (InvalidVersion, TypeError) as ex:
+            log_exception(ex)
+            gl_version = version_18_2
+
+        if gl_version < version_18_5:
+            return json.dumps({"error": "This tool is not available"})
+
         vulnerability_id = kwargs.pop("vulnerability_id")
         merge_request_id = kwargs.pop("merge_request_id")
 
@@ -715,19 +731,30 @@ class LinkVulnerabilityToMergeRequest(DuoBaseTool):
         response = await self.gitlab_client.apost(
             path="/api/graphql",
             body=json.dumps({"query": mutation, "variables": variables}),
+            use_http_response=True,
         )
 
-        errors = response["data"]["vulnerabilityLinkMergeRequest"]["errors"]
-        if errors:
-            return json.dumps({"error": "; ".join(errors)})
+        response = self._process_http_response(identifier="mutation", response=response)
 
-        return json.dumps(
-            {
-                "vulnerability": response["data"]["vulnerabilityLinkMergeRequest"][
-                    "vulnerability"
-                ]
-            }
-        )
+        try:
+            errors = response["data"]["vulnerabilityLinkMergeRequest"]["errors"]
+            if errors:
+                return json.dumps({"error": "; ".join(errors)})
+
+            return json.dumps(
+                {
+                    "vulnerability": response["data"]["vulnerabilityLinkMergeRequest"][
+                        "vulnerability"
+                    ]
+                }
+            )
+        except KeyError as e:
+            return json.dumps(
+                {
+                    "error": f"Unexpected response structure: {str(e)}",
+                    "response": response,
+                }
+            )
 
     def format_display_message(
         self, args: LinkVulnerabilityToMergeRequestInput, _tool_response: Any = None
