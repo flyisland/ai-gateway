@@ -18,3 +18,34 @@ You will need a GitLab environment, with runners deployed and configured.
     1. `export GPT_SKIP_VISIBILITY_CHECK=true`
     1. `export GPT_LARGE_PROJECT_CHECK_SKIP=true`
 1. Run `AI_DUO_WORKFLOW_PROJECT_ID=<PROJECT_ID> ./bin/run-k6 --environment <ENVIRONMENT_FILE> --options <OPTIONS_FILE> --tests api_v4_duo_workflow_chat.js`
+
+### Docker example
+
+Below is an example using Docker to run a test:
+
+```shell
+docker run -it \
+  --rm \
+  -e ACCESS_TOKEN=$GITLAB_TOKEN \
+  -e AI_DUO_WORKFLOW_PROJECT_ID=1000000 \
+  -e AI_DUO_WORKFLOW_ROOT_NAMESPACE_ID=1000000 \
+  -e SCENARIO_TYPE=mocked_llm \
+  -e GPT_SKIP_RETRY=true \
+  -e GPT_SKIP_VISIBILITY_CHECK=true \
+  -e GPT_LARGE_PROJECT_CHECK_SKIP=true \
+  -v ./performance_tests/config:/config \
+  -v ./performance_tests/stress_tests:/performance/k6/tests/experimental \
+  gitlab/gitlab-performance-tool \
+  --environment /config/environments/load-test-agentic-chat.json \
+  --options /config/options/5s_2rps.json \
+  --tests experimental/api_v4_duo_workflow_chat_graphql_api.js
+```
+
+Note the following:
+
+- The project and namespace ids correspond to the ids of the group and project created by the Duo rake setup task.
+- The GitLab instance in the environment configuration, `load-test-agentic-chat.json`, was deployed for the purpose of Duo Workflow Service load testing.
+  You can replace the URL in the configuration with your GDK URL if you'd like to run the tests locally.
+- `GPT_SKIP_RETRY=true` is helpful when running tests locally for development or troubleshooting purposes.
+- The `tests` path is constructed so that reference to `../../lib/gpt_k6_modules.js` in the tests resolves correctly to a file in the gitlab-performance-tool codebase.
+- `SCENARIO_TYPE=mocked_llm` is actually the default. Use `SCENARIO_TYPE=real_llm` for actual LLM responses.
