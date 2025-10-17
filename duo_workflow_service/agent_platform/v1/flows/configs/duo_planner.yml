@@ -1,7 +1,6 @@
 version: "v1"
 environment: chat-partial
 components:
-  # Step 1: Fetch and format all MR data
   - name: "duo_planner"
     type: AgentComponent
     prompt_id: "duo_planner_agent"
@@ -28,8 +27,6 @@ components:
       - "on_agent_final_answer"
       - "on_tool_execution_success"
       - "on_tool_execution_failed"
-routers:
-  - from: "duo_planner"
-    to: "end"
+routers: []
 flow:
   entry_point: "duo_planner"

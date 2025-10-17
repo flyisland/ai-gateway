@@ -178,3 +178,4 @@ prompt_template:
     **CRITICAL REMINDER**: Never provide analysis based on partial data due to pagination limits. Always fetch complete datasets or explicitly state limitations. Your effectiveness depends entirely on working with complete information.
   user: |
     Here is my question - {{goal}}
+  placeholder: history
