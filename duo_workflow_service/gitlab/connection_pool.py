@@ -22,7 +22,7 @@ def _create_ssl_context_with_custom_ca() -> Optional[ssl.SSLContext]:
     """
     ca_file = os.getenv("DUO_WORKFLOW_GITLAB_SSL_CA_FILE")
 
-    if not (ca_file and os.path.exists(ca_file)):
+    if not ca_file or not os.path.exists(ca_file):
         return None
 
     try:
