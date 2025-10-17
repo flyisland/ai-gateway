@@ -16,7 +16,6 @@ from duo_workflow_service.entities.state import (
     ToolStatus,
     UiChatLog,
 )
-from duo_workflow_service.errors.gitlab_docs_error_code import GitLabDocsErrorCode
 from duo_workflow_service.gitlab.gitlab_api import Project
 from duo_workflow_service.gitlab.gitlab_instance_info_service import GitLabInstanceInfo
 from duo_workflow_service.gitlab.gitlab_service_context import GitLabServiceContext
@@ -284,7 +283,7 @@ async def test_chat_agent_generic_error_handling(chat_agent, input):
     # pylint: disable=line-too-long
     assert (
         result["ui_chat_log"][0]["content"]
-        == f"There was an error processing your request. Please try again or contact support if the issue persists. {GitLabDocsErrorCode("A1007")}"
+        == "There was an error processing your request in the Duo Agent Platform, please try again or contact support if the issue persists."
     )
 
 
@@ -314,7 +313,7 @@ async def test_chat_agent_provider_error_handling(chat_agent, input):
     # pylint: disable=line-too-long
     assert (
         result["ui_chat_log"][0]["content"]
-        == f"There was an error processing your request. Please try again or contact support if the issue persists. {GitLabDocsErrorCode("A1008")}"
+        == "There was an error connecting to the chosen LLM provider, please try again or contact support if the issue persists."
     )
 
 
