@@ -10,7 +10,6 @@ import pytest
 from gitlab_cloud_connector import CloudConnectorUser
 
 from contract import contract_pb2
-from duo_workflow_service.executor.outbox import OutboxSignal
 from duo_workflow_service.interceptors.authentication_interceptor import current_user
 from duo_workflow_service.server import DuoWorkflowService
 
@@ -44,9 +43,6 @@ async def test_execute_workflow_enhanced_logging_with_context(
     mock_workflow.is_done = True
     mock_workflow.run = AsyncMock()
     mock_workflow.cleanup = AsyncMock()
-    mock_workflow.get_from_outbox = AsyncMock(
-        return_value=OutboxSignal.NO_MORE_OUTBOUND_REQUESTS
-    )
     mock_resolve_workflow.return_value = mock_abstract_workflow_class
 
     # Setup event context with test data
@@ -134,9 +130,6 @@ async def test_execute_workflow_enhanced_logging_without_context(
     mock_workflow.is_done = True
     mock_workflow.run = AsyncMock()
     mock_workflow.cleanup = AsyncMock()
-    mock_workflow.get_from_outbox = AsyncMock(
-        return_value=OutboxSignal.NO_MORE_OUTBOUND_REQUESTS
-    )
     mock_resolve_workflow.return_value = mock_abstract_workflow_class
 
     # Setup event context to return None

@@ -1,3 +1,4 @@
+import asyncio
 import time
 from typing import Any, Dict
 
@@ -7,7 +8,6 @@ from prometheus_client import Histogram
 
 from contract import contract_pb2
 from contract.contract_pb2 import HttpResponse, PlainTextResponse
-from duo_workflow_service.executor.outbox import Outbox
 
 ACTION_LATENCY = Histogram(
     name="executor_actions_duration_seconds",
@@ -24,7 +24,8 @@ def record_metrics(action_class: str, duration: float):
 async def _execute_action_and_get_action_response(
     metadata: Dict[str, Any], action: contract_pb2.Action
 ) -> contract_pb2.ActionResponse:
-    outbox: Outbox = metadata["outbox"]
+    outbox: asyncio.Queue = metadata["outbox"]
+    inbox: asyncio.Queue = metadata["inbox"]
     log = structlog.stdlib.get_logger("workflow")
 
     action_class = action.WhichOneof("action")
@@ -35,10 +36,8 @@ async def _execute_action_and_get_action_response(
     )
 
     start_time = time.time()
-
-    event: contract_pb2.ClientEvent = await outbox.put_action_and_wait_for_response(
-        action
-    )
+    await outbox.put(action)
+    event: contract_pb2.ClientEvent = await inbox.get()
 
     if event.actionResponse:
         duration = time.time() - start_time
@@ -93,6 +92,7 @@ async def _execute_action_and_get_action_response(
         # Record all metrics in the separate function
         record_metrics(action_class, duration)
 
+    inbox.task_done()
     return event.actionResponse
 
 

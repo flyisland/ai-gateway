@@ -17,7 +17,6 @@ message ClientEvent {
         StartWorkflowRequest startRequest = 1;
         ActionResponse actionResponse = 2;
         HeartbeatRequest heartbeat = 3;
-        StopWorkflowRequest stopWorkflow = 4;
     }
 }
 
@@ -48,10 +47,6 @@ message ActionResponse {
 
 message HeartbeatRequest {
     int64 timestamp = 1;
-}
-
-message StopWorkflowRequest {
-    string reason = 1;
 }
 
 message PlainTextResponse {
