@@ -6,7 +6,6 @@ from typing import Any, Generic, Protocol, TypeVar
 import structlog
 from langchain.tools import BaseTool
 
-from duo_workflow_service.agents.tool_output_manager import truncate_tool_response
 from duo_workflow_service.entities import MessageTypeEnum, ToolStatus, UiChatLog
 from duo_workflow_service.entities.state import ToolInfo, WorkflowState
 from duo_workflow_service.monitoring import duo_workflow_metrics
@@ -14,6 +13,7 @@ from duo_workflow_service.security.prompt_security import (
     PromptSecurity,
     SecurityException,
 )
+from duo_workflow_service.tools.tool_output_manager import truncate_tool_response
 from lib.internal_events.event_enum import CategoryEnum
 
 WorkflowStateT_contra = TypeVar(

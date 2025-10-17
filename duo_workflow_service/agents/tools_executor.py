@@ -13,7 +13,6 @@ from langgraph.types import Command
 from pydantic import ValidationError
 
 from ai_gateway.container import ContainerApplication
-from duo_workflow_service.agents.tool_output_manager import truncate_tool_response
 from duo_workflow_service.entities import WorkflowStatusEnum
 from duo_workflow_service.entities.state import (
     DuoWorkflowStateType,
@@ -30,6 +29,7 @@ from duo_workflow_service.security.prompt_security import (
 )
 from duo_workflow_service.tools import RunCommand, Toolset, format_tool_display_message
 from duo_workflow_service.tools.planner import PlannerTool
+from duo_workflow_service.tools.tool_output_manager import truncate_tool_response
 from lib.internal_events import InternalEventAdditionalProperties, InternalEventsClient
 from lib.internal_events.event_enum import CategoryEnum, EventEnum, EventLabelEnum
 

@@ -22,6 +22,7 @@ from duo_workflow_service.security.prompt_security import (
     PromptSecurity,
     SecurityException,
 )
+from duo_workflow_service.tools.tool_output_manager import truncate_tool_response
 from duo_workflow_service.tools.toolset import Toolset
 from lib.internal_events import InternalEventAdditionalProperties, InternalEventsClient
 from lib.internal_events.event_enum import CategoryEnum, EventEnum, EventLabelEnum
@@ -164,7 +165,11 @@ class ToolNodeWithErrorCorrection:
         """Execute a tool with error handling and tracking."""
         try:
             with duo_workflow_metrics.time_tool_call(tool_name=tool.name):
-                tool_call_result = await tool.ainvoke(tool_call_args)
+                tool_response = await tool.ainvoke(tool_call_args)
+
+                tool_call_result = truncate_tool_response(
+                    tool_response=tool_response, tool_name=tool.name
+                )
 
             self._track_internal_event(
                 event_name=EventEnum.WORKFLOW_TOOL_SUCCESS,
