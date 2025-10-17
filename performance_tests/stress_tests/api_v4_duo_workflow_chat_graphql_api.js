@@ -18,6 +18,10 @@
 
  Optionally, set `SCENARIO_TYPE=real_llm` for actual LLM responses, otherwise it uses mocked responses by default.
 
+ This ends up using workhorse to proxy requests to Rails. No other executor: https://handbook.gitlab.com/handbook/engineering/architecture/design-documents/duo_workflow/#from-the-gitlab-web-ui-without-a-separate-executor
+
+
+
 @gpt_data_version: 1
 @stressed_components: Duo Workflow Service, Postgres, Rails
 */

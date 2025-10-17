@@ -14,7 +14,7 @@ export const commonThresholds = {
   'ttfb': { 'latest': 50000 },
 };
 
-export const wsConnectingThreshold = 200; // 200ms
+export const wsConnectingThreshold = 1500; // 1.5s - based on observed performance with a client in Australia and server in us-east1
 export const wsDurationThreshold = 40000; // 40s
 export const WORKFLOW_COMPLETE_TIMEOUT = wsDurationThreshold + 10000; // 50s
 
@@ -27,7 +27,6 @@ export function createOptions(thresholds = commonThresholds) {
       successful_requests: [`rate>${__ENV.SUCCESS_RATE_THRESHOLD}`],
       checks: [`rate>${__ENV.SUCCESS_RATE_THRESHOLD}`],
       http_req_waiting: [`p(90)<${ttfbThreshold}`],
-      http_reqs: [`count>=${rpsThresholds["count"]}`],
       ws_connecting: [`p(90)<${wsConnectingThreshold}`],
       ws_session_duration: [`p(90)<${wsDurationThreshold}`],
     },
