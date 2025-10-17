@@ -69,6 +69,8 @@ components:
         as: "fix_pipeline_plan"
       - from: "context:inputs.pipeline.source_branch"
         as: "source_branch"
+      - from: "context:project_id"
+        as: "project_id"
     toolset:
       - create_file_with_contents
       - edit_file
