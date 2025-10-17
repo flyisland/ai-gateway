@@ -3,6 +3,7 @@ import unittest
 from typing import Any, cast
 from unittest.mock import MagicMock, patch
 
+from ai_gateway.code_suggestions import LanguageServerVersion
 from duo_workflow_service.tracking.duo_workflow_metrics import (
     DuoWorkflowMetrics,
     SessionTypeEnum,
@@ -300,6 +301,27 @@ class TestDuoWorkflowMetrics(unittest.TestCase):
                 "tool_name": "test_tool",
                 "failure_reason": "test_error",
                 "lsp_version": "unknown",
+            },
+            flow_type="test_flow_type",
+            tool_name="test_tool",
+            failure_reason="test_error",
+        )
+
+    @patch("duo_workflow_service.tracking.duo_workflow_metrics.language_server_version")
+    def test_agent_platform_tool_failure_counter_with_lsp_version(
+        self, mock_language_server_version
+    ):
+        mock_language_server_version.get.return_value = (
+            LanguageServerVersion.from_string("8.22.0")
+        )
+        self._assert_counter_called(
+            "agent_platform_tool_failure_counter",
+            "count_agent_platform_tool_failure",
+            {
+                "flow_type": "test_flow_type",
+                "tool_name": "test_tool",
+                "failure_reason": "test_error",
+                "lsp_version": "8.22.0",
             },
             flow_type="test_flow_type",
             tool_name="test_tool",
