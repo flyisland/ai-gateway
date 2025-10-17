@@ -23,6 +23,7 @@ BASE_CONTEXT_SCHEMA = {
     "feature_enabled_by_namespace_ids": None,
     "feature_enablement_type": None,
     "global_user_id": None,
+    "user_id": None,
     "host_name": None,
     "input_tokens": None,
     "instance_id": None,
