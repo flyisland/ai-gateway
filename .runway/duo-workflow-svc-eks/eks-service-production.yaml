@@ -1,0 +1,60 @@
+apiVersion: runway/v1
+kind: RunwayKubernetesDeployment
+duo-workflow-svc-eks:
+  metadata:
+    labels:
+      gitlab.com/department: eng-dev
+      gitlab.com/department_group: eng-dev-create-shared-infra
+      gitlab.com/product_category: duo_workflow
+      gitlab.com/owner_email_handle: dgriffith
+  serviceMixins:
+    - "runway-eks.service-mixin"
+  spec:
+    environment:
+      # Environment-specific configuration
+      DUO_WORKFLOW_SERVICE_ENVIRONMENT: "production"
+      DUO_WORKFLOW_AUTH__OIDC_GITLAB_URL: "https://gitlab.com/"
+      DUO_WORKFLOW_AUTH__OIDC_CUSTOMER_PORTAL_URL: "https://customers.gitlab.com"
+      DUO_WORKFLOW_DIRECT_CONNECTION_BASE_URL: "https://gitlab.com"
+      
+      # GCP configuration (for compatibility)
+      AIGW_GOOGLE_CLOUD_PLATFORM__PROJECT: "gitlab-ai-framework-prod"
+      AIGW_VERTEX_SEARCH__FALLBACK_DATASTORE_VERSION: "17.0"
+      DUO_WORKFLOW__VERTEX_LOCATION: "global"
+      GOOGLE_APPLICATION_CREDENTIALS: '/secrets/gcp-service-account/credentials.json'
+      
+      # LangSmith configuration
+      LANGSMITH_PROJECT: "duo-workflow-production"
+      
+      # Internal events configuration
+      AIGW_INTERNAL_EVENT__ENABLED: "true"
+      AIGW_INTERNAL_EVENT__ENDPOINT: "https://snowplowprd.trx.gitlab.net"
+      AIGW_INTERNAL_EVENT__APP_ID: "gitlab_duo_workflow"
+      AIGW_INTERNAL_EVENT__BATCH_SIZE: "1"
+      AIGW_INTERNAL_EVENT__THREAD_COUNT: "1"
+      
+      # Billing events configuration (disabled in production)
+      AIGW_BILLING_EVENT__ENABLED: "false"
+      AIGW_BILLING_EVENT__ENDPOINT: "https://snowplowprd.trx.gitlab.net"
+      AIGW_BILLING_EVENT__NAMESPACE: "gl"
+      AIGW_BILLING_EVENT__BATCH_SIZE: "1"
+      AIGW_BILLING_EVENT__THREAD_COUNT: "1"
+      
+    scalability:
+      min_instances: 8
+      max_instances: 16
+      
+    ingress:
+      hosts:
+        - duo-workflow.aws.gitlab.com
+        
+    workloadSecrets:
+      - name: env-vars
+      - name: gcp-service-account
+      
+    secretEnvFrom:
+      - env-vars
+      
+    secretVolumes:
+      - name: gcp-service-account
+        path: /secrets/gcp-service-account

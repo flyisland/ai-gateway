@@ -1,0 +1,82 @@
+apiVersion: runway/v1
+kind: RunwayKubernetesService
+metadata:
+  name: duo-workflow-svc-eks
+spec:
+  image: "registry.gitlab.com/gitlab-org/modelops/applied-ml/code-suggestions/ai-assist/model-gateway:{{ .AppVersion }}"
+  command: ["/home/aigateway/app/scripts/run.sh"]
+  environment:
+    # Core service configuration
+    HOME: "/root"
+    DUO_WORKFLOW_SERVICE_ENVIRONMENT: "{{ .Environment }}"
+    ENABLE_DUO_WORKFLOW_SERVICE: "true"
+    DISABLE_AI_GATEWAY: "true"
+    
+    # Metrics and monitoring
+    PROMETHEUS_METRICS__ADDR: "0.0.0.0"
+    PROMETHEUS_METRICS__PORT: "8082"
+    
+    # gRPC configuration
+    GRPC_TRACE: "http_keepalive"
+    GRPC_VERBOSITY: "ERROR"
+    
+    # Workflow configuration
+    WORKFLOW_INTERRUPT: "true"
+    FEATURE_GOAL_DISAMBIGUATION: "true"
+    
+    # Cloud profiler
+    DUO_WORKFLOW_GOOGLE_CLOUD_PROFILER__ENABLED: "true"
+    DUO_WORKFLOW_GOOGLE_CLOUD_PROFILER__VERBOSE: "2"
+    DUO_WORKFLOW_GOOGLE_CLOUD_PROFILER__PERIODS_MS: "10"
+    
+    # Cloud connector
+    DUO_WORKFLOW_CLOUD_CONNECTOR_SERVICE_NAME: "gitlab-duo-workflow-service"
+    
+    # LangChain tracing
+    LANGCHAIN_TRACING_V2: "true"
+    
+    # Sentry error tracking
+    SENTRY_ERROR_TRACKING_ENABLED: "true"
+    
+    # AWS region configuration
+    AWS_DEFAULT_REGION: "${region}"
+    
+  container_port: 8000
+  protocol: http
+  
+  scalability:
+    min_instances: 1
+    max_instances: 16
+    cpu_utilization: 70
+    
+  resources:
+    requests:
+      cpu: "500m"
+      memory: "2Gi"
+      ephemeral-storage: "2Gi"
+    limits:
+      cpu: "2000m"
+      memory: "8Gi"
+      ephemeral-storage: "8Gi"
+      
+  startup_probe:
+    path: "/health"
+    period_seconds: 10
+    failure_threshold: 30  # 5 minutes (30 * 10 seconds)
+    
+  liveness_probe:
+    path: "/health"
+    period_seconds: 10
+    failure_threshold: 6  # 60 seconds
+    
+  readiness_probe:
+    path: "/health"
+    period_seconds: 30
+    timeout_seconds: 5
+    failure_threshold: 2  # 60 seconds
+    
+  load_balancing:
+    external_load_balancer:
+      enabled: true
+    internal_load_balancer:
+      enabled: false

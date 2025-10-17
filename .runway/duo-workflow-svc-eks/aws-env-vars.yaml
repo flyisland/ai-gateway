@@ -1,0 +1,46 @@
+# AWS-specific environment variables for Duo Workflow Service EKS deployment
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: duo-workflow-svc-eks-aws-env
+  namespace: default
+data:
+  # AWS Configuration
+  AWS_DEFAULT_REGION: "us-east-1"
+  AWS_REGION: "us-east-1"
+  
+  # AWS Service Integration
+  AWS_EKS_CLUSTER_NAME: "runway-eks-cluster"
+  AWS_LOAD_BALANCER_TYPE: "application"
+  
+  # AWS CloudWatch Configuration
+  AWS_CLOUDWATCH_LOG_GROUP: "/aws/eks/duo-workflow-svc"
+  AWS_CLOUDWATCH_LOG_STREAM: "duo-workflow-svc-logs"
+  
+  # AWS X-Ray Tracing (if needed)
+  AWS_XRAY_TRACING_NAME: "duo-workflow-service"
+  AWS_XRAY_DAEMON_ADDRESS: "xray-daemon:2000"
+  
+  # AWS Secrets Manager Integration
+  AWS_SECRETS_MANAGER_REGION: "us-east-1"
+  
+  # AWS Parameter Store Integration
+  AWS_PARAMETER_STORE_REGION: "us-east-1"
+  
+  # AWS ELB Health Check Configuration
+  AWS_ELB_HEALTH_CHECK_PATH: "/health"
+  AWS_ELB_HEALTH_CHECK_PORT: "8000"
+  AWS_ELB_HEALTH_CHECK_PROTOCOL: "HTTP"
+  
+  # AWS Auto Scaling Configuration
+  AWS_ASG_MIN_SIZE: "1"
+  AWS_ASG_MAX_SIZE: "16"
+  AWS_ASG_DESIRED_CAPACITY: "2"
+  
+  # AWS VPC Configuration
+  AWS_VPC_ENABLE_DNS_HOSTNAMES: "true"
+  AWS_VPC_ENABLE_DNS_SUPPORT: "true"
+  
+  # AWS Security Group Configuration
+  AWS_SECURITY_GROUP_INGRESS_PORT: "8000"
+  AWS_SECURITY_GROUP_METRICS_PORT: "8082"
