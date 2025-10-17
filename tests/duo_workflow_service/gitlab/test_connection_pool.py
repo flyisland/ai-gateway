@@ -1,8 +1,6 @@
 """Tests for the connection pool manager."""
 
-import os
 import ssl
-import tempfile
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import aiohttp
