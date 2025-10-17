@@ -35,6 +35,7 @@ prompt_template:
     {% else %}
       Merge Request was not provided, so do not use any tools. Summarize your suggestions for this failing pipeline.
     {% endif %}
+  placeholder: history
 params:
   # Overriding the `AIGW_GOOGLE_CLOUD_PLATFORM__PROJECT` config, since Claude models
   # is only available in a handful of regions. See
