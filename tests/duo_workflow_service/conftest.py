@@ -1,3 +1,4 @@
+import asyncio
 from datetime import datetime, timezone
 from unittest.mock import AsyncMock, MagicMock, patch
 
@@ -10,7 +11,6 @@ from duo_workflow_service.entities.state import (
     WorkflowState,
     WorkflowStatusEnum,
 )
-from duo_workflow_service.executor.outbox import Outbox
 from duo_workflow_service.gitlab.gitlab_api import Project
 from duo_workflow_service.gitlab.http_client import GitlabHttpClient
 from duo_workflow_service.interceptors.gitlab_version_interceptor import gitlab_version
@@ -58,7 +58,8 @@ def project_mock_fixture():
 @pytest.fixture(name="tool_metadata", scope="function")
 def tool_metadata_fixture(gl_http_client, project_mock):
     return ToolMetadata(
-        outbox=MagicMock(spec=Outbox),
+        outbox=MagicMock(spec=asyncio.Queue),
+        inbox=MagicMock(spec=asyncio.Queue),
         gitlab_client=gl_http_client,
         gitlab_host="gitlab.example.com",
         project=project_mock,

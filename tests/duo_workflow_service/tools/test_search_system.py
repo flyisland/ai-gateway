@@ -85,20 +85,23 @@ class TestGrep:
     ]
 
     def _setup_grep_tool_with_mocks(self, mock_response: str) -> Grep:
-        """Helper method to set up Grep tool with mocked outbox.
+        """Helper method to set up Grep tool with mocked outbox and inbox.
 
         Args:
-            mock_response: The response string to return from the mocked outbox
+            mock_response: The response string to return from the mocked inbox
 
         Returns:
             Configured Grep tool instance with mocked dependencies
         """
         mock_outbox = MagicMock()
-        mock_outbox.put_action_and_wait_for_response = AsyncMock(
+        mock_outbox.put = AsyncMock()
+
+        mock_inbox = MagicMock()
+        mock_inbox.get = AsyncMock(
             return_value=create_mock_client_event_with_response(mock_response)
         )
 
-        metadata = {"outbox": mock_outbox}
+        metadata = {"outbox": mock_outbox, "inbox": mock_inbox}
         grep_tool = Grep()
         grep_tool.metadata = metadata
 

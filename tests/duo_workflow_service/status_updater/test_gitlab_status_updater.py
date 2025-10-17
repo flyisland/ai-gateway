@@ -3,9 +3,6 @@ from unittest.mock import AsyncMock
 import pytest
 from langchain_core.tools import ToolException
 
-from duo_workflow_service.checkpointer.gitlab_workflow_utils import (
-    WorkflowStatusEventEnum,
-)
 from duo_workflow_service.gitlab.http_client import GitLabHttpResponse
 from duo_workflow_service.status_updater.gitlab_status_updater import (
     GitLabStatusUpdater,
@@ -51,7 +48,7 @@ async def test_update_workflow_status(gitlab_status_updater):
     )
 
     result = await gitlab_status_updater.update_workflow_status(
-        workflow_id="391", status_event=WorkflowStatusEventEnum.DROP
+        workflow_id="391", status_event="drop"
     )
 
     assert result is None
@@ -82,7 +79,7 @@ async def test_update_workflow_status_http_connection_error(gitlab_status_update
 
     with pytest.raises(Exception, match="Connection refused"):
         await gitlab_status_updater.update_workflow_status(
-            workflow_id="391", status_event=WorkflowStatusEventEnum.START
+            workflow_id="391", status_event="start"
         )
 
     gitlab_status_updater._client.apatch.assert_called_once_with(

@@ -25,13 +25,12 @@ from contract import contract_pb2
 from duo_workflow_service.agent_platform.experimental.flows.flow_config import (
     list_configs,
 )
-from duo_workflow_service.executor.outbox import OutboxSignal
 from duo_workflow_service.interceptors.authentication_interceptor import current_user
 from duo_workflow_service.server import (
     DuoWorkflowService,
     clean_start_request,
     configure_cache,
-    next_client_event,
+    next_non_heartbeat_event,
     run,
     serve,
     string_to_category_enum,
@@ -349,9 +348,6 @@ async def test_execute_workflow_when_no_events_ends(
     mock_workflow.is_done = True
     mock_workflow.run = AsyncMock()
     mock_workflow.cleanup = AsyncMock()
-    mock_workflow.get_from_outbox = AsyncMock(
-        return_value=OutboxSignal.NO_MORE_OUTBOUND_REQUESTS
-    )
 
     async def mock_request_iterator() -> AsyncIterable[contract_pb2.ClientEvent]:
         yield contract_pb2.ClientEvent(
@@ -385,9 +381,10 @@ async def test_execute_workflow_when_nothing_in_outbox(
 
     def side_effect():
         mock_workflow.is_done = True
-        return OutboxSignal.NO_MORE_OUTBOUND_REQUESTS
 
-    mock_workflow.get_from_outbox = AsyncMock(side_effect=side_effect)
+    mock_workflow.get_from_outbox = AsyncMock(
+        side_effect=side_effect, return_value=None
+    )
 
     async def mock_request_iterator() -> AsyncIterable[contract_pb2.ClientEvent]:
         yield contract_pb2.ClientEvent(
@@ -437,9 +434,6 @@ async def test_workflow_is_cancelled_on_parent_task_cancellation(
 
     def mock_create_task(coro, **kwargs):
         nonlocal real_workflow_task
-        if real_workflow_task:
-            return original_create_task(coro, **kwargs)
-
         real_workflow_task = original_create_task(coro, **kwargs)
         return real_workflow_task
 
@@ -457,7 +451,7 @@ async def test_workflow_is_cancelled_on_parent_task_cancellation(
         assert real_workflow_task is not None
         assert real_workflow_task.cancelled()
 
-        mock_context.set_code.assert_called_once_with(grpc.StatusCode.CANCELLED)
+        mock_context.set_code.assert_called_once_with(grpc.StatusCode.ABORTED)
 
 
 @pytest.mark.asyncio
@@ -481,35 +475,28 @@ async def test_execute_workflow(
     mock_workflow_instance.run = AsyncMock()
     mock_workflow_instance.cleanup = AsyncMock()
 
-    mock_workflow_instance.get_from_outbox = AsyncMock(
+    checkpoint_action = contract_pb2.Action(newCheckpoint=contract_pb2.NewCheckpoint())
+
+    mock_workflow_instance.get_from_streaming_outbox = MagicMock(
         side_effect=[
-            contract_pb2.Action(
-                newCheckpoint=contract_pb2.NewCheckpoint(), requestID="1"
-            ),
-            contract_pb2.Action(requestID="2"),
-            contract_pb2.Action(
-                newCheckpoint=contract_pb2.NewCheckpoint(), requestID="3"
-            ),
-            contract_pb2.Action(requestID="4"),
-            contract_pb2.Action(
-                newCheckpoint=contract_pb2.NewCheckpoint(), requestID="5"
-            ),
-            contract_pb2.Action(
-                newCheckpoint=contract_pb2.NewCheckpoint(), requestID="6"
-            ),
-            OutboxSignal.NO_MORE_OUTBOUND_REQUESTS,
+            checkpoint_action,
+            checkpoint_action,
+            checkpoint_action,
+            checkpoint_action,
         ]
+    )
+    mock_workflow_instance.outbox_empty = MagicMock(
+        side_effect=[False, False, True, True]
+    )
+    mock_workflow_instance.get_from_outbox = AsyncMock(
+        side_effect=[contract_pb2.Action(), contract_pb2.Action()]
     )
     mock_resolve_workflow.return_value = mock_abstract_workflow_class
 
     async def mock_request_iterator() -> AsyncIterable[contract_pb2.ClientEvent]:
-        yield contract_pb2.ClientEvent(
-            startRequest=contract_pb2.StartWorkflowRequest(goal="test")
-        )
-
         for _ in range(request_iterator_count):
             yield contract_pb2.ClientEvent(
-                actionResponse=contract_pb2.ActionResponse(response="the response")
+                startRequest=contract_pb2.StartWorkflowRequest(goal="test")
             )
 
     current_user.set(CloudConnectorUser(authenticated=True, is_debug=True))
@@ -530,12 +517,8 @@ async def test_execute_workflow(
     assert (await anext(result)).WhichOneof("action") != "newCheckpoint"
     assert (await anext(result)).WhichOneof("action") == "newCheckpoint"
     assert (await anext(result)).WhichOneof("action") == "newCheckpoint"
-    with pytest.raises(StopAsyncIteration):
-        await anext(result)
 
-    assert (
-        mock_workflow_instance.set_action_response.call_count == request_iterator_count
-    )
+    assert mock_workflow_instance.add_to_inbox.call_count == 2
 
 
 @pytest.mark.asyncio
@@ -768,10 +751,6 @@ async def test_execute_workflow_missing_workflow_metadata(
     mock_workflow.run = AsyncMock()
     mock_workflow.cleanup = AsyncMock()
     mock_workflow.last_error = ValueError("validation error")
-    mock_workflow.successful_execution = MagicMock(return_value=False)
-    mock_workflow.get_from_outbox = AsyncMock(
-        return_value=OutboxSignal.NO_MORE_OUTBOUND_REQUESTS
-    )
     mock_resolve_workflow.return_value = mock_abstract_workflow_class
 
     async def mock_request_iterator() -> AsyncIterable[contract_pb2.ClientEvent]:
@@ -805,9 +784,7 @@ async def test_execute_workflow_missing_workflow_metadata(
     )
 
     mock_context.set_code.assert_called_once_with(grpc.StatusCode.INTERNAL)
-    mock_context.set_details.assert_called_once_with(
-        "workflow execution failure: ValueError: validation error"
-    )
+    mock_context.set_details.assert_called_once_with("validation error")
 
 
 @pytest.mark.asyncio
@@ -821,9 +798,6 @@ async def test_execute_workflow_valid_workflow_metadata(
     mock_workflow.run = AsyncMock()
     mock_workflow.cleanup = AsyncMock()
     mock_workflow.last_error = None
-    mock_workflow.get_from_outbox = AsyncMock(
-        return_value=OutboxSignal.NO_MORE_OUTBOUND_REQUESTS
-    )
     mock_resolve_workflow.return_value = mock_abstract_workflow_class
     mcp_tools = [
         contract_pb2.McpTool(name="get_issue", description="Tool to get issue")
@@ -922,7 +896,7 @@ def test_string_to_category_enum():
 
 
 @pytest.mark.asyncio
-async def test_next_client_event():
+async def test_next_non_heartbeat_event():
     async def mock_request_iterator() -> AsyncIterable[contract_pb2.ClientEvent]:
         yield contract_pb2.ClientEvent(
             heartbeat=contract_pb2.HeartbeatRequest(timestamp=123)
@@ -934,24 +908,19 @@ async def test_next_client_event():
             actionResponse=contract_pb2.ActionResponse(response="the response")
         )
 
-    iterator = mock_request_iterator()
-
     with patch("duo_workflow_service.server.log") as mock_log:
-        result = await next_client_event(iterator)
-        assert result.HasField("heartbeat")
-        result = await next_client_event(iterator)
-        assert result.HasField("heartbeat")
-        result = await next_client_event(iterator)
-        assert result.actionResponse.response == "the response"
-        assert not result.HasField("heartbeat")
+        result = await next_non_heartbeat_event(mock_request_iterator())
         mock_log.info.assert_called()
+
+    assert result.actionResponse.response == "the response"
+    assert not result.HasField("heartbeat")
 
 
 @pytest.mark.asyncio
-async def test_next_client_event_client_streaming_closed():
+async def test_next_non_heartbeat_event_client_streaming_closed():
     mock_iterator = AsyncMock()
     mock_iterator.__next__.side_effect = StopAsyncIteration
-    result = await next_client_event(mock_iterator)
+    result = await next_non_heartbeat_event(mock_iterator)
     assert result is None
 
 
@@ -974,9 +943,6 @@ async def test_execute_workflow_with_flow_config_schema_version_parameterized(
     mock_workflow.is_done = True
     mock_workflow.run = AsyncMock()
     mock_workflow.cleanup = AsyncMock()
-    mock_workflow.get_from_outbox = AsyncMock(
-        return_value=OutboxSignal.NO_MORE_OUTBOUND_REQUESTS
-    )
     mock_resolve_workflow.return_value = mock_abstract_workflow_class
 
     flow_config = request.getfixturevalue(flow_config_name)
@@ -1028,9 +994,6 @@ async def test_execute_workflow_tracks_receive_start_request_internal_event(
     mock_workflow.is_done = True
     mock_workflow.run = AsyncMock()
     mock_workflow.cleanup = AsyncMock()
-    mock_workflow.get_from_outbox = AsyncMock(
-        return_value=OutboxSignal.NO_MORE_OUTBOUND_REQUESTS
-    )
     mock_resolve_workflow.return_value = mock_abstract_workflow_class
 
     async def mock_request_iterator() -> AsyncIterable[contract_pb2.ClientEvent]:

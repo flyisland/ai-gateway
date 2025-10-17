@@ -1,11 +1,7 @@
 import json
-from typing import Callable, NoReturn
 
 import structlog
 
-from duo_workflow_service.checkpointer.gitlab_workflow_utils import (
-    WorkflowStatusEventEnum,
-)
 from duo_workflow_service.gitlab.http_client import GitlabHttpClient, GitLabHttpResponse
 
 logger = structlog.stdlib.get_logger(__name__)
@@ -16,16 +12,9 @@ class UnsupportedStatusEvent(Exception):
 
 
 class GitLabStatusUpdater:
-    def __init__(
-        self,
-        client: GitlabHttpClient,
-        status_update_callback: (
-            Callable[[WorkflowStatusEventEnum], NoReturn] | None
-        ) = None,
-    ):
+    def __init__(self, client: GitlabHttpClient):
         self._client = client
         self.workflow_api_path = "/api/v4/ai/duo_workflows/workflows"
-        self.status_update_callback = status_update_callback
 
     async def get_workflow_status(self, workflow_id: str) -> str:
         response = await self._client.aget(
@@ -44,14 +33,12 @@ class GitLabStatusUpdater:
 
         return response.body.get("status")
 
-    async def update_workflow_status(
-        self, workflow_id: str, status_event: WorkflowStatusEventEnum
-    ) -> None:
+    async def update_workflow_status(self, workflow_id: str, status_event: str) -> None:
         """Update the status of a workflow in GitLab.
 
         Args:
             workflow_id (str): The ID of the workflow to update.
-            status_event (WorkflowStatusEventEnum): The status event for the workflow. Can be start, finish or drop.
+            status_event (str): The status event for the workflow. Can be start, finish or drop.
 
         Raises:
             Exception: If the update request fails.
@@ -59,7 +46,7 @@ class GitLabStatusUpdater:
         """
         result = await self._client.apatch(
             path=f"{self.workflow_api_path}/{workflow_id}",
-            body=json.dumps({"status_event": status_event.value}),
+            body=json.dumps({"status_event": status_event}),
             parse_json=True,
             use_http_response=True,
         )
@@ -78,6 +65,3 @@ class GitLabStatusUpdater:
             raise Exception(
                 f"Failed to update workflow with '{status_event}' status: {result.status_code}"
             )
-
-        if self.status_update_callback:
-            self.status_update_callback(status_event)
