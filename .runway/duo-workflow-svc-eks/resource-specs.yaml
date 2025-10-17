@@ -1,0 +1,58 @@
+# Resource specifications for Duo Workflow Service on EKS
+# Based on GCP Cloud Run configuration and AI Gateway EKS patterns
+
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: duo-workflow-svc-eks-resources
+  namespace: default
+data:
+  # Resource limits and requests
+  cpu_request: "500m"
+  memory_request: "2Gi"
+  ephemeral_storage_request: "2Gi"
+  
+  cpu_limit: "2000m"  # 2 CPU cores (matching GCP config)
+  memory_limit: "8Gi"  # 8GB memory (matching GCP config)
+  ephemeral_storage_limit: "8Gi"
+  
+  # Scaling configuration
+  min_replicas_staging: "1"
+  max_replicas_staging: "8"
+  min_replicas_production: "8"
+  max_replicas_production: "16"
+  
+  # HPA configuration
+  target_cpu_utilization: "70"
+  target_memory_utilization: "80"
+  
+  # Request concurrency (equivalent to GCP max_instance_request_concurrency)
+  max_concurrent_requests_staging: "200"
+  max_concurrent_requests_production: "100"
+  
+  # Health check configuration
+  startup_probe_initial_delay: "30"
+  startup_probe_period: "10"
+  startup_probe_timeout: "5"
+  startup_probe_failure_threshold: "30"
+  
+  liveness_probe_initial_delay: "30"
+  liveness_probe_period: "10"
+  liveness_probe_timeout: "5"
+  liveness_probe_failure_threshold: "6"
+  
+  readiness_probe_initial_delay: "10"
+  readiness_probe_period: "30"
+  readiness_probe_timeout: "5"
+  readiness_probe_failure_threshold: "2"
+  
+  # Network configuration
+  container_port: "8000"
+  metrics_port: "8082"
+  
+  # Request timeout (matching GCP config)
+  request_timeout: "3600"  # 1 hour
+  
+  # Pod disruption budget
+  min_available_staging: "1"
+  min_available_production: "4"

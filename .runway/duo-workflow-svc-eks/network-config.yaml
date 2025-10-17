@@ -1,0 +1,127 @@
+# Network configuration for Duo Workflow Service EKS deployment
+# Includes ingress, load balancing, and external access setup
+
+---
+# Application Load Balancer Ingress
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: duo-workflow-svc-eks-ingress
+  namespace: default
+  annotations:
+    kubernetes.io/ingress.class: alb
+    alb.ingress.kubernetes.io/scheme: internet-facing
+    alb.ingress.kubernetes.io/target-type: ip
+    alb.ingress.kubernetes.io/listen-ports: '[{"HTTP": 80}, {"HTTPS": 443}]'
+    alb.ingress.kubernetes.io/ssl-redirect: '443'
+    alb.ingress.kubernetes.io/certificate-arn: "${AWS_ACM_CERTIFICATE_ARN}"
+    alb.ingress.kubernetes.io/healthcheck-path: /health
+    alb.ingress.kubernetes.io/healthcheck-port: '8000'
+    alb.ingress.kubernetes.io/healthcheck-protocol: HTTP
+    alb.ingress.kubernetes.io/healthcheck-interval-seconds: '30'
+    alb.ingress.kubernetes.io/healthcheck-timeout-seconds: '5'
+    alb.ingress.kubernetes.io/healthy-threshold-count: '2'
+    alb.ingress.kubernetes.io/unhealthy-threshold-count: '3'
+    alb.ingress.kubernetes.io/load-balancer-attributes: |
+      idle_timeout.timeout_seconds=3600,
+      routing.http2.enabled=true,
+      access_logs.s3.enabled=true,
+      access_logs.s3.bucket=${AWS_ALB_LOGS_BUCKET},
+      access_logs.s3.prefix=duo-workflow-svc-eks
+spec:
+  rules:
+  - host: duo-workflow.aws.gitlab.com
+    http:
+      paths:
+      - path: /
+        pathType: Prefix
+        backend:
+          service:
+            name: duo-workflow-svc-eks-service
+            port:
+              number: 8000
+  - host: duo-workflow.aws.staging.gitlab.com
+    http:
+      paths:
+      - path: /
+        pathType: Prefix
+        backend:
+          service:
+            name: duo-workflow-svc-eks-service
+            port:
+              number: 8000
+
+---
+# Service for Load Balancer
+apiVersion: v1
+kind: Service
+metadata:
+  name: duo-workflow-svc-eks-service
+  namespace: default
+  annotations:
+    service.beta.kubernetes.io/aws-load-balancer-type: nlb
+    service.beta.kubernetes.io/aws-load-balancer-backend-protocol: http
+    service.beta.kubernetes.io/aws-load-balancer-cross-zone-load-balancing-enabled: "true"
+    service.beta.kubernetes.io/aws-load-balancer-connection-idle-timeout: "3600"
+spec:
+  type: LoadBalancer
+  ports:
+  - name: http
+    port: 8000
+    targetPort: 8000
+    protocol: TCP
+  - name: metrics
+    port: 8082
+    targetPort: 8082
+    protocol: TCP
+  selector:
+    app: duo-workflow-svc-eks
+
+---
+# Network Policy for Security
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: duo-workflow-svc-eks-network-policy
+  namespace: default
+spec:
+  podSelector:
+    matchLabels:
+      app: duo-workflow-svc-eks
+  policyTypes:
+  - Ingress
+  - Egress
+  ingress:
+  - from:
+    - namespaceSelector:
+        matchLabels:
+          name: kube-system
+    - namespaceSelector:
+        matchLabels:
+          name: default
+    ports:
+    - protocol: TCP
+      port: 8000
+    - protocol: TCP
+      port: 8082
+  egress:
+  - {} # Allow all egress traffic
+
+---
+# Service Monitor for Prometheus
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: duo-workflow-svc-eks-metrics
+  namespace: default
+  labels:
+    app: duo-workflow-svc-eks
+spec:
+  selector:
+    matchLabels:
+      app: duo-workflow-svc-eks
+  endpoints:
+  - port: metrics
+    path: /metrics
+    interval: 30s
+    scrapeTimeout: 10s

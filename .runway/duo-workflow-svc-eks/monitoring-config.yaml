@@ -1,0 +1,279 @@
+# Monitoring and observability configuration for Duo Workflow Service EKS deployment
+# Includes CloudWatch, Prometheus, and logging configurations
+
+---
+# CloudWatch Log Group Configuration
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: duo-workflow-svc-eks-logging
+  namespace: default
+data:
+  fluent-bit.conf: |
+    [SERVICE]
+        Flush         1
+        Log_Level     info
+        Daemon        off
+        Parsers_File  parsers.conf
+        HTTP_Server   On
+        HTTP_Listen   0.0.0.0
+        HTTP_Port     2020
+
+    [INPUT]
+        Name              tail
+        Path              /var/log/containers/duo-workflow-svc-eks*.log
+        Parser            docker
+        Tag               kube.*
+        Refresh_Interval  5
+        Mem_Buf_Limit     50MB
+        Skip_Long_Lines   On
+
+    [FILTER]
+        Name                kubernetes
+        Match               kube.*
+        Kube_URL            https://kubernetes.default.svc:443
+        Kube_CA_File        /var/run/secrets/kubernetes.io/serviceaccount/ca.crt
+        Kube_Token_File     /var/run/secrets/kubernetes.io/serviceaccount/token
+        Kube_Tag_Prefix     kube.var.log.containers.
+        Merge_Log           On
+        Keep_Log            Off
+        K8S-Logging.Parser  On
+        K8S-Logging.Exclude On
+
+    [OUTPUT]
+        Name                cloudwatch_logs
+        Match               kube.*
+        region              us-east-1
+        log_group_name      /aws/eks/duo-workflow-svc
+        log_stream_prefix   duo-workflow-svc-
+        auto_create_group   true
+
+  parsers.conf: |
+    [PARSER]
+        Name   docker
+        Format json
+        Time_Key time
+        Time_Format %Y-%m-%dT%H:%M:%S.%L
+        Time_Keep   On
+
+---
+# Prometheus Configuration
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: duo-workflow-svc-eks-prometheus
+  namespace: default
+data:
+  prometheus.yml: |
+    global:
+      scrape_interval: 15s
+      evaluation_interval: 15s
+
+    rule_files:
+      - "duo_workflow_svc_rules.yml"
+
+    scrape_configs:
+      - job_name: 'duo-workflow-svc-eks'
+        static_configs:
+          - targets: ['duo-workflow-svc-eks-service:8082']
+        metrics_path: /metrics
+        scrape_interval: 30s
+        scrape_timeout: 10s
+
+      - job_name: 'kubernetes-pods'
+        kubernetes_sd_configs:
+          - role: pod
+        relabel_configs:
+          - source_labels: [__meta_kubernetes_pod_annotation_prometheus_io_scrape]
+            action: keep
+            regex: true
+          - source_labels: [__meta_kubernetes_pod_annotation_prometheus_io_path]
+            action: replace
+            target_label: __metrics_path__
+            regex: (.+)
+          - source_labels: [__address__, __meta_kubernetes_pod_annotation_prometheus_io_port]
+            action: replace
+            regex: ([^:]+)(?::\d+)?;(\d+)
+            replacement: $1:$2
+            target_label: __address__
+
+  duo_workflow_svc_rules.yml: |
+    groups:
+      - name: duo_workflow_svc_alerts
+        rules:
+          - alert: DuoWorkflowServiceDown
+            expr: up{job="duo-workflow-svc-eks"} == 0
+            for: 1m
+            labels:
+              severity: critical
+            annotations:
+              summary: "Duo Workflow Service is down"
+              description: "Duo Workflow Service has been down for more than 1 minute."
+
+          - alert: DuoWorkflowServiceHighErrorRate
+            expr: rate(http_requests_total{job="duo-workflow-svc-eks",status=~"5.."}[5m]) > 0.1
+            for: 5m
+            labels:
+              severity: warning
+            annotations:
+              summary: "High error rate in Duo Workflow Service"
+              description: "Error rate is {{ $value }} errors per second."
+
+          - alert: DuoWorkflowServiceHighLatency
+            expr: histogram_quantile(0.95, rate(http_request_duration_seconds_bucket{job="duo-workflow-svc-eks"}[5m])) > 2
+            for: 5m
+            labels:
+              severity: warning
+            annotations:
+              summary: "High latency in Duo Workflow Service"
+              description: "95th percentile latency is {{ $value }} seconds."
+
+          - alert: DuoWorkflowServiceHighMemoryUsage
+            expr: container_memory_usage_bytes{pod=~"duo-workflow-svc-eks.*"} / container_spec_memory_limit_bytes > 0.8
+            for: 5m
+            labels:
+              severity: warning
+            annotations:
+              summary: "High memory usage in Duo Workflow Service"
+              description: "Memory usage is {{ $value | humanizePercentage }} of limit."
+
+          - alert: DuoWorkflowServiceHighCPUUsage
+            expr: rate(container_cpu_usage_seconds_total{pod=~"duo-workflow-svc-eks.*"}[5m]) / container_spec_cpu_quota * 100 > 80
+            for: 5m
+            labels:
+              severity: warning
+            annotations:
+              summary: "High CPU usage in Duo Workflow Service"
+              description: "CPU usage is {{ $value }}% of limit."
+
+---
+# Grafana Dashboard Configuration
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: duo-workflow-svc-eks-dashboard
+  namespace: default
+data:
+  dashboard.json: |
+    {
+      "dashboard": {
+        "id": null,
+        "title": "Duo Workflow Service EKS",
+        "tags": ["duo-workflow", "eks", "aws"],
+        "timezone": "browser",
+        "panels": [
+          {
+            "id": 1,
+            "title": "Request Rate",
+            "type": "graph",
+            "targets": [
+              {
+                "expr": "rate(http_requests_total{job=\"duo-workflow-svc-eks\"}[5m])",
+                "legendFormat": "{{method}} {{status}}"
+              }
+            ]
+          },
+          {
+            "id": 2,
+            "title": "Response Time",
+            "type": "graph",
+            "targets": [
+              {
+                "expr": "histogram_quantile(0.95, rate(http_request_duration_seconds_bucket{job=\"duo-workflow-svc-eks\"}[5m]))",
+                "legendFormat": "95th percentile"
+              },
+              {
+                "expr": "histogram_quantile(0.50, rate(http_request_duration_seconds_bucket{job=\"duo-workflow-svc-eks\"}[5m]))",
+                "legendFormat": "50th percentile"
+              }
+            ]
+          },
+          {
+            "id": 3,
+            "title": "Memory Usage",
+            "type": "graph",
+            "targets": [
+              {
+                "expr": "container_memory_usage_bytes{pod=~\"duo-workflow-svc-eks.*\"}",
+                "legendFormat": "{{pod}}"
+              }
+            ]
+          },
+          {
+            "id": 4,
+            "title": "CPU Usage",
+            "type": "graph",
+            "targets": [
+              {
+                "expr": "rate(container_cpu_usage_seconds_total{pod=~\"duo-workflow-svc-eks.*\"}[5m])",
+                "legendFormat": "{{pod}}"
+              }
+            ]
+          }
+        ],
+        "time": {
+          "from": "now-1h",
+          "to": "now"
+        },
+        "refresh": "30s"
+      }
+    }
+
+---
+# AWS CloudWatch Container Insights Configuration
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: duo-workflow-svc-eks-cloudwatch
+  namespace: default
+data:
+  cwagentconfig.json: |
+    {
+      "logs": {
+        "metrics_collected": {
+          "kubernetes": {
+            "cluster_name": "runway-eks-cluster",
+            "metrics_collection_interval": 60
+          }
+        },
+        "force_flush_interval": 5
+      },
+      "metrics": {
+        "namespace": "DuoWorkflowService/EKS",
+        "metrics_collected": {
+          "cpu": {
+            "measurement": [
+              "cpu_usage_idle",
+              "cpu_usage_iowait",
+              "cpu_usage_user",
+              "cpu_usage_system"
+            ],
+            "metrics_collection_interval": 60
+          },
+          "disk": {
+            "measurement": [
+              "used_percent"
+            ],
+            "metrics_collection_interval": 60,
+            "resources": [
+              "*"
+            ]
+          },
+          "diskio": {
+            "measurement": [
+              "io_time"
+            ],
+            "metrics_collection_interval": 60,
+            "resources": [
+              "*"
+            ]
+          },
+          "mem": {
+            "measurement": [
+              "mem_used_percent"
+            ],
+            "metrics_collection_interval": 60
+          }
+        }
+      }
+    }

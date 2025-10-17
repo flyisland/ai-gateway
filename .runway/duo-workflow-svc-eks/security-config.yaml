@@ -1,0 +1,173 @@
+# Security configuration for Duo Workflow Service EKS deployment
+# Includes IAM roles, permissions, and security policies
+
+---
+# Service Account with IAM Role
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: duo-workflow-svc-eks-sa
+  namespace: default
+  annotations:
+    eks.amazonaws.com/role-arn: "${AWS_IAM_ROLE_ARN}"
+    eks.amazonaws.com/sts-regional-endpoints: "true"
+
+---
+# Pod Security Policy
+apiVersion: policy/v1beta1
+kind: PodSecurityPolicy
+metadata:
+  name: duo-workflow-svc-eks-psp
+spec:
+  privileged: false
+  allowPrivilegeEscalation: false
+  requiredDropCapabilities:
+    - ALL
+  volumes:
+    - 'configMap'
+    - 'emptyDir'
+    - 'projected'
+    - 'secret'
+    - 'downwardAPI'
+    - 'persistentVolumeClaim'
+  runAsUser:
+    rule: 'MustRunAsNonRoot'
+  seLinux:
+    rule: 'RunAsAny'
+  fsGroup:
+    rule: 'RunAsAny'
+
+---
+# Cluster Role for Service Account
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: duo-workflow-svc-eks-role
+rules:
+- apiGroups: [""]
+  resources: ["configmaps", "secrets"]
+  verbs: ["get", "list", "watch"]
+- apiGroups: [""]
+  resources: ["pods"]
+  verbs: ["get", "list", "watch"]
+- apiGroups: ["apps"]
+  resources: ["deployments"]
+  verbs: ["get", "list", "watch"]
+
+---
+# Cluster Role Binding
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: duo-workflow-svc-eks-binding
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: duo-workflow-svc-eks-role
+subjects:
+- kind: ServiceAccount
+  name: duo-workflow-svc-eks-sa
+  namespace: default
+
+---
+# Security Context Constraints
+apiVersion: v1
+kind: SecurityContextConstraints
+metadata:
+  name: duo-workflow-svc-eks-scc
+allowHostDirVolumePlugin: false
+allowHostIPC: false
+allowHostNetwork: false
+allowHostPID: false
+allowHostPorts: false
+allowPrivilegedContainer: false
+allowedCapabilities: null
+defaultAddCapabilities: null
+requiredDropCapabilities:
+- KILL
+- MKNOD
+- SETUID
+- SETGID
+fsGroup:
+  type: RunAsAny
+readOnlyRootFilesystem: false
+runAsUser:
+  type: MustRunAsNonRoot
+seLinuxContext:
+  type: MustRunAs
+volumes:
+- configMap
+- downwardAPI
+- emptyDir
+- persistentVolumeClaim
+- projected
+- secret
+
+---
+# AWS IAM Policy Document (for reference)
+# This would be applied via Terraform or AWS CLI
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: duo-workflow-svc-eks-iam-policy
+  namespace: default
+data:
+  policy.json: |
+    {
+      "Version": "2012-10-17",
+      "Statement": [
+        {
+          "Effect": "Allow",
+          "Action": [
+            "logs:CreateLogGroup",
+            "logs:CreateLogStream",
+            "logs:PutLogEvents",
+            "logs:DescribeLogStreams"
+          ],
+          "Resource": "arn:aws:logs:*:*:log-group:/aws/eks/duo-workflow-svc*"
+        },
+        {
+          "Effect": "Allow",
+          "Action": [
+            "secretsmanager:GetSecretValue",
+            "secretsmanager:DescribeSecret"
+          ],
+          "Resource": "arn:aws:secretsmanager:*:*:secret:duo-workflow-svc/*"
+        },
+        {
+          "Effect": "Allow",
+          "Action": [
+            "ssm:GetParameter",
+            "ssm:GetParameters",
+            "ssm:GetParametersByPath"
+          ],
+          "Resource": "arn:aws:ssm:*:*:parameter/duo-workflow-svc/*"
+        },
+        {
+          "Effect": "Allow",
+          "Action": [
+            "xray:PutTraceSegments",
+            "xray:PutTelemetryRecords"
+          ],
+          "Resource": "*"
+        },
+        {
+          "Effect": "Allow",
+          "Action": [
+            "cloudwatch:PutMetricData"
+          ],
+          "Resource": "*"
+        }
+      ]
+    }
+
+---
+# Secret for GCP Service Account (for compatibility)
+apiVersion: v1
+kind: Secret
+metadata:
+  name: gcp-service-account
+  namespace: default
+type: Opaque
+data:
+  credentials.json: "${GCP_SERVICE_ACCOUNT_KEY_BASE64}"
