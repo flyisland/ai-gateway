@@ -57,6 +57,9 @@ models:
 
   - name: "Claude Sonnet 4.5 - Anthropic"
     gitlab_identifier: "claude_sonnet_4_5_20250929"
+    family:
+      - claude_3
+    prompt_variant: sonnet_4_5
     params:
       model: "claude-sonnet-4-5-20250929"
       temperature: 0.0

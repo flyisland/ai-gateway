@@ -101,6 +101,13 @@ models:
         - custom
     params:
         model: custom
+  - name: Model with prompt variant
+    gitlab_identifier: model_with_variant
+    family:
+        - claude_3
+    prompt_variant: custom
+    params:
+        model: custom
 """,
     )
     fs.create_file(
@@ -969,6 +976,32 @@ prompt_template:
                 {
                     "stop": ["Foo", "Bar"],
                     "timeout": 60,
+                },
+                {
+                    "temperature": 0.1,
+                    "top_p": 0.8,
+                    "top_k": 40,
+                    "max_tokens": 256,
+                    "max_retries": 6,
+                },
+                ChatLiteLLM,
+            ),
+            (
+                "chat/react",
+                "^1.0.0",
+                {
+                    "name": "model_with_variant",
+                    "provider": "gitlab",
+                },
+                False,
+                "Chat react custom prompt",  # Should use prompt_variant (custom) instead of family (claude_3)
+                MockPromptClass,
+                [("system", "Template1"), ("user", "Template2")],
+                "custom",
+                {
+                    "stop": ["Foo", "Bar"],
+                    "timeout": 60,
+                    "vertex_location": "us-east1",
                 },
                 {
                     "temperature": 0.1,

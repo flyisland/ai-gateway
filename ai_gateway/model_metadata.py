@@ -11,6 +11,7 @@ from ai_gateway.model_selection import ModelSelectionConfig
 class BaseModelMetadata(BaseModel):
     llm_definition_params: dict[str, Any] = {}
     family: list[str] = []
+    prompt_variant: Optional[str] = None
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
@@ -93,6 +94,7 @@ def create_model_metadata(data: dict[str, Any] | None) -> Optional[TypeModelMeta
         return AmazonQModelMetadata(
             llm_definition_params=llm_definition.params.copy(),
             family=llm_definition.family,
+            prompt_variant=llm_definition.prompt_variant,
             friendly_name=llm_definition.name,
             **data,
         )
@@ -121,6 +123,7 @@ def create_model_metadata(data: dict[str, Any] | None) -> Optional[TypeModelMeta
     return ModelMetadata(
         llm_definition_params=llm_definition.params.copy(),
         family=llm_definition.family,
+        prompt_variant=llm_definition.prompt_variant,
         friendly_name=llm_definition.name,
         **data,
     )
