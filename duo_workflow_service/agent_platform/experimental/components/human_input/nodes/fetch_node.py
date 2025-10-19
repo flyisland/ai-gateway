@@ -54,9 +54,14 @@ class FetchNode(BaseModel):
                     event=UILogEventsHumanInput.ON_USER_RESPONSE,
                 )
 
+                # Append user rejection message to target component's history for replace-based reducer.
+                # The reducer will replace the target component's conversation history with this list.
+                existing_history = state[FlowStateKeys.CONVERSATION_HISTORY].get(
+                    self.sends_response_to, []
+                )
                 human_message = HumanMessage(content=event["message"])
                 result[FlowStateKeys.CONVERSATION_HISTORY] = {
-                    self.sends_response_to: [human_message]
+                    self.sends_response_to: existing_history + [human_message]
                 }
 
             result.update(self.ui_history.pop_state_updates())
@@ -76,11 +81,17 @@ class FetchNode(BaseModel):
             # Create HumanMessage for conversation history
             human_message = HumanMessage(content=user_message)
 
+            # Append user response to target component's history for replace-based reducer.
+            # The reducer will replace the target component's conversation history with this list.
+            existing_history = state[FlowStateKeys.CONVERSATION_HISTORY].get(
+                self.sends_response_to, []
+            )
+
             return {
                 **self.ui_history.pop_state_updates(),
                 FlowStateKeys.STATUS: WorkflowStatusEnum.EXECUTION.value,
                 FlowStateKeys.CONVERSATION_HISTORY: {
-                    self.sends_response_to: [human_message]
+                    self.sends_response_to: existing_history + [human_message]
                 },
             }
 

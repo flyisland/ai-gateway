@@ -13,16 +13,27 @@ from typing import (
     get_origin,
 )
 
-from langchain_core.messages import BaseMessage
+import structlog
+from langchain_core.messages import BaseMessage, SystemMessage, trim_messages
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 # TODO: Remove dependency on legacy duo workflow packages
 from duo_workflow_service.entities.state import (
+    MAX_CONTEXT_TOKENS,
     UiChatLog,
     WorkflowStatusEnum,
     _conversation_history_reducer,
+    _deduplicate_additional_context,
+    _pretrim_large_messages,
+    _restore_message_consistency,
     _ui_chat_log_reducer,
+    get_messages_profile,
 )
+from duo_workflow_service.token_counter.approximate_token_counter import (
+    ApproximateTokenCounter,
+)
+
+logger = structlog.stdlib.get_logger("experimental_state")
 
 __all__ = [
     "FlowEvent",
@@ -35,6 +46,7 @@ __all__ = [
     "IOKey",
     "IOKeyTemplate",
     "get_vars_from_state",
+    "_conversation_history_replace_reducer",
 ]
 
 
@@ -93,6 +105,144 @@ def merge_nested_dict_reducer(
     return merge_nested_dict(left or {}, right or {})
 
 
+def _conversation_history_replace_reducer(
+    current: dict[str, list[BaseMessage]], new: Optional[dict[str, list[BaseMessage]]]
+) -> dict[str, list[BaseMessage]]:
+    """Replace-based conversation history reducer for experimental flows.
+
+    Unlike the append-based reducer in v1, this reducer replaces conversation history
+    per component rather than automatically appending. This enables components to
+    implement context management strategies such as summarization, compression, or
+    selective message retention. Components must explicitly include existing messages
+    in their return value to preserve conversation history.
+
+    Args:
+        current: Current conversation history state mapping component names to message lists
+        new: New conversation history updates from component execution
+
+    Returns:
+        Updated conversation history with per-component replacements applied
+    """
+    reduced = {**current}
+
+    if new is None:
+        return reduced
+
+    for agent_name, new_messages in new.items():
+        if not new_messages:
+            continue
+
+        token_counter = ApproximateTokenCounter(agent_name)
+
+        # Log incoming message profile
+        new_msg_roles, new_msg_token = get_messages_profile(
+            messages=new_messages,
+            token_counter=token_counter,
+            include_tool_tokens=False,
+        )
+
+        logger.info(
+            f"Replace reducer processing {agent_name} with "
+            f"new messages roles: {new_msg_roles}, token size: {new_msg_token}; "
+            f"total token size including tool specs: {new_msg_token + token_counter.tool_tokens}",
+            new_msg_token=new_msg_token,
+            total_tokens_before_trimming=new_msg_token + token_counter.tool_tokens,
+        )
+
+        # Pre-trim large individual messages
+        processed_messages = _pretrim_large_messages(new_messages, token_counter)
+
+        if not processed_messages:
+            continue
+
+        # Replace strategy: overwrites existing messages for this component
+        reduced[agent_name] = processed_messages
+
+        pretrimmed_msg_roles, pretrimmed_msg_token = get_messages_profile(
+            messages=reduced[agent_name],
+            token_counter=token_counter,
+            include_tool_tokens=False,
+        )
+
+        logger.info(
+            f"Finished pretrim with messages roles: {pretrimmed_msg_roles}, message token: {pretrimmed_msg_token}, "
+            f"estimated token size including tool specs: {pretrimmed_msg_token + token_counter.tool_tokens}",
+            total_tokens_after_pretrimming=pretrimmed_msg_token
+            + token_counter.tool_tokens,
+        )
+
+        # Deduplicate additional context
+        deduplicated_messages = _deduplicate_additional_context(reduced[agent_name])
+
+        try:
+            # Trim to fit within token limits
+            trimmed_messages = trim_messages(
+                deduplicated_messages,
+                max_tokens=MAX_CONTEXT_TOKENS,
+                strategy="last",
+                token_counter=token_counter.count_tokens,
+                start_on="human",
+                include_system=True,
+                allow_partial=False,
+            )
+
+            reduced[agent_name] = _restore_message_consistency(trimmed_messages)
+
+            # Fallback if trimming resulted in empty or invalid messages
+            if not reduced[agent_name] or len(reduced[agent_name]) == 1:
+                system_messages = [
+                    msg for msg in new_messages if isinstance(msg, SystemMessage)
+                ]
+                non_system_messages = [
+                    msg for msg in new_messages if not isinstance(msg, SystemMessage)
+                ]
+
+                min_non_system = min(3, len(non_system_messages))
+                fallback_messages = (
+                    system_messages + non_system_messages[-min_non_system:]
+                )
+
+                reduced[agent_name] = _restore_message_consistency(fallback_messages)
+
+                logger.warning(
+                    "Trim resulted in empty messages/invalid messages - falling back to minimal context",
+                    agent_name=agent_name,
+                )
+
+        except Exception as e:
+            logger.error(
+                f"Error during message trimming: {str(e)}",
+                agent_name=agent_name,
+                exc_info=True,
+            )
+            # Fallback: keep system messages plus recent messages
+            system_messages = [
+                msg for msg in new_messages if isinstance(msg, SystemMessage)
+            ]
+            non_system_messages = [
+                msg for msg in new_messages if not isinstance(msg, SystemMessage)
+            ]
+
+            fallback_messages = system_messages + non_system_messages[-5:]
+            reduced[agent_name] = _restore_message_consistency(fallback_messages)
+
+        posttrimmed_msg_roles, posttrimmed_msg_token = get_messages_profile(
+            messages=reduced[agent_name],
+            token_counter=token_counter,
+            include_tool_tokens=False,
+        )
+
+        logger.info(
+            f"Finished posttrim with messages roles: {posttrimmed_msg_roles}, message token: {posttrimmed_msg_token}, "
+            f"estimated token size including tool specs: {posttrimmed_msg_token + token_counter.tool_tokens}",
+            total_tokens_before_trimming=new_msg_token + token_counter.tool_tokens,
+            total_tokens_after_posttrimming=posttrimmed_msg_token
+            + token_counter.tool_tokens,
+        )
+
+    return reduced
+
+
 class FlowStateKeys:
     STATUS: Literal["status"] = "status"
     CONVERSATION_HISTORY: Literal["conversation_history"] = "conversation_history"
@@ -103,7 +253,7 @@ class FlowStateKeys:
 class FlowState(TypedDict):
     status: WorkflowStatusEnum
     conversation_history: Annotated[
-        dict[str, list[BaseMessage]], _conversation_history_reducer
+        dict[str, list[BaseMessage]], _conversation_history_replace_reducer
     ]
     ui_chat_log: Annotated[list[UiChatLog], _ui_chat_log_reducer]
     context: Annotated[dict[str, Any], merge_nested_dict_reducer]
