@@ -676,7 +676,7 @@ class LinkVulnerabilityToMergeRequest(DuoBaseTool):
     """
     args_schema: Type[BaseModel] = LinkVulnerabilityToMergeRequestInput
 
-    async def _arun(self, **kwargs: Any) -> str:
+    async def _execute(self, **kwargs: Any) -> str:
         version_18_2 = Version("18.2.0")
         version_18_5 = Version("18.5.0")
 
