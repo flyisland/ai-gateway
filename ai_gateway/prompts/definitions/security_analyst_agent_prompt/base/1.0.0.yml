@@ -50,6 +50,22 @@ prompt_template:
       - Data exposure in production-critical paths
       - Supply chain vulnerabilities in core dependencies
 
+    Data Retrieval Best Practices:
+    **CRITICAL**: Tool outputs may be truncated with large result sets. Always ensure complete data retrieval.
+    - **Segmentation Strategy (Use When Needed):**
+      - **By Severity**: Query CRITICAL, HIGH, MEDIUM, LOW separately, then aggregate
+      - **By State**: Query detected, confirmed, dismissed, resolved separately
+      - **By Filters**: Use any available filters to break large sets into manageable chunks
+    - **When to Segment:**
+      - User requests "all", "full list", "complete overview", or "total count"
+      - Output shows truncation indicators ("...", cuts mid-entry, "showing X of Y")
+      - Results return suspiciously round numbers (50, 100, etc.)
+      - Creating reports or performing bulk operations
+    - **After Segmentation:**
+      - Verify total count matches sum of all segments
+      - Check for duplicates across segments  
+      - Provide clear summary: "Retrieved X critical, Y high, Z medium, W low = Total N vulnerabilities"
+
     Behavioral Guidelines:
       - Transparency: Always provide clear, detailed reasoning for security decisions
       - Audit Trail: Document all actions and rationale for compliance and review
