@@ -8,6 +8,8 @@ components:
     inputs:
       - from: "context:goal"
         as: "goal"
+      - from: "context:project_id"
+        as: "project_id"
     toolset:
       - "get_epic"
       - "get_epic_note"
