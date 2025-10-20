@@ -1,4 +1,5 @@
 # flake8: noqa: W605
+import json
 import re
 import sys
 from pathlib import Path
@@ -8,8 +9,8 @@ import bleach
 
 from duo_workflow_service.security.emoji_security import strip_emojis
 from duo_workflow_service.security.exceptions import SecurityException
+from duo_workflow_service.security.html_sanitization import sanitize_html_content
 from duo_workflow_service.security.markdown_content_security import (
-    _apply_recursively,
     strip_hidden_html_comments,
     strip_mermaid_comments,
 )
@@ -21,91 +22,6 @@ def run_from_args():
     content = Path(filename).read_text()
 
     return PromptSecurity.apply_security_to_tool_response(content, "test-tool")
-
-
-def sanitize_html_content(
-    response: Union[str, Dict[str, Any], List[Any]],
-) -> Union[str, List[Union[str, Dict[str, Any]]]]:
-    """Sanitize HTML content by removing unauthorized tags and attributes.
-
-    Args:
-        response: The response data to process
-
-    Returns:
-        Response with unauthorized HTML tags removed, compatible with ToolMessage.content
-    """
-
-    def _strip_tags(text: str) -> str:
-        if not text or not isinstance(text, str):
-            return text
-
-        # Preserve markdown code blocks by temporarily replacing them
-        import re
-
-        code_blocks = []
-        placeholder_pattern = "___CODE_BLOCK_PLACEHOLDER_{}___ "
-
-        # Match markdown code blocks (```...```)
-        def code_block_replacer(match):
-            code_blocks.append(match.group(0))
-            return placeholder_pattern.format(len(code_blocks) - 1)
-
-        # Temporarily replace code blocks
-        text_with_placeholders = re.sub(r"```[\s\S]*?```", code_block_replacer, text)
-
-        allowed_tags = [
-            "b",
-            "i",
-            "u",
-            "strong",
-            "em",
-            "br",
-            "p",
-            "span",
-            "div",
-            "h1",
-            "h2",
-            "h3",
-            "h4",
-            "h5",
-            "h6",
-            "ul",
-            "ol",
-            "li",
-            "a",
-            "img",
-            "code",
-            "pre",
-            "blockquote",
-            "table",
-            "tr",
-            "td",
-            "th",
-        ]
-
-        allowed_attributes = {
-            "*": ["class", "id"],
-            "a": ["href", "title"],
-            "img": ["src", "alt", "width", "height"],
-            "table": ["border", "cellpadding", "cellspacing"],
-        }
-
-        cleaned = bleach.clean(
-            text_with_placeholders,
-            tags=allowed_tags,
-            attributes=allowed_attributes,
-            strip=True,
-            strip_comments=True,
-        )
-
-        # Restore code blocks
-        for i, code_block in enumerate(code_blocks):
-            placeholder = placeholder_pattern.format(i)
-            cleaned = cleaned.replace(placeholder, code_block)
-
-        return cleaned
-
-    return _apply_recursively(response, _strip_tags)
 
 
 def encode_dangerous_tags(
@@ -121,7 +37,7 @@ def encode_dangerous_tags(
     """
 
     def _encode_recursive(data: Any) -> Any:
-        """Internal recursive function that doesn't change top-level structure."""
+        """Recursively encode dangerous tags in nested data structures."""
         DANGEROUS_TAGS = {
             "goal": "goal",
             "system": "system",
@@ -132,7 +48,9 @@ def encode_dangerous_tags(
         elif isinstance(data, list):
             return [_encode_recursive(item) for item in data]
 
+        # Encode tags in multiple formats to prevent bypass attacks
         for tag_name, replacement in DANGEROUS_TAGS.items():
+            # Standard HTML tags: <system>, </system>
             data = re.sub(
                 rf"<\s*(/?)\s*{re.escape(tag_name)}\s*>",
                 f"&lt;\\1{replacement}&gt;",
@@ -140,6 +58,7 @@ def encode_dangerous_tags(
                 flags=re.IGNORECASE,
             )
 
+            # Single-escaped Unicode: \u003csystem\u003e
             data = re.sub(
                 rf"\\u003c\s*(/?)\s*{re.escape(tag_name)}\s*\\u003e",
                 f"&lt;\\1{replacement}&gt;",
@@ -147,6 +66,7 @@ def encode_dangerous_tags(
                 flags=re.IGNORECASE,
             )
 
+            # Double-escaped Unicode: \\u003csystem\\u003e
             data = re.sub(
                 rf"\\\\u003c\s*(/?)\s*{re.escape(tag_name)}\s*\\\\u003e",
                 f"&lt;\\1{replacement}&gt;",
@@ -158,11 +78,11 @@ def encode_dangerous_tags(
 
     processed = _encode_recursive(response)
 
+    # Wrap dict responses in a list for ToolMessage.content compatibility
     if isinstance(processed, dict):
         return [processed]
 
-    # Type assertion: processed is guaranteed to be str or list after security processing
-    return processed  # type: ignore[no-any-return]
+    return processed
 
 
 def strip_hidden_unicode_tags(
@@ -189,20 +109,18 @@ def strip_hidden_unicode_tags(
         if not text or not isinstance(text, str):
             return text
 
-        # First handle JSON-escaped Unicode tag characters
-        # Unicode Tag Characters (U+E0000-E007F) get encoded as UTF-16 surrogates:
-        # U+E0000-E007F -> surrogate pairs starting with \udb40
-        # U+E0100-E01EF -> surrogate pairs starting with \udb40
         import re
 
-        # Remove JSON-escaped Unicode tag characters (UTF-16 surrogate pairs)
+        # Handle JSON-escaped Unicode tag characters (UTF-16 surrogate pairs)
+        # Unicode Tag Characters (U+E0000-E007F) get encoded as UTF-16 surrogates
         # These appear as \\udb40\\udc?? in JSON output
         text = re.sub(
             r"\\udb40\\ud[c-f][0-9a-f][0-9a-f]", "", text, flags=re.IGNORECASE
         )
 
-        # Also remove direct Unicode Tag Characters if they exist
-        # These ranges contain invisible characters that can be used for steganographic attacks
+        # Remove direct Unicode Tag Characters if present
+        # These invisible characters (U+E0000-E007F, U+E0100-E01EF) can be used
+        # for steganographic attacks to hide malicious instructions
         return "".join(
             char
             for char in text
@@ -259,6 +177,39 @@ class PromptSecurity:
     }
 
     @staticmethod
+    def _apply_security_functions(
+        response: Union[str, Dict[str, Any], List[Any]], tool_name: str
+    ) -> Union[str, List[Union[str, Dict[str, Any]]]]:
+        """Apply all security functions to the response.
+
+        Args:
+            response: The response to secure
+            tool_name: Name of the tool being used
+
+        Returns:
+            Secured response
+
+        Raises:
+            SecurityException: If any security validation fails
+        """
+        all_functions = list(PromptSecurity.DEFAULT_SECURITY_FUNCTIONS)
+        if tool_name in PromptSecurity.TOOL_SPECIFIC_FUNCTIONS:
+            all_functions.extend(PromptSecurity.TOOL_SPECIFIC_FUNCTIONS[tool_name])
+
+        secured_response: Union[str, List[Union[str, Dict[str, Any]]]] = response
+        for func in all_functions:
+            try:
+                secured_response = func(secured_response)
+            except SecurityException:
+                raise
+            except Exception as e:
+                raise SecurityException(
+                    f"Security function {func.__name__} failed for tool '{tool_name}': {str(e)}"
+                ) from e
+
+        return secured_response
+
+    @staticmethod
     def apply_security_to_tool_response(
         response: Union[str, Dict[str, Any], List[Any]], tool_name: str
     ) -> Union[str, List[Union[str, Dict[str, Any]]]]:
@@ -278,22 +229,21 @@ class PromptSecurity:
         Raises:
             SecurityException: If any security validation fails
         """
-        all_functions = list(PromptSecurity.DEFAULT_SECURITY_FUNCTIONS)
-        if tool_name in PromptSecurity.TOOL_SPECIFIC_FUNCTIONS:
-            all_functions.extend(PromptSecurity.TOOL_SPECIFIC_FUNCTIONS[tool_name])
-
-        secured_response = response
-        for func in all_functions:
+        if isinstance(response, str):
             try:
-                secured_response = func(secured_response)
+                parsed_response = json.loads(response)
+                is_json_input = True
+            except json.JSONDecodeError:
+                return PromptSecurity._apply_security_functions(response, tool_name)
+        else:
+            parsed_response = response
+            is_json_input = False
 
-            except SecurityException:
-                raise
+        secured_response = PromptSecurity._apply_security_functions(
+            parsed_response, tool_name
+        )
 
-            except Exception as e:
-                raise SecurityException(
-                    f"Security function {func.__name__} failed for tool '{tool_name}': {str(e)}"
-                ) from e
-
-        # Type assertion: security functions guarantee proper return type
-        return secured_response  # type: ignore[return-value]
+        if is_json_input:
+            return json.dumps(secured_response)
+        else:
+            return secured_response  # type: ignore[return-value]
