@@ -1,8 +1,10 @@
 # pylint: disable=direct-environment-variable-reference
 
 import asyncio
+import functools
 import json
 import os
+import signal
 from itertools import chain
 from typing import AsyncIterable, AsyncIterator, Optional
 
@@ -91,6 +93,11 @@ from lib.internal_events.event_enum import (
 CONTAINER_APPLICATION_PACKAGES = ["duo_workflow_service"]
 
 MAX_MESSAGE_SIZE = 4 * 1024 * 1024
+
+# Defines the limit for metadata/headers sent by the client:
+# https://github.com/grpc/grpc/blob/06f6f5d376a8c7abf067d060a28bf12afb664a7e/include/grpc/impl/channel_arg_names.h#L216C37-L216C59
+# Default is 8KB, we increase it to 24KB
+MAX_METADATA_SIZE = 24 * 1024
 
 log = structlog.stdlib.get_logger("server")
 
@@ -452,7 +459,9 @@ class DuoWorkflowService(contract_pb2_grpc.DuoWorkflowServicer):
                 )
             else:
                 context.set_code(grpc.StatusCode.UNKNOWN)
-                context.set_details("RPC ended with unknown workflow state")
+                context.set_details(
+                    f"RPC ended with unknown workflow state: {workflow.last_gitlab_status}"
+                )
         except asyncio.CancelledError as err:
             # This exception is raised when RPC is cancelled by the client.
             context.set_code(grpc.StatusCode.CANCELLED)
@@ -647,6 +656,10 @@ async def serve(port: int) -> None:
                 "grpc.max_send_message_length",
                 MAX_MESSAGE_SIZE,
             ),
+            (
+                "grpc.max_metadata_size",
+                MAX_METADATA_SIZE,
+            ),
         ]
 
         server = grpc.aio.server(
@@ -677,7 +690,29 @@ async def serve(port: int) -> None:
         log.info("Starting gRPC server on port %d", port)
         await server.start()
         log.info("Started server")
+
+        # Set up graceful shutdown
+        loop = asyncio.get_running_loop()
+        setup_signal_handlers(server, loop)
+
         await server.wait_for_termination()
+        log.info("Server shutdown complete")
+
+
+def setup_signal_handlers(
+    server: grpc.aio.Server, loop: asyncio.AbstractEventLoop
+) -> None:
+    """Set up signal handlers for graceful server shutdown."""
+
+    grace_period_env = os.environ.get("DUO_WORKFLOW_SHUTDOWN_GRACE_PERIOD_S")
+    grace_period = int(grace_period_env) if grace_period_env else None
+
+    def handle_shutdown(sig):
+        log.info(f"Received signal {sig}, initiating graceful shutdown")
+        asyncio.create_task(server.stop(grace=grace_period))
+
+    for sig in (signal.SIGTERM, signal.SIGINT):
+        loop.add_signal_handler(sig, functools.partial(handle_shutdown, sig))
 
 
 def configure_cache() -> None:
