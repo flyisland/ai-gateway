@@ -135,6 +135,7 @@ routers:
       routes:
         "add_comment": "fix_pipeline_add_comment"
         "create_fix": "fix_pipeline_create_plan"
+        "default_route": "fix_pipeline_add_comment"
   - from: "fix_pipeline_add_comment"
     to: "end"
   - from: "fix_pipeline_create_plan"
