@@ -17,7 +17,6 @@ from duo_workflow_service.entities.state import (
     WorkflowState,
     WorkflowStatusEnum,
 )
-from duo_workflow_service.errors.gitlab_docs_error_code import GitLabDocsErrorCode
 from duo_workflow_service.gitlab.http_client import GitlabHttpClient
 from lib.internal_events.event_enum import CategoryEnum
 
@@ -263,6 +262,6 @@ Human message"""
             assert result["ui_chat_log"][0]["status"] == ToolStatus.FAILURE
             assert (
                 result["ui_chat_log"][0]["content"]
-                == f"There was an error processing your request. Please try again or contact support if "
-                f"the issue persists. {GitLabDocsErrorCode("A1008")}"
+                == "There was an error connecting to the chosen LLM provider, please try again or contact "
+                "support if the issue persists."
             )

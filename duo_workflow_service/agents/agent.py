@@ -20,7 +20,6 @@ from duo_workflow_service.entities.state import (
     WorkflowStatusEnum,
 )
 from duo_workflow_service.errors.error_handler import ERROR_TYPES, ModelErrorType
-from duo_workflow_service.errors.gitlab_docs_error_code import GitLabDocsErrorCode
 from duo_workflow_service.gitlab.events import get_event
 from duo_workflow_service.gitlab.http_client import GitlabHttpClient
 from duo_workflow_service.llm_factory import AnthropicStopReason
@@ -155,7 +154,6 @@ class Agent(BaseAgent):
                 error_message = HumanMessage(
                     content=f"There was an error processing your request: {error}"
                 )
-                docs_link = GitLabDocsErrorCode.from_exception(error)
 
                 return {
                     "conversation_history": {self.name: [error_message]},
@@ -165,8 +163,8 @@ class Agent(BaseAgent):
                             message_type=MessageTypeEnum.AGENT,
                             message_sub_type=None,
                             content=(
-                                "There was an error processing your request. "
-                                f"Please try again or contact support if the issue persists. {docs_link}"
+                                "There was an error connecting to the chosen LLM provider, please try again or contact "
+                                "support if the issue persists."
                             ),
                             timestamp=datetime.now(timezone.utc).isoformat(),
                             status=ToolStatus.FAILURE,
