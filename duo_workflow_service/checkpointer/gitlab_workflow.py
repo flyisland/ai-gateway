@@ -433,6 +433,9 @@ class GitLabWorkflow(
 
             await self._handle_workflow_exception(exc_value, event)
             await self._update_workflow_status_safely(status)
+            if isinstance(exc_value, ModelError):
+                raise exc_value
+
             return False
 
         if not self._offline_mode:
