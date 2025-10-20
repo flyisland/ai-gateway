@@ -13,7 +13,6 @@ from duo_workflow_service.security.prompt_security import (
     PromptSecurity,
     SecurityException,
 )
-from duo_workflow_service.tools.tool_output_manager import truncate_tool_response
 from lib.internal_events.event_enum import CategoryEnum
 
 WorkflowStateT_contra = TypeVar(
@@ -84,9 +83,6 @@ class RunToolNode(Generic[WorkflowStateT]):
                 tool_name=self._tool.name, flow_type=self._flow_type.value
             ):
                 if output := await self._tool._arun(**tool_params):
-                    output = truncate_tool_response(
-                        tool_response=output, tool_name=self._tool.name
-                    )
                     try:
                         secure_output = PromptSecurity.apply_security_to_tool_response(
                             response=output,

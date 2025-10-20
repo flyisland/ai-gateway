@@ -17,7 +17,6 @@ from duo_workflow_service.agent_platform.experimental.state import (
 from duo_workflow_service.agent_platform.experimental.ui_log import UIHistory
 from duo_workflow_service.monitoring import duo_workflow_metrics
 from duo_workflow_service.security.prompt_security import PromptSecurity
-from duo_workflow_service.tools.tool_output_manager import truncate_tool_response
 from lib.internal_events import InternalEventAdditionalProperties, InternalEventsClient
 from lib.internal_events.event_enum import CategoryEnum, EventEnum, EventLabelEnum
 
@@ -120,10 +119,7 @@ class DeterministicStepNode:
         with duo_workflow_metrics.time_tool_call(
             tool_name=tool.name, flow_type=self._flow_type.value
         ):
-            tool_response = await tool.arun(tool_call_args)
-            tool_call_result = truncate_tool_response(
-                tool_response=tool_response, tool_name=tool.name
-            )
+            tool_call_result = await tool.arun(tool_call_args)
 
         secure_result = PromptSecurity.apply_security_to_tool_response(
             response=tool_call_result, tool_name=self._tool_name

@@ -132,7 +132,7 @@ class ListVulnerabilities(DuoBaseTool):
     """
     args_schema: Type[BaseModel] = ListVulnerabilitiesInput
 
-    async def _arun(self, **kwargs: Any) -> str:
+    async def _execute(self, **kwargs: Any) -> str:
         """Execute the vulnerability listing."""
         try:
             project_full_path = kwargs.pop("project_full_path")
@@ -332,7 +332,7 @@ class DismissVulnerability(DuoBaseTool):
     """
     args_schema: Type[BaseModel] = DismissVulnerabilityInput
 
-    async def _arun(self, **kwargs: Any) -> str:
+    async def _execute(self, **kwargs: Any) -> str:
         vulnerability_id = kwargs.pop("vulnerability_id")
         comment = kwargs.pop("comment")
         dismissal_reason = kwargs.pop("dismissal_reason")
@@ -440,7 +440,7 @@ class CreateVulnerabilityIssue(DuoBaseTool):
     args_schema: Type[BaseModel] = CreateVulnerabilityIssueInput
 
     # pylint: disable-next=too-many-return-statements
-    async def _arun(self, **kwargs: Any) -> str:
+    async def _execute(self, **kwargs: Any) -> str:
         project_full_path = kwargs.pop("project_full_path")
         vulnerability_ids = kwargs.pop("vulnerability_ids")
 
@@ -567,7 +567,7 @@ class LinkVulnerabilityToIssue(DuoBaseTool):
     """
     args_schema: Type[BaseModel] = LinkVulnerabilityToIssueInput
 
-    async def _arun(self, **kwargs: Any) -> str:
+    async def _execute(self, **kwargs: Any) -> str:
         issue_id = kwargs.pop("issue_id")
         vulnerability_ids = kwargs.pop("vulnerability_ids")
 
@@ -660,7 +660,7 @@ that needs to be addressed.
 """
     args_schema: Type[BaseModel] = ConfirmVulnerabilityInput
 
-    async def _arun(self, **kwargs: Any) -> str:
+    async def _execute(self, **kwargs: Any) -> str:
         vulnerability_id = kwargs.pop("vulnerability_id")
         comment = kwargs.pop("comment", None)
 
@@ -754,7 +754,7 @@ class RevertToDetectedVulnerability(DuoBaseTool):
     """
     args_schema: Type[BaseModel] = RevertToDetectedVulnerabilityInput
 
-    async def _arun(self, **kwargs: Any) -> str:
+    async def _execute(self, **kwargs: Any) -> str:
         vulnerability_id = kwargs.pop("vulnerability_id")
         comment = kwargs.pop("comment", None)
 

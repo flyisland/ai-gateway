@@ -29,7 +29,6 @@ from duo_workflow_service.security.prompt_security import (
 )
 from duo_workflow_service.tools import RunCommand, Toolset, format_tool_display_message
 from duo_workflow_service.tools.planner import PlannerTool
-from duo_workflow_service.tools.tool_output_manager import truncate_tool_response
 from lib.internal_events import InternalEventAdditionalProperties, InternalEventsClient
 from lib.internal_events.event_enum import CategoryEnum, EventEnum, EventLabelEnum
 
@@ -228,10 +227,6 @@ class ToolsExecutor:
 
                 tool_response = await tool.ainvoke(tool_call)
 
-                tool_response_truncated = truncate_tool_response(
-                    tool_response=tool_response, tool_name=tool_name
-                )
-
             self._track_internal_event(
                 event_name=EventEnum.WORKFLOW_TOOL_SUCCESS,
                 tool_name=tool_name,
@@ -241,11 +236,11 @@ class ToolsExecutor:
                 tool_info={"name": tool_name, "args": tool_args},
                 status=ToolStatus.SUCCESS,
                 ui_chat_logs=chat_logs,
-                tool_response=tool_response_truncated,
+                tool_response=tool_response,
             )
 
             return {
-                "response": tool_response_truncated,
+                "response": tool_response,
                 "chat_logs": chat_logs,
             }
 
