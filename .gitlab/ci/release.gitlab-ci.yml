@@ -86,3 +86,23 @@ publish-node-client:
     - if: $CI_COMMIT_BRANCH == "main"
       changes:
         - clients/node/**/*
+
+release-docker-fips-image:latest:
+  stage: release
+  extends: .docker-release
+  variables:
+    TARGET_IMAGE: "$FIPS_TARGET_IMAGE"
+    RELEASE_VERSION: "$DOCKER_MODEL_GATEWAY-fips:latest"
+  rules:
+    - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
+      when: manual
+      allow_failure: true
+
+release-docker-fips-image:tag:
+  stage: release
+  extends: .docker-release
+  variables:
+    TARGET_IMAGE: "$FIPS_TARGET_IMAGE"
+    RELEASE_VERSION: "$DOCKER_MODEL_GATEWAY-fips:$CI_COMMIT_TAG"
+  rules:
+    - if: $CI_COMMIT_TAG =~ /^self-hosted-.*-fips$/
