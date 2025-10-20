@@ -452,6 +452,11 @@ class DuoWorkflowService(contract_pb2_grpc.DuoWorkflowServicer):
                 context.set_details(
                     f"workflow execution success: {workflow.last_gitlab_status}"
                 )
+            elif str(workflow.last_error) == AIO_CANCEL_STOP_WORKFLOW_REQUEST:
+                context.set_code(grpc.StatusCode.CANCELLED)
+                context.set_details(
+                    f"workflow execution stopped: {workflow.last_gitlab_status}"
+                )
             elif workflow.last_error:
                 context.set_code(grpc.StatusCode.INTERNAL)
                 context.set_details(
@@ -464,7 +469,7 @@ class DuoWorkflowService(contract_pb2_grpc.DuoWorkflowServicer):
                 )
         except asyncio.CancelledError as err:
             # This exception is raised when RPC is cancelled by the client.
-            context.set_code(grpc.StatusCode.CANCELLED)
+            context.set_code(grpc.StatusCode.INTERNAL)
             context.set_details("RPC cancelled by client")
             log_exception(err, extra={"source": __name__})
             await abort_workflow(workflow_task, err)
