@@ -1,4 +1,5 @@
 from unittest import mock
+from unittest.mock import AsyncMock
 
 import pytest
 from langchain_core.messages import AIMessage, HumanMessage, SystemMessage
@@ -6,6 +7,27 @@ from langchain_core.outputs import ChatGenerationChunk
 
 from ai_gateway.integrations.amazon_q.chat import ChatAmazonQ, Reference, ReferenceSpan
 from ai_gateway.integrations.amazon_q.client import AmazonQClientFactory
+from duo_workflow_service.tools.repository_files import ListRepositoryTree
+
+
+@pytest.fixture(name="gitlab_client_mock")
+def gitlab_client_mock_fixture():
+    mock = AsyncMock()
+    return mock
+
+
+@pytest.fixture(name="tree_tool")
+def tree_tool_fixture(metadata):
+    tool = ListRepositoryTree(metadata=metadata)
+    return tool
+
+
+@pytest.fixture(name="metadata")
+def metadata_fixture(gitlab_client_mock):
+    return {
+        "gitlab_client": gitlab_client_mock,
+        "gitlab_host": "gitlab.com",
+    }
 
 
 class TestChatAmazonQ:
@@ -411,8 +433,138 @@ class TestChatAmazonQ:
             },
             history=[
                 {"userInputMessage": {"content": "user message"}},
-                {"assistantResponseMessage": {"content": "assistant message"}},
+                {
+                    "assistantResponseMessage": {
+                        "content": "assistant message",
+                        "toolUses": [],
+                    }
+                },
+                {"userInputMessage": {"content": "latest user message"}},
+                {
+                    "assistantResponseMessage": {
+                        "content": "latest assistant message",
+                        "toolUses": [],
+                    }
+                },
             ],
+            tools=[],
+            tool_results=[],
+        )
+
+    def test_called_with_tools(
+        self,
+        chat_amazon_q,
+        messages,
+        mock_user,
+        mock_q_client,
+        mock_q_client_factory,
+        tree_tool,
+    ):
+        role_arn = "role-arn"
+        result = chat_amazon_q.invoke(
+            messages, user=mock_user, role_arn=role_arn, tools=[tree_tool]
+        )
+
+        assert result.content == "Streamed response"
+        mock_q_client_factory.get_client.assert_called_once_with(
+            current_user=mock_user, role_arn=role_arn
+        )
+        mock_q_client.send_message.assert_called_once_with(
+            message={
+                "content": "system message latest user message latest assistant message"
+            },
+            history=[
+                {"userInputMessage": {"content": "user message"}},
+                {
+                    "assistantResponseMessage": {
+                        "content": "assistant message",
+                        "toolUses": [],
+                    }
+                },
+                {"userInputMessage": {"content": "latest user message"}},
+                {
+                    "assistantResponseMessage": {
+                        "content": "latest assistant message",
+                        "toolUses": [],
+                    }
+                },
+            ],
+            tools=[
+                {
+                    "toolSpecification": {
+                        "inputSchema": {
+                            "json": {
+                                "type": "object",
+                                "properties": {
+                                    "url": {
+                                        "anyOf": [{"type": "string"}, {"type": "null"}],
+                                        "default": None,
+                                        "description": "GitLab URL for the resource. If provided, other ID fields are not required.",
+                                        "title": "Url",
+                                    },
+                                    "project_id": {
+                                        "anyOf": [
+                                            {"type": "integer"},
+                                            {"type": "string"},
+                                            {"type": "null"},
+                                        ],
+                                        "default": None,
+                                        "description": "The ID or URL-encoded path of the project. Examples: 123, 'gitlab-org%2Fgitlab'. Required if URL is not provided.",
+                                        "title": "Project Id",
+                                    },
+                                    "path": {
+                                        "anyOf": [{"type": "string"}, {"type": "null"}],
+                                        "default": None,
+                                        "description": "Path inside repository. Used to get content of subdirectories",
+                                        "title": "Path",
+                                    },
+                                    "ref": {
+                                        "anyOf": [{"type": "string"}, {"type": "null"}],
+                                        "default": None,
+                                        "description": "The name of a repository branch or tag or, if not given, the default branch",
+                                        "title": "Ref",
+                                    },
+                                    "recursive": {
+                                        "anyOf": [
+                                            {"type": "boolean"},
+                                            {"type": "null"},
+                                        ],
+                                        "default": False,
+                                        "description": "Boolean value for getting a recursive tree",
+                                        "title": "Recursive",
+                                    },
+                                    "page": {
+                                        "anyOf": [
+                                            {"minimum": 1, "type": "integer"},
+                                            {"type": "null"},
+                                        ],
+                                        "default": 1,
+                                        "description": "Page number for pagination (min 1)",
+                                        "title": "Page",
+                                    },
+                                    "per_page": {
+                                        "anyOf": [
+                                            {
+                                                "maximum": 100,
+                                                "minimum": 1,
+                                                "type": "integer",
+                                            },
+                                            {"type": "null"},
+                                        ],
+                                        "default": 20,
+                                        "description": "Results per page for pagination (min 1, max 100)",
+                                        "title": "Per Page",
+                                    },
+                                },
+                                "required": [],
+                            }
+                        },
+                        "name": "list_repository_tree",
+                        "description": 'List files and directories in a GitLab repository.\n\n    To identify a project you must provide either:\n    - project_id parameter, or\n    - A GitLab URL like:\n        - https://gitlab.com/namespace/project\n        - https://gitlab.com/group/subgroup/project\n\n    You can specify a path to get contents of a subdirectory, a specific ref (branch/tag),\n    and whether to get a recursive tree.\n\n    For example:\n    - Given project_id 13, the tool call would be:\n        list_repository_tree(project_id=13)\n    - To list files in a specific subdirectory with a specific branch:\n        list_repository_tree(project_id=13, path="src", ref="main")\n    - To recursively list all files in a project:\n        list_repository_tree(project_id=13, recursive=True)\n    ',
+                    }
+                }
+            ],
+            tool_results=[],
         )
 
     def test_stream(
@@ -435,7 +587,9 @@ class TestChatAmazonQ:
         )
         mock_q_client.send_message.assert_called_once_with(
             message={"content": "system message user message"},
-            history=[],
+            history=[{"userInputMessage": {"content": "user message"}}],
+            tools=[],
+            tool_results=[],
         )
 
     def test_stream_history(
@@ -462,8 +616,22 @@ class TestChatAmazonQ:
             },
             history=[
                 {"userInputMessage": {"content": "user message"}},
-                {"assistantResponseMessage": {"content": "assistant message"}},
+                {
+                    "assistantResponseMessage": {
+                        "content": "assistant message",
+                        "toolUses": [],
+                    }
+                },
+                {"userInputMessage": {"content": "latest user message"}},
+                {
+                    "assistantResponseMessage": {
+                        "content": "latest assistant message",
+                        "toolUses": [],
+                    }
+                },
             ],
+            tools=[],
+            tool_results=[],
         )
 
     def test_identifying_params(self, chat_amazon_q):

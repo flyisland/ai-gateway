@@ -55,9 +55,19 @@ class TestCreateAgent:
         "prompt_id,prompt_version,workflow_id,registry_fixture",
         [
             ("chat/agent", "^1.0.0", "workflow_123", "mock_local_prompt_registry"),
+            (
+                "chat/agent/amazon_q",
+                "^1.0.0",
+                "workflow_123",
+                "mock_in_memory_prompt_registry",
+            ),
             ("custom/prompt", None, "workflow_456", "mock_in_memory_prompt_registry"),
         ],
-        ids=["with_local_prompt_registry", "with_in_memory_prompt_registry"],
+        ids=[
+            "with_local_prompt_registry",
+            "mock_in_memory_prompt_registry",
+            "with_in_memory_prompt_registry",
+        ],
     )
     def test_create_agent_with_prompt_registry(
         self,

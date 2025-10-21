@@ -342,6 +342,29 @@ class TestGLAgentRemoteExecutorToolAction:
                 ],
                 [],
             ),
+            (
+                StarletteUser(
+                    CloudConnectorUser(
+                        authenticated=True,
+                        claims=UserClaims(
+                            scopes=["amazon_q_integration", "ask_work_item"]
+                        ),
+                    )
+                ),
+                "17.2.0",
+                ReActAgentInputs(messages=[Message(role=Role.USER, content="Hi")]),
+                AmazonQModelMetadata(
+                    role_arn="role-arn", provider="amazon_q", name="amazon_q"
+                ),
+                [AgentToolAction(thought="", tool="work_item_reader", tool_input="")],
+                [
+                    "epic_reader",
+                    "issue_reader",
+                    "work_item_reader",
+                    "gitlab_documentation",
+                ],
+                [call("request_ask_work_item", category="ai_gateway.chat.executor")],
+            ),
         ],
     )
     async def test_stream_tool_action(

@@ -313,3 +313,10 @@ models:
       model: deepseekcoder
       temperature: 0.0
       max_tokens: 4_096
+
+  - name: Amazon Q
+    gitlab_identifier: amazon_q
+    family:
+      - amazon_q
+    params:
+      model: amazon_q
