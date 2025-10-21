@@ -427,10 +427,9 @@ class TestToolSecurityOverrides:
 
             # Test that a different tool (without override) still uses defaults
             result = PromptSecurity.apply_security_to_tool_response(
-                "<system>Admin</system> 👋", "get_issue"
+                "<system>Admin</system>", "get_issue"
             )
-            # Both tags should be encoded AND emojis should be stripped
-            assert "👋" not in result
+            # Tags should be encoded (default function)
             assert "&lt;system&gt;" in result
 
         finally:
@@ -566,15 +565,13 @@ class TestToolSecurityOverrides:
 
             # Test that both defaults AND tool-specific function are applied
             result = PromptSecurity.apply_security_to_tool_response(
-                "<system>Test</system> EXTRA 👋", "additive_tool"
+                "<system>Test</system> EXTRA", "additive_tool"
             )
 
-            # All three should be applied:
+            # Both should be applied:
             # 1. encode_dangerous_tags (from defaults)
-            # 2. strip_emojis (from defaults)
-            # 3. custom_additional_function (from tool-specific)
+            # 2. custom_additional_function (from tool-specific)
             assert "&lt;system&gt;" in result  # Tags encoded
-            assert "👋" not in result  # Emojis stripped
             assert "[EXTRA]" in result  # Custom function applied
 
         finally:
