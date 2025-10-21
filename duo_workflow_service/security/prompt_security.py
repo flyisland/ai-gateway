@@ -169,11 +169,34 @@ class PromptSecurity:
         # Add tools that need EXTRA security functions beyond the defaults
     }
 
+    # Tool-specific security overrides - completely replaces DEFAULT_SECURITY_FUNCTIONS
+    # Use this when you want to specify a custom set of security functions for a tool
+    # security functions are too strict (e.g., read_file, code review tools).
+    # High-risk tools that handle user-generated content (issues, epics, comments)
+    # should continue using DEFAULT_SECURITY_FUNCTIONS.
+    TOOL_SECURITY_OVERRIDES: Dict[
+        str,
+        List[
+            Callable[
+                [Union[str, Dict[str, Any], List[Any]]],
+                Union[str, List[Union[str, Dict[str, Any]]]],
+            ]
+        ],
+    ] = {
+        # Example: 'read_file': [encode_dangerous_tags],  # Only encode tags, skip unicode stripping
+        # Example: 'code_review': [],  # No security functions for code review tools
+        # Add tools that need COMPLETE REPLACEMENT of default security functions
+    }
+
     @staticmethod
     def apply_security_to_tool_response(
         response: Union[str, Dict[str, Any], List[Any]], tool_name: str
     ) -> Union[str, List[Union[str, Dict[str, Any]]]]:
         """Apply all configured security functions for a specific tool.
+
+        Security function application logic:
+        1. If tool has TOOL_SECURITY_OVERRIDES defined, use ONLY those functions
+        2. Otherwise, use DEFAULT_SECURITY_FUNCTIONS + TOOL_SPECIFIC_FUNCTIONS
 
         Each security function should either:
         - Return the (possibly modified) response
@@ -189,9 +212,15 @@ class PromptSecurity:
         Raises:
             SecurityException: If any security validation fails
         """
-        all_functions = list(PromptSecurity.DEFAULT_SECURITY_FUNCTIONS)
-        if tool_name in PromptSecurity.TOOL_SPECIFIC_FUNCTIONS:
-            all_functions.extend(PromptSecurity.TOOL_SPECIFIC_FUNCTIONS[tool_name])
+        # Check if tool has override configuration
+        if tool_name in PromptSecurity.TOOL_SECURITY_OVERRIDES:
+            # Use ONLY the override functions, bypassing defaults
+            all_functions = list(PromptSecurity.TOOL_SECURITY_OVERRIDES[tool_name])
+        else:
+            # Use default + tool-specific (additive) approach
+            all_functions = list(PromptSecurity.DEFAULT_SECURITY_FUNCTIONS)
+            if tool_name in PromptSecurity.TOOL_SPECIFIC_FUNCTIONS:
+                all_functions.extend(PromptSecurity.TOOL_SPECIFIC_FUNCTIONS[tool_name])
 
         secured_response = response
         for func in all_functions:
