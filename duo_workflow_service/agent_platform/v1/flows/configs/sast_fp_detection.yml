@@ -37,17 +37,13 @@ components:
       - "on_tool_execution_success"
       - "on_tool_execution_failed"
   - name: "sast_vulnerability_lines_component"
-    type: OneOffComponent
-    prompt_id: "sast_vulnerability_lines_agent_prompt"
-    prompt_version: "1.0.0"
+    type: DeterministicStepComponent
     inputs:
       - from: "context:sast_vulnerability_details_component.tool_responses"
         as: vulnerability_details_json
       - from: "context:sast_vulnerability_source_file_component.tool_responses"
         as: vulnerability_source_code
-    toolset:
-      - "extract_lines_from_text"
-    max_correction_attempts: 3
+    tool_name: "extract_lines_from_text"
     ui_log_events:
       - "on_tool_execution_success"
       - "on_tool_execution_failed"
