@@ -4,8 +4,11 @@ from enum import StrEnum
 from typing import Optional
 
 import structlog
+from packaging.version import InvalidVersion, Version
 from prometheus_client import REGISTRY, Counter, Histogram
 
+from duo_workflow_service.interceptors.client_type_interceptor import client_type
+from duo_workflow_service.interceptors.gitlab_version_interceptor import gitlab_version
 from duo_workflow_service.interceptors.language_server_version_interceptor import (
     language_server_version,
 )
@@ -38,6 +41,8 @@ LLM_TIME_SCALE_BUCKETS = [0.25, 0.5, 1, 2, 4, 7, 10, 20, 30, 60]
 
 ANTHROPIC_STOP_REASONS = AnthropicStopReason.values()
 
+METADATA_LABELS = ["lsp_version", "gitlab_version", "client_type"]
+
 
 class SessionTypeEnum(StrEnum):
     START = "start"
@@ -58,7 +63,7 @@ class DuoWorkflowMetrics:  # pylint: disable=too-many-instance-attributes
         self.llm_request_duration = Histogram(
             "duo_workflow_llm_request_seconds",
             "Duration of LLM requests in Duo Workflow",
-            ["model", "request_type", "lsp_version"],
+            ["model", "request_type"] + METADATA_LABELS,
             registry=registry,
             buckets=LLM_TIME_SCALE_BUCKETS,
         )
@@ -66,7 +71,7 @@ class DuoWorkflowMetrics:  # pylint: disable=too-many-instance-attributes
         self.tool_call_duration = Histogram(
             "duo_workflow_tool_call_seconds",
             "Duration of tool calls in Duo Workflow",
-            ["tool_name", "flow_type", "lsp_version"],
+            ["tool_name", "flow_type"] + METADATA_LABELS,
             registry=registry,
         )
 
@@ -101,78 +106,78 @@ class DuoWorkflowMetrics:  # pylint: disable=too-many-instance-attributes
                 "stop_reason",
                 "status_code",
                 "error_type",
-                "lsp_version",
-            ],
+            ]
+            + METADATA_LABELS,
             registry=registry,
         )
 
         self.checkpoint_counter = Counter(
             "duo_workflow_checkpoint_total",
             "Count of checkpoint calls in Duo Workflow",
-            ["endpoint", "status_code", "method", "lsp_version"],
+            ["endpoint", "status_code", "method"] + METADATA_LABELS,
             registry=registry,
         )
 
         self.agent_platform_session_start_counter = Counter(
             "agent_platform_session_start_total",
             "Count of flow start events in Duo Workflow",
-            ["flow_type", "lsp_version"],
+            ["flow_type"] + METADATA_LABELS,
             registry=registry,
         )
 
         self.agent_platform_session_retry_counter = Counter(
             "agent_platform_session_retry_total",
             "Count of flow retry events in Duo Workflow",
-            ["flow_type", "lsp_version"],
+            ["flow_type"] + METADATA_LABELS,
             registry=registry,
         )
 
         self.agent_platform_session_reject_counter = Counter(
             "agent_platform_session_reject_total",
             "Count of flow reject events in Duo Workflow",
-            ["flow_type", "lsp_version"],
+            ["flow_type"] + METADATA_LABELS,
             registry=registry,
         )
 
         self.agent_platform_session_resume_counter = Counter(
             "agent_platform_session_resume_total",
             "Count of flow resume events in Duo Workflow",
-            ["flow_type", "lsp_version"],
+            ["flow_type"] + METADATA_LABELS,
             registry=registry,
         )
 
         self.agent_platform_session_success_counter = Counter(
             "agent_platform_session_success_total",
             "Count of successful flow completions in Duo Workflow",
-            ["flow_type", "lsp_version"],
+            ["flow_type"] + METADATA_LABELS,
             registry=registry,
         )
 
         self.agent_platform_session_failure_counter = Counter(
             "agent_platform_session_failure_total",
             "Count of failed flows in Duo Workflow",
-            ["flow_type", "failure_reason", "session_type", "lsp_version"],
+            ["flow_type", "failure_reason", "session_type"] + METADATA_LABELS,
             registry=registry,
         )
 
         self.agent_platform_tool_failure_counter = Counter(
             "agent_platform_tool_failure_total",
             "Count of failed tools in Duo Workflow",
-            ["flow_type", "tool_name", "failure_reason", "lsp_version"],
+            ["flow_type", "tool_name", "failure_reason"] + METADATA_LABELS,
             registry=registry,
         )
 
         self.agent_platform_receive_start_counter = Counter(
             "agent_platform_receive_start_total",
             "Count of receive start events in Duo Workflow",
-            ["flow_type", "lsp_version"],
+            ["flow_type"] + METADATA_LABELS,
             registry=registry,
         )
 
         self.agent_platform_session_abort_counter = Counter(
             "agent_platform_session_abort_total",
             "Count of aborted sessions in Duo Agent Platform",
-            ["flow_type", "session_type", "lsp_version"],
+            ["flow_type", "session_type"] + METADATA_LABELS,
             registry=registry,
         )
 
@@ -196,7 +201,7 @@ class DuoWorkflowMetrics:  # pylint: disable=too-many-instance-attributes
             ),
             status_code=status_code,
             error_type=error_type,
-            lsp_version=self.language_server_version_label(),
+            **self.metadata_labels(),
         ).inc()
 
     def count_checkpoints(
@@ -209,7 +214,7 @@ class DuoWorkflowMetrics:  # pylint: disable=too-many-instance-attributes
             endpoint=endpoint,
             status_code=status_code,
             method=method,
-            lsp_version=self.language_server_version_label(),
+            **self.metadata_labels(),
         ).inc()
 
     def count_agent_platform_session_start(
@@ -218,7 +223,7 @@ class DuoWorkflowMetrics:  # pylint: disable=too-many-instance-attributes
     ) -> None:
         self.agent_platform_session_start_counter.labels(
             flow_type=flow_type,
-            lsp_version=self.language_server_version_label(),
+            **self.metadata_labels(),
         ).inc()
 
     def count_agent_platform_session_retry(
@@ -227,7 +232,7 @@ class DuoWorkflowMetrics:  # pylint: disable=too-many-instance-attributes
     ) -> None:
         self.agent_platform_session_retry_counter.labels(
             flow_type=flow_type,
-            lsp_version=self.language_server_version_label(),
+            **self.metadata_labels(),
         ).inc()
 
     def count_agent_platform_session_reject(
@@ -236,7 +241,7 @@ class DuoWorkflowMetrics:  # pylint: disable=too-many-instance-attributes
     ) -> None:
         self.agent_platform_session_reject_counter.labels(
             flow_type=flow_type,
-            lsp_version=self.language_server_version_label(),
+            **self.metadata_labels(),
         ).inc()
 
     def count_agent_platform_session_resume(
@@ -245,7 +250,7 @@ class DuoWorkflowMetrics:  # pylint: disable=too-many-instance-attributes
     ) -> None:
         self.agent_platform_session_resume_counter.labels(
             flow_type=flow_type,
-            lsp_version=self.language_server_version_label(),
+            **self.metadata_labels(),
         ).inc()
 
     def count_agent_platform_session_success(
@@ -254,7 +259,7 @@ class DuoWorkflowMetrics:  # pylint: disable=too-many-instance-attributes
     ) -> None:
         self.agent_platform_session_success_counter.labels(
             flow_type=flow_type,
-            lsp_version=self.language_server_version_label(),
+            **self.metadata_labels(),
         ).inc()
 
     def count_agent_platform_session_failure(
@@ -266,7 +271,7 @@ class DuoWorkflowMetrics:  # pylint: disable=too-many-instance-attributes
             flow_type=flow_type,
             failure_reason=failure_reason,
             session_type=session_type_context.get(),
-            lsp_version=self.language_server_version_label(),
+            **self.metadata_labels(),
         ).inc()
 
     def count_agent_platform_session_abort(
@@ -276,7 +281,7 @@ class DuoWorkflowMetrics:  # pylint: disable=too-many-instance-attributes
         self.agent_platform_session_abort_counter.labels(
             flow_type=flow_type,
             session_type=session_type_context.get(),
-            lsp_version=self.language_server_version_label(),
+            **self.metadata_labels(),
         ).inc()
 
     def count_agent_platform_tool_failure(
@@ -289,7 +294,7 @@ class DuoWorkflowMetrics:  # pylint: disable=too-many-instance-attributes
             flow_type=flow_type,
             tool_name=tool_name,
             failure_reason=failure_reason,
-            lsp_version=self.language_server_version_label(),
+            **self.metadata_labels(),
         ).inc()
 
     def count_agent_platform_receive_start_counter(
@@ -298,7 +303,7 @@ class DuoWorkflowMetrics:  # pylint: disable=too-many-instance-attributes
     ) -> None:
         self.agent_platform_receive_start_counter.labels(
             flow_type=flow_type,
-            lsp_version=self.language_server_version_label(),
+            **self.metadata_labels(),
         ).inc()
 
     def time_llm_request(
@@ -310,7 +315,7 @@ class DuoWorkflowMetrics:  # pylint: disable=too-many-instance-attributes
             lambda duration: self.llm_request_duration.labels(
                 model=model,
                 request_type=request_type,
-                lsp_version=self.language_server_version_label(),
+                **self.metadata_labels(),
             ).observe(duration)
         )
 
@@ -319,7 +324,7 @@ class DuoWorkflowMetrics:  # pylint: disable=too-many-instance-attributes
             lambda duration: self.tool_call_duration.labels(
                 tool_name=tool_name,
                 flow_type=flow_type,
-                lsp_version=self.language_server_version_label(),
+                **self.metadata_labels(),
             ).observe(duration)
         )
 
@@ -351,10 +356,31 @@ class DuoWorkflowMetrics:  # pylint: disable=too-many-instance-attributes
             ).observe(duration)
         )
 
-    def language_server_version_label(self):
+    def metadata_labels(self):
+        return {
+            "lsp_version": self._language_server_version_label(),
+            "gitlab_version": self._gitlab_version_label(),
+            "client_type": self._client_type_label(),
+        }
+
+    def _language_server_version_label(self):
         lsp_version = language_server_version.get()
         if lsp_version:
             return str(lsp_version.version)
+
+        return "unknown"
+
+    def _gitlab_version_label(self):
+        try:
+            gl_version = Version(gitlab_version.get())  # type: ignore[arg-type]
+            return str(gl_version)
+        except (InvalidVersion, TypeError):
+            return "unknown"
+
+    def _client_type_label(self):
+        client_type_value = client_type.get()
+        if client_type_value:
+            return str(client_type_value)
 
         return "unknown"
 
