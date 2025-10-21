@@ -79,9 +79,8 @@ multiple lines --> more text"""
         assert strip_hidden_html_comments("") == ""
         assert strip_hidden_html_comments(None) == None
 
-        # Numbers now raise SecurityException for strict security
-        with pytest.raises(SecurityException):
-            strip_hidden_html_comments(123)
+        # Numbers now pass through safely
+        assert strip_hidden_html_comments(123) == 123
 
     def test_preserves_non_comment_content(self):
         """Test that non-comment content is preserved exactly."""
@@ -157,32 +156,18 @@ def hello():
 class TestMarkdownSecurityEdgeCases:
     """Test edge cases and security behavior for markdown content security."""
 
-    def test_primitive_types_raise_security_exception(self):
-        """Test that primitive types now raise SecurityException for strict security."""
-        import pytest
-
+    def test_primitive_types_pass_through_safely(self):
+        """Test that primitive types now pass through safely."""
         # Test integers
-        with pytest.raises(SecurityException) as exc_info:
-            strip_hidden_html_comments(42)
-        assert "Unsupported type for security processing: int" in str(exc_info.value)
-
-        with pytest.raises(SecurityException) as exc_info:
-            strip_hidden_html_comments(0)
-        assert "Unsupported type for security processing: int" in str(exc_info.value)
+        assert strip_hidden_html_comments(42) == 42
+        assert strip_hidden_html_comments(0) == 0
 
         # Test floats
-        with pytest.raises(SecurityException) as exc_info:
-            strip_hidden_html_comments(3.14)
-        assert "Unsupported type for security processing: float" in str(exc_info.value)
+        assert strip_hidden_html_comments(3.14) == 3.14
 
         # Test booleans
-        with pytest.raises(SecurityException) as exc_info:
-            strip_hidden_html_comments(True)
-        assert "Unsupported type for security processing: bool" in str(exc_info.value)
-
-        with pytest.raises(SecurityException) as exc_info:
-            strip_hidden_html_comments(False)
-        assert "Unsupported type for security processing: bool" in str(exc_info.value)
+        assert strip_hidden_html_comments(True) is True
+        assert strip_hidden_html_comments(False) is False
 
         # Test None is still allowed
         assert strip_hidden_html_comments(None) == None
