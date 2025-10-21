@@ -23,6 +23,7 @@ class ContainerPrompts(containers.DeclarativeContainer):
             "workflow/convert_to_gitlab_ci": "duo_workflow_service.agents.Agent",
             "workflow/executor": "duo_workflow_service.agents.Agent",
             "workflow/context_builder": "duo_workflow_service.agents.Agent",
+            "workflow/context_planning": "duo_workflow_service.agents.Agent",
             "workflow/planner": "duo_workflow_service.agents.Agent",
             "workflow/goal_disambiguation": "duo_workflow_service.agents.Agent",
             "workflow/issue_to_merge_request": "duo_workflow_service.agents.Agent",

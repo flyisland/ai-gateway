@@ -1,0 +1,14 @@
+name: context_planning
+model:
+  params:
+    model_class_provider: anthropic
+    max_tokens: 32_768
+unit_primitives:
+  - duo_workflow_execute_workflow
+prompt_template:
+  system: |
+    {% include 'workflow/context_planning/system/1.0.0.jinja' %}
+  user: |
+    {% include 'workflow/context_planning/user/1.0.0.jinja' %}
+params:
+  timeout: 60
