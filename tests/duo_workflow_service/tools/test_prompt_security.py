@@ -397,7 +397,9 @@ class TestToolSecurityOverrides:
             PromptSecurity.TOOL_SECURITY_OVERRIDES["test_tool"] = [
                 encode_dangerous_tags
             ]
-            PromptSecurity.TOOL_SPECIFIC_FUNCTIONS["test_tool"] = []  # This should be ignored
+            PromptSecurity.TOOL_SPECIFIC_FUNCTIONS["test_tool"] = (
+                []
+            )  # This should be ignored
 
             # Test that only encode_dangerous_tags is applied
             result = PromptSecurity.apply_security_to_tool_response(
