@@ -691,6 +691,7 @@ class GitLabWorkflow(
                         "parent_ts": configurable.get("checkpoint_id"),
                         "checkpoint": checkpoint,
                         "metadata": metadata,
+                        "lease_id": self._workflow_config.get("lease_id"),
                     },
                     cls=CustomEncoder,
                 ),
