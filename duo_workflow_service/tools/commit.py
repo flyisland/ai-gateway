@@ -116,7 +116,9 @@ class CommitBaseTool(DuoBaseTool):
 
         if not response.is_success():
             logger.error(
-                "API error - Status: {file_info.status_code}, Body: {file_info.body}"
+                "API error - Status: %s, Body: %s",
+                response.status_code,
+                response.body,
             )
             raise RuntimeError(
                 f"GitLab API error while fetching {file_path}: {response.status_code}"
@@ -149,14 +151,9 @@ class CommitBaseTool(DuoBaseTool):
                 new_str = action.new_str
                 ref = (start_branch if auto_branch else branch) or "main"
 
-                try:
-                    current_content = await self._get_file_content(
-                        project_id, ref, action.file_path
-                    )
-                except Exception as e:
-                    raise RuntimeError(
-                        f"Error fetching file '{action.file_path}': {str(e)}"
-                    ) from e
+                current_content = await self._get_file_content(
+                    project_id, ref, action.file_path
+                )
 
                 if old_str not in current_content:
                     raise ValueError(f"old_str not found in {action.file_path}")
@@ -617,27 +614,16 @@ class CreateCommit(CommitBaseTool):
             branch = auto_branch
 
             if not (start_branch or start_sha):
-                try:
-                    default_branch = await self._get_default_branch(project_id)
-                except Exception as e:
-                    return json.dumps(
-                        {
-                            "status": "error",
-                            "message": f"Failed to resolve default branch for project {project_id}: {e}",
-                        }
-                    )
+                default_branch = await self._get_default_branch(project_id)
                 start_branch = default_branch or "main"
 
-        try:
-            actions_data = await self._prepare_actions_data(
-                project_id=project_id,
-                actions=actions,
-                branch=branch,
-                start_branch=start_branch,
-                auto_branch=auto_branch,
-            )
-        except Exception as e:
-            return json.dumps({"error": str(e)})
+        actions_data = await self._prepare_actions_data(
+            project_id=project_id,
+            actions=actions,
+            branch=branch,
+            start_branch=start_branch,
+            auto_branch=auto_branch,
+        )
 
         # Prepare request parameters
         commit_branch = auto_branch or branch
@@ -653,21 +639,18 @@ class CreateCommit(CommitBaseTool):
             if kwargs.get(param) is not None:
                 params[param] = kwargs[param]
 
-        try:
-            response = await self.gitlab_client.apost(
-                path=f"/api/v4/projects/{project_id}/repository/commits",
-                body=json.dumps(params),
-                use_http_response=True,
-            )
+        response = await self.gitlab_client.apost(
+            path=f"/api/v4/projects/{project_id}/repository/commits",
+            body=json.dumps(params),
+            use_http_response=True,
+        )
 
-            self._process_http_response(
-                identifier=f"/api/v4/projects/{project_id}/repository/commits",
-                response=response,
-            )
+        self._process_http_response(
+            identifier=f"/api/v4/projects/{project_id}/repository/commits",
+            response=response,
+        )
 
-            return json.dumps({"status": "success", "branch": commit_branch})
-        except Exception as e:
-            return json.dumps({"status": "error", "message": str(e)})
+        return json.dumps({"status": "success", "branch": commit_branch})
 
     def format_display_message(
         self, args: CreateCommitInput, _tool_response: Any = None

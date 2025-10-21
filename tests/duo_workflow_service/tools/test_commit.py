@@ -8,6 +8,7 @@ import pytest
 from duo_workflow_service.gitlab.gitlab_api import Project
 from duo_workflow_service.gitlab.http_client import GitLabHttpResponse
 from duo_workflow_service.tools.commit import (
+    CommitBaseTool,
     CommitResourceInput,
     CreateCommit,
     CreateCommitAction,
@@ -1105,15 +1106,23 @@ async def test_create_commit_exception(gitlab_client_mock, metadata):
         ),
     ]
 
-    response = await tool._arun(
-        project_id=24,
-        branch="main",
-        commit_message="Test commit message",
-        actions=actions,
-    )
+    with pytest.raises(Exception, match=error_message):
+        await tool._arun(
+            project_id=24,
+            branch="main",
+            commit_message="Test commit message",
+            actions=actions,
+        )
 
-    expected_response = json.dumps({"status": "error", "message": error_message})
-    assert response == expected_response
+    gitlab_client_mock.apost.assert_called_once_with(
+        path="/api/v4/projects/24/repository/commits",
+        body=(
+            '{"branch": "main", "commit_message": "Test commit message", '
+            '"actions": [{"action": "create", "file_path": "test.txt", '
+            '"content": "This is a test file"}]}'
+        ),
+        use_http_response=True,
+    )
 
 
 @pytest.mark.asyncio
@@ -1203,15 +1212,13 @@ async def test_create_commit_with_partial_edit_not_found(
         ),
     ]
 
-    response = await tool._arun(
-        project_id=24,
-        branch="main",
-        commit_message="Update with partial edit",
-        actions=actions,
-    )
-
-    expected_response = json.dumps({"error": "old_str not found in README.md"})
-    assert response == expected_response
+    with pytest.raises(ValueError, match="old_str not found in README.md"):
+        await tool._arun(
+            project_id=24,
+            branch="main",
+            commit_message="Update with partial edit",
+            actions=actions,
+        )
 
     gitlab_client_mock.aget.assert_called_once_with(
         f"/api/v4/projects/24/repository/files/README.md",
@@ -1238,17 +1245,13 @@ async def test_create_commit_with_partial_edit_error(gitlab_client_mock, metadat
         ),
     ]
 
-    response = await tool._arun(
-        project_id=24,
-        branch="main",
-        commit_message="Update with partial edit",
-        actions=actions,
-    )
-
-    expected_response = json.dumps(
-        {"error": "Error fetching file 'README.md': File not found"}
-    )
-    assert response == expected_response
+    with pytest.raises(Exception, match="File not found"):
+        await tool._arun(
+            project_id=24,
+            branch="main",
+            commit_message="Update with partial edit",
+            actions=actions,
+        )
 
     gitlab_client_mock.aget.assert_called_once_with(
         f"/api/v4/projects/24/repository/files/README.md",
@@ -1640,14 +1643,37 @@ async def test_project_info_api_error(gitlab_client_mock, metadata):
         ),
     ]
 
-    result = await tool._arun(
-        project_id=24,
-        commit_message="Test API error",
-        actions=actions,
+    with pytest.raises(Exception, match="API error"):
+        await tool._arun(
+            project_id=24,
+            commit_message="Test API error",
+            actions=actions,
+        )
+
+    gitlab_client_mock.aget.assert_called_once_with("/api/v4/projects/24")
+
+
+@pytest.mark.asyncio
+async def test_get_file_content_failure_logs_and_raises(gitlab_client_mock, metadata):
+    class TestCommitTool(CommitBaseTool):
+        async def _execute(self, *args, **kwargs):
+            pass
+
+    mock_response = GitLabHttpResponse(
+        status_code=404,
+        body={"error": "File not found"},
     )
 
-    data = json.loads(result)
+    gitlab_client_mock.aget = AsyncMock(return_value=mock_response)
 
-    assert data["status"] == "error"
-    assert "Failed to resolve default branch" in data["message"]
-    assert "API error" in data["message"]
+    tool = TestCommitTool(name="test_tool", description="test", metadata=metadata)
+    with pytest.raises(RuntimeError) as exc_info:
+        await tool._get_file_content(project_id="24", ref="main", file_path="README.md")
+
+    assert "GitLab API error while fetching README.md" in str(exc_info.value)
+
+    gitlab_client_mock.aget.assert_awaited_once_with(
+        "/api/v4/projects/24/repository/files/README.md",
+        params={"ref": "main"},
+        use_http_response=True,
+    )
