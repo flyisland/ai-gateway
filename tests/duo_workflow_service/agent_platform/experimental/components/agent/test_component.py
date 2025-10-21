@@ -44,6 +44,12 @@ def ui_role_as_fixture() -> Literal["agent", "tool"]:
     return "agent"
 
 
+@pytest.fixture(name="tool_arguments_binding")
+def tool_arguments_binding_fixture():
+    """Fixture for tool arguments binding."""
+    return []
+
+
 @pytest.fixture(name="agent_component")
 def agent_component_fixture(
     component_name,
@@ -56,6 +62,7 @@ def agent_component_fixture(
     mock_toolset,
     mock_prompt_registry,
     mock_internal_event_client,
+    tool_arguments_binding,
 ):
     """Fixture for AgentComponent instance."""
     return AgentComponent(
@@ -66,6 +73,7 @@ def agent_component_fixture(
         prompt_id=prompt_id,
         prompt_version=prompt_version,
         toolset=mock_toolset,
+        tool_arguments_binding=tool_arguments_binding,
         prompt_registry=mock_prompt_registry,
         internal_event_client=mock_internal_event_client,
         ui_log_events=ui_log_events,
@@ -85,6 +93,7 @@ def agent_component_no_output_fixture(
     mock_toolset,
     mock_prompt_registry,
     mock_internal_event_client,
+    tool_arguments_binding,
 ):
     """Fixture for AgentComponent instance without output."""
     return AgentComponent(
@@ -95,6 +104,7 @@ def agent_component_no_output_fixture(
         prompt_id=prompt_id,
         prompt_version=prompt_version,
         toolset=mock_toolset,
+        tool_arguments_binding=tool_arguments_binding,
         prompt_registry=mock_prompt_registry,
         internal_event_client=mock_internal_event_client,
         ui_log_events=ui_log_events,
@@ -175,9 +185,108 @@ class TestAgentComponentInitialization:
             prompt_id=prompt_id,
             prompt_version=prompt_version,
             toolset=mock_toolset,
+            tool_arguments_binding=[],
             prompt_registry=mock_prompt_registry,
             internal_event_client=mock_internal_event_client,
         )
+
+    def test_tool_arguments_binding_defaults_to_empty_list(
+        self,
+        component_name,
+        flow_id,
+        flow_type,
+        prompt_id,
+        prompt_version,
+        mock_toolset,
+        mock_prompt_registry,
+        mock_internal_event_client,
+    ):
+        """Test that tool_arguments_binding defaults to empty list."""
+        component = AgentComponent(
+            name=component_name,
+            flow_id=flow_id,
+            flow_type=flow_type,
+            inputs=["context:user_input"],
+            prompt_id=prompt_id,
+            prompt_version=prompt_version,
+            toolset=mock_toolset,
+            prompt_registry=mock_prompt_registry,
+            internal_event_client=mock_internal_event_client,
+        )
+
+        assert component.tool_arguments_binding == []
+
+    def test_tool_arguments_binding_calls_parse_keys_and_assigns_result(
+        self,
+        component_name,
+        flow_id,
+        flow_type,
+        prompt_id,
+        prompt_version,
+        mock_toolset,
+        mock_prompt_registry,
+        mock_internal_event_client,
+    ):
+        """Test that component calls IOKey.parse_keys and assigns the result."""
+        binding_config = [
+            "context:project_id",
+            {"from": "context:branch_name", "as": "ref"},
+        ]
+
+        component = AgentComponent(
+            name=component_name,
+            flow_id=flow_id,
+            flow_type=flow_type,
+            inputs=["context:user_input"],
+            prompt_id=prompt_id,
+            prompt_version=prompt_version,
+            toolset=mock_toolset,
+            tool_arguments_binding=binding_config,
+            prompt_registry=mock_prompt_registry,
+            internal_event_client=mock_internal_event_client,
+        )
+
+        # Verify component stored the parsed IOKey instances
+        assert len(component.tool_arguments_binding) == 2
+        
+        # Verify first binding (simple string format)
+        assert isinstance(component.tool_arguments_binding[0], IOKey)
+        assert component.tool_arguments_binding[0].target == "context"
+        assert component.tool_arguments_binding[0].subkeys == ["project_id"]
+        assert component.tool_arguments_binding[0].alias is None
+        
+        # Verify second binding (dict format with alias)
+        assert isinstance(component.tool_arguments_binding[1], IOKey)
+        assert component.tool_arguments_binding[1].target == "context"
+        assert component.tool_arguments_binding[1].subkeys == ["branch_name"]
+        assert component.tool_arguments_binding[1].alias == "ref"
+
+    def test_tool_arguments_binding_not_parsed_when_not_provided(
+        self,
+        component_name,
+        flow_id,
+        flow_type,
+        prompt_id,
+        prompt_version,
+        mock_toolset,
+        mock_prompt_registry,
+        mock_internal_event_client,
+    ):
+        """Test that tool_arguments_binding defaults to empty list when not provided."""
+        component = AgentComponent(
+            name=component_name,
+            flow_id=flow_id,
+            flow_type=flow_type,
+            inputs=["context:user_input"],
+            prompt_id=prompt_id,
+            prompt_version=prompt_version,
+            toolset=mock_toolset,
+            prompt_registry=mock_prompt_registry,
+            internal_event_client=mock_internal_event_client,
+        )
+
+        # Verify default empty list for tool_arguments_binding
+        assert component.tool_arguments_binding == []
 
 
 class TestAgentComponentEntryHook:
@@ -265,6 +374,7 @@ class TestAgentComponentAttachNodes:
         assert tool_call_kwargs["name"] == f"{component_name}#tools"
         assert tool_call_kwargs["component_name"] == component_name
         assert tool_call_kwargs["toolset"] == mock_toolset
+        assert tool_call_kwargs["tool_arguments_binding"] == []
         assert tool_call_kwargs["flow_id"] == flow_id
         assert tool_call_kwargs["flow_type"] == flow_type
         assert tool_call_kwargs["internal_event_client"] == mock_internal_event_client
@@ -566,3 +676,141 @@ class TestAgentComponentModelMetadata:
             assert call_kwargs["model_metadata"] is None
         finally:
             current_model_metadata_context.reset(metadata_token)
+
+
+class TestAgentComponentToolArgumentsBinding:
+    """Test suite for AgentComponent tool_arguments_binding feature."""
+
+    @pytest.fixture(name="agent_component_with_binding")
+    def agent_component_with_binding_fixture(
+        self,
+        component_name,
+        flow_id,
+        flow_type,
+        prompt_id,
+        prompt_version,
+        mock_toolset,
+        mock_prompt_registry,
+        mock_internal_event_client,
+    ):
+        """Fixture for AgentComponent with tool_arguments_binding."""
+        return AgentComponent(
+            name=component_name,
+            flow_id=flow_id,
+            flow_type=flow_type,
+            inputs=["context:user_input"],
+            prompt_id=prompt_id,
+            prompt_version=prompt_version,
+            toolset=mock_toolset,
+            tool_arguments_binding=[
+                "context:project_id",
+                {"from": "context:branch_name", "as": "ref"},
+            ],
+            prompt_registry=mock_prompt_registry,
+            internal_event_client=mock_internal_event_client,
+        )
+
+    def test_attach_passes_tool_arguments_binding_to_tool_node(
+        self,
+        component_name,
+        flow_id,
+        flow_type,
+        prompt_id,
+        prompt_version,
+        mock_toolset,
+        mock_prompt_registry,
+        mock_internal_event_client,
+        mock_state_graph,
+        mock_router,
+        mock_tool_node_cls,
+        mock_agent_node_cls,
+        mock_final_response_node_cls,
+    ):
+        """Test that tool_arguments_binding is passed to ToolNode during attach."""
+        binding_config = [
+            "context:project_id",
+            {"from": "context:branch_name", "as": "ref"},
+        ]
+
+        component = AgentComponent(
+            name=component_name,
+            flow_id=flow_id,
+            flow_type=flow_type,
+            inputs=["context:user_input"],
+            prompt_id=prompt_id,
+            prompt_version=prompt_version,
+            toolset=mock_toolset,
+            tool_arguments_binding=binding_config,
+            prompt_registry=mock_prompt_registry,
+            internal_event_client=mock_internal_event_client,
+        )
+
+        component.attach(mock_state_graph, mock_router)
+
+        # Verify ToolNode was created with the parsed IOKey instances
+        mock_tool_node_cls.assert_called_once()
+        tool_call_kwargs = mock_tool_node_cls.call_args[1]
+
+        assert "tool_arguments_binding" in tool_call_kwargs
+        bindings = tool_call_kwargs["tool_arguments_binding"]
+        assert len(bindings) == 2
+        
+        # Verify the bindings are IOKey instances with correct properties
+        assert isinstance(bindings[0], IOKey)
+        assert bindings[0].target == "context"
+        assert bindings[0].subkeys == ["project_id"]
+        
+        assert isinstance(bindings[1], IOKey)
+        assert bindings[1].target == "context"
+        assert bindings[1].subkeys == ["branch_name"]
+        assert bindings[1].alias == "ref"
+
+    def test_tool_arguments_binding_empty_list_passed_to_tool_node(
+        self,
+        agent_component,
+        mock_state_graph,
+        mock_router,
+        mock_tool_node_cls,
+        mock_agent_node_cls,
+        mock_final_response_node_cls,
+    ):
+        """Test that empty tool_arguments_binding list is passed to ToolNode."""
+        agent_component.attach(mock_state_graph, mock_router)
+
+        # Verify ToolNode was created with empty list
+        mock_tool_node_cls.assert_called_once()
+        tool_call_kwargs = mock_tool_node_cls.call_args[1]
+
+        assert "tool_arguments_binding" in tool_call_kwargs
+        assert tool_call_kwargs["tool_arguments_binding"] == []
+
+    def test_tool_arguments_binding_integration_with_graph_building(
+        self,
+        agent_component_with_binding,
+        mock_state_graph,
+        mock_router,
+        mock_agent_node_cls,
+        mock_tool_node_cls,
+        mock_final_response_node_cls,
+        component_name,
+    ):
+        """Test complete integration of tool_arguments_binding in graph building."""
+        agent_component_with_binding.attach(mock_state_graph, mock_router)
+
+        # Verify all three nodes were added to the graph
+        assert mock_state_graph.add_node.call_count == 3
+
+        # Verify node names
+        added_nodes = [call[0][0] for call in mock_state_graph.add_node.call_args_list]
+        assert f"{component_name}#agent" in added_nodes
+        assert f"{component_name}#tools" in added_nodes
+        assert f"{component_name}#final_response" in added_nodes
+
+        # Verify ToolNode received bindings (whatever was stored in component)
+        tool_call_kwargs = mock_tool_node_cls.call_args[1]
+        # The component's tool_arguments_binding should be passed through
+        assert "tool_arguments_binding" in tool_call_kwargs
+        assert (
+            tool_call_kwargs["tool_arguments_binding"]
+            == agent_component_with_binding.tool_arguments_binding
+        )
