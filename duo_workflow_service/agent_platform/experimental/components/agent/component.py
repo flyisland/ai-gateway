@@ -3,7 +3,7 @@ from typing import Annotated, ClassVar, Literal, Optional
 from dependency_injector.wiring import Provide, inject
 from langchain_core.messages import AIMessage, BaseMessage
 from langgraph.graph import StateGraph
-from pydantic import Field
+from pydantic import Field, model_validator
 
 from ai_gateway.container import ContainerApplication
 from ai_gateway.prompts import InMemoryPromptRegistry, LocalPromptRegistry
@@ -27,6 +27,7 @@ from duo_workflow_service.agent_platform.experimental.components.registry import
 from duo_workflow_service.agent_platform.experimental.state import (
     FlowState,
     FlowStateKeys,
+    IOKey,
     IOKeyTemplate,
 )
 from duo_workflow_service.agent_platform.experimental.ui_log import (
@@ -64,6 +65,7 @@ class AgentComponent(BaseComponent):
     prompt_id: str
     prompt_version: Optional[str] = None
     toolset: Toolset
+    tool_arguments_binding: list[IOKey] = Field(default_factory=list)
 
     prompt_registry: LocalPromptRegistry | InMemoryPromptRegistry = Provide[
         ContainerApplication.pkg_prompts.prompt_registry
@@ -76,6 +78,51 @@ class AgentComponent(BaseComponent):
     ui_role_as: Literal["agent", "tool"] = "agent"
 
     _allowed_input_targets = tuple(FlowState.__annotations__.keys())
+
+    @model_validator(mode="before")
+    @classmethod
+    def parse_tool_arguments_binding(cls, data: dict) -> dict:
+        """Parse tool_arguments_binding from configuration."""
+        if "tool_arguments_binding" in data:
+            data["tool_arguments_binding"] = IOKey.parse_keys(
+                data["tool_arguments_binding"]
+            )
+        return data
+
+    @model_validator(mode="after")
+    def validate_tool_arguments_binding(self):
+        """Validate that binding parameter names map to actual tool parameters.
+        
+        This validation ensures that bound arguments correspond to parameters
+        that exist in at least one tool in the toolset.
+        """
+        if not self.tool_arguments_binding:
+            return self
+
+        # Collect all bound argument names using the new get_key_name() method
+        bound_args = set()
+        for binding in self.tool_arguments_binding:
+            param_name = binding.get_key_name()
+            bound_args.add(param_name)
+
+        # Check that at least one tool accepts each bound argument
+        for arg_name in bound_args:
+            arg_found_in_tool = False
+            for tool in self.toolset.bindable:
+                if hasattr(tool, "args_schema") and tool.args_schema:
+                    tool_params = tool.args_schema.model_fields.keys()
+                    if arg_name in tool_params:
+                        arg_found_in_tool = True
+                        break
+            
+            if not arg_found_in_tool:
+                import warnings
+                warnings.warn(
+                    f"Bound argument '{arg_name}' does not match any tool parameter in toolset. "
+                    f"This binding will have no effect."
+                )
+
+        return self
 
     def _agent_node_router(self, state: FlowState) -> str:
         history: list[BaseMessage] = state[FlowStateKeys.CONVERSATION_HISTORY].get(
@@ -126,6 +173,7 @@ class AgentComponent(BaseComponent):
             name=f"{self.name}#tools",
             component_name=self.name,
             toolset=self.toolset,
+            tool_arguments_binding=self.tool_arguments_binding,
             flow_id=self.flow_id,
             flow_type=self.flow_type,
             internal_event_client=self.internal_event_client,

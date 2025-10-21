@@ -208,6 +208,38 @@ class IOKey(BaseModel):
                 current = current[key]
         return current
 
+    def get_key_name(self) -> str:
+        """Get the effective key name for this IOKey.
+        
+        This method encapsulates the logic for determining what key name
+        should be used when extracting or binding values. It follows the
+        same priority as template_variable_from_state():
+        - If alias is set: use alias
+        - If subkeys exist: use last subkey
+        - Otherwise: use target
+        
+        This is useful for tool_arguments_binding and other features that
+        need to know the parameter name without exposing internal details.
+        
+        Returns:
+            The effective key name as a string
+            
+        Examples:
+            IOKey(target="context", subkeys=["project_id"], alias="pid").get_key_name()
+            # Returns: "pid"
+            
+            IOKey(target="context", subkeys=["project_id"]).get_key_name()
+            # Returns: "project_id"
+            
+            IOKey(target="status").get_key_name()
+            # Returns: "status"
+        """
+        if self.alias:
+            return self.alias
+        if self.subkeys:
+            return self.subkeys[-1]
+        return self.target
+
     def to_nested_dict(self, value: Any) -> dict[str, Any]:
         """Generate nested dictionary matching target and subkeys list, with value supplied as argument.
 
