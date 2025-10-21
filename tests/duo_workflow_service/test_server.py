@@ -473,7 +473,7 @@ async def test_workflow_is_cancelled_on_parent_task_cancellation(
         (
             AIO_CANCEL_STOP_WORKFLOW_REQUEST,
             False,
-            grpc.StatusCode.CANCELLED,
+            grpc.StatusCode.OK,
             "workflow execution stopped:",
         ),
         (
