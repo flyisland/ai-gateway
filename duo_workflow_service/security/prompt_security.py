@@ -171,7 +171,8 @@ class PromptSecurity:
 
     # Tool-specific security overrides - completely replaces DEFAULT_SECURITY_FUNCTIONS
     # Use this when you want to specify a custom set of security functions for a tool
-    # security functions are too strict (e.g., read_file, code review tools).
+    # instead of the defaults. Useful for low-risk tools where default security functions
+    # are too strict (e.g., read_file, code review tools).
     # High-risk tools that handle user-generated content (issues, epics, comments)
     # should continue using DEFAULT_SECURITY_FUNCTIONS.
     TOOL_SECURITY_OVERRIDES: Dict[
