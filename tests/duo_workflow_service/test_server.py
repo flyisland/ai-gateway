@@ -465,7 +465,7 @@ async def test_workflow_is_cancelled_on_parent_task_cancellation(
         assert real_workflow_task is not None
         assert real_workflow_task.cancelled()
 
-        mock_context.set_code.assert_called_once_with(grpc.StatusCode.INTERNAL)
+        mock_context.set_code.assert_called_once_with(grpc.StatusCode.CANCELLED)
 
 
 @pytest.mark.asyncio
@@ -476,7 +476,7 @@ async def test_workflow_is_cancelled_on_parent_task_cancellation(
         (
             AIO_CANCEL_STOP_WORKFLOW_REQUEST,
             False,
-            grpc.StatusCode.CANCELLED,
+            grpc.StatusCode.OK,
             "workflow execution stopped:",
         ),
         (
