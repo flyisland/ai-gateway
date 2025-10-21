@@ -34,7 +34,7 @@ from duo_workflow_service.components.executor.component import ExecutorComponent
 from duo_workflow_service.components.goal_disambiguation import (
     GoalDisambiguationComponent,
 )
-from duo_workflow_service.components.planner.component import PlannerComponent
+from duo_workflow_service.components.planner import PlannerComponent
 from duo_workflow_service.entities import (
     MessageTypeEnum,
     Plan,
@@ -162,6 +162,8 @@ PLANNER_TOOLS = [
     "create_plan",
 ]
 
+CONTEXT_PLANNING_TOOLS = CONTEXT_BUILDER_TOOLS + PLANNER_TOOLS
+
 
 class Routes(StrEnum):
     END = "end"
@@ -223,33 +225,11 @@ class Workflow(AbstractWorkflow):
             "allow_agent_to_request_user", True
         )
         # Add nodes to the graph
-        graph.set_entry_point("build_context")
-
-        last_node_name = self._add_context_builder_nodes(graph, tools_registry)
-        disambiguation_component = GoalDisambiguationComponent(
-            user=self._user,
-            goal=goal,
-            model_config=self._model_config,
-            http_client=self._http_client,
-            workflow_id=self._workflow_id,
-            tools_registry=tools_registry,
-            allow_agent_to_request_user=allow_agent_to_request_user,
-            workflow_type=self._workflow_type,
-        )
-        disambiguation_entry_node = disambiguation_component.attach(
-            graph=graph,
-            component_exit_node="planning",
-            graph_termination_node="plan_terminator",
-            component_execution_state=WorkflowStatusEnum.PLANNING,
-        )
-
-        graph.add_edge(last_node_name, disambiguation_entry_node)
-
-        planner_component = PlannerComponent(
+        planning_component = PlannerComponent(
             user=self._user,
             workflow_id=self._workflow_id,
             workflow_type=self._workflow_type,
-            planner_toolset=tools_registry.toolset(PLANNER_TOOLS),
+            planner_toolset=tools_registry.toolset(CONTEXT_PLANNING_TOOLS),
             executor_toolset=tools_registry.toolset(EXECUTOR_TOOLS),
             tools_registry=tools_registry,
             model_config=self._model_config,
@@ -267,14 +247,14 @@ class Workflow(AbstractWorkflow):
                 approved_agent_state=WorkflowStatusEnum.PLANNING,
             )
 
-        planner_component.attach(
+        planning_component.attach(
             graph=graph,
             next_node="set_status_to_execution",
             exit_node="plan_terminator",
             approval_component=plan_approval_component,
         )
-        # graph.add_edge(disambiguation_exit_node, "planning")
         plan_terminator = PlanTerminatorAgent(workflow_id=self._workflow_id)
+        graph.set_entry_point("planning")
         graph.add_node("plan_terminator", plan_terminator.run)
 
         graph.add_node(
