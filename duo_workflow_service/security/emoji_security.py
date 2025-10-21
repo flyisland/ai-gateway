@@ -34,8 +34,8 @@ _EMOJI_MAIN_PATTERN = re.compile(
     flags=re.UNICODE,
 )
 _SKIN_TONE_PATTERN = re.compile(r"[\U0001F3FB-\U0001F3FF]+")
-_WHITESPACE_CLEANUP_PATTERN = re.compile(r"\s{2,}")
-_NEWLINE_CLEANUP_PATTERN = re.compile(r"\n\s*\n")
+_WHITESPACE_CLEANUP_PATTERN = re.compile(r"[^\S\n]{2,}")
+_NEWLINE_CLEANUP_PATTERN = re.compile(r"\n\s*\n\s*\n")
 
 _COMMON_EMOJI_PATTERNS = [
     re.compile(r"\\ud83d\\ude[0-4][0-9a-f]", re.IGNORECASE),
@@ -90,7 +90,7 @@ def strip_emojis(
         text = _SKIN_TONE_PATTERN.sub("", text)
 
         # Clean up excessive newlines and whitespace
-        text = _NEWLINE_CLEANUP_PATTERN.sub("\n", text)
+        text = _NEWLINE_CLEANUP_PATTERN.sub("\n\n", text)
         text = _WHITESPACE_CLEANUP_PATTERN.sub(" ", text)
         text = text.strip()
 
