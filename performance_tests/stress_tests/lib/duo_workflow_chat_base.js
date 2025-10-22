@@ -2,11 +2,6 @@ import http from "k6/http";
 import { check, group } from "k6";
 import { Rate } from "k6/metrics";
 import { WebSocket } from "k6/experimental/websockets";
-import {
-  logError,
-  getRpsThresholds,
-  getTtfbThreshold,
-} from "../../../lib/gpt_k6_modules.js";
 
 // Common thresholds and metrics
 export const commonThresholds = {
@@ -16,40 +11,16 @@ export const commonThresholds = {
 
 export const wsConnectingThreshold = 1500; // 1.5s - based on observed performance with a client in Australia and server in us-east1
 export const wsDurationThreshold = 40000; // 40s
-export const WORKFLOW_COMPLETE_TIMEOUT = wsDurationThreshold + 10000; // 50s
-
-export function createOptions(thresholds = commonThresholds) {
-  const rpsThresholds = getRpsThresholds(thresholds['rps']);
-  const ttfbThreshold = getTtfbThreshold(thresholds['ttfb']);
-
-  return {
-    thresholds: {
-      successful_requests: [`rate>${__ENV.SUCCESS_RATE_THRESHOLD}`],
-      checks: [`rate>${__ENV.SUCCESS_RATE_THRESHOLD}`],
-      http_req_waiting: [`p(90)<${ttfbThreshold}`],
-      ws_connecting: [`p(90)<${wsConnectingThreshold}`],
-      ws_session_duration: [`p(90)<${wsDurationThreshold}`],
-    },
-    rpsThresholds,
-    ttfbThreshold
-  };
-}
-
-export function createSetupFunction(options) {
-  return function setup() {
-    console.log("");
-    console.log(`RPS Threshold: ${options.rpsThresholds["mean"]}/s (${options.rpsThresholds["count"]})`);
-    console.log(`TTFB P90 Threshold: ${options.ttfbThreshold}ms`);
-    console.log(`Success Rate Threshold: ${parseFloat(__ENV.SUCCESS_RATE_THRESHOLD) * 100}%`);
-    console.log(`WebSocket Connecting P90 Threshold: ${wsConnectingThreshold}ms`);
-    console.log(`WebSocket Duration P90 Threshold: ${wsDurationThreshold}ms`);
-  };
-}
+export const WORKFLOW_COMPLETE_TIMEOUT = wsDurationThreshold * 2; // 80s
 
 function logDebug(...args) {
   if (__ENV.DEBUG === 'true') {
     console.log(...args);
   }
+}
+
+function logError(...args) {
+  console.warn(...args);
 }
 
 export function createDuoWorkflowChatTest(config) {

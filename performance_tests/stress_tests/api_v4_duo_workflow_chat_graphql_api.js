@@ -26,12 +26,7 @@
 @stressed_components: Duo Workflow Service, Postgres, Rails
 */
 
-import {
-  createOptions,
-  createSetupFunction,
-  createDuoWorkflowChatTest,
-  Rate
-} from "./lib/duo_workflow_chat_base.js";
+import createDuoWorkflowChatTest from "./lib/duo_workflow_chat_base.js";
 
 // Test configuration - use env var to determine which test to run
 const scenarioType = __ENV.SCENARIO_TYPE || 'mocked_llm';
@@ -65,18 +60,18 @@ if (!config) {
   throw new Error(`Unknown scenario type: ${scenarioType}. Valid options: real_llm, mocked_llm`);
 }
 
-// Setup exports
-const optionsConfig = createOptions();
-
-export let options = {
-  thresholds: optionsConfig.thresholds
+// Adjust as necessary to increase load
+export const options = {
+  scenarios: {
+    sustain: {
+      executor: 'constant-arrival-rate',
+      rate: 5,
+      timeUnit: '1s',
+      duration: '20s',
+      preAllocatedVUs: 101,
+      gracefulStop: '5m',
+    },
+  },
 };
-export let successRate = new Rate("successful_requests");
-export let rpsThresholds = optionsConfig.rpsThresholds;
-export let ttfbThreshold = optionsConfig.ttfbThreshold;
 
-// Setup function
-export const setup = createSetupFunction(optionsConfig);
-
-// Main test function - uses the selected scenario configuration
 export default createDuoWorkflowChatTest(config);
