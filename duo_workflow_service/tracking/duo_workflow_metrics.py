@@ -50,6 +50,34 @@ class SessionTypeEnum(StrEnum):
     RETRY = "retry"
 
 
+def _language_server_version_label():
+    lsp_version = language_server_version.get()
+    if lsp_version:
+        return str(lsp_version.version)
+
+    return "unknown"
+
+def _gitlab_version_label():
+    try:
+        gl_version = Version(gitlab_version.get())  # type: ignore[arg-type]
+        return str(gl_version)
+    except (InvalidVersion, TypeError):
+        return "unknown"
+
+def _client_type_label():
+    client_type_value = client_type.get()
+    if client_type_value:
+        return str(client_type_value)
+
+    return "unknown"
+
+def metadata_labels():
+    return {
+        "lsp_version": _language_server_version_label(),
+        "gitlab_version": _gitlab_version_label(),
+        "client_type": _client_type_label(),
+    }
+
 class DuoWorkflowMetrics:  # pylint: disable=too-many-instance-attributes
     def __init__(self, registry=REGISTRY):
         self.workflow_duration = Histogram(
@@ -201,7 +229,7 @@ class DuoWorkflowMetrics:  # pylint: disable=too-many-instance-attributes
             ),
             status_code=status_code,
             error_type=error_type,
-            **self.metadata_labels(),
+            **metadata_labels(),
         ).inc()
 
     def count_checkpoints(
@@ -214,7 +242,7 @@ class DuoWorkflowMetrics:  # pylint: disable=too-many-instance-attributes
             endpoint=endpoint,
             status_code=status_code,
             method=method,
-            **self.metadata_labels(),
+            **metadata_labels(),
         ).inc()
 
     def count_agent_platform_session_start(
@@ -223,7 +251,7 @@ class DuoWorkflowMetrics:  # pylint: disable=too-many-instance-attributes
     ) -> None:
         self.agent_platform_session_start_counter.labels(
             flow_type=flow_type,
-            **self.metadata_labels(),
+            **metadata_labels(),
         ).inc()
 
     def count_agent_platform_session_retry(
@@ -232,7 +260,7 @@ class DuoWorkflowMetrics:  # pylint: disable=too-many-instance-attributes
     ) -> None:
         self.agent_platform_session_retry_counter.labels(
             flow_type=flow_type,
-            **self.metadata_labels(),
+            **metadata_labels(),
         ).inc()
 
     def count_agent_platform_session_reject(
@@ -241,7 +269,7 @@ class DuoWorkflowMetrics:  # pylint: disable=too-many-instance-attributes
     ) -> None:
         self.agent_platform_session_reject_counter.labels(
             flow_type=flow_type,
-            **self.metadata_labels(),
+            **metadata_labels(),
         ).inc()
 
     def count_agent_platform_session_resume(
@@ -250,7 +278,7 @@ class DuoWorkflowMetrics:  # pylint: disable=too-many-instance-attributes
     ) -> None:
         self.agent_platform_session_resume_counter.labels(
             flow_type=flow_type,
-            **self.metadata_labels(),
+            **metadata_labels(),
         ).inc()
 
     def count_agent_platform_session_success(
@@ -259,7 +287,7 @@ class DuoWorkflowMetrics:  # pylint: disable=too-many-instance-attributes
     ) -> None:
         self.agent_platform_session_success_counter.labels(
             flow_type=flow_type,
-            **self.metadata_labels(),
+            **metadata_labels(),
         ).inc()
 
     def count_agent_platform_session_failure(
@@ -271,7 +299,7 @@ class DuoWorkflowMetrics:  # pylint: disable=too-many-instance-attributes
             flow_type=flow_type,
             failure_reason=failure_reason,
             session_type=session_type_context.get(),
-            **self.metadata_labels(),
+            **metadata_labels(),
         ).inc()
 
     def count_agent_platform_session_abort(
@@ -281,7 +309,7 @@ class DuoWorkflowMetrics:  # pylint: disable=too-many-instance-attributes
         self.agent_platform_session_abort_counter.labels(
             flow_type=flow_type,
             session_type=session_type_context.get(),
-            **self.metadata_labels(),
+            **metadata_labels(),
         ).inc()
 
     def count_agent_platform_tool_failure(
@@ -294,7 +322,7 @@ class DuoWorkflowMetrics:  # pylint: disable=too-many-instance-attributes
             flow_type=flow_type,
             tool_name=tool_name,
             failure_reason=failure_reason,
-            **self.metadata_labels(),
+            **metadata_labels(),
         ).inc()
 
     def count_agent_platform_receive_start_counter(
@@ -303,7 +331,7 @@ class DuoWorkflowMetrics:  # pylint: disable=too-many-instance-attributes
     ) -> None:
         self.agent_platform_receive_start_counter.labels(
             flow_type=flow_type,
-            **self.metadata_labels(),
+            **metadata_labels(),
         ).inc()
 
     def time_llm_request(
@@ -315,7 +343,7 @@ class DuoWorkflowMetrics:  # pylint: disable=too-many-instance-attributes
             lambda duration: self.llm_request_duration.labels(
                 model=model,
                 request_type=request_type,
-                **self.metadata_labels(),
+                **metadata_labels(),
             ).observe(duration)
         )
 
@@ -324,7 +352,7 @@ class DuoWorkflowMetrics:  # pylint: disable=too-many-instance-attributes
             lambda duration: self.tool_call_duration.labels(
                 tool_name=tool_name,
                 flow_type=flow_type,
-                **self.metadata_labels(),
+                **metadata_labels(),
             ).observe(duration)
         )
 
@@ -355,34 +383,6 @@ class DuoWorkflowMetrics:  # pylint: disable=too-many-instance-attributes
                 workflow_type=workflow_type
             ).observe(duration)
         )
-
-    def metadata_labels(self):
-        return {
-            "lsp_version": self._language_server_version_label(),
-            "gitlab_version": self._gitlab_version_label(),
-            "client_type": self._client_type_label(),
-        }
-
-    def _language_server_version_label(self):
-        lsp_version = language_server_version.get()
-        if lsp_version:
-            return str(lsp_version.version)
-
-        return "unknown"
-
-    def _gitlab_version_label(self):
-        try:
-            gl_version = Version(gitlab_version.get())  # type: ignore[arg-type]
-            return str(gl_version)
-        except (InvalidVersion, TypeError):
-            return "unknown"
-
-    def _client_type_label(self):
-        client_type_value = client_type.get()
-        if client_type_value:
-            return str(client_type_value)
-
-        return "unknown"
 
     class _timer:
         def __init__(self, callback):
