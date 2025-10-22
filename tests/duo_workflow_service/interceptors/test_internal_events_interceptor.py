@@ -2,8 +2,12 @@ from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
+from ai_gateway.code_suggestions.language_server import LanguageServerVersion
 from duo_workflow_service.interceptors.internal_events_interceptor import (
     InternalEventsInterceptor,
+)
+from duo_workflow_service.interceptors.language_server_version_interceptor import (
+    language_server_version,
 )
 from lib.internal_events import current_event_context
 
@@ -217,3 +221,51 @@ async def test_interceptor_metadata_handling(
         == expected["ultimate_parent_namespace_id"]
     )
     assert event_context.is_gitlab_team_member == expected["is_gitlab_team_member"]
+    # By default, no lsp_version should be in extra
+    assert event_context.extra == {}
+
+
+@pytest.mark.asyncio
+async def test_interceptor_with_lsp_version(interceptor, mock_continuation):
+    """Test that lsp_version is included in extra when language_server_version is set."""
+    metadata = {
+        "x-gitlab-realm": "test-realm",
+        "x-gitlab-instance-id": "test-instance-id",
+        "x-gitlab-global-user-id": "test-global-user-id",
+        "x-gitlab-host-name": "test-gitlab-host",
+    }
+    handler_call_details = create_handler_call_details(metadata)
+
+    # Set the language server version in the context
+    test_version = LanguageServerVersion.from_string("7.43.0")
+    language_server_version.set(test_version)
+
+    await interceptor.intercept_service(mock_continuation, handler_call_details)
+
+    event_context = current_event_context.get()
+
+    # Verify lsp_version is in extra
+    assert "lsp_version" in event_context.extra
+    assert event_context.extra["lsp_version"] == "7.43.0"
+
+
+@pytest.mark.asyncio
+async def test_interceptor_without_lsp_version(interceptor, mock_continuation):
+    """Test that extra is empty when language_server_version is not set."""
+    metadata = {
+        "x-gitlab-realm": "test-realm",
+        "x-gitlab-instance-id": "test-instance-id",
+        "x-gitlab-global-user-id": "test-global-user-id",
+        "x-gitlab-host-name": "test-gitlab-host",
+    }
+    handler_call_details = create_handler_call_details(metadata)
+
+    # Reset the language server version context
+    language_server_version.set(None)
+
+    await interceptor.intercept_service(mock_continuation, handler_call_details)
+
+    event_context = current_event_context.get()
+
+    # Verify extra is empty
+    assert event_context.extra == {}

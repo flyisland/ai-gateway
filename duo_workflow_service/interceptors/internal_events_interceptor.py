@@ -19,6 +19,9 @@ from duo_workflow_service.interceptors import (
     X_GITLAB_ROOT_NAMESPACE_ID,
 )
 from duo_workflow_service.interceptors.correlation_id_interceptor import correlation_id
+from duo_workflow_service.interceptors.language_server_version_interceptor import (
+    language_server_version,
+)
 from lib.internal_events import EventContext, current_event_context
 
 
@@ -62,6 +65,12 @@ class InternalEventsInterceptor(grpc.aio.ServerInterceptor):
         namespace_id = metadata.get(X_GITLAB_NAMESPACE_ID)
         namespace_id = int(namespace_id) if namespace_id else None
 
+        # Get language server version from context
+        lsp_version = language_server_version.get()
+        extra = {}
+        if lsp_version:
+            extra["lsp_version"] = str(lsp_version.version)
+
         context = EventContext(
             realm=metadata.get(X_GITLAB_REALM_HEADER),
             environment=os.environ.get(
@@ -82,6 +91,7 @@ class InternalEventsInterceptor(grpc.aio.ServerInterceptor):
             ultimate_parent_namespace_id=metadata.get(X_GITLAB_ROOT_NAMESPACE_ID, None)
             or None,
             is_gitlab_team_member=is_gitlab_member,
+            extra=extra,
         )
 
         current_event_context.set(context)
