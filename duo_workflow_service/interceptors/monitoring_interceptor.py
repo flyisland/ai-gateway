@@ -39,7 +39,7 @@ class MonitoringInterceptor(ServerInterceptor):
         self._requests_counter: Counter = Counter(
             "grpc_server_handled_total",
             "Total number of RPCs completed on the server, regardless of success or failure.",
-            ["grpc_type", "grpc_service", "grpc_method", "grpc_code"] + METADATA_LABELS,
+            ["grpc_type", "grpc_service", "grpc_method", "grpc_code", "workflow_definition"] + METADATA_LABELS,
             registry=registry,
         )
 
@@ -246,10 +246,13 @@ class MonitoringInterceptor(ServerInterceptor):
     ) -> None:
         grpc_code = grpc_code or grpc.StatusCode.OK
 
+        context: MonitoringContext = current_monitoring_context.get()
+
         self._requests_counter.labels(
             grpc_type=grpc_type,
             grpc_service=grpc_service_name,
             grpc_method=grpc_method_name,
             grpc_code=grpc_code.name,
+            workflow_definition=context.workflow_definition,
             **metadata_labels(),
         ).inc()
