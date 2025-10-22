@@ -1,6 +1,7 @@
 # flake8: noqa
 
 from duo_workflow_service.agents.agent import Agent
+from duo_workflow_service.agents.agent_with_context import AgentWithContext
 from duo_workflow_service.agents.chat_agent import ChatAgent
 from duo_workflow_service.agents.handover import HandoverAgent
 from duo_workflow_service.agents.human_approval_check_executor import (
@@ -20,4 +21,5 @@ __all__ = [
     "ToolsExecutor",
     "RunToolNode",
     "HumanApprovalCheckExecutor",
+    "AgentWithContext"
 ]

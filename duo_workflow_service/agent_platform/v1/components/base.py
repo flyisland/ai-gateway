@@ -1,5 +1,6 @@
 from abc import ABC, abstractmethod
-from typing import Annotated, Any, ClassVar, Optional, Protocol, Self
+from enum import Enum
+from typing import Annotated, Any, ClassVar, Optional, Protocol, Self, List
 
 from langgraph.graph import END, StateGraph
 from pydantic import BaseModel, ConfigDict, Field, model_validator
@@ -15,6 +16,10 @@ from lib.internal_events.event_enum import CategoryEnum
 
 __all__ = ["RouterProtocol", "BaseComponent", "EndComponent"]
 
+
+class IncludeContext(Enum):
+    HISTORY = "history"
+    AGENTS_MD = "AGENTS.md"
 
 class RouterProtocol(Protocol):
     """Protocol defining the interface for routers used by components."""
@@ -38,6 +43,7 @@ class BaseComponent(BaseModel, ABC):
     name: str
     flow_id: str
     flow_type: CategoryEnum
+    include_context: List[IncludeContext] = [IncludeContext.HISTORY, IncludeContext.AGENTS_MD]
 
     @model_validator(mode="before")
     @classmethod
