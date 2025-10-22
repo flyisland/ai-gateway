@@ -3,9 +3,7 @@ from typing import Any, AsyncIterator, List, Optional
 import structlog
 from langchain_core.callbacks import AsyncCallbackManagerForLLMRun
 from langchain_core.messages import BaseMessage
-from langchain_core.outputs import ChatGenerationChunk
-
-from ai_gateway.tracking import SnowplowEventContext
+from langchain_core.outputs import ChatGenerationChunk, ChatResult
 
 from .chat_litellm import ChatLiteLLM
 
@@ -49,8 +47,9 @@ class ChatFireworks(ChatLiteLLM):
         messages: List[BaseMessage],
         stop: Optional[List[str]] = None,
         run_manager: Optional[AsyncCallbackManagerForLLMRun] = None,
+        stream: Optional[bool] = None,
         **kwargs: Any,
-    ):
+    ) -> ChatResult:
         self._setup_fireworks_kwargs(kwargs)
 
         return await super()._agenerate(

@@ -1,4 +1,3 @@
-import structlog
 from dependency_injector import containers, providers
 from langchain_openai import ChatOpenAI
 from litellm.llms.custom_httpx.http_handler import AsyncHTTPHandler

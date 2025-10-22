@@ -59,7 +59,7 @@ class FireworksModelMetadata(BaseModelMetadata):
             params["api_base"] = str(self.endpoint).removesuffix("/")
 
         if self.using_cache is not None:
-            params["using_cache"] = self.using_cache
+            params["using_cache"] = str(self.using_cache)
 
         if self.session_id is not None:
             params["session_id"] = self.session_id
@@ -99,7 +99,7 @@ class ModelMetadata(BaseModelMetadata):
                 params["model"] = self.identifier
 
         if self.api_key:
-            params["api_key"] = str(self.api_key)
+            params["api_key"] = self.api_key
         else:
             # Set a default dummy key to avoid LiteLLM errors
             # See https://gitlab.com/gitlab-org/gitlab/-/issues/520512
