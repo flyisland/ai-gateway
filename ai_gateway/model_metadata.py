@@ -135,7 +135,7 @@ def create_model_metadata(data: dict[str, Any] | None) -> Optional[TypeModelMeta
         model_config = region_config.get(data["name"], {})
 
         model_identifier = model_config.get("identifier")
-        if not model_identifier:
+        if not model_identifier or model_identifier == "":
             raise ValueError(
                 f"Fireworks model identifier is missing for model {data['name']}."
             )
