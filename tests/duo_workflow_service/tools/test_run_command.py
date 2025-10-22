@@ -5,7 +5,11 @@ from unittest.mock import AsyncMock, MagicMock
 import pytest
 
 from contract import contract_pb2
-from duo_workflow_service.tools.command import RunCommand, RunCommandInput, _DISALLOWED_OPERATORS
+from duo_workflow_service.tools.command import (
+    _DISALLOWED_OPERATORS,
+    RunCommand,
+    RunCommandInput,
+)
 
 
 @pytest.mark.asyncio
@@ -77,6 +81,7 @@ def test_run_command_format_display_message():
     expected_message = "Run command: ls -l -a /home"
     assert message == expected_message
 
+
 CASES = [
     *[
         # operator in program
@@ -95,6 +100,8 @@ CASES = [
     ],
     pytest.param("echo", None, id="no-operator"),  # control case
 ]
+
+
 @pytest.mark.asyncio
 @pytest.mark.parametrize(("program", "args"), CASES)
 @mock.patch("duo_workflow_service.tools.command._execute_action")
@@ -104,7 +111,9 @@ async def test_run_command_disallowed_operators(execute_action_mock, program, ar
 
     await run_command._arun(program=program, args=args)
 
-    has_op = any(op in ((program or "") + " " + (args or "")) for op in _DISALLOWED_OPERATORS)
+    has_op = any(
+        op in ((program or "") + " " + (args or "")) for op in _DISALLOWED_OPERATORS
+    )
 
     if has_op:
         execute_action_mock.assert_not_called()
