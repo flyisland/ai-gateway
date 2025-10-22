@@ -1,4 +1,5 @@
 import json
+import re
 import urllib
 from enum import Enum
 from typing import (
@@ -358,7 +359,7 @@ class WorkItemBaseTool(DuoBaseTool):
             return None
 
         # Validate and normalize the parent_id to proper GitLab GID format
-        if not parent_id.startswith("gid://gitlab/"):
+        if not re.match(r"^gid://gitlab/(WorkItem|Issue|Epic)/\d+$", parent_id):
             warnings.append(
                 f"Invalid parent_id format: {parent_id}. Expected GitLab GID."
             )
