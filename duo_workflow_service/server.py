@@ -39,6 +39,9 @@ from duo_workflow_service.interceptors.authentication_interceptor import (
 from duo_workflow_service.interceptors.authentication_interceptor import (
     current_user as current_user_context_var,
 )
+from duo_workflow_service.interceptors.client_type_interceptor import (
+    ClientTypeInterceptor,
+)
 from duo_workflow_service.interceptors.correlation_id_interceptor import (
     CorrelationIdInterceptor,
 )
@@ -677,6 +680,7 @@ async def serve(port: int) -> None:
                 InternalEventsInterceptor(),
                 ModelMetadataInterceptor(),
                 MonitoringInterceptor(),
+                ClientTypeInterceptor(),
                 LanguageServerVersionInterceptor(),
                 GitLabVersionInterceptor(),
             ],
