@@ -199,9 +199,7 @@ class CodeCompletions:
                             "prefix": prompt.prefix,
                             "suffix": prompt.suffix,
                             "file_name": file_name,
-                            "language": (
-                                editor_lang or resolve_lang_name(file_name)
-                            ).lower(),
+                        "language": lang.lower(),
                         }
 
                         res = await self.model.generate(params, stream)
