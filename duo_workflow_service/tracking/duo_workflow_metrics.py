@@ -57,12 +57,14 @@ def _language_server_version_label():
 
     return "unknown"
 
+
 def _gitlab_version_label():
     try:
         gl_version = Version(gitlab_version.get())  # type: ignore[arg-type]
         return str(gl_version)
     except (InvalidVersion, TypeError):
         return "unknown"
+
 
 def _client_type_label():
     client_type_value = client_type.get()
@@ -71,12 +73,14 @@ def _client_type_label():
 
     return "unknown"
 
+
 def metadata_labels():
     return {
         "lsp_version": _language_server_version_label(),
         "gitlab_version": _gitlab_version_label(),
         "client_type": _client_type_label(),
     }
+
 
 class DuoWorkflowMetrics:  # pylint: disable=too-many-instance-attributes
     def __init__(self, registry=REGISTRY):

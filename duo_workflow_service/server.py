@@ -61,9 +61,6 @@ from duo_workflow_service.interceptors.language_server_version_interceptor impor
     LanguageServerVersionInterceptor,
     language_server_version,
 )
-from duo_workflow_service.interceptors.client_type_interceptor import (
-    ClientTypeInterceptor,
-)
 from duo_workflow_service.interceptors.model_metadata_interceptor import (
     ModelMetadataInterceptor,
 )
@@ -683,7 +680,6 @@ async def serve(port: int) -> None:
                 InternalEventsInterceptor(),
                 ModelMetadataInterceptor(),
                 MonitoringInterceptor(),
-                ClientTypeInterceptor(),
                 LanguageServerVersionInterceptor(),
                 ClientTypeInterceptor(),
                 GitLabVersionInterceptor(),
