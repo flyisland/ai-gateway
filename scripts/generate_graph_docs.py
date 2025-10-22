@@ -2,10 +2,10 @@ import importlib
 import logging
 import os
 import sys
-import yaml
 from unittest.mock import MagicMock
 
 import structlog
+import yaml
 from gitlab_cloud_connector import CloudConnectorUser
 from langgraph.checkpoint.memory import MemorySaver
 
@@ -22,20 +22,19 @@ These diagrams show the LangGraph structure of each Workflow in the duo_workflow
 this file, instead update it by running `make duo-workflow-docs`.
 """
 
-GRAPH_CONFIG ="""
+GRAPH_CONFIG = """
 ---
 config:
-  flowchart:
-    curve: linear
+    flowchart:
+        curve: linear
 ---
 graph TD;
     __start__(__start__):::first;
     __end__(__end__):::last;
 """
 
-FLOW_REGISTRY_CONFIG_DIR = (
-    "duo_workflow_service/agent_platform/v1/flows/configs/"
-)
+FLOW_REGISTRY_CONFIG_DIR = "duo_workflow_service/agent_platform/v1/flows/configs/"
+
 
 def main():
     # Setup variables so we can see the full graphs:
@@ -103,24 +102,28 @@ def main():
             if file.endswith(".yml")
         ]
         for flow in flow_registry_names:
-            with open(FLOW_REGISTRY_CONFIG_DIR + flow) as yml_contents:
+            with open(os.path.join(FLOW_REGISTRY_CONFIG_DIR, flow)) as yml_contents:
                 data = yaml.safe_load(yml_contents)
                 version = data["version"]
                 flow_name = flow.removesuffix(".yml") + "/" + version
             output_file.write(f"\n## Graph: `{flow_name}` (Flow Registry)\n\n")
 
             diagram = GRAPH_CONFIG
-            routers = data['routers']
-            start_node = data['flow']['entry_point']
+            routers = data["routers"]
+            components = data["components"]
+            start_node = data["flow"]["entry_point"]
 
             diagram += f"    __start__ --> {start_node};\n"
+            for component in components:
+                diagram += f"    {component['name']}({component['name']}<br>#91;{component['type']}#93;);\n"
+
             for edge in routers:
                 if "to" in edge.keys():
                     diagram += f"    {edge['from']} --> {clean_name(edge['to'])};\n"
                 else:
-                    edge_from = edge['from']
-                    edge_condition = edge['condition']
-                    for (condition_output, edge_to) in edge_condition['routes'].items():
+                    edge_from = edge["from"]
+                    edge_condition = edge["condition"]
+                    for condition_output, edge_to in edge_condition["routes"].items():
                         diagram += f"    {edge_from} -.->|{condition_output}| {clean_name(edge_to)};\n"
 
             diagram += "    classDef default fill:#f2f0ff,line-height:1.2;\n"
@@ -135,6 +138,7 @@ def clean_name(name):
         return "__end__"
 
     return name
+
 
 if __name__ == "__main__":
     main()
