@@ -20,7 +20,7 @@ from prometheus_client import REGISTRY, Counter
 from duo_workflow_service.tracking import MonitoringContext, current_monitoring_context
 from duo_workflow_service.tracking.duo_workflow_metrics import (
     METADATA_LABELS,
-    metadata_labels,
+    build_metadata_labels,
 )
 
 log = structlog.stdlib.get_logger("grpc")
@@ -251,5 +251,5 @@ class MonitoringInterceptor(ServerInterceptor):
             grpc_service=grpc_service_name,
             grpc_method=grpc_method_name,
             grpc_code=grpc_code.name,
-            **metadata_labels(),
+            **build_metadata_labels(),
         ).inc()

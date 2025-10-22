@@ -41,8 +41,6 @@ LLM_TIME_SCALE_BUCKETS = [0.25, 0.5, 1, 2, 4, 7, 10, 20, 30, 60]
 
 ANTHROPIC_STOP_REASONS = AnthropicStopReason.values()
 
-METADATA_LABELS = ["lsp_version", "gitlab_version", "client_type"]
-
 
 class SessionTypeEnum(StrEnum):
     START = "start"
@@ -74,12 +72,17 @@ def _client_type_label():
     return "unknown"
 
 
-def metadata_labels():
-    return {
-        "lsp_version": _language_server_version_label(),
-        "gitlab_version": _gitlab_version_label(),
-        "client_type": _client_type_label(),
-    }
+_METADATA_LABEL_GETTERS = {
+    "lsp_version": _language_server_version_label,
+    "gitlab_version": _gitlab_version_label,
+    "client_type": _client_type_label,
+}
+
+METADATA_LABELS = list(_METADATA_LABEL_GETTERS.keys())
+
+
+def build_metadata_labels():
+    return {key: getter() for key, getter in _METADATA_LABEL_GETTERS.items()}
 
 
 class DuoWorkflowMetrics:  # pylint: disable=too-many-instance-attributes
@@ -233,7 +236,7 @@ class DuoWorkflowMetrics:  # pylint: disable=too-many-instance-attributes
             ),
             status_code=status_code,
             error_type=error_type,
-            **metadata_labels(),
+            **build_metadata_labels(),
         ).inc()
 
     def count_checkpoints(
@@ -246,7 +249,7 @@ class DuoWorkflowMetrics:  # pylint: disable=too-many-instance-attributes
             endpoint=endpoint,
             status_code=status_code,
             method=method,
-            **metadata_labels(),
+            **build_metadata_labels(),
         ).inc()
 
     def count_agent_platform_session_start(
@@ -255,7 +258,7 @@ class DuoWorkflowMetrics:  # pylint: disable=too-many-instance-attributes
     ) -> None:
         self.agent_platform_session_start_counter.labels(
             flow_type=flow_type,
-            **metadata_labels(),
+            **build_metadata_labels(),
         ).inc()
 
     def count_agent_platform_session_retry(
@@ -264,7 +267,7 @@ class DuoWorkflowMetrics:  # pylint: disable=too-many-instance-attributes
     ) -> None:
         self.agent_platform_session_retry_counter.labels(
             flow_type=flow_type,
-            **metadata_labels(),
+            **build_metadata_labels(),
         ).inc()
 
     def count_agent_platform_session_reject(
@@ -273,7 +276,7 @@ class DuoWorkflowMetrics:  # pylint: disable=too-many-instance-attributes
     ) -> None:
         self.agent_platform_session_reject_counter.labels(
             flow_type=flow_type,
-            **metadata_labels(),
+            **build_metadata_labels(),
         ).inc()
 
     def count_agent_platform_session_resume(
@@ -282,7 +285,7 @@ class DuoWorkflowMetrics:  # pylint: disable=too-many-instance-attributes
     ) -> None:
         self.agent_platform_session_resume_counter.labels(
             flow_type=flow_type,
-            **metadata_labels(),
+            **build_metadata_labels(),
         ).inc()
 
     def count_agent_platform_session_success(
@@ -291,7 +294,7 @@ class DuoWorkflowMetrics:  # pylint: disable=too-many-instance-attributes
     ) -> None:
         self.agent_platform_session_success_counter.labels(
             flow_type=flow_type,
-            **metadata_labels(),
+            **build_metadata_labels(),
         ).inc()
 
     def count_agent_platform_session_failure(
@@ -303,7 +306,7 @@ class DuoWorkflowMetrics:  # pylint: disable=too-many-instance-attributes
             flow_type=flow_type,
             failure_reason=failure_reason,
             session_type=session_type_context.get(),
-            **metadata_labels(),
+            **build_metadata_labels(),
         ).inc()
 
     def count_agent_platform_session_abort(
@@ -313,7 +316,7 @@ class DuoWorkflowMetrics:  # pylint: disable=too-many-instance-attributes
         self.agent_platform_session_abort_counter.labels(
             flow_type=flow_type,
             session_type=session_type_context.get(),
-            **metadata_labels(),
+            **build_metadata_labels(),
         ).inc()
 
     def count_agent_platform_tool_failure(
@@ -326,7 +329,7 @@ class DuoWorkflowMetrics:  # pylint: disable=too-many-instance-attributes
             flow_type=flow_type,
             tool_name=tool_name,
             failure_reason=failure_reason,
-            **metadata_labels(),
+            **build_metadata_labels(),
         ).inc()
 
     def count_agent_platform_receive_start_counter(
@@ -335,7 +338,7 @@ class DuoWorkflowMetrics:  # pylint: disable=too-many-instance-attributes
     ) -> None:
         self.agent_platform_receive_start_counter.labels(
             flow_type=flow_type,
-            **metadata_labels(),
+            **build_metadata_labels(),
         ).inc()
 
     def time_llm_request(
@@ -347,7 +350,7 @@ class DuoWorkflowMetrics:  # pylint: disable=too-many-instance-attributes
             lambda duration: self.llm_request_duration.labels(
                 model=model,
                 request_type=request_type,
-                **metadata_labels(),
+                **build_metadata_labels(),
             ).observe(duration)
         )
 
@@ -356,7 +359,7 @@ class DuoWorkflowMetrics:  # pylint: disable=too-many-instance-attributes
             lambda duration: self.tool_call_duration.labels(
                 tool_name=tool_name,
                 flow_type=flow_type,
-                **metadata_labels(),
+                **build_metadata_labels(),
             ).observe(duration)
         )
 
