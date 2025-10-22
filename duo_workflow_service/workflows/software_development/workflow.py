@@ -31,9 +31,6 @@ from duo_workflow_service.components import (
     ToolsRegistry,
 )
 from duo_workflow_service.components.executor.component import ExecutorComponent
-from duo_workflow_service.components.goal_disambiguation import (
-    GoalDisambiguationComponent,
-)
 from duo_workflow_service.components.planner import PlannerComponent
 from duo_workflow_service.entities import (
     MessageTypeEnum,
@@ -160,9 +157,39 @@ PLANNER_TOOLS = [
     "update_task_description",
     "handover_tool",
     "create_plan",
+    "list_issues",
+    "get_issue",
+    "list_issue_notes",
+    "get_issue_note",
+    "get_job_logs",
+    "get_merge_request",
+    "get_project",
+    "get_pipeline_errors",
+    "run_read_only_git_command",
+    "run_git_command",
+    "list_all_merge_request_notes",
+    "list_merge_request_diffs",
+    "gitlab_issue_search",
+    "gitlab_blob_search",
+    "gitlab_merge_request_search",
+    "read_file",
+    "read_files",
+    "find_files",
+    "list_dir",
+    "grep",
+    "get_epic",
+    "list_epics",
+    "get_repository_file",
+    "list_epic_notes",
+    "get_commit",
+    "list_commits",
+    "get_commit_comments",
+    "get_commit_diff",
+    "get_work_item",
+    "list_work_items",
+    "get_work_item_notes",
+    "create_work_item",
 ]
-
-CONTEXT_PLANNING_TOOLS = CONTEXT_BUILDER_TOOLS + PLANNER_TOOLS
 
 
 class Routes(StrEnum):
@@ -229,7 +256,7 @@ class Workflow(AbstractWorkflow):
             user=self._user,
             workflow_id=self._workflow_id,
             workflow_type=self._workflow_type,
-            planner_toolset=tools_registry.toolset(CONTEXT_PLANNING_TOOLS),
+            planner_toolset=tools_registry.toolset(PLANNER_TOOLS),
             executor_toolset=tools_registry.toolset(EXECUTOR_TOOLS),
             tools_registry=tools_registry,
             model_config=self._model_config,
