@@ -185,6 +185,32 @@ graph TD;
     classDef last fill:#bfb6fc
 ```
 
+## Graph: `code_review/v1` (Flow Registry)
+
+```mermaid
+
+---
+config:
+    flowchart:
+        curve: linear
+---
+graph TD;
+    __start__(__start__):::first;
+    __end__(__end__):::last;
+    __start__ --> build_review_context;
+    build_review_context(build_review_context<br>#91;DeterministicStepComponent#93;);
+    prescan_codebase(prescan_codebase<br>#91;AgentComponent#93;);
+    perform_code_review(perform_code_review<br>#91;AgentComponent#93;);
+    publish_review(publish_review<br>#91;DeterministicStepComponent#93;);
+    build_review_context --> prescan_codebase;
+    prescan_codebase --> perform_code_review;
+    perform_code_review --> publish_review;
+    publish_review --> __end__;
+    classDef default fill:#f2f0ff,line-height:1.2;
+    classDef first fill-opacity: 0;
+    classDef last fill:#bfb6fc;
+```
+
 ## Graph: `fix_pipeline/v1` (Flow Registry)
 
 ```mermaid
@@ -221,39 +247,6 @@ graph TD;
     classDef last fill:#bfb6fc;
 ```
 
-## Graph: `sast_fp_detection/v1` (Flow Registry)
-
-```mermaid
-
----
-config:
-    flowchart:
-        curve: linear
----
-graph TD;
-    __start__(__start__):::first;
-    __end__(__end__):::last;
-    __start__ --> sast_vulnerability_details_component;
-    sast_vulnerability_details_component(sast_vulnerability_details_component<br>#91;DeterministicStepComponent#93;);
-    validate_sast_vulnerability_component(validate_sast_vulnerability_component<br>#91;AgentComponent#93;);
-    sast_vulnerability_source_file_component(sast_vulnerability_source_file_component<br>#91;OneOffComponent#93;);
-    sast_vulnerability_lines_component(sast_vulnerability_lines_component<br>#91;OneOffComponent#93;);
-    sast_vulnerability_report_component(sast_vulnerability_report_component<br>#91;AgentComponent#93;);
-    sast_fp_detection_agent(sast_fp_detection_agent<br>#91;AgentComponent#93;);
-    sast_post_results_to_gitlab_component(sast_post_results_to_gitlab_component<br>#91;OneOffComponent#93;);
-    sast_vulnerability_details_component --> validate_sast_vulnerability_component;
-    validate_sast_vulnerability_component -.->|Valid SAST vulnerability| sast_vulnerability_source_file_component;
-    validate_sast_vulnerability_component -.->|Not a valid SAST vulnerability| __end__;
-    sast_vulnerability_source_file_component --> sast_vulnerability_lines_component;
-    sast_vulnerability_lines_component --> sast_vulnerability_report_component;
-    sast_vulnerability_report_component --> sast_fp_detection_agent;
-    sast_fp_detection_agent --> sast_post_results_to_gitlab_component;
-    sast_post_results_to_gitlab_component --> __end__;
-    classDef default fill:#f2f0ff,line-height:1.2;
-    classDef first fill-opacity: 0;
-    classDef last fill:#bfb6fc;
-```
-
 ## Graph: `resolve_sast_vulnerability/v1` (Flow Registry)
 
 ```mermaid
@@ -282,7 +275,7 @@ graph TD;
     classDef last fill:#bfb6fc;
 ```
 
-## Graph: `code_review/v1` (Flow Registry)
+## Graph: `sast_fp_detection/v1` (Flow Registry)
 
 ```mermaid
 
@@ -294,15 +287,22 @@ config:
 graph TD;
     __start__(__start__):::first;
     __end__(__end__):::last;
-    __start__ --> build_review_context;
-    build_review_context(build_review_context<br>#91;DeterministicStepComponent#93;);
-    prescan_codebase(prescan_codebase<br>#91;AgentComponent#93;);
-    perform_code_review(perform_code_review<br>#91;AgentComponent#93;);
-    publish_review(publish_review<br>#91;DeterministicStepComponent#93;);
-    build_review_context --> prescan_codebase;
-    prescan_codebase --> perform_code_review;
-    perform_code_review --> publish_review;
-    publish_review --> __end__;
+    __start__ --> sast_vulnerability_details_component;
+    sast_vulnerability_details_component(sast_vulnerability_details_component<br>#91;DeterministicStepComponent#93;);
+    validate_sast_vulnerability_component(validate_sast_vulnerability_component<br>#91;AgentComponent#93;);
+    sast_vulnerability_source_file_component(sast_vulnerability_source_file_component<br>#91;OneOffComponent#93;);
+    sast_vulnerability_lines_component(sast_vulnerability_lines_component<br>#91;OneOffComponent#93;);
+    sast_vulnerability_report_component(sast_vulnerability_report_component<br>#91;AgentComponent#93;);
+    sast_fp_detection_agent(sast_fp_detection_agent<br>#91;AgentComponent#93;);
+    sast_post_results_to_gitlab_component(sast_post_results_to_gitlab_component<br>#91;OneOffComponent#93;);
+    sast_vulnerability_details_component --> validate_sast_vulnerability_component;
+    validate_sast_vulnerability_component -.->|Valid SAST vulnerability| sast_vulnerability_source_file_component;
+    validate_sast_vulnerability_component -.->|Not a valid SAST vulnerability| __end__;
+    sast_vulnerability_source_file_component --> sast_vulnerability_lines_component;
+    sast_vulnerability_lines_component --> sast_vulnerability_report_component;
+    sast_vulnerability_report_component --> sast_fp_detection_agent;
+    sast_fp_detection_agent --> sast_post_results_to_gitlab_component;
+    sast_post_results_to_gitlab_component --> __end__;
     classDef default fill:#f2f0ff,line-height:1.2;
     classDef first fill-opacity: 0;
     classDef last fill:#bfb6fc;

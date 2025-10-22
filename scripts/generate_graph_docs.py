@@ -96,10 +96,10 @@ def main():
                 output_file.write(f"\n## Graph: `{graph_name}`\n\n")
                 output_file.write("```mermaid\n" + diagram + "```\n")
 
+        flow_registry_files = os.listdir(FLOW_REGISTRY_CONFIG_DIR)
+        flow_registry_files.sort()
         flow_registry_names = [
-            file
-            for file in os.listdir(FLOW_REGISTRY_CONFIG_DIR)
-            if file.endswith(".yml")
+            file for file in flow_registry_files if file.endswith(".yml")
         ]
         for flow in flow_registry_names:
             with open(os.path.join(FLOW_REGISTRY_CONFIG_DIR, flow)) as yml_contents:
