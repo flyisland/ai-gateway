@@ -20,9 +20,5 @@ duo_workflow_service/security/
 # - TOOL_SECURITY_OVERRIDES dictionary
 duo_workflow_service/security/prompt_security.py
 
-# Security tests
-tests/duo_workflow_service/security/
-tests/duo_workflow_service/tools/test_prompt_security.py
-
 ^[Infrastructure]
 * @gitlab-org/production-engineering @gitlab-org/scalability
