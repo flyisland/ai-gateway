@@ -450,12 +450,15 @@ class DuoWorkflowService(contract_pb2_grpc.DuoWorkflowServicer):
 
             await workflow_task
 
+            monitoring_context.last_error_name = type(workflow.last_error).__name__ if workflow.last_error else None
+
             if workflow.successful_execution():
                 context.set_code(grpc.StatusCode.OK)
                 context.set_details(
                     f"workflow execution success: {workflow.last_gitlab_status}"
                 )
             elif str(workflow.last_error) == AIO_CANCEL_STOP_WORKFLOW_REQUEST:
+                monitoring_context.last_error_name = AIO_CANCEL_STOP_WORKFLOW_REQUEST
                 context.set_code(grpc.StatusCode.OK)
                 context.set_details(
                     f"workflow execution stopped: {workflow.last_gitlab_status}"
