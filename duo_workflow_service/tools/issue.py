@@ -134,6 +134,8 @@ For example:
     create_issue(project_id=13, title="Fix bug in login form")
 - Given the URL https://gitlab.com/namespace/project and the title "Fix bug in login form", the tool call would be:
     create_issue(url="https://gitlab.com/namespace/project", title="Fix bug in login form")
+- Given the URL https://gitlab.com/namespace/project and the parent epic id equal 42, the tool call would be:
+    create_issue(url="https://gitlab.com/namespace/project", epic_id: 42) 
 """
     args_schema: Type[BaseModel] = CreateIssueInput  # type: ignore
 
