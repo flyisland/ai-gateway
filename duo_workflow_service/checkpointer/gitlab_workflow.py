@@ -72,6 +72,10 @@ from lib.internal_events.event_enum import (
 T = TypeVar("T", bound=callable)  # type: ignore
 
 
+class SessionAlreadyFinished(Exception):
+    pass
+
+
 def not_implemented_sync_method(func: T) -> T:
     @functools.wraps(func)
     def wrapper(*args, **kwargs):
@@ -289,9 +293,11 @@ class GitLabWorkflow(
                 return MemorySaver()
 
             config: RunnableConfig = {"configurable": {}}
+
             self.initial_status_event, event_property = (
                 await self._get_initial_status_event(config)
             )
+
             await self._update_workflow_status(self.initial_status_event)
 
             if self.initial_status_event == WorkflowStatusEventEnum.START:
@@ -320,6 +326,8 @@ class GitLabWorkflow(
                 additional_properties=additional_properties,
             )
             return self
+        except SessionAlreadyFinished as e:
+            raise e
         except UnsupportedStatusEvent as e:
             reject_properties = InternalEventAdditionalProperties(
                 label=EventLabelEnum.WORKFLOW_REJECT_LABEL.value,
@@ -377,6 +385,9 @@ class GitLabWorkflow(
         """
         checkpoint_tuple = self._workflow_config["first_checkpoint"]
         status = self._workflow_config["workflow_status"]
+
+        if status == "finished":
+            raise SessionAlreadyFinished()
 
         if status in [
             WorkflowStatusEnum.INPUT_REQUIRED,
