@@ -189,13 +189,14 @@ configurable_unit_primitives:
   - feature_setting: "duo_agent_platform"
     unit_primitives:
       - "duo_agent_platform"
-    default_model: "claude_sonnet_4_20250514"
+    default_model: "claude_sonnet_4_5_20250929"
     selectable_models:
+      - "claude_haiku_4_5_20251001"
       - "claude_sonnet_3_7_20250219"
       - "claude_sonnet_4_20250514"
       - "claude_sonnet_4_20250514_vertex"
+      - "claude_sonnet_4_5_20250929"
       - "claude_sonnet_4_5_20250929_vertex"
-      - "claude_haiku_4_5_20251001"
       - "gpt_5"
       - "gpt_5_codex"
       - "gpt_5_mini"
