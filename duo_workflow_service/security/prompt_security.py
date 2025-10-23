@@ -188,14 +188,15 @@ class PromptSecurity:
     # 1. Add it to this dictionary with a comment explaining why
     # 2. Ensure your MR is approved by AppSec team (required by CODEOWNERS)
     # 3. Reference the risk assessment in your comment
+    SecurityFunctionType = Callable[
+        [Union[str, Dict[str, Any], List[Any]]],
+        Union[str, List[Union[str, Dict[str, Any]]]],
+    ]
+
+
     TOOL_SECURITY_OVERRIDES: Dict[
         str,
-        List[
-            Callable[
-                [Union[str, Dict[str, Any], List[Any]]],
-                Union[str, List[Union[str, Dict[str, Any]]]],
-            ]
-        ],
+        List[SecurityFunctionType],
     ] = {
         # Example: 'read_file': [encode_dangerous_tags],  # Only encode tags, skip unicode stripping
         # Example: 'code_review': [],  # No security functions for code review tools
