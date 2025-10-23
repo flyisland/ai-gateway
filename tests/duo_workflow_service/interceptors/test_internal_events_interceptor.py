@@ -7,6 +7,7 @@ from duo_workflow_service.interceptors.gitlab_version_interceptor import gitlab_
 from duo_workflow_service.interceptors.internal_events_interceptor import (
     InternalEventsInterceptor,
 )
+from duo_workflow_service.interceptors.gitlab_version_interceptor import gitlab_version
 from duo_workflow_service.interceptors.language_server_version_interceptor import (
     language_server_version,
 )
