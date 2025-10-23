@@ -351,7 +351,7 @@ class TestToolSecurityOverrides:
         from unittest.mock import Mock, patch
 
         # Create a mock security function
-        mock_encode_tags = Mock(side_effect=lambda x: x.replace("<system>", "&lt;system&gt;").replace("</system>", "&lt;/system&gt;"))
+        mock_encode_tags = Mock(return_value="safe_content")
         mock_encode_tags.__name__ = "encode_dangerous_tags"
 
         # Use context manager to temporarily override TOOL_SECURITY_OVERRIDES
@@ -372,7 +372,7 @@ class TestToolSecurityOverrides:
             result = PromptSecurity.apply_security_to_tool_response(
                 "Hello 👋 World", "code_review"
             )
-            assert result == "Hello 👋 World"
+            assert result == "safe_content"
             mock_encode_tags.assert_called_once()
 
     def test_override_takes_precedence_over_defaults(self):
@@ -496,21 +496,12 @@ class TestToolSecurityOverrides:
         from unittest.mock import Mock, patch
 
         # Track execution order with side effects
-        execution_order = []
-
-        def track_first(response):
-            execution_order.append("first")
-            return response
-
-        def track_second(response):
-            execution_order.append("second")
-            return response
 
         # Create mocks with side effects that track order
-        mock_first = Mock(side_effect=track_first)
+        mock_first = Mock(return_value="1st_sanitized_response")
         mock_first.__name__ = "first_function"
 
-        mock_second = Mock(side_effect=track_second)
+        mock_second = Mock(side_effect="2nd_sanitized_response")
         mock_second.__name__ = "second_function"
 
         # Use context manager to temporarily override TOOL_SECURITY_OVERRIDES
@@ -520,12 +511,11 @@ class TestToolSecurityOverrides:
             {"order_test": [mock_first, mock_second]},
         ):
             # Execute
-            PromptSecurity.apply_security_to_tool_response("test", "order_test")
+            result = PromptSecurity.apply_security_to_tool_response("test", "order_test")
 
-            # Verify order
-            assert execution_order == ["first", "second"]
-            mock_first.assert_called_once()
-            mock_second.assert_called_once()
+            mock_first.assert_called_once_with("test")
+            mock_second.assert_called_once("1st_sanitized_response")
+            assert result == "2nd_sanitized_response"
 
     def test_tool_specific_functions_still_work_without_override(self):
         """Test that TOOL_SPECIFIC_FUNCTIONS still works when no override is set."""
