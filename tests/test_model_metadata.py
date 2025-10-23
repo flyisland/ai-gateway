@@ -389,14 +389,14 @@ class TestFireworksModelMetadata:
             endpoint="https://api.fireworks.ai/v1",
             api_key="test_key",
             model_identifier="test_identifier",
-            using_cache=True,
+            using_cache="True",
             session_id="test_session_id",
         )
         params = metadata.to_params()
         assert params["model"] == "test_identifier"
         assert params["api_key"] == "test_key"
         assert params["api_base"] == "https://api.fireworks.ai/v1"
-        assert params["using_cache"] is True
+        assert params["using_cache"] == "True"
         assert params["session_id"] == "test_session_id"
 
 

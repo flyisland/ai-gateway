@@ -18,7 +18,7 @@ class ChatFireworks(ChatLiteLLM):
     def _setup_fireworks_kwargs(self, kwargs: dict[str, Any]) -> None:
         """Setup Fireworks-specific kwargs including prompt caching and session affinity headers."""
         # Apply prompt caching control
-        if not kwargs.pop("using_cache", True):
+        if kwargs.pop("using_cache", "True").lower() == "false":
             kwargs["prompt_cache_max_len"] = 0
 
         # Add session affinity header if conditions are met

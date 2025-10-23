@@ -1197,17 +1197,17 @@ class TestCodeCompletions:
     @pytest.mark.parametrize(
         ("cache_header_value", "expected_using_cache"),
         [
-            ("true", True),  # Cache enabled
-            ("false", False),  # Cache disabled
-            ("True", True),  # Case-insensitive true
-            ("FALSE", False),  # Case-insensitive false
+            ("true", "True"),  # Cache enabled
+            ("false", "False"),  # Cache disabled
+            ("True", "True"),  # Case-insensitive true
+            ("FALSE", "False"),  # Case-insensitive false
         ],
     )
     def test_fireworks_prompt_cache_behavior(
         self,
         mock_client: Mock,
         cache_header_value: str,
-        expected_using_cache: bool,
+        expected_using_cache: str,
         mock_prompt_ainvoke: Mock,
     ):
         """Test that X-Gitlab-Model-Prompt-Cache-Enabled header affects using_cache in Fireworks calls."""
@@ -1305,7 +1305,7 @@ class TestCodeCompletions:
             model=expected_model,
             api_key="mock_fireworks_key",
             api_base="https://fireworks.endpoint",
-            using_cache=False,
+            using_cache="False",
         )
 
     @pytest.mark.asyncio
