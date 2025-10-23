@@ -172,11 +172,12 @@ class ListIssuesInput(ProjectResourceInput):
         description="""Return issues assigned to the given user ID. It can't be used together with assignee_usernames.
 None returns unassigned issues. Any returns issues with an assignee.""",
     )
-    assignee_usernames: Optional[List[str]] = Field(
+    assignee_username: Optional[List[str]] = Field(
         default=None,
         # pylint: disable=line-too-long
-        description="""Return issues assigned to the given username. This works like assignee_id but can't be used together with it. In GitLab CE,
-assignee_username can only have one value. If there's more than one, an error will be returned.""",
+        description=""" "Filter issues by assignee username(s). Pass usernames as individual strings in a list.
+Examples: ['alice'] for one user, ['alice', 'bob'] for multiple users. 
+Alternative to assignee_id (cannot use both). """,
     )
     author_id: Optional[int] = Field(
         default=None,
@@ -271,7 +272,7 @@ class ListIssues(IssueBaseTool):
             return json.dumps({"error": "; ".join(errors)})
 
         params = {k: v for k, v in kwargs.items() if v is not None}
-
+        
         try:
             response = await self.gitlab_client.aget(
                 path=f"/api/v4/projects/{project_id}/issues",
