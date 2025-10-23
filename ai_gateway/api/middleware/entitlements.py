@@ -1,5 +1,4 @@
-import logging
-from typing import override
+from typing import FrozenSet, override
 from urllib.parse import urljoin
 
 import httpx
@@ -10,12 +9,33 @@ from starlette.responses import JSONResponse, Response
 from starlette.types import ASGIApp
 
 from ai_gateway.api.middleware.base import _PathResolver
+from ai_gateway.instrumentators.entitlements import (
+    ENTITLEMENTS_CHECK_TOTAL,
+    ENTITLEMENTS_CUSTOMERSDOT_LATENCY_SECONDS,
+    ENTITLEMENTS_CUSTOMERSDOT_REQUESTS_TOTAL,
+)
+from lib.feature_flags import FeatureFlag, is_feature_enabled
 from lib.internal_events.context import EventContext, current_event_context
-
-logger = logging.getLogger("entitlements")
 
 
 class EntitlementsMiddleware(BaseHTTPMiddleware):
+    CDOT_RESOLVE_PARAM_KEYS: FrozenSet[str] = frozenset(
+        {
+            "environment",
+            "source",
+            "realm",
+            "instance_id",
+            "unique_instance_id",
+            "feature_enablement_type",
+            "host_name",
+            "instance_version",
+            "global_user_id",
+            "user_id",
+            "project_id",
+            "namespace_id",
+        }
+    )
+
     def __init__(
         self,
         app: ASGIApp,
@@ -35,21 +55,32 @@ class EntitlementsMiddleware(BaseHTTPMiddleware):
         self.path_resolver = _PathResolver.from_optional_list(skip_endpoints)
         self.request_timeout: float = request_timeout
 
+    def is_active(self) -> bool:
+        return self.enabled and is_feature_enabled(
+            FeatureFlag.BILLING_ENTITLEMENTS_CHECK
+        )
+
     @override
     async def dispatch(
         self, request: Request, call_next: RequestResponseEndpoint
     ) -> Response:
+        if not self.is_active():
+            return await call_next(request)
+
         if self.path_resolver.skip_path(request.url.path):
             return await call_next(request)
 
         event_context = current_event_context.get()
+        realm = getattr(event_context, "realm", "unknown")
 
         try:
-            is_authorized = await self.check_consumer_entitlements(event_context)
+            is_authorized = await self.has_usage_quota_left(event_context)
         except Exception:
             is_authorized = True
+            ENTITLEMENTS_CHECK_TOTAL.labels(result="fail_open", realm=realm).inc()
 
         if is_authorized is False:
+            ENTITLEMENTS_CHECK_TOTAL.labels(result="deny", realm=realm).inc()
             return JSONResponse(
                 status_code=402,
                 content={
@@ -60,42 +91,57 @@ class EntitlementsMiddleware(BaseHTTPMiddleware):
             )
 
         response = await call_next(request)
+        ENTITLEMENTS_CHECK_TOTAL.labels(result="allow", realm=realm).inc()
 
         return response
 
-    @cached(cache=TTLCache(maxsize=10_000, ttl=60))
-    async def check_consumer_entitlements(self, context: EventContext) -> bool:
+    @cached(cache=TTLCache(maxsize=10_000, ttl=3600))
+    async def has_usage_quota_left(self, context: EventContext) -> bool:
+        realm = getattr(context, "realm", "unknown")
         try:
             async with httpx.AsyncClient(
                 timeout=httpx.Timeout(self.request_timeout),
                 limits=httpx.Limits(max_keepalive_connections=20, max_connections=100),
             ) as client:
-                response = await client.head(
-                    urljoin(self.customersdot_url, "api/v1/consumers/resolve"),
-                    params=context.model_dump_json(),
+                url = urljoin(self.customersdot_url, "api/v1/consumers/resolve")
+                params = context.model_dump(
+                    include=set(self.CDOT_RESOLVE_PARAM_KEYS),
+                    exclude_none=True,
+                    exclude_unset=True,
                 )
+                with ENTITLEMENTS_CUSTOMERSDOT_LATENCY_SECONDS.labels(
+                    realm=realm
+                ).time():
+                    response = await client.head(url, params=params)
 
-                return response.status_code == 200
+                status = response.status_code
+                if status == 200:
+                    ENTITLEMENTS_CUSTOMERSDOT_REQUESTS_TOTAL.labels(
+                        outcome="success", status="200"
+                    ).inc()
+                    return True
+                if status in (401, 402, 403):
+                    ENTITLEMENTS_CUSTOMERSDOT_REQUESTS_TOTAL.labels(
+                        outcome="denied", status=str(status)
+                    ).inc()
+                    return False
 
-        except httpx.TimeoutException as e:
-            logger.warning(
-                "CustomersDot timeout after %ss - allowing request (fail-open)",
-                self.request_timeout,
-            )
-            raise e
-        except httpx.HTTPStatusError as e:
-            if e.response.status_code in [402]:
-                logger.info("Insufficient entitlements")
-                return False
+                response.raise_for_status()
 
-            logger.error(
-                "CustomersDot HTTP error %s - allowing request (fail-open)",
-                e.response.status_code,
-            )
-            raise e
-        except Exception as e:
-            logger.error(
-                "Unexpected error calling CustomersDot - allowing request (fail-open): %s",
-                e,
-            )
-            raise e
+        except httpx.TimeoutException:
+            ENTITLEMENTS_CUSTOMERSDOT_REQUESTS_TOTAL.labels(
+                outcome="timeout", status="timeout"
+            ).inc()
+            raise
+        except httpx.HTTPStatusError:
+            ENTITLEMENTS_CUSTOMERSDOT_REQUESTS_TOTAL.labels(
+                outcome="http_error", status=str(status)
+            ).inc()
+            raise
+        except Exception:
+            ENTITLEMENTS_CUSTOMERSDOT_REQUESTS_TOTAL.labels(
+                outcome="unexpected", status="client_error"
+            ).inc()
+            raise
+
+        return False
