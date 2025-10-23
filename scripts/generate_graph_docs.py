@@ -20,6 +20,8 @@ HEADER_TEXT = """
 
 These diagrams show the LangGraph structure of each Workflow in the duo_workflow_service. Do not manually edit
 this file, instead update it by running `make duo-workflow-docs`.
+
+[[_TOC_]]
 """
 
 GRAPH_CONFIG = """
