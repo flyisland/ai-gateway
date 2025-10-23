@@ -341,14 +341,17 @@ class TestToolSecurityOverrides:
         mock_default_func.__name__ = "default_function"
 
         # Use context manager to temporarily override both
-        with patch.object(
-            PromptSecurity,
-            "TOOL_SECURITY_OVERRIDES",
-            {"code_review": [mock_override_func]},
-        ), patch.object(
-            PromptSecurity,
-            "DEFAULT_SECURITY_FUNCTIONS",
-            [mock_default_func],
+        with (
+            patch.object(
+                PromptSecurity,
+                "TOOL_SECURITY_OVERRIDES",
+                {"code_review": [mock_override_func]},
+            ),
+            patch.object(
+                PromptSecurity,
+                "DEFAULT_SECURITY_FUNCTIONS",
+                [mock_default_func],
+            ),
         ):
             # Execute with override configured
             result = PromptSecurity.apply_security_to_tool_response(
@@ -375,18 +378,22 @@ class TestToolSecurityOverrides:
         mock_default_func.__name__ = "default_function"
 
         # Use context managers to set up all three dictionaries
-        with patch.object(
-            PromptSecurity,
-            "TOOL_SECURITY_OVERRIDES",
-            {"test_tool": [mock_override_func]},
-        ), patch.object(
-            PromptSecurity,
-            "TOOL_SPECIFIC_FUNCTIONS",
-            {"test_tool": [mock_tool_specific_func]},
-        ), patch.object(
-            PromptSecurity,
-            "DEFAULT_SECURITY_FUNCTIONS",
-            [mock_default_func],
+        with (
+            patch.object(
+                PromptSecurity,
+                "TOOL_SECURITY_OVERRIDES",
+                {"test_tool": [mock_override_func]},
+            ),
+            patch.object(
+                PromptSecurity,
+                "TOOL_SPECIFIC_FUNCTIONS",
+                {"test_tool": [mock_tool_specific_func]},
+            ),
+            patch.object(
+                PromptSecurity,
+                "DEFAULT_SECURITY_FUNCTIONS",
+                [mock_default_func],
+            ),
         ):
             # Execute
             result = PromptSecurity.apply_security_to_tool_response(
@@ -412,14 +419,17 @@ class TestToolSecurityOverrides:
         mock_override_func.__name__ = "mock_override_security"
 
         # Use context managers to set up the test scenario
-        with patch.object(
-            PromptSecurity,
-            "TOOL_SECURITY_OVERRIDES",
-            {"read_file": [mock_override_func]},  # Only read_file has override
-        ), patch.object(
-            PromptSecurity,
-            "DEFAULT_SECURITY_FUNCTIONS",
-            [mock_default_func],
+        with (
+            patch.object(
+                PromptSecurity,
+                "TOOL_SECURITY_OVERRIDES",
+                {"read_file": [mock_override_func]},  # Only read_file has override
+            ),
+            patch.object(
+                PromptSecurity,
+                "DEFAULT_SECURITY_FUNCTIONS",
+                [mock_default_func],
+            ),
         ):
             # Test that a different tool (without override) still uses defaults
             result = PromptSecurity.apply_security_to_tool_response(
@@ -483,7 +493,9 @@ class TestToolSecurityOverrides:
             {"order_test": [mock_first, mock_second]},
         ):
             # Execute
-            result = PromptSecurity.apply_security_to_tool_response("test", "order_test")
+            result = PromptSecurity.apply_security_to_tool_response(
+                "test", "order_test"
+            )
 
             # Verify execution order by checking call arguments
             # mock_first should be called with the original input
@@ -499,22 +511,28 @@ class TestToolSecurityOverrides:
         mock_default_func = Mock(return_value="&lt;system&gt;Test&lt;/system&gt; EXTRA")
         mock_default_func.__name__ = "encode_dangerous_tags"
 
-        mock_additional_func = Mock(return_value="&lt;system&gt;Test&lt;/system&gt; [EXTRA]")
+        mock_additional_func = Mock(
+            return_value="&lt;system&gt;Test&lt;/system&gt; [EXTRA]"
+        )
         mock_additional_func.__name__ = "custom_additional_function"
 
         # Use context managers to set up the test scenario
-        with patch.object(
-            PromptSecurity,
-            "TOOL_SECURITY_OVERRIDES",
-            {},  # No override for additive_tool
-        ), patch.object(
-            PromptSecurity,
-            "TOOL_SPECIFIC_FUNCTIONS",
-            {"additive_tool": [mock_additional_func]},
-        ), patch.object(
-            PromptSecurity,
-            "DEFAULT_SECURITY_FUNCTIONS",
-            [mock_default_func],
+        with (
+            patch.object(
+                PromptSecurity,
+                "TOOL_SECURITY_OVERRIDES",
+                {},  # No override for additive_tool
+            ),
+            patch.object(
+                PromptSecurity,
+                "TOOL_SPECIFIC_FUNCTIONS",
+                {"additive_tool": [mock_additional_func]},
+            ),
+            patch.object(
+                PromptSecurity,
+                "DEFAULT_SECURITY_FUNCTIONS",
+                [mock_default_func],
+            ),
         ):
             # Test that both defaults AND tool-specific function are applied
             result = PromptSecurity.apply_security_to_tool_response(
@@ -527,4 +545,6 @@ class TestToolSecurityOverrides:
             assert result == "&lt;system&gt;Test&lt;/system&gt; [EXTRA]"
             mock_default_func.assert_called_once_with("<system>Test</system> EXTRA")
             # mock_additional_func is called with the output of mock_default_func
-            mock_additional_func.assert_called_once_with("&lt;system&gt;Test&lt;/system&gt; EXTRA")
+            mock_additional_func.assert_called_once_with(
+                "&lt;system&gt;Test&lt;/system&gt; EXTRA"
+            )

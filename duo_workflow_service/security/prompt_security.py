@@ -11,6 +11,12 @@ from duo_workflow_service.security.markdown_content_security import (
     strip_mermaid_comments,
 )
 
+# Type alias for security functions
+SecurityFunctionType = Callable[
+    [Union[str, Dict[str, Any], List[Any]]],
+    Union[str, List[Union[str, Dict[str, Any]]]],
+]
+
 
 def run_from_args():
     args = sys.argv[1:]
@@ -142,12 +148,7 @@ class PromptSecurity:
     """Security class with configurable security functions."""
 
     # Default security functions to apply to ALL tools
-    DEFAULT_SECURITY_FUNCTIONS: List[
-        Callable[
-            [Union[str, Dict[str, Any], List[Any]]],
-            Union[str, List[Union[str, Dict[str, Any]]]],
-        ]
-    ] = [
+    DEFAULT_SECURITY_FUNCTIONS: List[SecurityFunctionType] = [
         encode_dangerous_tags,
         strip_hidden_html_comments,
         strip_hidden_unicode_tags,
@@ -156,15 +157,7 @@ class PromptSecurity:
     ]
 
     # Tool-specific additional security functions
-    TOOL_SPECIFIC_FUNCTIONS: Dict[
-        str,
-        List[
-            Callable[
-                [Union[str, Dict[str, Any], List[Any]]],
-                Union[str, List[Union[str, Dict[str, Any]]]],
-            ]
-        ],
-    ] = {
+    TOOL_SPECIFIC_FUNCTIONS: Dict[str, List[SecurityFunctionType]] = {
         # Example: 'file_read': [validate_no_script_tags],
         # Add tools that need EXTRA security functions beyond the defaults
     }
@@ -183,16 +176,6 @@ class PromptSecurity:
     # - Centralized and easy to audit
     # - Subject to AppSec review via CODEOWNERS
     # - Version controlled with proper change history
-    #
-    # When adding a new override:
-    # 1. Add it to this dictionary with a comment explaining why
-    # 2. Ensure your MR is approved by AppSec team (required by CODEOWNERS)
-    # 3. Reference the risk assessment in your comment
-    SecurityFunctionType = Callable[
-        [Union[str, Dict[str, Any], List[Any]]],
-        Union[str, List[Union[str, Dict[str, Any]]]],
-    ]
-
 
     TOOL_SECURITY_OVERRIDES: Dict[
         str,
