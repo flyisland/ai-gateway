@@ -175,6 +175,19 @@ class PromptSecurity:
     # are too strict (e.g., read_file, code review tools).
     # High-risk tools that handle user-generated content (issues, epics, comments)
     # should continue using DEFAULT_SECURITY_FUNCTIONS.
+    #
+    # ⚠️ IMPORTANT: This dictionary is the Single Source of Truth (SSoT) for tool security overrides.
+    # ALL security overrides MUST be defined here in this dictionary.
+    # DO NOT set overrides dynamically at runtime (e.g., PromptSecurity.TOOL_SECURITY_OVERRIDES['tool'] = [...])
+    # This ensures all security configurations are:
+    # - Centralized and easy to audit
+    # - Subject to AppSec review via CODEOWNERS
+    # - Version controlled with proper change history
+    #
+    # When adding a new override:
+    # 1. Add it to this dictionary with a comment explaining why
+    # 2. Ensure your MR is approved by AppSec team (required by CODEOWNERS)
+    # 3. Reference the risk assessment in your comment
     TOOL_SECURITY_OVERRIDES: Dict[
         str,
         List[
@@ -186,7 +199,7 @@ class PromptSecurity:
     ] = {
         # Example: 'read_file': [encode_dangerous_tags],  # Only encode tags, skip unicode stripping
         # Example: 'code_review': [],  # No security functions for code review tools
-        # Add tools that need COMPLETE REPLACEMENT of default security functions
+        # Add tools that need COMPLETE REPLACEMENT of default security functions below
     }
 
     @staticmethod
