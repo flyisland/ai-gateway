@@ -1,3 +1,5 @@
+import re
+import shlex
 from typing import Any, Optional, Type
 
 from pydantic import BaseModel, Field
@@ -7,7 +9,7 @@ from duo_workflow_service.executor.action import _execute_action
 from duo_workflow_service.tools.duo_base_tool import DuoBaseTool
 
 _DISALLOWED_COMMANDS = ["git"]
-_DISALLOWED_OPERATORS = ["&&", "||", "|"]
+_DISALLOWED_OPERATORS = ["&&", "||"]
 
 
 class RunCommandInput(BaseModel):
@@ -30,6 +32,18 @@ class RunCommand(DuoBaseTool):
     )
     args_schema: Type[BaseModel] = RunCommandInput  # type: ignore
 
+    def _detect_shell_operators(self, args: str) -> bool:
+        """Detect if shell operators are present in the arguments."""
+        # Operators that require shell execution
+        # Removed &> as it's bash-specific and we want to be more conservative
+        shell_operators = [r"\|", r">", r">>", r"<", r"2>", r";"]
+
+        # Build regex pattern: operator with word boundary before or after, or at string start/end
+        # This reduces (but doesn't eliminate) false positives from filenames
+        pattern = r"(?:^|\s)(?:" + "|".join(shell_operators) + r")(?:\s|$)"
+
+        return bool(re.search(pattern, args))
+
     async def _execute(
         self,
         program: str,
@@ -40,19 +54,48 @@ class RunCommand(DuoBaseTool):
         for disallowed_operator in _DISALLOWED_OPERATORS:
             if disallowed_operator in program or disallowed_operator in args:
                 # pylint: disable=line-too-long
-                return f"""'{disallowed_operator}' operators are not supported with {self.name} tool.
-Instead of '{disallowed_operator}' please use {self.name} multiple times consecutively to emulate '{disallowed_operator}' behaviour
-"""
+                return f"""
+                    '{disallowed_operator}' operators are not supported with {self.name} tool.
+                    Instead of '{disallowed_operator}' please use {self.name} multiple times
+                    consecutively to emulate '{disallowed_operator}' behaviour.
+                    """
+
         for disallowed_command in _DISALLOWED_COMMANDS:
             if program.startswith(disallowed_command):
                 return f"{disallowed_command} commands are not supported with {self.name} tool."
+
+        # Detect shell operators that require bash execution
+        needs_shell = self._detect_shell_operators(args)
+
+        if needs_shell:
+            # Use sh -c for maximum portability across environments
+            # All operators we support (|, >, <, >>, 2>, ;) are POSIX-compliant
+            # sh is guaranteed to exist in minimal containers, CI/CD environments, and all Unix-like systems
+            full_command = f"{program} {args}"
+            return await _execute_action(
+                self.metadata,  # type: ignore
+                contract_pb2.Action(
+                    runCommand=contract_pb2.RunCommandAction(
+                        program="sh",
+                        arguments=["-c", full_command],
+                        flags=[],
+                    )
+                ),
+            )
+
+        # Direct execution (existing behavior for commands without shell operators)
+        # Use shlex.split() to correctly handle quoted arguments.
+        try:
+            arguments = shlex.split(args)
+        except ValueError as e:
+            return f"Invalid command arguments: {str(e)}. Check for unclosed quotes or malformed input."
 
         return await _execute_action(
             self.metadata,  # type: ignore
             contract_pb2.Action(
                 runCommand=contract_pb2.RunCommandAction(
                     program=program,
-                    arguments=args.split(),
+                    arguments=arguments,
                     flags=[],
                 )
             ),
