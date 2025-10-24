@@ -681,6 +681,55 @@ def test_available_tools_for_user(
 
 
 @pytest.mark.parametrize(
+    "gitlab_version,enabled_tools,expected_available,expected_unavailable",
+    [
+        (
+            "17.0.0",
+            ["read_write_gitlab"],
+            {"get_work_item", "list_work_items", "create_work_item"},
+            set(),
+        ),
+        (
+            "14.0.0",
+            ["read_write_gitlab"],
+            set(),
+            {"get_work_item", "list_work_items", "create_work_item"},
+        ),
+        (
+            None,
+            ["read_write_gitlab"],
+            {"get_work_item", "list_work_items", "create_work_item"},
+            set(),
+        ),
+    ],
+    ids=[
+        "version_meets_minimum",
+        "version_below_minimum",
+        "no_version_provided",
+    ],
+)
+def test_gitlab_version_filtering(
+    tool_metadata,
+    gitlab_version,
+    enabled_tools,
+    expected_available,
+    expected_unavailable,
+):
+    registry = ToolsRegistry(
+        enabled_tools=enabled_tools,
+        preapproved_tools=[],
+        tool_metadata=tool_metadata,
+        gitlab_version=gitlab_version,
+    )
+
+    available_tools = set(registry._enabled_tools.keys())
+    if len(expected_available) > 0:
+        assert expected_available.issubset(available_tools)
+    if len(expected_unavailable) > 0:
+        assert not expected_unavailable.issubset(available_tools)
+
+
+@pytest.mark.parametrize(
     ("privileges", "tool_names", "expected_tool_names", "expected_preapproved"),
     [
         (

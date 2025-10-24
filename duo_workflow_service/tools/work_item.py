@@ -127,6 +127,7 @@ class ListWorkItemsInput(ParentResourceInput):
 
 class ListWorkItems(WorkItemBaseTool):
     name: str = "list_work_items"
+    gitlab_minimum_version: str = "15.0.0"
     description: str = f"""List work items in a GitLab project or group.
     By default, only returns the first 20 work items. Use 'after' parameter with the
     endCursor from previous responses to fetch subsequent pages.
@@ -244,6 +245,7 @@ class WorkItemResourceInput(ParentResourceInput):
 
 class GetWorkItem(WorkItemBaseTool):
     name: str = "get_work_item"
+    gitlab_minimum_version: str = "15.0.0"
     description: str = f"""Get a single work item in a GitLab group or project.
 
     {WORK_ITEM_IDENTIFICATION_DESCRIPTION}
@@ -306,6 +308,7 @@ class GetWorkItemNotesInput(WorkItemResourceInput):
 
 class GetWorkItemNotes(WorkItemBaseTool):
     name: str = "get_work_item_notes"
+    gitlab_minimum_version: str = "15.0.0"
     description: str = f"""Get all comments (notes) for a specific work item.
 
     {WORK_ITEM_IDENTIFICATION_DESCRIPTION}
@@ -408,6 +411,7 @@ class CreateWorkItemInput(ParentResourceInput):
 
 class CreateWorkItem(WorkItemBaseTool):
     name: str = "create_work_item"
+    gitlab_minimum_version: str = "15.0.0"
     description: str = f"""Create a new work item in a GitLab group or project.
 
     {WORK_ITEM_QUICK_ACTION_NOTE}
@@ -484,6 +488,7 @@ class UpdateWorkItemInput(WorkItemResourceInput):
 
 class UpdateWorkItem(WorkItemBaseTool):
     name: str = "update_work_item"
+    gitlab_minimum_version: str = "15.0.0"
     description: str = f"""Update an existing work item in a GitLab group or project.
 
     {WORK_ITEM_QUICK_ACTION_NOTE}
@@ -536,6 +541,7 @@ class CreateWorkItemNoteInput(WorkItemResourceInput):
 
 class CreateWorkItemNote(WorkItemBaseTool):
     name: str = "create_work_item_note"
+    gitlab_minimum_version: str = "15.0.0"
     description: str = f"""Create a new note (comment) on a GitLab work item.
 
     {WORK_ITEM_QUICK_ACTION_NOTE}
