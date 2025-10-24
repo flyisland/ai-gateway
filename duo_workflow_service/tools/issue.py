@@ -176,7 +176,7 @@ None returns unassigned issues. Any returns issues with an assignee.""",
         default=None,
         # pylint: disable=line-too-long
         description=""" "Filter issues by assignee username(s). Pass usernames as individual strings in a list.
-Examples: ['alice'] for one user, ['alice', 'bob'] for multiple users. 
+Examples: ['alice'] for one user, ['alice', 'bob'] for multiple users.
 Alternative to assignee_id (cannot use both). """,
     )
     author_id: Optional[int] = Field(
@@ -272,7 +272,7 @@ class ListIssues(IssueBaseTool):
             return json.dumps({"error": "; ".join(errors)})
 
         params = {k: v for k, v in kwargs.items() if v is not None}
-        
+
         try:
             response = await self.gitlab_client.aget(
                 path=f"/api/v4/projects/{project_id}/issues",
