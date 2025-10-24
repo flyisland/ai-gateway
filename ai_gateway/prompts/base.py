@@ -122,7 +122,6 @@ class Prompt(RunnableBinding[Input, Output]):
         prompt_template_factory: Optional[TypePromptTemplateFactory] = None,
         disable_streaming: bool = False,
         tools: Optional[List[BaseTool]] = None,
-        tool_choice: Optional[str] = None,
         **kwargs: Any,
     ):
         model_provider = config.model.params.model_class_provider
@@ -132,6 +131,7 @@ class Prompt(RunnableBinding[Input, Output]):
         )
 
         if tools and isinstance(model, BaseChatModel):
+            tool_choice = config.model.params.tool_choice
             model = model.bind_tools(tools, tool_choice=tool_choice)  # type: ignore[assignment]
 
         prompt = (
@@ -180,7 +180,9 @@ class Prompt(RunnableBinding[Input, Output]):
             "disable_streaming": disable_streaming,
             **llm_params,
             **config.params.model_dump(
-                exclude={"model_class_provider"}, exclude_none=True, by_alias=True
+                exclude={"model_class_provider", "tool_choice"},
+                exclude_none=True,
+                by_alias=True,
             ),
         }
         return model_factory(**model_factory_args)

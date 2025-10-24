@@ -659,57 +659,6 @@ prompt_template:
             assert call_dict["gitlab_feature_enabled_by_namespace_ids"] is None
 
     @pytest.mark.usefixtures("mock_fs")
-    @pytest.mark.parametrize(
-        ("tool_choice", "prompt_class"),
-        [
-            ("auto", Mock(spec=Prompt)),
-            ("any", Mock(spec=Prompt)),
-            (None, Mock(spec=Prompt)),
-        ],
-    )
-    def test_get_with_tool_choice(
-        self,
-        prompt_class: Mock,
-        registry: LocalPromptRegistry,
-        tool_choice: str | None,
-    ):
-        """Test that tool_choice parameter is correctly passed from get method to Prompt constructor."""
-
-        # We have custom BaseTool in ai_gateway.chat.tools.
-        # To avoid potential collisions, we import BaseTool from LangChain locally.
-        from langchain_core.tools.base import (  # pylint: disable=import-outside-toplevel
-            BaseTool,
-        )
-
-        tools: list[BaseTool] = [Mock(spec=BaseTool)]
-
-        # Mock the _load_prompt_definition to return a mock prompt
-        with patch.object(
-            registry,
-            "_load_prompt_definition",
-            return_value=Mock(klass=prompt_class, versions={"1.0.0": Mock()}),
-        ):
-            with patch.object(
-                registry,
-                "_get_prompt_config",
-                return_value=Mock(
-                    model=Mock(
-                        params=Mock(model_class_provider=ModelClassProvider.LITE_LLM)
-                    )
-                ),
-            ):
-                _ = registry.get(
-                    prompt_id="test",
-                    prompt_version="^1.0.0",
-                    tools=tools,
-                    tool_choice=tool_choice,
-                )
-
-                kwargs = prompt_class.call_args.kwargs
-                assert kwargs.get("tool_choice") == tool_choice
-                assert kwargs.get("tools") == tools
-
-    @pytest.mark.usefixtures("mock_fs")
     def test_file_not_found_error(
         self,
         registry: LocalPromptRegistry,

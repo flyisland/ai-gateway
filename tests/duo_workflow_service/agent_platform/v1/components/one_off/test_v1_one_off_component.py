@@ -199,9 +199,8 @@ class TestOneOffComponentAttachNodes:
         assert call_args[0][0] == prompt_id
         assert call_args[0][1] == prompt_version
 
-        # Check that tools and tool_choice are set correctly
+        # Check that tools are set correctly
         assert call_args[1]["tools"] == mock_toolset.bindable
-        assert call_args[1]["tool_choice"] == "any"
 
         # Verify AgentNode creation
         mock_agent_node_cls.assert_called_once()
@@ -629,8 +628,6 @@ class TestOneOffComponentModelMetadata:
         mock_state_graph,
         mock_router,
         mock_prompt_registry,
-        prompt_id,
-        prompt_version,
     ):
         mock_model_metadata = ModelMetadata(
             name="gpt_5",

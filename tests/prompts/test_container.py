@@ -181,7 +181,9 @@ def test_container_openai_model_factory_exists(
     )
     model: ChatOpenAI = factory(
         model="gpt-4",
-        **params.model_dump(exclude_none=True, exclude={"model_class_provider"}),
+        **params.model_dump(
+            exclude_none=True, exclude={"model_class_provider", "tool_choice"}
+        ),
     )
 
     assert model.model_name == "gpt-4"

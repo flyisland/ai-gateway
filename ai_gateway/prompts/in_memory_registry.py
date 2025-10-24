@@ -61,7 +61,6 @@ class InMemoryPromptRegistry(BasePromptRegistry):
         prompt_id: str,
         model_metadata: Optional[TypeModelMetadata] = None,
         tools: Optional[list[BaseTool]] = None,
-        tool_choice: Optional[str] = None,
         **kwargs: Any,
     ) -> Prompt:
         """Retrieve and instantiate a local prompt from in-memory storage.
@@ -94,7 +93,6 @@ class InMemoryPromptRegistry(BasePromptRegistry):
             model_metadata=model_metadata,
             disable_streaming=self.shared_registry.disable_streaming,
             tools=tools,
-            tool_choice=tool_choice,
             **kwargs,
         )
 
@@ -104,7 +102,6 @@ class InMemoryPromptRegistry(BasePromptRegistry):
         prompt_version: Optional[str],
         model_metadata: Optional[TypeModelMetadata] = None,
         tools: Optional[list[BaseTool]] = None,
-        tool_choice: Optional[str] = None,  # auto, any, <tool name>. By default, auto.
         **kwargs: Any,
     ) -> Prompt:
         if not prompt_version:
@@ -112,7 +109,6 @@ class InMemoryPromptRegistry(BasePromptRegistry):
                 prompt_id,
                 model_metadata,
                 tools,
-                tool_choice,
                 **kwargs,
             )
         return self.shared_registry.get(
@@ -120,6 +116,5 @@ class InMemoryPromptRegistry(BasePromptRegistry):
             prompt_version,
             model_metadata,
             tools,
-            tool_choice,
             **kwargs,
         )

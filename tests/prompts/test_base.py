@@ -679,6 +679,7 @@ configurable_unit_primitives:
         "tool_choice",
         [
             "auto",
+            "required",
             None,
             "any",
         ],
@@ -694,13 +695,13 @@ configurable_unit_primitives:
         """Test that tool_choice parameter is correctly passed to bind_tools method."""
 
         with mock.patch.object(FakeModel, "bind_tools") as mock_bind_tool:
+            prompt_config.model.params.tool_choice = tool_choice
             mock_bind_tool.return_value = model
             Prompt(
                 model_factory=model_factory,
                 config=prompt_config,
                 model_metadata=model_metadata,
                 tools=[mock.Mock(spec=BaseTool)],
-                tool_choice=tool_choice,
             )
 
         kwargs = mock_bind_tool.call_args.kwargs
