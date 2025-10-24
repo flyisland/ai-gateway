@@ -117,10 +117,6 @@ If a label does not already exist, this creates a new project label and assigns 
         default=None,
         description="The type of issue. One of issue, incident, test_case or task. Default is issue.",
     )
-    epic_id: Optional[int] = Field(
-        default=None,
-        description="The ID of an epic to add the issue to as a child issue. Use only when epic id is available.",
-    )
 
 
 class CreateIssue(IssueBaseTool):
