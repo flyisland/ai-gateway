@@ -1,6 +1,5 @@
 from typing import Any, AsyncIterator, List, Optional
 
-import structlog
 from langchain_core.callbacks import AsyncCallbackManagerForLLMRun
 from langchain_core.messages import BaseMessage
 from langchain_core.outputs import ChatGenerationChunk, ChatResult
@@ -8,9 +7,6 @@ from langchain_core.outputs import ChatGenerationChunk, ChatResult
 from .chat_litellm import ChatLiteLLM
 
 __all__ = ["ChatFireworks"]
-
-logger = structlog.stdlib.get_logger("fireworks")
-
 
 class ChatFireworks(ChatLiteLLM):
     """A Fireworks-specific wrapper that implements prompt caching control similar to LiteLlmTextGenModel."""

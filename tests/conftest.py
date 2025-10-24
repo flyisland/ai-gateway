@@ -275,14 +275,6 @@ def mock_anthropic_chat_stream_fixture(mock_output: TextGenModelOutput):
         yield mock
 
 
-@pytest.fixture(name="mock_llm_chat")
-def mock_llm_chat_fixture(mock_output: TextGenModelOutput):
-    with _mock_generate(
-        "ai_gateway.models.litellm.LiteLlmChatModel", mock_output
-    ) as mock:
-        yield mock
-
-
 @pytest.fixture(name="mock_llm_text")
 def mock_llm_text_fixture(mock_output: TextGenModelOutput):
     with _mock_generate(
