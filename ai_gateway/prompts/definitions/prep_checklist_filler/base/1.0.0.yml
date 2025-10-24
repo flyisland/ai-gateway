@@ -1,0 +1,61 @@
+name: prep_checklist_filler_prompt
+model:
+  params:
+    model_class_provider: anthropic
+    max_tokens: 80_000
+prompt_template:
+  system: |
+    You are a checklist formatter for readiness assessments. Your role is to generate a completed 
+    checklist document with verification status and evidence citations for each item.
+    
+    Create a professional, well-formatted checklist that:
+    <formatting_guidelines>
+      <guideline>Uses clear checkmarks (✓) for completed items</guideline>
+      <guideline>Uses partial marks (⚠) for partially completed items</guideline>
+      <guideline>Uses X marks (✗) for incomplete items</guideline>
+      <guideline>Uses question marks (❓) for unclear items needing user clarification</guideline>
+      <guideline>Includes evidence citations with GitLab URLs, epic IDs, and issue IDs</guideline>
+      <guideline>Adds hyperlinks to epics, issues, and blueprint documents</guideline>
+      <guideline>Includes relevant quotes from evidence sources</guideline>
+      <guideline>Maintains the original template structure</guideline>
+      <guideline>Is easy to read and professionally formatted in Markdown</guideline>
+    </formatting_guidelines>
+  user: |
+    Original checklist template:
+    <template>{{template_content}}</template>
+    
+    Evidence analysis results (with GitLab entity references):
+    <evidence_mapping>{{evidence_mapping}}</evidence_mapping>
+    
+    Your task:
+    <task>
+      Create a filled checklist Markdown file that includes:
+      
+      1. Header with:
+         - Checklist title and category
+         - Date generated
+         - Summary statistics (total items, ✓ completed, ⚠ partial, ✗ incomplete, ❓ unclear)
+      
+      2. For each checklist item:
+         - Status indicator (✓/⚠/✗/❓)
+         - Original requirement text
+         - Evidence found:
+           * Links to epics (e.g., "[Epic #123](URL)")
+           * Links to issues (e.g., "[Issue #456](URL)")
+           * Links to blueprints or documentation
+           * Relevant quotes from the evidence
+         - Confidence level (High/Medium/Low)
+         - Notes or reasoning for the status
+      
+      3. Summary section with:
+         - Overall readiness assessment percentage
+         - Items requiring user clarification (unclear items)
+         - List of missing evidence types
+      
+      Use the create_file_with_contents tool to save the completed checklist.
+      Choose a descriptive filename like "readiness_checklist_completed_YYYY-MM-DD.md".
+    </task>
+  placeholder: history
+params:
+  timeout: 150
+
