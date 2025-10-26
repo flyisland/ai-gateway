@@ -12,9 +12,12 @@ from duo_workflow_service.monitoring import duo_workflow_metrics
 from duo_workflow_service.security.prompt_security import (
     PromptSecurity,
     SecurityException,
+    compute_response_hash_with_length,
 )
 from duo_workflow_service.tracking.errors import log_exception
 from lib.internal_events.event_enum import CategoryEnum
+
+log = structlog.stdlib.get_logger("run_tool_node")
 
 WorkflowStateT_contra = TypeVar(
     "WorkflowStateT_contra",
@@ -85,10 +88,25 @@ class RunToolNode(Generic[WorkflowStateT]):
             ):
                 if output := await self._tool._arun(**tool_params):
                     try:
+                        # Compute hash and length of original output (single pass)
+                        original_hash, original_length = compute_response_hash_with_length(output)
+
+                        # Apply security functions
                         secure_output = PromptSecurity.apply_security_to_tool_response(
                             response=output,
                             tool_name=self._tool.name,
                         )
+
+                        # Log if security modified the tool response
+                        secured_hash, secured_length = compute_response_hash_with_length(secure_output)
+                        if original_hash != secured_hash:
+                            log.warning(
+                                "Tool response was modified by security functions before sending to agent",
+                                tool_name=self._tool.name,
+                                original_length=original_length,
+                                secured_length=secured_length,
+                            )
+
                         output = secure_output
                     except SecurityException as e:
                         log_exception(

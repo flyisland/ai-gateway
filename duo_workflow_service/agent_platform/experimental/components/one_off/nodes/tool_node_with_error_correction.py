@@ -21,6 +21,7 @@ from duo_workflow_service.monitoring import duo_workflow_metrics
 from duo_workflow_service.security.prompt_security import (
     PromptSecurity,
     SecurityException,
+    compute_response_hash_with_length,
 )
 from duo_workflow_service.tools.toolset import Toolset
 from lib.internal_events import InternalEventAdditionalProperties, InternalEventsClient
@@ -200,10 +201,26 @@ class ToolNodeWithErrorCorrection:
     ) -> str | list[str | dict]:
         """Sanitize tool response for security."""
         try:
-            return PromptSecurity.apply_security_to_tool_response(
+            # Compute hash of original response for comparison
+            original_hash, original_length = compute_response_hash_with_length(response)
+
+            # Apply security functions
+            sanitized = PromptSecurity.apply_security_to_tool_response(
                 response=response,
                 tool_name=tool_name,
             )
+
+            # Log if security modified the tool response
+            secured_hash, secured_length = compute_response_hash_with_length(sanitized)
+            if original_hash != secured_hash:
+                self._logger.warning(
+                    "Tool response was modified by security functions before sending to agent",
+                    tool_name=tool_name,
+                    original_length=original_length,
+                    secured_length=secured_length,
+                )
+
+            return sanitized
         except SecurityException as e:
             self._logger.error(f"Security validation failed for tool {tool_name}: {e}")
             raise

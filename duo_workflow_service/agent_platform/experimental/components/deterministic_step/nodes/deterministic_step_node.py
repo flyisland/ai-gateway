@@ -16,7 +16,10 @@ from duo_workflow_service.agent_platform.experimental.state import (
 )
 from duo_workflow_service.agent_platform.experimental.ui_log import UIHistory
 from duo_workflow_service.monitoring import duo_workflow_metrics
-from duo_workflow_service.security.prompt_security import PromptSecurity
+from duo_workflow_service.security.prompt_security import (
+    PromptSecurity,
+    compute_response_hash_with_length,
+)
 from lib.internal_events import InternalEventAdditionalProperties, InternalEventsClient
 from lib.internal_events.event_enum import CategoryEnum, EventEnum, EventLabelEnum
 
@@ -121,9 +124,23 @@ class DeterministicStepNode:
         ):
             tool_call_result = await tool.arun(tool_call_args)
 
+        # Compute hash of original result for comparison
+        original_hash, original_length = compute_response_hash_with_length(tool_call_result)
+
+        # Apply security functions
         secure_result = PromptSecurity.apply_security_to_tool_response(
             response=tool_call_result, tool_name=self._tool_name
         )
+
+        # Log if security modified the tool response
+        secured_hash, secured_length = compute_response_hash_with_length(secure_result)
+        if original_hash != secured_hash:
+            self._logger.warning(
+                "Tool response was modified by security functions before sending to agent",
+                tool_name=self._tool_name,
+                original_length=original_length,
+                secured_length=secured_length,
+            )
 
         self._track_internal_event(
             event_name=EventEnum.WORKFLOW_TOOL_SUCCESS,
