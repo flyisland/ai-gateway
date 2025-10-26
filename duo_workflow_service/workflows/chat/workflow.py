@@ -167,7 +167,8 @@ class Workflow(AbstractWorkflow):
     ):
         self._tools_override = kwargs.pop("tools_override", None)
 
-        self._prompt_id = "chat/agent"
+        # self._prompt_id = "chat/agent"
+        self._prompt_id = "chat/my_cortex_agent"
         self._prompt_version = "^1.0.0"
         active_prompt_registry: Union[LocalPromptRegistry, InMemoryPromptRegistry] = (
             prompt_registry

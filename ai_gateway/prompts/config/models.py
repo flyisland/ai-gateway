@@ -19,6 +19,7 @@ class ModelClassProvider(StrEnum):
     ANTHROPIC = "anthropic"
     AMAZON_Q = "amazon_q"
     OPENAI = "openai"
+    CORTEX = "cortex"
 
 
 class BaseModelParams(BaseModel):
@@ -54,8 +55,17 @@ class ChatAmazonQParams(BaseModelParams):
 class ChatOpenAIParams(BaseModelParams):
     model_class_provider: Literal[ModelClassProvider.OPENAI]
 
+class ChatCortexParams(BaseModelParams):
+    model_class_provider: Literal[ModelClassProvider.CORTEX]
+
+    database: str | None = None
+    cortex_schema: str | None = None
+    agent_name: str | None = None
+    api_token: str | None = None
+    base_url: str | None = None
+
 
 TypeModelParams = Annotated[
-    ChatLiteLLMParams | ChatAnthropicParams | ChatAmazonQParams | ChatOpenAIParams,
+    ChatLiteLLMParams | ChatAnthropicParams | ChatAmazonQParams | ChatOpenAIParams | ChatCortexParams,
     Field(discriminator="model_class_provider"),
 ]

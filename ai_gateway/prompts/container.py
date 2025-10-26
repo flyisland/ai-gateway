@@ -4,6 +4,7 @@ from ai_gateway.chat import agents as chat
 from ai_gateway.config import ConfigModelLimits
 from ai_gateway.prompts.config import ModelClassProvider
 from ai_gateway.prompts.registry import LocalPromptRegistry
+from ai_gateway.models.cortex import cortex_model_factory
 
 __all__ = [
     "ContainerPrompts",
@@ -40,6 +41,7 @@ class ContainerPrompts(containers.DeclarativeContainer):
             ),
             ModelClassProvider.LITE_LLM: providers.Factory(models.lite_llm_chat_fn),
             ModelClassProvider.AMAZON_Q: providers.Factory(models.amazon_q_chat_fn),
+            ModelClassProvider.CORTEX: providers.Factory(cortex_model_factory),
         },
         internal_event_client=internal_event.client,
         model_limits=providers.Factory(ConfigModelLimits, config.model_engine_limits),
