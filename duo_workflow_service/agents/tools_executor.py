@@ -124,7 +124,7 @@ class ToolsExecutor:
                         result["response"].content
                     )
                     if original_hash != secured_hash:
-                        log.warning(
+                        self._logger.warning(
                             "Tool response was modified by security functions before sending to agent",
                             tool_name=tool_name,
                             original_length=original_length,
