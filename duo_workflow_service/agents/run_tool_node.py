@@ -89,7 +89,9 @@ class RunToolNode(Generic[WorkflowStateT]):
                 if output := await self._tool._arun(**tool_params):
                     try:
                         # Compute hash and length of original output (single pass)
-                        original_hash, original_length = compute_response_hash_with_length(output)
+                        original_hash, original_length = (
+                            compute_response_hash_with_length(output)
+                        )
 
                         # Apply security functions
                         secure_output = PromptSecurity.apply_security_to_tool_response(
@@ -98,7 +100,9 @@ class RunToolNode(Generic[WorkflowStateT]):
                         )
 
                         # Log if security modified the tool response
-                        secured_hash, secured_length = compute_response_hash_with_length(secure_output)
+                        secured_hash, secured_length = (
+                            compute_response_hash_with_length(secure_output)
+                        )
                         if original_hash != secured_hash:
                             log.warning(
                                 "Tool response was modified by security functions before sending to agent",

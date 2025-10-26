@@ -41,7 +41,7 @@ def compute_response_hash(response: Union[str, Dict[str, Any], List[Any]]) -> st
 
 
 def compute_response_hash_with_length(
-    response: Union[str, Dict[str, Any], List[Any]]
+    response: Union[str, Dict[str, Any], List[Any]],
 ) -> tuple[str, int]:
     """Compute hash and length of a response in a single pass.
 
@@ -300,20 +300,26 @@ class PromptSecurity:
         for func in all_functions:
             try:
                 # Compute hash and length before this function (single pass!)
-                before_hash, before_length = compute_response_hash_with_length(secured_response)
+                before_hash, before_length = compute_response_hash_with_length(
+                    secured_response
+                )
 
                 # Apply the security function
                 secured_response = func(secured_response)
 
                 # Check if this specific function modified the response
-                after_hash, after_length = compute_response_hash_with_length(secured_response)
+                after_hash, after_length = compute_response_hash_with_length(
+                    secured_response
+                )
                 if before_hash != after_hash:
-                    functions_that_modified.append({
-                        "function": func.__name__,
-                        "length_before": before_length,
-                        "length_after": after_length,
-                        "chars_removed": before_length - after_length,
-                    })
+                    functions_that_modified.append(
+                        {
+                            "function": func.__name__,
+                            "length_before": before_length,
+                            "length_after": after_length,
+                            "chars_removed": before_length - after_length,
+                        }
+                    )
 
             except SecurityException as e:
                 log.error(
@@ -337,7 +343,9 @@ class PromptSecurity:
                 ) from e
 
         # Check if any security functions modified the response
-        secured_hash, secured_length = compute_response_hash_with_length(secured_response)
+        secured_hash, secured_length = compute_response_hash_with_length(
+            secured_response
+        )
         response_modified = original_hash != secured_hash
 
         if response_modified:
@@ -345,7 +353,9 @@ class PromptSecurity:
                 "Security functions modified the tool response",
                 tool_name=tool_name,
                 functions_applied=len(all_functions),
-                functions_that_modified=[f["function"] for f in functions_that_modified],
+                functions_that_modified=[
+                    f["function"] for f in functions_that_modified
+                ],
                 modification_details=functions_that_modified,
                 original_length=original_length,
                 secured_length=secured_length,

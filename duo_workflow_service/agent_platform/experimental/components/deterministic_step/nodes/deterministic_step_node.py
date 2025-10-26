@@ -125,7 +125,9 @@ class DeterministicStepNode:
             tool_call_result = await tool.arun(tool_call_args)
 
         # Compute hash of original result for comparison
-        original_hash, original_length = compute_response_hash_with_length(tool_call_result)
+        original_hash, original_length = compute_response_hash_with_length(
+            tool_call_result
+        )
 
         # Apply security functions
         secure_result = PromptSecurity.apply_security_to_tool_response(
