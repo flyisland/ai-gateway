@@ -33,4 +33,4 @@ spec:
     startup_cpu_boost: true
     limits:
       cpu: 1000m
-      memory: 4G
+      memory: 8G
