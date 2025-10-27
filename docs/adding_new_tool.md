@@ -81,8 +81,8 @@ implementation details, and best practices.
 
 **All tools have automatic response truncation applied.**
 
-- **Max length**: Configured in [tool_output_manager](https://gitlab.com/gitlab-org/modelops/applied-ml/code-suggestions/ai-assist/-/blob/main/duo_workflow_service/tools/tool_output_manager.py?ref_type=heads#L16)
-- **Behavior**: Only the **first N characters** of your tool's response are kept. Content beyond this limit is truncated and structured by [truncate_tool_response](https://gitlab.com/gitlab-org/modelops/applied-ml/code-suggestions/ai-assist/-/blob/main/duo_workflow_service/tools/duo_base_tool.py?ref_type=heads#L93)
+- **Max length**: Configured in [tool_output_manager](https://gitlab.com/gitlab-org/modelops/applied-ml/code-suggestions/ai-assist/-/blob/main/duo_workflow_service/tools/tool_output_manager.py)
+- **Behavior**: Only the **first N characters** of your tool's response are kept. Content beyond this limit is truncated and structured by [truncate_tool_response](https://gitlab.com/gitlab-org/modelops/applied-ml/code-suggestions/ai-assist/-/blob/main/duo_workflow_service/tools/duo_base_tool.py)
 - **Action required**: Structure your tool output to put the most important information **at the beginning**
 
 **Example:**
