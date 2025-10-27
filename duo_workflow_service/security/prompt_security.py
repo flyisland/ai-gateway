@@ -2,7 +2,7 @@
 import re
 import sys
 from pathlib import Path
-from typing import Any, Callable, Dict, List, Union
+from typing import Any, Callable, Dict, List, Union, overload
 
 from duo_workflow_service.security.emoji_security import strip_emojis
 from duo_workflow_service.security.exceptions import SecurityException
@@ -187,6 +187,22 @@ class PromptSecurity:
         "read_file": [],  # No security functions for read_file tool
     }
 
+    @overload
+    @staticmethod
+    def apply_security_to_tool_response(response: str, tool_name: str) -> str: ...
+
+    @overload
+    @staticmethod
+    def apply_security_to_tool_response(
+        response: Dict[str, Any], tool_name: str
+    ) -> List[Union[str, Dict[str, Any]]]: ...
+
+    @overload
+    @staticmethod
+    def apply_security_to_tool_response(
+        response: List[Any], tool_name: str
+    ) -> List[Union[str, Dict[str, Any]]]: ...
+
     @staticmethod
     def apply_security_to_tool_response(
         response: Union[str, Dict[str, Any], List[Any]], tool_name: str
@@ -207,6 +223,9 @@ class PromptSecurity:
 
         Returns:
             Secured response compatible with ToolMessage.content (str | list[str | dict])
+            - If input is str, returns str
+            - If input is Dict[str, Any], returns List[Union[str, Dict[str, Any]]]
+            - If input is List[Any], returns List[Union[str, Dict[str, Any]]]
 
         Raises:
             SecurityException: If any security validation fails

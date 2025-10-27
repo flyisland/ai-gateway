@@ -3,7 +3,7 @@ from typing import Annotated, ClassVar, Literal, Optional
 from dependency_injector.wiring import Provide, inject
 from langchain_core.messages import AIMessage, BaseMessage
 from langgraph.graph import StateGraph
-from pydantic import Field
+from pydantic import Field, model_validator
 
 from ai_gateway.container import ContainerApplication
 from ai_gateway.model_metadata import current_model_metadata_context
@@ -28,6 +28,7 @@ from duo_workflow_service.agent_platform.experimental.components.registry import
 from duo_workflow_service.agent_platform.experimental.state import (
     FlowState,
     FlowStateKeys,
+    IOKey,
     IOKeyTemplate,
 )
 from duo_workflow_service.agent_platform.experimental.ui_log import (
@@ -65,6 +66,7 @@ class AgentComponent(BaseComponent):
     prompt_id: str
     prompt_version: Optional[str] = None
     toolset: Toolset
+    tool_arguments_binding: list[IOKey] = Field(default_factory=list)
 
     prompt_registry: LocalPromptRegistry | InMemoryPromptRegistry = Provide[
         ContainerApplication.pkg_prompts.prompt_registry
@@ -77,6 +79,16 @@ class AgentComponent(BaseComponent):
     ui_role_as: Literal["agent", "tool"] = "agent"
 
     _allowed_input_targets = tuple(FlowState.__annotations__.keys())
+
+    @model_validator(mode="before")
+    @classmethod
+    def parse_tool_arguments_binding(cls, data: dict) -> dict:
+        """Parse tool_arguments_binding from configuration."""
+        if "tool_arguments_binding" in data:
+            data["tool_arguments_binding"] = IOKey.parse_keys(
+                data["tool_arguments_binding"]
+            )
+        return data
 
     def _agent_node_router(self, state: FlowState) -> str:
         history: list[BaseMessage] = state[FlowStateKeys.CONVERSATION_HISTORY].get(
@@ -131,6 +143,7 @@ class AgentComponent(BaseComponent):
             name=f"{self.name}#tools",
             component_name=self.name,
             toolset=self.toolset,
+            tool_arguments_binding=self.tool_arguments_binding,
             flow_id=self.flow_id,
             flow_type=self.flow_type,
             internal_event_client=self.internal_event_client,

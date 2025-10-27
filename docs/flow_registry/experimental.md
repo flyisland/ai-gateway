@@ -202,6 +202,144 @@ Each AgentComponent automatically produces:
 These outputs can be used as inputs by other components or referenced in routing logic to control flow execution.
 For example, you might route to different components based on whether the agent's final answer equals to specific phrase
 
+#### Tool Arguments Binding
+
+The `tool_arguments_binding` feature provides a security mechanism to prevent prompt injection attacks by restricting the scope in which an agent operates. It works by **overriding tool call arguments** at execution time, ensuring that agents cannot be manipulated into accessing resources outside their prescribed data perimeter.
+
+##### Configuration
+
+The binding applies to **all tools** in the toolset that have a matching parameter
+
+###### Syntax Example
+
+```yaml
+components:
+  - name: "secure_agent"
+    type: AgentComponent
+    prompt_id: "my_prompt"
+    prompt_version: "^1.0.0"
+    inputs:
+      - from: "context:project_id"
+        as: "project_id"
+    toolset:
+      - "get_repository_file"
+      - "list_repository_tree"
+    tool_arguments_binding:
+      - from: "context:project_id"  # Binds to parameter named "project_id"
+      - from: "context:current_branch"
+        as: "ref"  # Binds to "ref" parameter
+```
+
+##### How It Works
+
+###### Execution Flow
+
+1. **Agent generates tool call** with arguments
+1. **Binding layer intercepts** the tool call
+1. **Bound values are extracted** from flow state
+1. **Agent arguments are overridden** with bound values
+1. **Tool executes** with enforced arguments
+1. **Tool response** is being wrapped with JIT (just-in-time) instructions informing LLM that tool call arguments has been overrode
+
+###### Example Scenario
+
+**Configuration:**
+
+```yaml
+tool_arguments_binding:
+  - from: "context:project_id"  # No 'as' needed - infers "project_id"
+```
+
+**Agent attempts to call:**
+
+```python
+get_repository_file(project_id=999, file_path="secret.txt")
+```
+
+**Binding enforcement:**
+
+1. Extracts `context.project_id` from state using `template_variable_from_state()` → `{"project_id": 42}`
+1. Detects parameter name: `"project_id"` (from last segment of path)
+1. Compares: agent value `999` ≠ bound value `42`
+1. Overrides agent's argument: `project_id=999` → `project_id=42`
+1. Logs the security override
+1. Tool executes with `project_id=42`
+1. LLM receives tool response wrapped in JIT instruction informing it that arguments has been overrode
+
+**Result:** Agent cannot access project 999 even if prompted to do so.
+
+##### Use Cases
+
+###### 1. Project Scope Restriction
+
+Prevent agents from accessing projects outside their authorization:
+
+```yaml
+components:
+  - name: "code_reviewer"
+    type: AgentComponent
+    prompt_id: "code_review"
+    prompt_version: "^1.0.0"
+    inputs:
+      - from: "context:project_id"
+        as: "project_id"
+      - from: "context:merge_request_iid"
+        as: "mr_iid"
+    toolset:
+      - "get_repository_file"
+      - "list_repository_tree"
+      - "get_merge_request"
+      - "list_merge_request_diffs"
+    tool_arguments_binding:
+      - from: "context:project_id"
+        as: "project_id"
+      - from: "context:merge_request_iid"
+        as: "merge_request_iid"
+```
+
+**Security benefit:** Agent can only review the specific merge request, even if prompted to access others.
+
+###### 1. Branch Protection
+
+Ensure agents only work on designated branches:
+
+```yaml
+components:
+  - name: "branch_worker"
+    type: AgentComponent
+    prompt_id: "branch_operations"
+    prompt_version: "^1.0.0"
+    inputs:
+      - from: "context:working_branch"
+        as: "branch_name"
+      - from: "context:project_id"
+        as: "project_id"
+    toolset:
+      - "get_repository_file"
+      - "list_repository_tree"
+    tool_arguments_binding:
+      - from: "context:project_id"
+        as: "project_id"
+      - from: "context:working_branch"
+        as: "ref"  # Binds branch reference
+```
+
+##### Security Guarantees
+
+###### What's Protected
+
+✅ **Parameter values** - Bound parameters cannot be changed by agent  
+✅ **Cross-tool enforcement** - Bindings apply to all tools with matching parameters  
+✅ **Runtime enforcement** - Overrides happen at execution time, not configuration time  
+✅ **Audit logging** - All overrides are logged for security monitoring
+
+###### What's NOT Protected
+
+❌ **Non-bound parameters** - Agent controls unbound parameters  
+❌ **Tool selection** - Agent can still choose which tools to call  
+❌ **Tool call frequency** - Agent controls how often tools are called  
+❌ **Literal values** - Cannot bind to literal strings (must come from state)
+
 #### UI Log Events
 
 The AgentComponent supports the following UI log events that can be specified in the `ui_log_events` configuration:
