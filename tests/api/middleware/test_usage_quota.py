@@ -6,7 +6,7 @@ import pytest
 from starlette.requests import Request
 from starlette.responses import Response
 
-from ai_gateway.api.middleware.entitlements import EntitlementsMiddleware
+from ai_gateway.api.middleware.usage_quota import UsageQuotaMiddleware
 from lib.feature_flags import FeatureFlag
 from lib.internal_events.context import EventContext
 
@@ -31,16 +31,16 @@ def mock_event_context_fixture():
 
     # Dynamically build model_dump return value based on CDOT_RESOLVE_PARAM_KEYS
     ctx.model_dump.return_value = {
-        k: getattr(ctx, k) for k in EntitlementsMiddleware.CDOT_RESOLVE_PARAM_KEYS
+        k: getattr(ctx, k) for k in UsageQuotaMiddleware.CDOT_RESOLVE_PARAM_KEYS
     }
 
     return ctx
 
 
-@pytest.fixture(name="entitlements_middleware")
-def entitlements_middleware_fixture(mock_app):
-    """Create an EntitlementsMiddleware instance for testing."""
-    middleware = EntitlementsMiddleware(
+@pytest.fixture(name="usage_quota_middleware")
+def usage_quota_middleware_fixture(mock_app):
+    """Create an UsageQuotaMiddleware instance for testing."""
+    middleware = UsageQuotaMiddleware(
         app=mock_app,
         customersdot_url="https://customers.gitlab.local",
         skip_endpoints=["/health", "/metrics"],
@@ -52,8 +52,8 @@ def entitlements_middleware_fixture(mock_app):
 
 
 @pytest.mark.asyncio
-async def test_skips_endpoint_in_skip_list(entitlements_middleware, mock_event_context):
-    """Test that middleware skips entitlement check for endpoints in skip_endpoints list."""
+async def test_skips_endpoint_in_skip_list(usage_quota_middleware, mock_event_context):
+    """Test that middleware skips usage quota check for endpoints in skip_endpoints list."""
     request = Request(
         {
             "type": "http",
@@ -66,20 +66,20 @@ async def test_skips_endpoint_in_skip_list(entitlements_middleware, mock_event_c
 
     with (
         patch(
-            "ai_gateway.api.middleware.entitlements.current_event_context"
+            "ai_gateway.api.middleware.usage_quota.current_event_context"
         ) as mock_ctx,
-        patch("ai_gateway.api.middleware.entitlements.is_feature_enabled") as mock_ff,
+        patch("ai_gateway.api.middleware.usage_quota.is_feature_enabled") as mock_ff,
     ):
         mock_ff.return_value = True
         mock_ctx.get.return_value = mock_event_context
-        response = await entitlements_middleware.dispatch(request, call_next)
+        response = await usage_quota_middleware.dispatch(request, call_next)
 
     assert response.status_code == 200
     call_next.assert_called_once_with(request)
 
 
 @pytest.mark.asyncio
-async def test_skips_metrics_endpoint(entitlements_middleware, mock_event_context):
+async def test_skips_metrics_endpoint(usage_quota_middleware, mock_event_context):
     """Test that /metrics endpoint is skipped."""
     request = Request(
         {
@@ -93,13 +93,13 @@ async def test_skips_metrics_endpoint(entitlements_middleware, mock_event_contex
 
     with (
         patch(
-            "ai_gateway.api.middleware.entitlements.current_event_context"
+            "ai_gateway.api.middleware.usage_quota.current_event_context"
         ) as mock_ctx,
-        patch("ai_gateway.api.middleware.entitlements.is_feature_enabled") as mock_ff,
+        patch("ai_gateway.api.middleware.usage_quota.is_feature_enabled") as mock_ff,
     ):
         mock_ff.return_value = True
         mock_ctx.get.return_value = mock_event_context
-        response = await entitlements_middleware.dispatch(request, call_next)
+        response = await usage_quota_middleware.dispatch(request, call_next)
 
     assert response.status_code == 200
     call_next.assert_called_once_with(request)
@@ -107,7 +107,7 @@ async def test_skips_metrics_endpoint(entitlements_middleware, mock_event_contex
 
 @pytest.mark.asyncio
 async def test_feature_flag_disabled_skips_usage_quota_check(
-    entitlements_middleware, mock_event_context
+    usage_quota_middleware, mock_event_context
 ):
     """Test that middleware skips usage quota check when feature flag is disabled."""
     request = Request(
@@ -117,11 +117,11 @@ async def test_feature_flag_disabled_skips_usage_quota_check(
 
     with (
         patch(
-            "ai_gateway.api.middleware.entitlements.current_event_context"
+            "ai_gateway.api.middleware.usage_quota.current_event_context"
         ) as mock_ctx,
-        patch("ai_gateway.api.middleware.entitlements.is_feature_enabled") as mock_ff,
+        patch("ai_gateway.api.middleware.usage_quota.is_feature_enabled") as mock_ff,
         patch.object(
-            entitlements_middleware,
+            usage_quota_middleware,
             "has_usage_quota_left",
             new_callable=AsyncMock,
         ) as mock_check,
@@ -129,17 +129,17 @@ async def test_feature_flag_disabled_skips_usage_quota_check(
         mock_ctx.get.return_value = mock_event_context
         mock_ff.return_value = False
 
-        response = await entitlements_middleware.dispatch(request, call_next)
+        response = await usage_quota_middleware.dispatch(request, call_next)
 
     assert response.status_code == 200
     call_next.assert_called_once_with(request)
     mock_check.assert_not_called()
-    mock_ff.assert_called_once_with(FeatureFlag.BILLING_ENTITLEMENTS_CHECK)
+    mock_ff.assert_called_once_with(FeatureFlag.USAGE_QUOTA_LEFT_CHECK)
 
 
 @pytest.mark.asyncio
 async def test_feature_flag_enabled_performs_usage_quota_check(
-    entitlements_middleware, mock_event_context
+    usage_quota_middleware, mock_event_context
 ):
     """Test that middleware performs usage quota check when feature flag is enabled."""
     request = Request(
@@ -150,20 +150,20 @@ async def test_feature_flag_enabled_performs_usage_quota_check(
 
     with (
         patch(
-            "ai_gateway.api.middleware.entitlements.current_event_context"
+            "ai_gateway.api.middleware.usage_quota.current_event_context"
         ) as mock_ctx,
-        patch("ai_gateway.api.middleware.entitlements.is_feature_enabled") as mock_ff,
-        patch.object(entitlements_middleware, "has_usage_quota_left", mock_check),
+        patch("ai_gateway.api.middleware.usage_quota.is_feature_enabled") as mock_ff,
+        patch.object(usage_quota_middleware, "has_usage_quota_left", mock_check),
     ):
         mock_ctx.get.return_value = mock_event_context
         mock_ff.return_value = True
 
-        response = await entitlements_middleware.dispatch(request, call_next)
+        response = await usage_quota_middleware.dispatch(request, call_next)
 
     assert response.status_code == 200
     call_next.assert_called_once_with(request)
     mock_check.assert_called_once_with(mock_event_context)
-    mock_ff.assert_called_once_with(FeatureFlag.BILLING_ENTITLEMENTS_CHECK)
+    mock_ff.assert_called_once_with(FeatureFlag.USAGE_QUOTA_LEFT_CHECK)
 
 
 @pytest.mark.asyncio
@@ -171,7 +171,7 @@ async def test_middleware_disabled_skips_usage_quota_check(
     mock_event_context, mock_app
 ):
     """Test that middleware skips usage quota check when middleware is disabled."""
-    middleware = EntitlementsMiddleware(
+    middleware = UsageQuotaMiddleware(
         app=mock_app,
         customersdot_url="https://customers.gitlab.local",
         skip_endpoints=[],
@@ -186,9 +186,9 @@ async def test_middleware_disabled_skips_usage_quota_check(
 
     with (
         patch(
-            "ai_gateway.api.middleware.entitlements.current_event_context"
+            "ai_gateway.api.middleware.usage_quota.current_event_context"
         ) as mock_ctx,
-        patch("ai_gateway.api.middleware.entitlements.is_feature_enabled") as mock_ff,
+        patch("ai_gateway.api.middleware.usage_quota.is_feature_enabled") as mock_ff,
     ):
         mock_ctx.get.return_value = mock_event_context
         mock_ff.return_value = True  # even if FF is on, middleware disabled → skip
@@ -200,7 +200,7 @@ async def test_middleware_disabled_skips_usage_quota_check(
 
 @pytest.mark.asyncio
 async def test_authorized_request_passes_through(
-    entitlements_middleware, mock_event_context
+    usage_quota_middleware, mock_event_context
 ):
     """Test that an authorized request is allowed through."""
     request = Request(
@@ -211,14 +211,14 @@ async def test_authorized_request_passes_through(
 
     with (
         patch(
-            "ai_gateway.api.middleware.entitlements.current_event_context"
+            "ai_gateway.api.middleware.usage_quota.current_event_context"
         ) as mock_ctx,
-        patch("ai_gateway.api.middleware.entitlements.is_feature_enabled") as mock_ff,
-        patch.object(entitlements_middleware, "has_usage_quota_left", mock_check),
+        patch("ai_gateway.api.middleware.usage_quota.is_feature_enabled") as mock_ff,
+        patch.object(usage_quota_middleware, "has_usage_quota_left", mock_check),
     ):
         mock_ff.return_value = True
         mock_ctx.get.return_value = mock_event_context
-        response = await entitlements_middleware.dispatch(request, call_next)
+        response = await usage_quota_middleware.dispatch(request, call_next)
 
     assert response.status_code == 200
     call_next.assert_called_once_with(request)
@@ -226,7 +226,7 @@ async def test_authorized_request_passes_through(
 
 @pytest.mark.asyncio
 async def test_no_usage_quota_left_returns_402(
-    entitlements_middleware, mock_event_context
+    usage_quota_middleware, mock_event_context
 ):
     """Test that a usage_quota left request returns 402 status code."""
     request = Request(
@@ -237,14 +237,14 @@ async def test_no_usage_quota_left_returns_402(
 
     with (
         patch(
-            "ai_gateway.api.middleware.entitlements.current_event_context"
+            "ai_gateway.api.middleware.usage_quota.current_event_context"
         ) as mock_ctx,
-        patch("ai_gateway.api.middleware.entitlements.is_feature_enabled") as mock_ff,
-        patch.object(entitlements_middleware, "has_usage_quota_left", mock_check),
+        patch("ai_gateway.api.middleware.usage_quota.is_feature_enabled") as mock_ff,
+        patch.object(usage_quota_middleware, "has_usage_quota_left", mock_check),
     ):
         mock_ff.return_value = True
         mock_ctx.get.return_value = mock_event_context
-        response = await entitlements_middleware.dispatch(request, call_next)
+        response = await usage_quota_middleware.dispatch(request, call_next)
 
     assert response.status_code == 402
     call_next.assert_not_called()
@@ -252,7 +252,7 @@ async def test_no_usage_quota_left_returns_402(
 
 @pytest.mark.asyncio
 async def test_no_usage_quota_left_response_format(
-    entitlements_middleware, mock_event_context
+    usage_quota_middleware, mock_event_context
 ):
     """Test that 402 error response has correct JSON format."""
     request = Request(
@@ -263,25 +263,25 @@ async def test_no_usage_quota_left_response_format(
 
     with (
         patch(
-            "ai_gateway.api.middleware.entitlements.current_event_context"
+            "ai_gateway.api.middleware.usage_quota.current_event_context"
         ) as mock_ctx,
-        patch("ai_gateway.api.middleware.entitlements.is_feature_enabled") as mock_ff,
-        patch.object(entitlements_middleware, "has_usage_quota_left", mock_check),
+        patch("ai_gateway.api.middleware.usage_quota.is_feature_enabled") as mock_ff,
+        patch.object(usage_quota_middleware, "has_usage_quota_left", mock_check),
     ):
         mock_ff.return_value = True
         mock_ctx.get.return_value = mock_event_context
-        response = await entitlements_middleware.dispatch(request, call_next)
+        response = await usage_quota_middleware.dispatch(request, call_next)
 
     assert response.status_code == 402
     content = json.loads(response.body.decode())
-    assert content["error"] == "not_entitled"
-    assert content["error_code"] == "ENTITLEMENT_NOT_ENTITLED"
+    assert content["error"] == "insufficient_credits"
+    assert content["error_code"] == "USAGE_QUOTA_EXCEEDED"
     assert "sufficient credits" in content["message"]
 
 
 @pytest.mark.asyncio
 async def test_dispatch_fails_open_on_timeout(
-    entitlements_middleware, mock_event_context
+    usage_quota_middleware, mock_event_context
 ):
     """Test that dispatch allows request when timeout occurs (fail-open)."""
     request = Request(
@@ -292,14 +292,14 @@ async def test_dispatch_fails_open_on_timeout(
 
     with (
         patch(
-            "ai_gateway.api.middleware.entitlements.current_event_context"
+            "ai_gateway.api.middleware.usage_quota.current_event_context"
         ) as mock_ctx,
-        patch("ai_gateway.api.middleware.entitlements.is_feature_enabled") as mock_ff,
-        patch.object(entitlements_middleware, "has_usage_quota_left", mock_check),
+        patch("ai_gateway.api.middleware.usage_quota.is_feature_enabled") as mock_ff,
+        patch.object(usage_quota_middleware, "has_usage_quota_left", mock_check),
     ):
         mock_ff.return_value = True
         mock_ctx.get.return_value = mock_event_context
-        response = await entitlements_middleware.dispatch(request, call_next)
+        response = await usage_quota_middleware.dispatch(request, call_next)
 
     assert response.status_code == 200
     call_next.assert_called_once_with(request)
@@ -307,7 +307,7 @@ async def test_dispatch_fails_open_on_timeout(
 
 @pytest.mark.asyncio
 async def test_dispatch_fails_open_on_unexpected_error(
-    entitlements_middleware, mock_event_context
+    usage_quota_middleware, mock_event_context
 ):
     """Test that dispatch allows request when unexpected exception occurs."""
     request = Request(
@@ -318,14 +318,14 @@ async def test_dispatch_fails_open_on_unexpected_error(
 
     with (
         patch(
-            "ai_gateway.api.middleware.entitlements.current_event_context"
+            "ai_gateway.api.middleware.usage_quota.current_event_context"
         ) as mock_ctx,
-        patch("ai_gateway.api.middleware.entitlements.is_feature_enabled") as mock_ff,
-        patch.object(entitlements_middleware, "has_usage_quota_left", mock_check),
+        patch("ai_gateway.api.middleware.usage_quota.is_feature_enabled") as mock_ff,
+        patch.object(usage_quota_middleware, "has_usage_quota_left", mock_check),
     ):
         mock_ff.return_value = True
         mock_ctx.get.return_value = mock_event_context
-        response = await entitlements_middleware.dispatch(request, call_next)
+        response = await usage_quota_middleware.dispatch(request, call_next)
 
     assert response.status_code == 200
     call_next.assert_called_once_with(request)
@@ -334,7 +334,7 @@ async def test_dispatch_fails_open_on_unexpected_error(
 @pytest.mark.asyncio
 async def test_customersdot_success_returns_true(mock_event_context):
     """Test that CustomersDot 200 response returns True (entitled)."""
-    middleware = EntitlementsMiddleware(
+    middleware = UsageQuotaMiddleware(
         app=AsyncMock(),
         customersdot_url="https://customers.gitlab.local",
         skip_endpoints=[],
@@ -345,7 +345,7 @@ async def test_customersdot_success_returns_true(mock_event_context):
 
     mock_response = MagicMock(status_code=200)
     with patch(
-        "ai_gateway.api.middleware.entitlements.httpx.AsyncClient"
+        "ai_gateway.api.middleware.usage_quota.httpx.AsyncClient"
     ) as mock_client_cls:
         mock_client = AsyncMock()
         mock_client.__aenter__.return_value = mock_client
@@ -362,9 +362,9 @@ async def test_customersdot_success_returns_true(mock_event_context):
 @pytest.mark.asyncio
 async def test_customersdot_denied_status_returns_false(mock_event_context, status):
     """Test that CustomersDot 401/402/403 responses return False (not entitled)."""
-    EntitlementsMiddleware.has_usage_quota_left.cache.clear()
+    UsageQuotaMiddleware.has_usage_quota_left.cache.clear()
 
-    middleware = EntitlementsMiddleware(
+    middleware = UsageQuotaMiddleware(
         app=AsyncMock(),
         customersdot_url="https://customers.gitlab.local",
         skip_endpoints=[],
@@ -376,7 +376,7 @@ async def test_customersdot_denied_status_returns_false(mock_event_context, stat
     mock_response = MagicMock(status_code=status)
 
     with patch(
-        "ai_gateway.api.middleware.entitlements.httpx.AsyncClient"
+        "ai_gateway.api.middleware.usage_quota.httpx.AsyncClient"
     ) as mock_client_cls:
         mock_client = AsyncMock()
         mock_client.__aenter__.return_value = mock_client
@@ -387,13 +387,13 @@ async def test_customersdot_denied_status_returns_false(mock_event_context, stat
         result = await middleware.has_usage_quota_left(mock_event_context)
         assert result is False
 
-    EntitlementsMiddleware.has_usage_quota_left.cache.clear()
+    UsageQuotaMiddleware.has_usage_quota_left.cache.clear()
 
 
 @pytest.mark.asyncio
 async def test_customersdot_timeout_raises_exception(mock_event_context):
     """Test that CustomersDot timeout raises TimeoutException (prevent caching)."""
-    middleware = EntitlementsMiddleware(
+    middleware = UsageQuotaMiddleware(
         app=AsyncMock(),
         customersdot_url="https://customers.gitlab.local",
         skip_endpoints=[],
@@ -403,7 +403,7 @@ async def test_customersdot_timeout_raises_exception(mock_event_context):
     )
 
     with patch(
-        "ai_gateway.api.middleware.entitlements.httpx.AsyncClient"
+        "ai_gateway.api.middleware.usage_quota.httpx.AsyncClient"
     ) as mock_client_cls:
         mock_client = AsyncMock()
         mock_client.__aenter__.return_value = mock_client
@@ -418,7 +418,7 @@ async def test_customersdot_timeout_raises_exception(mock_event_context):
 @pytest.mark.asyncio
 async def test_customersdot_unexpected_error_raises_exception(mock_event_context):
     """Test that unexpected error in CustomersDot call raises Exception."""
-    middleware = EntitlementsMiddleware(
+    middleware = UsageQuotaMiddleware(
         app=AsyncMock(),
         customersdot_url="https://customers.gitlab.local",
         skip_endpoints=[],
@@ -428,7 +428,7 @@ async def test_customersdot_unexpected_error_raises_exception(mock_event_context
     )
 
     with patch(
-        "ai_gateway.api.middleware.entitlements.httpx.AsyncClient"
+        "ai_gateway.api.middleware.usage_quota.httpx.AsyncClient"
     ) as mock_client_cls:
         mock_client = AsyncMock()
         mock_client.__aenter__.return_value = mock_client
@@ -442,7 +442,7 @@ async def test_customersdot_unexpected_error_raises_exception(mock_event_context
 
 @pytest.mark.asyncio
 async def test_customersdot_sends_params_as_dict(mock_event_context):
-    middleware = EntitlementsMiddleware(
+    middleware = UsageQuotaMiddleware(
         app=AsyncMock(),
         customersdot_url="https://customers.gitlab.local",
         skip_endpoints=[],
@@ -452,7 +452,7 @@ async def test_customersdot_sends_params_as_dict(mock_event_context):
     )
 
     with patch(
-        "ai_gateway.api.middleware.entitlements.httpx.AsyncClient"
+        "ai_gateway.api.middleware.usage_quota.httpx.AsyncClient"
     ) as mock_client_cls:
         mock_client = AsyncMock()
         mock_client.__aenter__.return_value = mock_client
@@ -466,5 +466,5 @@ async def test_customersdot_sends_params_as_dict(mock_event_context):
         params = kwargs.get("params")
 
         assert isinstance(params, dict)
-        missing = EntitlementsMiddleware.CDOT_RESOLVE_PARAM_KEYS - params.keys()
+        missing = UsageQuotaMiddleware.CDOT_RESOLVE_PARAM_KEYS - params.keys()
         assert not missing, f"Missing expected params: {missing}"

@@ -12,7 +12,7 @@ class FeatureFlag(StrEnum):
     STREAM_DURING_TOOL_CALL_GENERATION = (
         "duo_workflow_stream_during_tool_call_generation"
     )
-    BILLING_ENTITLEMENTS_CHECK = "billing_entitlements_check"
+    USAGE_QUOTA_LEFT_CHECK = "usage_quota_left_check"
 
 
 def is_feature_enabled(feature_name: FeatureFlag | str) -> bool:

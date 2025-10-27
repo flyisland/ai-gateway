@@ -1,7 +1,6 @@
 from .authentication import MiddlewareAuthentication
 from .base import AccessLogMiddleware
 from .distributed_trace import DistributedTraceMiddleware
-from .entitlements import EntitlementsMiddleware
 from .feature_flag import FeatureFlagMiddleware
 from .headers import (
     X_GITLAB_CLIENT_NAME,
@@ -22,6 +21,7 @@ from .headers import (
 )
 from .internal_event import InternalEventMiddleware
 from .model_config import ModelConfigMiddleware
+from .usage_quota import UsageQuotaMiddleware
 
 __all__ = [
     "AccessLogMiddleware",
@@ -30,7 +30,7 @@ __all__ = [
     "InternalEventMiddleware",
     "MiddlewareAuthentication",
     "ModelConfigMiddleware",
-    "EntitlementsMiddleware",
+    "UsageQuotaMiddleware",
     "X_GITLAB_CLIENT_NAME",
     "X_GITLAB_CLIENT_TYPE",
     "X_GITLAB_CLIENT_VERSION",

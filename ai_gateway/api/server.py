@@ -24,11 +24,11 @@ from starlette_context.middleware import RawContextMiddleware
 from ai_gateway.api.middleware import (
     AccessLogMiddleware,
     DistributedTraceMiddleware,
-    EntitlementsMiddleware,
     FeatureFlagMiddleware,
     InternalEventMiddleware,
     MiddlewareAuthentication,
     ModelConfigMiddleware,
+    UsageQuotaMiddleware,
 )
 from ai_gateway.api.middleware.self_hosted_logging import (
     EnabledInstanceVerboseAiLogsHeaderPlugin,
@@ -157,7 +157,7 @@ def create_fast_api_server(config: Config):
                 environment=config.environment,
             ),
             Middleware(
-                EntitlementsMiddleware,
+                UsageQuotaMiddleware,
                 enabled=config.billing_event.enabled,
                 skip_endpoints=_SKIP_ENDPOINTS,
                 environment=config.environment,

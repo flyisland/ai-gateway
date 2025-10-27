@@ -9,16 +9,16 @@ from starlette.responses import JSONResponse, Response
 from starlette.types import ASGIApp
 
 from ai_gateway.api.middleware.base import _PathResolver
-from ai_gateway.instrumentators.entitlements import (
-    ENTITLEMENTS_CHECK_TOTAL,
-    ENTITLEMENTS_CUSTOMERSDOT_LATENCY_SECONDS,
-    ENTITLEMENTS_CUSTOMERSDOT_REQUESTS_TOTAL,
+from ai_gateway.instrumentators.usage_quota import (
+    USAGE_QUOTA_CHECK_TOTAL,
+    USAGE_QUOTA_CUSTOMERSDOT_LATENCY_SECONDS,
+    USAGE_QUOTA_CUSTOMERSDOT_REQUESTS_TOTAL,
 )
 from lib.feature_flags import FeatureFlag, is_feature_enabled
 from lib.internal_events.context import EventContext, current_event_context
 
 
-class EntitlementsMiddleware(BaseHTTPMiddleware):
+class UsageQuotaMiddleware(BaseHTTPMiddleware):
     CDOT_RESOLVE_PARAM_KEYS: FrozenSet[str] = frozenset(
         {
             "environment",
@@ -56,9 +56,7 @@ class EntitlementsMiddleware(BaseHTTPMiddleware):
         self.request_timeout: float = request_timeout
 
     def is_active(self) -> bool:
-        return self.enabled and is_feature_enabled(
-            FeatureFlag.BILLING_ENTITLEMENTS_CHECK
-        )
+        return self.enabled and is_feature_enabled(FeatureFlag.USAGE_QUOTA_LEFT_CHECK)
 
     @override
     async def dispatch(
@@ -77,21 +75,21 @@ class EntitlementsMiddleware(BaseHTTPMiddleware):
             is_authorized = await self.has_usage_quota_left(event_context)
         except Exception:
             is_authorized = True
-            ENTITLEMENTS_CHECK_TOTAL.labels(result="fail_open", realm=realm).inc()
+            USAGE_QUOTA_CHECK_TOTAL.labels(result="fail_open", realm=realm).inc()
 
         if is_authorized is False:
-            ENTITLEMENTS_CHECK_TOTAL.labels(result="deny", realm=realm).inc()
+            USAGE_QUOTA_CHECK_TOTAL.labels(result="deny", realm=realm).inc()
             return JSONResponse(
                 status_code=402,
                 content={
-                    "error": "not_entitled",
-                    "error_code": "ENTITLEMENT_NOT_ENTITLED",
+                    "error": "insufficient_credits",
+                    "error_code": "USAGE_QUOTA_EXCEEDED",
                     "message": "Consumer does not have sufficient credits for this request",
                 },
             )
 
         response = await call_next(request)
-        ENTITLEMENTS_CHECK_TOTAL.labels(result="allow", realm=realm).inc()
+        USAGE_QUOTA_CHECK_TOTAL.labels(result="allow", realm=realm).inc()
 
         return response
 
@@ -109,19 +107,19 @@ class EntitlementsMiddleware(BaseHTTPMiddleware):
                     exclude_none=True,
                     exclude_unset=True,
                 )
-                with ENTITLEMENTS_CUSTOMERSDOT_LATENCY_SECONDS.labels(
+                with USAGE_QUOTA_CUSTOMERSDOT_LATENCY_SECONDS.labels(
                     realm=realm
                 ).time():
                     response = await client.head(url, params=params)
 
                 status = response.status_code
                 if status == 200:
-                    ENTITLEMENTS_CUSTOMERSDOT_REQUESTS_TOTAL.labels(
+                    USAGE_QUOTA_CUSTOMERSDOT_REQUESTS_TOTAL.labels(
                         outcome="success", status="200"
                     ).inc()
                     return True
                 if status in (401, 402, 403):
-                    ENTITLEMENTS_CUSTOMERSDOT_REQUESTS_TOTAL.labels(
+                    USAGE_QUOTA_CUSTOMERSDOT_REQUESTS_TOTAL.labels(
                         outcome="denied", status=str(status)
                     ).inc()
                     return False
@@ -129,17 +127,17 @@ class EntitlementsMiddleware(BaseHTTPMiddleware):
                 response.raise_for_status()
 
         except httpx.TimeoutException:
-            ENTITLEMENTS_CUSTOMERSDOT_REQUESTS_TOTAL.labels(
+            USAGE_QUOTA_CUSTOMERSDOT_REQUESTS_TOTAL.labels(
                 outcome="timeout", status="timeout"
             ).inc()
             raise
         except httpx.HTTPStatusError:
-            ENTITLEMENTS_CUSTOMERSDOT_REQUESTS_TOTAL.labels(
+            USAGE_QUOTA_CUSTOMERSDOT_REQUESTS_TOTAL.labels(
                 outcome="http_error", status=str(status)
             ).inc()
             raise
         except Exception:
-            ENTITLEMENTS_CUSTOMERSDOT_REQUESTS_TOTAL.labels(
+            USAGE_QUOTA_CUSTOMERSDOT_REQUESTS_TOTAL.labels(
                 outcome="unexpected", status="client_error"
             ).inc()
             raise
