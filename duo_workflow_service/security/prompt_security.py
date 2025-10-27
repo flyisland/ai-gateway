@@ -12,7 +12,9 @@ from duo_workflow_service.security.markdown_content_security import (
     strip_hidden_html_comments,
     strip_mermaid_comments,
 )
-from duo_workflow_service.security.security_utils import compute_response_hash_with_length
+from duo_workflow_service.security.security_utils import (
+    compute_response_hash_with_length,
+)
 
 log = structlog.stdlib.get_logger("security")
 
