@@ -265,8 +265,6 @@ class PromptSecurity:
                     functions_that_modified.append(
                         {
                             "function": func.__name__,
-                            "length_before": before_length,
-                            "length_after": after_length,
                             "chars_removed": before_length - after_length,
                         }
                     )
@@ -303,13 +301,8 @@ class PromptSecurity:
                 "Security functions modified the tool response",
                 tool_name=tool_name,
                 functions_applied=len(all_functions),
-                functions_that_modified=[
-                    f["function"] for f in functions_that_modified
-                ],
                 modification_details=functions_that_modified,
                 original_length=original_length,
-                secured_length=secured_length,
-                total_chars_removed=original_length - secured_length,
             )
         else:
             log.info(
