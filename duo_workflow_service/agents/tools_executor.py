@@ -105,7 +105,6 @@ class ToolsExecutor:
             response = result.get("response")
             if response and hasattr(response, "content"):
                 try:
-                    # Apply security functions
                     result["response"].content = (
                         PromptSecurity.apply_security_to_tool_response(
                             response=result["response"].content,

@@ -134,11 +134,9 @@ class ToolNode:
         self, response: str | dict | list, tool_name: str
     ) -> str | list[str | dict]:
         try:
-            # Apply security functions
-            sanitized = PromptSecurity.apply_security_to_tool_response(
+            return PromptSecurity.apply_security_to_tool_response(
                 response=response, tool_name=tool_name
             )
-            return sanitized
         except SecurityException as e:
             self._logger.error(f"Security validation failed for tool {tool_name}: {e}")
             raise

@@ -16,8 +16,6 @@ from duo_workflow_service.security.prompt_security import (
 from duo_workflow_service.tracking.errors import log_exception
 from lib.internal_events.event_enum import CategoryEnum
 
-log = structlog.stdlib.get_logger("run_tool_node")
-
 WorkflowStateT_contra = TypeVar(
     "WorkflowStateT_contra",
     bound=WorkflowState,
@@ -87,11 +85,11 @@ class RunToolNode(Generic[WorkflowStateT]):
             ):
                 if output := await self._tool._arun(**tool_params):
                     try:
-                        # Apply security functions
-                        output = PromptSecurity.apply_security_to_tool_response(
+                        secure_output = PromptSecurity.apply_security_to_tool_response(
                             response=output,
                             tool_name=self._tool.name,
                         )
+                        output = secure_output
                     except SecurityException as e:
                         log_exception(
                             e,

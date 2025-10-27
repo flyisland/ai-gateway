@@ -121,7 +121,6 @@ class DeterministicStepNode:
         ):
             tool_call_result = await tool.arun(tool_call_args)
 
-        # Apply security functions
         secure_result = PromptSecurity.apply_security_to_tool_response(
             response=tool_call_result, tool_name=self._tool_name
         )
