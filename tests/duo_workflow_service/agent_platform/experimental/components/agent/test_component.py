@@ -248,13 +248,13 @@ class TestAgentComponentInitialization:
 
         # Verify component stored the parsed IOKey instances
         assert len(component.tool_arguments_binding) == 2
-        
+
         # Verify first binding (simple string format)
         assert isinstance(component.tool_arguments_binding[0], IOKey)
         assert component.tool_arguments_binding[0].target == "context"
         assert component.tool_arguments_binding[0].subkeys == ["project_id"]
         assert component.tool_arguments_binding[0].alias is None
-        
+
         # Verify second binding (dict format with alias)
         assert isinstance(component.tool_arguments_binding[1], IOKey)
         assert component.tool_arguments_binding[1].target == "context"
@@ -754,12 +754,12 @@ class TestAgentComponentToolArgumentsBinding:
         assert "tool_arguments_binding" in tool_call_kwargs
         bindings = tool_call_kwargs["tool_arguments_binding"]
         assert len(bindings) == 2
-        
+
         # Verify the bindings are IOKey instances with correct properties
         assert isinstance(bindings[0], IOKey)
         assert bindings[0].target == "context"
         assert bindings[0].subkeys == ["project_id"]
-        
+
         assert isinstance(bindings[1], IOKey)
         assert bindings[1].target == "context"
         assert bindings[1].subkeys == ["branch_name"]
