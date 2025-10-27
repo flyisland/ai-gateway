@@ -49,3 +49,24 @@ build:self-hosted-ai-gateway-latest-image:
     - if: $CI_COMMIT_BRANCH && $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
   needs:
     - build-docker-model-gateway
+
+build:ai-gateway-fips-base-image:
+  stage: build
+  extends:
+    - .docker
+  variables:
+    TARGET_IMAGE: "${FIPS_TARGET_IMAGE}"
+    GITLAB_API_KEY: "$DEMO_ACCESS_TOKEN"
+  script:
+    - docker buildx build
+      --file docker/fips/Dockerfile
+      --tag "$TARGET_IMAGE"
+      --build-arg GITLAB_API_KEY="$GITLAB_API_KEY"
+      .
+  rules:
+    - if: $CI_COMMIT_TAG =~ /^self-hosted-.*-fips$/
+    - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
+      when: manual
+      allow_failure: true
+  needs:
+    - build-docker-model-gateway
