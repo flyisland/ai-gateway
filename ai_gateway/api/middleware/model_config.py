@@ -56,9 +56,7 @@ class ModelConfigMiddleware:
                     model_metadata = create_model_metadata(data["model_metadata"])
                     current_model_metadata_context.set(model_metadata)
 
-            except Exception:
-                # Silently ignore any errors in model_metadata parsing
-                # to avoid breaking the request
+            except (json.JSONDecodeError, UnicodeDecodeError):
                 pass
 
             return {"type": "http.request", "body": full_body, "more_body": False}
