@@ -91,11 +91,7 @@ def create_model_metadata(data: dict[str, Any] | None) -> Optional[TypeModelMeta
 
     if data["provider"] == "amazon_q":
         llm_definition = configs.get_model("amazon_q")
-        # Remove fields that are explicitly set to avoid duplicate argument errors
-        data.pop("llm_definition_params", None)
-        data.pop("family", None)
-        data.pop("prompt_variant", None)
-        data.pop("friendly_name", None)
+
         return AmazonQModelMetadata(
             llm_definition_params=llm_definition.params.copy(),
             family=llm_definition.family,
@@ -124,12 +120,6 @@ def create_model_metadata(data: dict[str, Any] | None) -> Optional[TypeModelMeta
             )
 
         data["name"] = llm_definition.gitlab_identifier
-
-    # Remove fields that are explicitly set to avoid duplicate argument errors
-    data.pop("llm_definition_params", None)
-    data.pop("family", None)
-    data.pop("prompt_variant", None)
-    data.pop("friendly_name", None)
 
     return ModelMetadata(
         llm_definition_params=llm_definition.params.copy(),
