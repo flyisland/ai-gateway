@@ -26,7 +26,6 @@ from duo_workflow_service.monitoring import duo_workflow_metrics
 from duo_workflow_service.security.prompt_security import (
     PromptSecurity,
     SecurityException,
-    compute_response_hash_with_length,
 )
 from duo_workflow_service.tools import RunCommand, Toolset, format_tool_display_message
 from duo_workflow_service.tools.planner import PlannerTool
@@ -106,11 +105,6 @@ class ToolsExecutor:
             response = result.get("response")
             if response and hasattr(response, "content"):
                 try:
-                    # Compute hash and length of original content (single pass)
-                    original_hash, original_length = compute_response_hash_with_length(
-                        result["response"].content
-                    )
-
                     # Apply security functions
                     result["response"].content = (
                         PromptSecurity.apply_security_to_tool_response(
@@ -118,18 +112,6 @@ class ToolsExecutor:
                             tool_name=tool_name,
                         )
                     )
-
-                    # Log if security modified the tool response
-                    secured_hash, secured_length = compute_response_hash_with_length(
-                        result["response"].content
-                    )
-                    if original_hash != secured_hash:
-                        self._logger.warning(
-                            "Tool response was modified by security functions before sending to agent",
-                            tool_name=tool_name,
-                            original_length=original_length,
-                            secured_length=secured_length,
-                        )
                 except SecurityException as e:
                     log_exception(
                         e,

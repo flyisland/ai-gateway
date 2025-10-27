@@ -2,11 +2,8 @@ import re
 from typing import Any, Callable, Dict, List, Union
 
 import bleach
-import structlog
 
 from duo_workflow_service.security.exceptions import SecurityException
-
-log = structlog.stdlib.get_logger("security")
 
 
 def _apply_recursively(response: Any, func: Callable[[str], str]) -> Any:

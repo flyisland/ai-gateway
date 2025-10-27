@@ -4,11 +4,7 @@
 import re
 from typing import Any, Dict, List, Union
 
-import structlog
-
 from duo_workflow_service.security.markdown_content_security import _apply_recursively
-
-log = structlog.stdlib.get_logger("security")
 
 _EMOJI_SURROGATE_PATTERN = re.compile(
     r"\\ud([89a-fA-F][0-9a-fA-F]{2})\s*\\ud([c-fC-F][0-9a-fA-F]{2})"
