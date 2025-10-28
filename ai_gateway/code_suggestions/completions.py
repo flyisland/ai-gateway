@@ -285,7 +285,7 @@ class CodeCompletions:
             try:
                 self.billing_event_client.track_billing_event(
                     user=user,
-                    event_type="code_suggestions",
+                    event_type="code_completions",
                     category=self.__class__.__name__,
                     unit_of_measure="tokens",
                     quantity=tokens_consumption_metadata.output_tokens,

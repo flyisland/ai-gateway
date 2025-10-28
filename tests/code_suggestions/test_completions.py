@@ -942,7 +942,7 @@ class TestCodeCompletionsBillingEvents:
 
         mock_billing_client.track_billing_event.assert_called_once_with(
             user=mock_user,
-            event_type="code_suggestions",
+            event_type="code_completions",
             category="CodeCompletions",
             unit_of_measure="tokens",
             quantity=expected_output_tokens,
@@ -1068,7 +1068,7 @@ class TestCodeCompletionsBillingEvents:
         # Should still track billing event even with 0 tokens for consistency
         mock_billing_client.track_billing_event.assert_called_once_with(
             user=mock_user,
-            event_type="code_suggestions",
+            event_type="code_completions",
             category="CodeCompletions",
             unit_of_measure="tokens",
             quantity=0,

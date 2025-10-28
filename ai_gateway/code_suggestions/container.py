@@ -38,6 +38,7 @@ class ContainerCodeGenerations(containers.DeclarativeContainer):
     agent_model = providers.Dependency(instance_of=TextGenModelBase)  # type: ignore[type-abstract]
 
     snowplow_instrumentator = providers.Dependency(instance_of=SnowplowInstrumentator)
+    billing_event_client = providers.Dependency(instance_of=BillingEventsClient)
 
     vertex = providers.Factory(
         CodeGenerations,
@@ -48,6 +49,7 @@ class ContainerCodeGenerations(containers.DeclarativeContainer):
             TokenizerTokenStrategy, tokenizer=tokenizer
         ),
         snowplow_instrumentator=snowplow_instrumentator,
+        billing_event_client=billing_event_client,
     )
 
     # We need to resolve the model based on model name provided in request payload
@@ -62,6 +64,7 @@ class ContainerCodeGenerations(containers.DeclarativeContainer):
             TokenizerTokenStrategy, tokenizer=tokenizer
         ),
         snowplow_instrumentator=snowplow_instrumentator,
+        billing_event_client=billing_event_client,
     )
 
     anthropic_chat_factory = providers.Factory(
@@ -71,6 +74,7 @@ class ContainerCodeGenerations(containers.DeclarativeContainer):
             TokenizerTokenStrategy, tokenizer=tokenizer
         ),
         snowplow_instrumentator=snowplow_instrumentator,
+        billing_event_client=billing_event_client,
     )
 
     litellm_factory = providers.Factory(
@@ -80,6 +84,7 @@ class ContainerCodeGenerations(containers.DeclarativeContainer):
             TokenizerTokenStrategy, tokenizer=tokenizer
         ),
         snowplow_instrumentator=snowplow_instrumentator,
+        billing_event_client=billing_event_client,
     )
 
     amazon_q_factory = providers.Factory(
@@ -89,6 +94,7 @@ class ContainerCodeGenerations(containers.DeclarativeContainer):
             TokenizerTokenStrategy, tokenizer=tokenizer
         ),
         snowplow_instrumentator=snowplow_instrumentator,
+        billing_event_client=billing_event_client,
     )
 
     agent_factory = providers.Factory(
@@ -98,6 +104,7 @@ class ContainerCodeGenerations(containers.DeclarativeContainer):
             TokenizerTokenStrategy, tokenizer=tokenizer
         ),
         snowplow_instrumentator=snowplow_instrumentator,
+        billing_event_client=billing_event_client,
     )
 
     anthropic_default = providers.Factory(
@@ -236,6 +243,7 @@ class ContainerCodeSuggestions(containers.DeclarativeContainer):
         agent_model=models.agent_model,
         amazon_q_model=models.amazon_q_model,
         snowplow_instrumentator=snowplow.instrumentator,
+        billing_event_client=billing_event.client,
     )
 
     completions = providers.Container(
