@@ -85,15 +85,12 @@ CHAT_READ_ONLY_TOOLS = [
     "get_commit_diff",
     "get_work_item",
     "list_work_items",
-    "list_vulnerabilities",
     "get_work_item_notes",
     "get_current_user",
-    "get_vulnerability_details",
 ]
 
 
 CHAT_GITLAB_MUTATION_TOOLS = [
-    "update_vulnerability_severity",
     "create_issue",
     "update_issue",
     "create_issue_note",
@@ -103,14 +100,9 @@ CHAT_GITLAB_MUTATION_TOOLS = [
     "create_epic",
     "update_epic",
     "create_commit",
-    "dismiss_vulnerability",
-    "confirm_vulnerability",
     "create_work_item",
     "create_work_item_note",
-    "link_vulnerability_to_issue",
     "update_work_item",
-    "revert_to_detected_vulnerability",
-    "create_vulnerability_issue",
 ]
 
 
