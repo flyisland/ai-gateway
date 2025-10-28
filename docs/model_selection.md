@@ -188,3 +188,37 @@ configurable_unit_primitives:
       - "claude-3-7-sonnet-20250219"
       - "claude_3_5_sonnet_20240620"
 ```
+
+## Model Selection for Evaluation with CEF
+
+When evaluating flows using the Centralized Evaluation Framework (CEF), model selection needs to work differently than in production environments.
+In production, the standard model selection approach relies on the `x-gitlab-agent-platform-model-metadata` header for propagating model metadata,
+but this approach has limitations:
+
+- Go executor doesn't provide an option to send the `x-gitlab-agent-platform-model-metadata` header
+- Model selection needs to be supported for all flows, not only those working over WebSocket
+
+To address these limitations, an evaluation-specific approach has been implemented that uses a JSON patch file to configure model selection.
+
+> Note: This is a temporary approach until model selection is supported across all types of flows.
+> The patch file is gitignored, and the logic doesn't work in production environments.
+> Please, find more details in the [issue](https://gitlab.com/gitlab-org/modelops/ai-model-validation-and-research/ai-evaluation/prompt-library/-/issues/802).
+
+### How It Works
+
+- Create a file named `patch_model_selection.json` in the root directory of the repository
+- Add your model selection parameters in JSON format
+- Set the environment variable `AIGW_ENVIRONMENT=evaluation`
+
+The `ModelMetadataEvalBasedInterceptor` will automatically detect the evaluation environment and use the patch file instead of the header-based approach.
+
+### Example Patch File
+
+```json
+{
+  "provider": "gitlab",
+  "name": "gpt_5"
+}
+```
+
+This patch file will select the GPT-5 model for all flows when running in evaluation mode.
