@@ -91,7 +91,6 @@ query GetProjectWorkItem($fullPath: ID!, $iid: String!) {
                             closedAt
                             webUrl
                             reference(full: true)
-                            
                         }
                         }
                     }
