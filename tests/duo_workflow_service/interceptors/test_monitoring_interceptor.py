@@ -260,7 +260,10 @@ async def test_interceptor_stream_handles_exception():
     mock_context = Mock()
     mock_context.code.return_value = grpc.StatusCode.OK
 
-    with pytest.raises(BaseException, match="Test Exception"), capture_logs() as cap_logs:
+    with (
+        pytest.raises(BaseException, match="Test Exception"),
+        capture_logs() as cap_logs,
+    ):
         result = await interceptor.intercept_service(continuation, handler_call_details)
         assert result is not None
 
