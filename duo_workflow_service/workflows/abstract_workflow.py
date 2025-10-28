@@ -25,7 +25,10 @@ from ai_gateway.models import KindAnthropicModel
 from ai_gateway.prompts import InMemoryPromptRegistry
 from ai_gateway.prompts.registry import LocalPromptRegistry
 from contract import contract_pb2
-from duo_workflow_service.checkpointer.gitlab_workflow import GitLabWorkflow
+from duo_workflow_service.checkpointer.gitlab_workflow import (
+    GitLabWorkflow,
+    SessionAlreadyFinished,
+)
 from duo_workflow_service.checkpointer.gitlab_workflow_utils import (
     SUCCESSFUL_WORKFLOW_EXECUTION_STATUSES,
     WorkflowStatusEventEnum,
@@ -220,6 +223,10 @@ class AbstractWorkflow(ABC):
                 )
             )
 
+            initial_status = self._workflow_config.get("workflow_status")
+            if initial_status == "finished":
+                self._last_gitlab_status = WorkflowStatusEventEnum.FINISH
+
             if self._project and self._project.get("web_url"):
                 self._session_url = (
                     f"{self._project['web_url']}{SESSION_URL_PATH}{self._workflow_id}"
@@ -291,6 +298,8 @@ class AbstractWorkflow(ABC):
                         await checkpoint_notifier.send_event(
                             type=type, state=state, stream=self._stream
                         )
+        except SessionAlreadyFinished:
+            pass
         except BaseException as e:
             self.last_error = e
             if str(e) != AIO_CANCEL_STOP_WORKFLOW_REQUEST:
