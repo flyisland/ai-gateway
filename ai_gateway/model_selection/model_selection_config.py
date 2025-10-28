@@ -18,6 +18,7 @@ class LLMDefinition(BaseModel):
     gitlab_identifier: str
     params: dict[str, Any] = {}
     family: list[str] = []
+    prompt_variant: Optional[str] = None
 
 
 class UnitPrimitiveConfig(BaseModel):

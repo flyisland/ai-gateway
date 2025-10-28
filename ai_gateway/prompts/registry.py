@@ -214,12 +214,20 @@ class LocalPromptRegistry(BasePromptRegistry):
         self,
         prompt_id: str,
         family: list[str],
+        prompt_variant: str | None = None,
     ) -> Path:
         base_path = Path(__file__).parent
         prompts_definitions_dir = base_path / "definitions" / prompt_id
 
-        # Look for the first existing prompt definition in the family, or `base` as a last option
-        for prompt_folder in family + [self.key_prompt_type_base]:
+        # Build search order: prompt_variant (if specified), then family, then base
+        search_order = []
+        if prompt_variant:
+            search_order.append(prompt_variant)
+        search_order.extend(family)
+        search_order.append(self.key_prompt_type_base)
+
+        # Look for the first existing prompt definition in the search order
+        for prompt_folder in search_order:
             prompt_path = prompts_definitions_dir / prompt_folder
             if prompt_path.exists() and prompt_path.is_dir():
                 return prompt_path
@@ -330,9 +338,15 @@ class LocalPromptRegistry(BasePromptRegistry):
                 model_metadata = self._default_model_metadata(prompt_id, prompt_version)  # type: ignore[arg-type]
 
             family = model_metadata.family if model_metadata else []
-            prompt_path = self._resolve_id(prompt_id, family)
+            prompt_variant = model_metadata.prompt_variant if model_metadata else None
+            prompt_path = self._resolve_id(prompt_id, family, prompt_variant)
 
-            log.info("Resolved prompt id", prompt_id=prompt_id, prompt_path=prompt_path)
+            log.info(
+                "Resolved prompt id",
+                prompt_id=prompt_id,
+                prompt_path=prompt_path,
+                prompt_variant=prompt_variant,
+            )
 
             prompt_registered = self._load_prompt_definition(prompt_id, prompt_path)
         except (FileNotFoundError, ValueError) as e:

@@ -1320,7 +1320,7 @@ class TestAmazonQIntegrationV3:
             "prompt_components": [prompt_component],
             "model_metadata": model_metadata
             and model_metadata.model_dump(
-                exclude={"llm_definition_params", "family", "friendly_name"},
+                exclude={"llm_definition_params", "family", "friendly_name", "prompt_variant"},
                 mode="json",
             ),
         }
@@ -1459,7 +1459,7 @@ class TestAmazonQIntegrationV3:
             "prompt_components": [prompt_component],
             "model_metadata": model_metadata
             and model_metadata.model_dump(
-                exclude={"llm_definition_params", "family", "friendly_name"},
+                exclude={"llm_definition_params", "family", "friendly_name", "prompt_variant"},
                 mode="json",
             ),
         }
