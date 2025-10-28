@@ -16,13 +16,9 @@ config:
 ---
 graph TD;
     __start__([<p>__start__</p>]):::first
-    build_context(build_context)
-    build_context_tools(build_context_tools)
-    build_context_handover(build_context_handover)
-    build_context_supervisor(build_context_supervisor)
-    tools_approval_entry_context_builder(tools_approval_entry_context_builder)
-    tools_approval_check_context_builder(tools_approval_check_context_builder)
     planning(planning)
+    tools_approval_entry_planner(tools_approval_entry_planner)
+    tools_approval_check_planner(tools_approval_check_planner)
     update_plan(update_plan)
     planning_supervisor(planning_supervisor)
     plan_terminator(plan_terminator)
@@ -34,16 +30,7 @@ graph TD;
     execution_supervisor(execution_supervisor)
     execution_handover(execution_handover)
     __end__([<p>__end__</p>]):::last
-    __start__ --> build_context;
-    build_context -. &nbsp;HandoverAgent&nbsp; .-> build_context_handover;
-    build_context -. &nbsp;PlanSupervisorAgent&nbsp; .-> build_context_supervisor;
-    build_context -. &nbsp;call_tool&nbsp; .-> build_context_tools;
-    build_context -. &nbsp;stop&nbsp; .-> plan_terminator;
-    build_context -. &nbsp;tools_approval&nbsp; .-> tools_approval_entry_context_builder;
-    build_context_handover --> planning;
-    build_context_supervisor --> build_context;
-    build_context_tools -.-> build_context;
-    build_context_tools -. &nbsp;stop&nbsp; .-> plan_terminator;
+    __start__ --> planning;
     execution -. &nbsp;HandoverAgent&nbsp; .-> execution_handover;
     execution -. &nbsp;PlanSupervisorAgent&nbsp; .-> execution_supervisor;
     execution -. &nbsp;call_tool&nbsp; .-> execution_tools;
@@ -54,19 +41,20 @@ graph TD;
     planning -. &nbsp;stop&nbsp; .-> plan_terminator;
     planning -. &nbsp;PlanSupervisorAgent&nbsp; .-> planning_supervisor;
     planning -. &nbsp;HandoverAgent&nbsp; .-> set_status_to_execution;
+    planning -. &nbsp;tools_approval&nbsp; .-> tools_approval_entry_planner;
     planning -. &nbsp;call_tool&nbsp; .-> update_plan;
     planning_supervisor --> planning;
     set_status_to_execution --> execution;
-    tools_approval_check_context_builder -. &nbsp;back&nbsp; .-> build_context;
-    tools_approval_check_context_builder -. &nbsp;continue&nbsp; .-> build_context_tools;
-    tools_approval_check_context_builder -. &nbsp;stop&nbsp; .-> plan_terminator;
     tools_approval_check_executor -. &nbsp;back&nbsp; .-> execution;
     tools_approval_check_executor -. &nbsp;continue&nbsp; .-> execution_tools;
     tools_approval_check_executor -. &nbsp;stop&nbsp; .-> plan_terminator;
-    tools_approval_entry_context_builder -. &nbsp;back&nbsp; .-> build_context;
-    tools_approval_entry_context_builder -. &nbsp;continue&nbsp; .-> tools_approval_check_context_builder;
+    tools_approval_check_planner -. &nbsp;stop&nbsp; .-> plan_terminator;
+    tools_approval_check_planner -. &nbsp;back&nbsp; .-> planning;
+    tools_approval_check_planner -. &nbsp;continue&nbsp; .-> update_plan;
     tools_approval_entry_executor -. &nbsp;back&nbsp; .-> execution;
     tools_approval_entry_executor -. &nbsp;continue&nbsp; .-> tools_approval_check_executor;
+    tools_approval_entry_planner -. &nbsp;back&nbsp; .-> planning;
+    tools_approval_entry_planner -. &nbsp;continue&nbsp; .-> tools_approval_check_planner;
     update_plan --> planning;
     execution_handover --> __end__;
     plan_terminator --> __end__;
@@ -141,6 +129,8 @@ graph TD;
     build_context_tools(build_context_tools)
     build_context_handover(build_context_handover)
     planning(planning)
+    tools_approval_entry_planner(tools_approval_entry_planner)
+    tools_approval_check_planner(tools_approval_check_planner)
     update_plan(update_plan)
     planning_supervisor(planning_supervisor)
     plan_terminator(plan_terminator)
@@ -171,14 +161,20 @@ graph TD;
     planning -. &nbsp;stop&nbsp; .-> plan_terminator;
     planning -. &nbsp;PlanSupervisorAgent&nbsp; .-> planning_supervisor;
     planning -. &nbsp;HandoverAgent&nbsp; .-> set_status_to_execution;
+    planning -. &nbsp;tools_approval&nbsp; .-> tools_approval_entry_planner;
     planning -. &nbsp;call_tool&nbsp; .-> update_plan;
     planning_supervisor --> planning;
     set_status_to_execution --> execution;
     tools_approval_check_executor -. &nbsp;back&nbsp; .-> execution;
     tools_approval_check_executor -. &nbsp;continue&nbsp; .-> execution_tools;
     tools_approval_check_executor -. &nbsp;stop&nbsp; .-> plan_terminator;
+    tools_approval_check_planner -. &nbsp;stop&nbsp; .-> plan_terminator;
+    tools_approval_check_planner -. &nbsp;back&nbsp; .-> planning;
+    tools_approval_check_planner -. &nbsp;continue&nbsp; .-> update_plan;
     tools_approval_entry_executor -. &nbsp;back&nbsp; .-> execution;
     tools_approval_entry_executor -. &nbsp;continue&nbsp; .-> tools_approval_check_executor;
+    tools_approval_entry_planner -. &nbsp;back&nbsp; .-> planning;
+    tools_approval_entry_planner -. &nbsp;continue&nbsp; .-> tools_approval_check_planner;
     update_plan --> planning;
     git_actions --> __end__;
     plan_terminator --> __end__;
