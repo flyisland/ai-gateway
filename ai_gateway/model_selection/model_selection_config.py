@@ -26,6 +26,9 @@ class UnitPrimitiveConfig(BaseModel):
     default_model: str
     selectable_models: list[str] = []
     beta_models: list[str] = []
+    dev_selectable_models: list[str] = []
+    dev_default_model: str
+    dev_group_ids: list[int]
 
 
 class ModelSelectionConfig:
