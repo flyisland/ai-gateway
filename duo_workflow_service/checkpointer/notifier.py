@@ -30,6 +30,7 @@ class UserInterface:
         self.ui_chat_log: list[UiChatLog] = []
         self.status = WorkflowStatusEnum.NOT_STARTED
         self.steps: list[dict] = []
+        self.checkpoint_number = 0
 
     async def send_event(
         self,
@@ -55,21 +56,9 @@ class UserInterface:
                 return await self._execute_action()
 
     async def _execute_action(self):
-
+        # We just construct an empty NewCheckpoint here as we want to fetch the latest right before sending
         action = contract_pb2.Action(
-            newCheckpoint=contract_pb2.NewCheckpoint(
-                goal=self.goal,
-                status=WORKFLOW_STATUS_TO_CHECKPOINT_STATUS[self.status],
-                checkpoint=dumps(
-                    {
-                        "channel_values": {
-                            "ui_chat_log": self.ui_chat_log,
-                            "plan": {"steps": self.steps},
-                        }
-                    },
-                    cls=CustomEncoder,
-                ),
-            ),
+            newCheckpoint=contract_pb2.NewCheckpoint(),
         )
 
         log = structlog.stdlib.get_logger("workflow")
@@ -78,6 +67,21 @@ class UserInterface:
         self.outbox.put_action(action)
 
         log.info("Added NewCheckpoint to outbox")
+
+    def most_recent_new_checkpoint(self):
+        return contract_pb2.NewCheckpoint(
+                goal=self.goal,
+                status=WORKFLOW_STATUS_TO_CHECKPOINT_STATUS[self.status],
+                checkpoint=dumps({
+                    "channel_values": {
+                            "ui_chat_log": self.ui_chat_log,
+                            "plan": {"steps": self.steps},
+                        }
+                    },
+                    cls=CustomEncoder,
+                )
+            )
+
 
     def _append_chunk_to_ui_chat_log(self, message: BaseMessage) -> bool:
         """Append a message chunk to the UI chat log.
@@ -113,4 +117,5 @@ class UserInterface:
 
         last_message["content"] = last_message["content"] + message.text()
 
+        self.checkpoint_number += 1
         return True
