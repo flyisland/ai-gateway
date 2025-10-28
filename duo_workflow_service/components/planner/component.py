@@ -1,4 +1,5 @@
 from enum import StrEnum
+from functools import partial
 from typing import Any, Optional
 
 from langchain_core.messages import AIMessage
@@ -10,6 +11,7 @@ from duo_workflow_service.agents import (
     PlanSupervisorAgent,
     ToolsExecutor,
 )
+from duo_workflow_service.components import ToolsApprovalComponent, ToolsRegistry
 from duo_workflow_service.components.base import BaseComponent
 from duo_workflow_service.components.human_approval.plan_approval import (
     PlanApprovalComponent,
@@ -32,6 +34,7 @@ class Routes(StrEnum):
 
 
 def _router(
+    tools_registry: ToolsRegistry,
     state: WorkflowState,
 ) -> Routes:
     if state["status"] in [WorkflowStatusEnum.CANCELLED, WorkflowStatusEnum.ERROR]:
@@ -41,6 +44,11 @@ def _router(
     if isinstance(last_message, AIMessage) and len(last_message.tool_calls) > 0:
         if last_message.tool_calls[0]["name"] == HandoverTool.tool_title:
             return Routes.HANDOVER
+        if any(
+            tools_registry.approval_required(call["name"])
+            for call in last_message.tool_calls
+        ):
+            return Routes.TOOLS_APPROVAL
         return Routes.CALL_TOOL
 
     return Routes.SUPERVISOR
@@ -104,7 +112,22 @@ class PlannerComponent(BaseComponent):
             workflow_id=self.workflow_id,
             workflow_type=self.workflow_type,
         )
+        tools_approval_component = ToolsApprovalComponent(
+            workflow_id=self.workflow_id,
+            approved_agent_name="planner",
+            approved_agent_state=WorkflowStatusEnum.PLANNING,
+            toolset=planner_toolset,
+        )
+
         plan_supervisor = PlanSupervisorAgent(supervised_agent_name="planner")
+
+        tools_approval_entry_node = tools_approval_component.attach(
+            graph=graph,
+            next_node="update_plan",
+            back_node="planning",
+            exit_node=exit_node,
+        )
+
         # When plan approval component is not attached, proceed to next node
         plan_approval_entry_node = next_node
         if approval_component is not None:
@@ -120,14 +143,16 @@ class PlannerComponent(BaseComponent):
 
         graph.add_conditional_edges(
             "planning",
-            _router,
+            partial(_router, self.tools_registry),
             {
                 Routes.CALL_TOOL: "update_plan",
+                Routes.TOOLS_APPROVAL: tools_approval_entry_node,
                 Routes.SUPERVISOR: "planning_supervisor",
                 Routes.HANDOVER: plan_approval_entry_node,
                 Routes.STOP: exit_node,
             },
         )
+
         graph.add_edge("update_plan", "planning")
         graph.add_edge("planning_supervisor", "planning")
 

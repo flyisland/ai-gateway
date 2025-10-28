@@ -31,10 +31,7 @@ from duo_workflow_service.components import (
     ToolsRegistry,
 )
 from duo_workflow_service.components.executor.component import ExecutorComponent
-from duo_workflow_service.components.goal_disambiguation import (
-    GoalDisambiguationComponent,
-)
-from duo_workflow_service.components.planner.component import PlannerComponent
+from duo_workflow_service.components.planner import PlannerComponent
 from duo_workflow_service.entities import (
     MessageTypeEnum,
     Plan,
@@ -160,6 +157,38 @@ PLANNER_TOOLS = [
     "update_task_description",
     "handover_tool",
     "create_plan",
+    "list_issues",
+    "get_issue",
+    "list_issue_notes",
+    "get_issue_note",
+    "get_job_logs",
+    "get_merge_request",
+    "get_project",
+    "get_pipeline_errors",
+    "run_read_only_git_command",
+    "run_git_command",
+    "list_all_merge_request_notes",
+    "list_merge_request_diffs",
+    "gitlab_issue_search",
+    "gitlab_blob_search",
+    "gitlab_merge_request_search",
+    "read_file",
+    "read_files",
+    "find_files",
+    "list_dir",
+    "grep",
+    "get_epic",
+    "list_epics",
+    "get_repository_file",
+    "list_epic_notes",
+    "get_commit",
+    "list_commits",
+    "get_commit_comments",
+    "get_commit_diff",
+    "get_work_item",
+    "list_work_items",
+    "get_work_item_notes",
+    "create_work_item",
 ]
 
 
@@ -223,29 +252,7 @@ class Workflow(AbstractWorkflow):
             "allow_agent_to_request_user", True
         )
         # Add nodes to the graph
-        graph.set_entry_point("build_context")
-
-        last_node_name = self._add_context_builder_nodes(graph, tools_registry)
-        disambiguation_component = GoalDisambiguationComponent(
-            user=self._user,
-            goal=goal,
-            model_config=self._model_config,
-            http_client=self._http_client,
-            workflow_id=self._workflow_id,
-            tools_registry=tools_registry,
-            allow_agent_to_request_user=allow_agent_to_request_user,
-            workflow_type=self._workflow_type,
-        )
-        disambiguation_entry_node = disambiguation_component.attach(
-            graph=graph,
-            component_exit_node="planning",
-            graph_termination_node="plan_terminator",
-            component_execution_state=WorkflowStatusEnum.PLANNING,
-        )
-
-        graph.add_edge(last_node_name, disambiguation_entry_node)
-
-        planner_component = PlannerComponent(
+        planning_component = PlannerComponent(
             user=self._user,
             workflow_id=self._workflow_id,
             workflow_type=self._workflow_type,
@@ -267,14 +274,14 @@ class Workflow(AbstractWorkflow):
                 approved_agent_state=WorkflowStatusEnum.PLANNING,
             )
 
-        planner_component.attach(
+        planning_component.attach(
             graph=graph,
             next_node="set_status_to_execution",
             exit_node="plan_terminator",
             approval_component=plan_approval_component,
         )
-        # graph.add_edge(disambiguation_exit_node, "planning")
         plan_terminator = PlanTerminatorAgent(workflow_id=self._workflow_id)
+        graph.set_entry_point("planning")
         graph.add_node("plan_terminator", plan_terminator.run)
 
         graph.add_node(

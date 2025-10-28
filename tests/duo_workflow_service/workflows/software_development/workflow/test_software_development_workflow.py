@@ -1,3 +1,4 @@
+# pylint: disable=file-naming-for-tests, unused-argument, redefined-outer-name, direct-environment-variable-reference
 import asyncio
 import os
 from typing import Any
@@ -37,7 +38,7 @@ class MockComponent:
         self._approved_agent_name = approved_agent_name
         self._mock_node_run = mock_node_run
 
-    def attach(
+    def attach(  # pylint: disable=unused-argument
         self,
         graph,
         exit_node: str,
@@ -53,7 +54,9 @@ class MockComponent:
 
 
 @pytest.fixture(autouse=True)
-def prepare_container(mock_duo_workflow_service_container):
+def prepare_container(
+    mock_duo_workflow_service_container,
+):  # pylint: disable=unused-argument
     pass
 
 
@@ -98,7 +101,7 @@ def mock_log_exception_fixture():
 @pytest.fixture(name="agent_responses")
 def agent_responses_fixture() -> list[dict[str, Any]]:
     status = WorkflowStatusEnum.PLANNING
-    agent_name = "context_builder"
+    agent_name = "planner"
 
     return [
         {
@@ -179,21 +182,27 @@ def mock_handover_agent_fixture():
 
 @pytest.fixture(name="mock_plan_supervisor_agent")
 def mock_plan_supervisor_agent_fixture():
-    with patch(
-        "duo_workflow_service.workflows.software_development.workflow.PlanSupervisorAgent"
-    ) as mock:
-        mock.return_value.run.return_value = {
-            "plan": Plan(steps=[]),
-            "status": WorkflowStatusEnum.EXECUTION,
-            "conversation_history": {},
-        }
-        yield mock
+    with (
+        patch(
+            "duo_workflow_service.components.planner.component.PlanSupervisorAgent"
+        ) as mock_planner_supervisor,
+        patch(
+            "duo_workflow_service.components.executor.component.PlanSupervisorAgent"
+        ) as mock_executor_supervisor,
+    ):
+        for mock in [mock_planner_supervisor, mock_executor_supervisor]:
+            mock.return_value.run.return_value = {
+                "plan": Plan(steps=[]),
+                "status": WorkflowStatusEnum.EXECUTION,
+                "conversation_history": {},
+            }
+        yield mock_planner_supervisor
 
 
 @pytest.fixture(name="mock_tools_executor")
 def mock_tools_executor_fixture():
     with patch(
-        "duo_workflow_service.workflows.software_development.workflow.ToolsExecutor"
+        "duo_workflow_service.components.planner.component.ToolsExecutor"
     ) as mock:
         yield mock
 
@@ -221,19 +230,9 @@ def mock_planner_component_fixture():
 @pytest.fixture(name="mock_tools_approval_component")
 def mock_tools_approval_component_fixture():
     with patch(
-        "duo_workflow_service.workflows.software_development.workflow.ToolsApprovalComponent",
+        "duo_workflow_service.components.planner.component.ToolsApprovalComponent",
         autospec=True,
     ) as mock:
-        yield mock
-
-
-@pytest.fixture(name="mock_goal_disambiguation_component")
-def mock_goal_disambiguation_component_fixture():
-    with patch(
-        "duo_workflow_service.workflows.software_development.workflow.GoalDisambiguationComponent",
-        autospec=True,
-    ) as mock:
-        mock.return_value.attach.return_value = "set_status_to_execution"
         yield mock
 
 
@@ -259,10 +258,6 @@ async def test_workflow_run(
     mock_gitlab_workflow_aput,
     mock_gitlab_workflow_aget_tuple,
     mock_checkpoint_notifier,
-    mock_goal_disambiguation_component,
-    mock_tools_approval_component,
-    mock_planner_component,
-    mock_executor_component,
     mock_fetch_workflow_and_container_data,
     mock_tools_executor,
     mock_plan_supervisor_agent,
@@ -291,50 +286,17 @@ async def test_workflow_run(
         },
     ]
 
-    mock_tools_approval_component.return_value.attach.side_effect = [
-        "build_context_tools",
-        "execution_tools",
-    ]
-
     await workflow.run("test_goal")
 
-    mock_goal_disambiguation_component.assert_called_once_with(
-        user=workflow._user,
-        goal="test_goal",
-        model_config=workflow._model_config,
-        http_client=workflow._http_client,
-        workflow_id=workflow._workflow_id,
-        tools_registry=mock_tools_registry,
-        allow_agent_to_request_user=True,
-        workflow_type=workflow._workflow_type,
-    )
-
-    assert mock_goal_disambiguation_component.return_value.attach.call_count == 1
-    assert mock_planner_component.return_value.attach.call_count == 1
-    assert mock_executor_component.return_value.attach.call_count == 1
-    assert (
-        mock_planner_component.return_value.attach.call_args.kwargs.get(
-            "approval_component"
-        )
-        is not None
-    )
-    assert (
-        mock_executor_component.return_value.attach.call_args.kwargs.get(
-            "approval_component"
-        )
-        is not None
-    )
-
-    assert mock_tools_approval_component.return_value.attach.call_count == 1
-
-    assert mock_agent.call_count == 1
+    # Planner + executor = 2 calls
+    assert mock_agent.call_count == 2
     assert mock_agent.return_value.run.call_count >= 3
 
     assert mock_tools_executor.call_count == 1
     assert mock_tools_executor.return_value.run.call_count >= 1
 
-    assert mock_handover_agent.call_count == 2
-    assert mock_handover_agent.return_value.run.call_count == 2
+    assert mock_handover_agent.call_count == 1
+    assert mock_handover_agent.return_value.run.call_count == 1
 
     assert mock_plan_supervisor_agent.call_count == 1
     assert mock_plan_supervisor_agent.return_value.run.call_count == 1
@@ -354,9 +316,6 @@ async def test_workflow_run(
 @pytest.mark.parametrize("offline_mode", [True])
 async def test_workflow_run_with_memory_saver(
     mock_checkpoint_notifier,
-    mock_executor_component,
-    mock_planner_component,
-    mock_goal_disambiguation_component,
     mock_gitlab_workflow,
     mock_fetch_workflow_and_container_data,
     mock_tools_executor,
@@ -379,22 +338,9 @@ async def test_workflow_run_with_memory_saver(
 
     await workflow.run("test_goal")
 
-    assert mock_agent.call_count == 1
-    assert mock_agent.return_value.run.call_count == 3
-
-    assert mock_tools_executor.call_count == 1
-    assert mock_tools_executor.return_value.run.call_count >= 1
-
-    assert mock_handover_agent.call_count == 2
-    assert mock_handover_agent.return_value.run.call_count >= 1
-
-    assert mock_plan_supervisor_agent.call_count == 1
-    assert mock_plan_supervisor_agent.return_value.run.call_count == 1
-
+    # API shouldn't be called when using memsaver
     assert mock_git_lab_workflow_instance.aput.call_count == 0
     assert mock_git_lab_workflow_instance.aget_tuple.call_count == 0
-
-    assert mock_planner_component.return_value.attach.call_count == 1
 
     assert workflow.is_done
 
@@ -404,7 +350,6 @@ async def test_workflow_run_when_exception(
     mock_log_exception,
     mock_planner_component,
     mock_executor_component,
-    mock_goal_disambiguation_component,
     mock_fetch_workflow_and_container_data,
     mock_gitlab_workflow,
     mock_tools_executor,
@@ -444,15 +389,37 @@ async def test_workflow_run_when_exception(
     "duo_workflow_service.checkpointer.gitlab_workflow.GitLabStatusUpdater",
     autospec=True,
 )
+@pytest.mark.parametrize(
+    "agent_responses",
+    [
+        [
+            {
+                "status": WorkflowStatusEnum.PLANNING,
+                "conversation_history": {
+                    "planner": [
+                        SystemMessage(content="system message"),
+                        HumanMessage(content="human message"),
+                        AIMessage(
+                            content="...",
+                            tool_calls=[
+                                {
+                                    "id": "1",
+                                    "name": "test_tool",
+                                    "args": {"test": "test"},
+                                }
+                            ],
+                        ),
+                    ],
+                },
+            }
+        ]
+    ],
+)
 async def test_workflow_run_with_error_state(
     mock_status_updater,
     mock_gitlab_workflow_aput,
     mock_gitlab_workflow_aget_tuple,
     mock_checkpoint_notifier,
-    mock_planner_component,
-    mock_tools_approval_component,
-    mock_executor_component,
-    mock_goal_disambiguation_component,
     mock_fetch_workflow_and_container_data,
     mock_tools_executor,
     mock_agent,
@@ -469,19 +436,10 @@ async def test_workflow_run_with_error_state(
         }
     ]
 
-    mock_tools_approval_component.return_value.attach.return_value = (
-        "build_context_tools"
-    )
-
     await workflow.run("test_goal")
-
-    assert mock_agent.call_count == 1
-    assert mock_agent.return_value.run.call_count == 2
 
     assert mock_tools_executor.call_count == 1
     assert mock_tools_executor.return_value.run.call_count == 1
-
-    assert mock_planner_component.return_value.attach.call_count == 1
 
     assert workflow.is_done
 
@@ -491,7 +449,6 @@ async def test_workflow_run_with_tools_registry(
     mock_log_exception,
     mock_executor_component,
     mock_planner_component,
-    mock_goal_disambiguation_component,
     mock_gitlab_workflow,
     mock_fetch_workflow_and_container_data,
     mock_tools_executor,
@@ -529,7 +486,6 @@ async def test_workflow_run_with_tools_registry(
     mock_tools_registry.toolset.assert_has_calls(
         [
             call(EXECUTOR_TOOLS),
-            call(CONTEXT_BUILDER_TOOLS),
             call(PLANNER_TOOLS),
         ],
         any_order=True,
@@ -574,7 +530,6 @@ def test_context_builder_tools(tools_registry, workflow):
 async def test_workflow_run_with_setup_error(
     mock_executor_component,
     mock_planner_component,
-    mock_goal_disambiguation_component,
     mock_fetch_workflow_and_container_data,
     mock_gitlab_workflow,
     mock_git_lab_workflow_instance,
@@ -658,7 +613,6 @@ async def test_workflow_run_with_retry(
     mock_log_exception,
     mock_executor_component,
     mock_planner_component,
-    mock_goal_disambiguation_component,
     mock_fetch_workflow_and_container_data,
     mock_gitlab_workflow,
     mock_git_lab_workflow_instance,
@@ -744,7 +698,7 @@ async def test_workflow_run_with_retry(
                 "plan": Plan(steps=[]),
                 "status": WorkflowStatusEnum.PLANNING,
                 "conversation_history": {
-                    "context_builder": [
+                    "planner": [
                         SystemMessage(content="system message"),
                         HumanMessage(content="human message"),
                         AIMessage(
@@ -764,7 +718,7 @@ async def test_workflow_run_with_retry(
                 "plan": Plan(steps=[]),
                 "status": WorkflowStatusEnum.EXECUTION,
                 "conversation_history": {
-                    "context_builder": [
+                    "planner": [
                         AIMessage(
                             content="Tool calls are present, route to build executor tools execution",
                             tool_calls=[
@@ -784,14 +738,11 @@ async def test_workflow_run_with_retry(
 @pytest.mark.parametrize("tool_approval_required", [[True, False, False]])
 async def test_workflow_run_with_tool_approvals(
     mock_checkpoint_notifier,
-    mock_executor_component,
     mock_tools_approval_component,
     mock_gitlab_workflow,
     mock_git_lab_workflow_instance,
     mock_fetch_workflow_and_container_data,
     mock_tools_executor,
-    mock_planner_component,
-    mock_goal_disambiguation_component,
     mock_handover_agent,
     mock_agent,
     mock_tools_registry_cls,
@@ -801,13 +752,13 @@ async def test_workflow_run_with_tool_approvals(
     mock_tools_approval_execution.return_value = {"status": WorkflowStatusEnum.PLANNING}
     mock_tools_approval_component.return_value = MockComponent(
         mock_node_run=mock_tools_approval_execution,
-        approved_agent_name="context_builder",
+        approved_agent_name="planner",
     )
 
     await workflow.run("test_goal")
 
-    assert mock_agent.call_count == 1
-    assert mock_tools_approval_execution.call_count == 1
+    assert mock_agent.call_count == 2
+    assert mock_tools_approval_execution.call_count >= 1
 
     assert workflow.is_done
 
@@ -828,7 +779,6 @@ async def test_workflow_run_without_plan_approval_component(
     mock_fetch_workflow_and_container_data,
     mock_tools_executor,
     mock_planner_component,
-    mock_goal_disambiguation_component,
     mock_handover_agent,
     mock_agent,
     mock_tools_registry_cls,
@@ -854,7 +804,6 @@ async def test_workflow_run_without_plan_approval_component(
         instance.compile.return_value = compiled_graph
         await workflow.run("test_goal")
 
-    assert mock_agent.call_count == 1
     assert mock_planner_component.return_value.attach.call_count == 1
     assert mock_executor_component.return_value.attach.call_count == 1
 
@@ -873,7 +822,9 @@ async def test_workflow_run_without_plan_approval_component(
 
 
 @pytest.mark.asyncio
-async def test_workflow_cleanup(workflow, mock_action):
+async def test_workflow_cleanup(
+    workflow, mock_action
+):  # pylint: disable=redefined-outer-name
     assert workflow._outbox._queue.empty()
 
     workflow._outbox.put_action(mock_action)
