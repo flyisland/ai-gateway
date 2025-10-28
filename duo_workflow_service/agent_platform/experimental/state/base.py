@@ -167,6 +167,9 @@ class IOKey(BaseModel):
         alias: Optional[str] = None
         literal: Optional[bool] = False
 
+        # cls._AliasedIOKeyConfig(**key) throws an error
+        print("****** PARSE_KEY")
+        print(key)
         if isinstance(key, dict):
             key_config = cls._AliasedIOKeyConfig(**key)
             key = key_config.from_

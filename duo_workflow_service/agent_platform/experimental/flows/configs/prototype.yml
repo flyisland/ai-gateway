@@ -1,0 +1,20 @@
+version: "experimental"
+environment: remote
+components:
+   - name: "run_thingy"
+     type: DeterministicStepComponent
+     inputs:
+       - from: 3.14
+         as: "file_path"
+         literal: true
+       - from: true
+         as: "contents"
+         literal: true
+     tool_name: "create_file_with_contents"
+     toolset: ["create_file_with_contents"]
+routers:
+   - from: "run_thingy"
+     to: "end"
+flow:
+   entry_point: "run_thingy"
+
