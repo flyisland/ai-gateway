@@ -43,8 +43,8 @@ class GetPipelineErrors(DuoBaseTool):
         - https://gitlab.com/group/subgroup/project/-/pipelines/42
 
     For example:
-    - Given project_id 13 and merge_request_iid 9, the tool call would be:
-        get_pipeline_errors(project_id=13, merge_request_iid=9)
+    - Given project_id 'gitlab-org/gitlab' and merge_request_iid 9, the tool call would be:
+        get_pipeline_errors(project_id='gitlab-org/gitlab', merge_request_iid=9)
     - Given a merge request URL https://gitlab.com/namespace/project/-/merge_requests/103, the tool call would be:
         get_pipeline_errors(url="https://gitlab.com/namespace/project/-/merge_requests/103")
     - Given a pipeline URL https://gitlab.com/namespace/project/-/pipelines/33, the tool call would be:
@@ -176,4 +176,4 @@ class GetPipelineErrors(DuoBaseTool):
     ) -> str:
         if args.url:
             return f"Get pipeline error logs for {args.url}"
-        return f"Get pipeline error logs for merge request !{args.merge_request_iid} in project {args.project_id}"
+        return f"Get pipeline error logs for merge request !{args.merge_request_iid} in {self.format_project_reference(args.project_id, args.url)}"

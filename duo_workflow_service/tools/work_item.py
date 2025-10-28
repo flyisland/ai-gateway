@@ -232,7 +232,7 @@ class ListWorkItems(WorkItemBaseTool):
         if args.group_id:
             return f"List work items in group {args.group_id}"
 
-        return f"List work items in project {args.project_id}"
+        return f"List work items in {self.format_project_reference(args.project_id, args.url)}"
 
 
 class WorkItemResourceInput(ParentResourceInput):
@@ -290,7 +290,7 @@ class GetWorkItem(WorkItemBaseTool):
         if args.group_id:
             return f"Read work item #{args.work_item_iid} in group {args.group_id}"
 
-        return f"Read work item #{args.work_item_iid} in project {args.project_id}"
+        return f"Read work item #{args.work_item_iid} in {self.format_project_reference(args.project_id, args.url)}"
 
 
 class GetWorkItemNotesInput(WorkItemResourceInput):
@@ -367,7 +367,7 @@ class GetWorkItemNotes(WorkItemBaseTool):
         if args.group_id:
             return f"Read comments on work item #{args.work_item_iid} in group {args.group_id}"
 
-        return f"Read comments on work item #{args.work_item_iid} in project {args.project_id}"
+        return f"Read comments on work item #{args.work_item_iid} in {self.format_project_reference(args.project_id, args.url)}"
 
 
 class CreateWorkItemInput(ParentResourceInput):
@@ -439,7 +439,7 @@ class CreateWorkItem(WorkItemBaseTool):
             return f"Create work item '{args.title}' in {args.url}"
         if args.group_id:
             return f"Create work item '{args.title}' in group {args.group_id}"
-        return f"Create work item '{args.title}' in project {args.project_id}"
+        return f"Create work item '{args.title}' in {self.format_project_reference(args.project_id, args.url)}"
 
 
 class UpdateWorkItemInput(WorkItemResourceInput):
@@ -518,7 +518,7 @@ class UpdateWorkItem(WorkItemBaseTool):
             return f"Update work item in {args.url}"
         if args.group_id:
             return f"Update work item #{args.work_item_iid} in group {args.group_id}"
-        return f"Update work item #{args.work_item_iid} in project {args.project_id}"
+        return f"Update work item #{args.work_item_iid} in {self.format_project_reference(args.project_id, args.url)}"
 
 
 class CreateWorkItemNoteInput(WorkItemResourceInput):
@@ -649,4 +649,4 @@ class CreateWorkItemNote(WorkItemBaseTool):
             return f"Add comment to work item {args.url}"
         if args.group_id:
             return f"Add comment to work item #{args.work_item_iid} in group {args.group_id}"
-        return f"Add comment to work item #{args.work_item_iid} in project {args.project_id}"
+        return f"Add comment to work item #{args.work_item_iid} in {self.format_project_reference(args.project_id, args.url)}"

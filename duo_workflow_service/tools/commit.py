@@ -232,8 +232,8 @@ class ListCommits(CommitBaseTool):
     {PROJECT_IDENTIFICATION_DESCRIPTION}
 
     For example:
-    - Given project_id 13, the tool call would be:
-        list_commits(project_id=13)
+    - Given project_id 'gitlab-org/gitlab', the tool call would be:
+        list_commits(project_id='gitlab-org/gitlab')
     - Given the URL https://gitlab.com/namespace/project, the tool call would be:
         list_commits(url="https://gitlab.com/namespace/project")
     """
@@ -275,7 +275,7 @@ class ListCommits(CommitBaseTool):
     ) -> str:
         if args.url:
             return f"List commits in {args.url}"
-        return f"List commits in project {args.project_id}"
+        return f"List commits in {self.format_project_reference(args.project_id, args.url)}"
 
 
 class GetCommitInput(CommitResourceInput):
@@ -293,8 +293,8 @@ class GetCommit(CommitBaseTool):
 {COMMIT_IDENTIFICATION_DESCRIPTION}
 
 For example:
-- Given project_id 13 and commit_sha "6104942438c14ec7bd21c6cd5bd995272b3faff6", the tool call would be:
-    get_commit(project_id=13, commit_sha="6104942438c14ec7bd21c6cd5bd995272b3faff6")
+- Given project_id 'gitlab-org/gitlab' and commit_sha "6104942438c14ec7bd21c6cd5bd995272b3faff6", the tool call would be:
+    get_commit(project_id='gitlab-org/gitlab', commit_sha="6104942438c14ec7bd21c6cd5bd995272b3faff6")
 - Given the URL https://gitlab.com/namespace/project/-/commit/6104942438c14ec7bd21c6cd5bd995272b3faff6, the tool call would be:
     get_commit(url="https://gitlab.com/namespace/project/-/commit/6104942438c14ec7bd21c6cd5bd995272b3faff6")
 """
@@ -339,7 +339,7 @@ For example:
     ) -> str:
         if args.url:
             return f"Read commit {args.url}"
-        return f"Read commit {args.commit_sha} in project {args.project_id}"
+        return f"Read commit {args.commit_sha} in {self.format_project_reference(args.project_id, args.url)}"
 
 
 class GetCommitDiff(CommitBaseTool):
@@ -349,8 +349,8 @@ class GetCommitDiff(CommitBaseTool):
     {COMMIT_IDENTIFICATION_DESCRIPTION}
 
     For example:
-    - Given project_id 13 and commit_sha "6104942438c14ec7bd21c6cd5bd995272b3faff6", the tool call would be:
-        get_commit_diff(project_id=13, commit_sha="6104942438c14ec7bd21c6cd5bd995272b3faff6")
+    - Given project_id 'gitlab-org/gitlab' and commit_sha "6104942438c14ec7bd21c6cd5bd995272b3faff6", the tool call would be:
+        get_commit_diff(project_id='gitlab-org/gitlab', commit_sha="6104942438c14ec7bd21c6cd5bd995272b3faff6")
     - Given the URL https://gitlab.com/namespace/project/-/commit/6104942438c14ec7bd21c6cd5bd995272b3faff6, the tool call would be:
         get_commit_diff(url="https://gitlab.com/namespace/project/-/commit/6104942438c14ec7bd21c6cd5bd995272b3faff6")
     """
@@ -412,7 +412,7 @@ class GetCommitDiff(CommitBaseTool):
 
         if args.url:
             return f"Get diff for commit {args.url}{excluded_files_msg}"
-        return f"Get diff for commit {args.commit_sha} in project {args.project_id}{excluded_files_msg}"
+        return f"Get diff for commit {args.commit_sha} in {self.format_project_reference(args.project_id, args.url)}{excluded_files_msg}"
 
 
 class GetCommitComments(CommitBaseTool):
@@ -422,8 +422,8 @@ class GetCommitComments(CommitBaseTool):
     {COMMIT_IDENTIFICATION_DESCRIPTION}
 
     For example:
-    - Given project_id 13 and commit_sha "6104942438c14ec7bd21c6cd5bd995272b3faff6", the tool call would be:
-        get_commit_comments(project_id=13, commit_sha="6104942438c14ec7bd21c6cd5bd995272b3faff6")
+    - Given project_id 'gitlab-org/gitlab' and commit_sha "6104942438c14ec7bd21c6cd5bd995272b3faff6", the tool call would be:
+        get_commit_comments(project_id='gitlab-org/gitlab', commit_sha="6104942438c14ec7bd21c6cd5bd995272b3faff6")
     - Given the URL https://gitlab.com/namespace/project/-/commit/6104942438c14ec7bd21c6cd5bd995272b3faff6, the tool call would be:
         get_commit_comments(url="https://gitlab.com/namespace/project/-/commit/6104942438c14ec7bd21c6cd5bd995272b3faff6")
     """
@@ -464,7 +464,7 @@ class GetCommitComments(CommitBaseTool):
     ) -> str:
         if args.url:
             return f"Get comments for commit {args.url}"
-        return f"Get comments for commit {args.commit_sha} in project {args.project_id}"
+        return f"Get comments for commit {args.commit_sha} in {self.format_project_reference(args.project_id, args.url)}"
 
 
 class CreateCommitAction(BaseModel):
@@ -660,8 +660,9 @@ class CreateCommit(CommitBaseTool):
         action_types = [action.action for action in args.actions]
         file_count = len(args.actions)
         branch_info = args.branch or "new auto-created branch"
+        project_ref = args.url if args.url else self.format_project_reference(args.project_id, args.url)
         return (
-            f"Create commit in project {args.project_id or args.url} on {branch_info} "
+            f"Create commit in {project_ref} on {branch_info} "
             f"with {file_count} file {self._pluralize('action', file_count)} ({', '.join(action_types)})"
         )
 

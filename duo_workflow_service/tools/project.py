@@ -36,4 +36,4 @@ class GetProject(DuoBaseTool):
     def format_display_message(
         self, args: GetProjectInput, _tool_response: Any = None
     ) -> str:
-        return f"Get project information for project {args.project_id}"
+        return f"Get project information for {self.format_project_reference(str(args.project_id))}"

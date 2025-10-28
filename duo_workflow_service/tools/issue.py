@@ -130,8 +130,8 @@ class CreateIssue(IssueBaseTool):
 {PROJECT_IDENTIFICATION_DESCRIPTION}
 
 For example:
-- Given project_id 13 and the title "Fix bug in login form", the tool call would be:
-    create_issue(project_id=13, title="Fix bug in login form")
+- Given project_id 'gitlab-org/gitlab' and the title "Fix bug in login form", the tool call would be:
+    create_issue(project_id='gitlab-org/gitlab', title="Fix bug in login form")
 - Given the URL https://gitlab.com/namespace/project and the title "Fix bug in login form", the tool call would be:
     create_issue(url="https://gitlab.com/namespace/project", title="Fix bug in login form")
 - Given the URL https://gitlab.com/namespace/project and the parent epic id equal 42, the tool call would be:
@@ -169,7 +169,7 @@ For example:
     ) -> str:
         if args.url:
             return f"Create issue '{args.title}' in {args.url}"
-        return f"Create issue '{args.title}' in project {args.project_id}"
+        return f"Create issue '{args.title}' in {self.format_project_reference(args.project_id, args.url)}"
 
 
 class ListIssuesInput(ProjectResourceInput):
@@ -264,8 +264,8 @@ class ListIssues(IssueBaseTool):
     {PROJECT_IDENTIFICATION_DESCRIPTION}
 
     For example:
-    - Given project_id 13, the tool call would be:
-        list_issues(project_id=13)
+    - Given project_id 'gitlab-org/gitlab', the tool call would be:
+        list_issues(project_id='gitlab-org/gitlab')
     - Given the URL https://gitlab.com/namespace/project, the tool call would be:
         list_issues(url="https://gitlab.com/namespace/project")
     """
@@ -306,7 +306,7 @@ class ListIssues(IssueBaseTool):
     ) -> str:
         if args.url:
             return f"List issues in {args.url}"
-        return f"List issues in project {args.project_id}"
+        return f"List issues in {self.format_project_reference(args.project_id, args.url)}"
 
 
 class GetIssue(IssueBaseTool):
@@ -316,8 +316,8 @@ class GetIssue(IssueBaseTool):
     {ISSUE_IDENTIFICATION_DESCRIPTION}
 
     For example:
-    - Given project_id 13 and issue_iid 9, the tool call would be:
-        get_issue(project_id=13, issue_iid=9)
+    - Given project_id 'gitlab-org/gitlab' and issue_iid 9, the tool call would be:
+        get_issue(project_id='gitlab-org/gitlab', issue_iid=9)
     - Given the URL https://gitlab.com/namespace/project/-/issues/103, the tool call would be:
         get_issue(url=https://gitlab.com/namespace/project/-/issues/103)
     """
@@ -358,7 +358,7 @@ class GetIssue(IssueBaseTool):
     ) -> str:
         if args.url:
             return f"Read issue {args.url}"
-        return f"Read issue #{args.issue_iid} in project {args.project_id}"
+        return f"Read issue #{args.issue_iid} in {self.format_project_reference(args.project_id, args.url)}"
 
 
 class UpdateIssueInput(IssueResourceInput):
@@ -403,8 +403,8 @@ class UpdateIssue(IssueBaseTool):
     {ISSUE_IDENTIFICATION_DESCRIPTION}
 
     For example:
-    - Given project_id 13, issue_iid 9, and title "Updated title", the tool call would be:
-        update_issue(project_id=13, issue_iid=9, title="Updated title")
+    - Given project_id 'gitlab-org/gitlab', issue_iid 9, and title "Updated title", the tool call would be:
+        update_issue(project_id='gitlab-org/gitlab', issue_iid=9, title="Updated title")
     - Given the URL https://gitlab.com/namespace/project/-/issues/103 and title "Updated title", the tool call would be:
         update_issue(url="https://gitlab.com/namespace/project/-/issues/103", title="Updated title")
     """
@@ -447,7 +447,7 @@ class UpdateIssue(IssueBaseTool):
     ) -> str:
         if args.url:
             return f"Update issue {args.url}"
-        return f"Update issue #{args.issue_iid} in project {args.project_id}"
+        return f"Update issue #{args.issue_iid} in {self.format_project_reference(args.project_id, args.url)}"
 
 
 class CreateIssueNoteInput(IssueResourceInput):
@@ -463,8 +463,8 @@ class CreateIssueNote(IssueBaseTool):
 {ISSUE_IDENTIFICATION_DESCRIPTION}
 
 For example:
-- Given project_id 13, issue_iid 9, and body "This is a comment", the tool call would be:
-    create_issue_note(project_id=13, issue_iid=9, body="This is a comment")
+- Given project_id 'gitlab-org/gitlab', issue_iid 9, and body "This is a comment", the tool call would be:
+    create_issue_note(project_id='gitlab-org/gitlab', issue_iid=9, body="This is a comment")
 - Given the URL https://gitlab.com/namespace/project/-/issues/103 and body "This is a comment", the tool call would be:
     create_issue_note(url="https://gitlab.com/namespace/project/-/issues/103", body="This is a comment")
 
@@ -508,7 +508,7 @@ The body parameter is always required.
     ) -> str:
         if args.url:
             return f"Add comment to issue {args.url}"
-        return f"Add comment to issue #{args.issue_iid} in project {args.project_id}"
+        return f"Add comment to issue #{args.issue_iid} in {self.format_project_reference(args.project_id, args.url)}"
 
 
 class ListIssueNotesInput(IssueResourceInput):
@@ -534,8 +534,8 @@ class ListIssueNotes(IssueBaseTool):
     {ISSUE_IDENTIFICATION_DESCRIPTION}
 
     For example:
-    - Given project_id 13 and issue_iid 9, the tool call would be:
-        list_issue_notes(project_id=13, issue_iid=9)
+    - Given project_id 'gitlab-org/gitlab' and issue_iid 9, the tool call would be:
+        list_issue_notes(project_id='gitlab-org/gitlab', issue_iid=9)
     - Given the URL https://gitlab.com/namespace/project/-/issues/103, the tool call would be:
         list_issue_notes(url="https://gitlab.com/namespace/project/-/issues/103")
     """
@@ -579,7 +579,7 @@ class ListIssueNotes(IssueBaseTool):
     ) -> str:
         if args.url:
             return f"Read comments on issue {args.url}"
-        return f"Read comments on issue #{args.issue_iid} in project {args.project_id}"
+        return f"Read comments on issue #{args.issue_iid} in {self.format_project_reference(args.project_id, args.url)}"
 
 
 class GetIssueNoteInput(IssueResourceInput):
@@ -593,8 +593,8 @@ class GetIssueNote(IssueBaseTool):
     {ISSUE_IDENTIFICATION_DESCRIPTION}
 
     For example:
-    - Given project_id 13, issue_iid 9, and note_id 5, the tool call would be:
-        get_issue_note(project_id=13, issue_iid=9, note_id=5)
+    - Given project_id 'gitlab-org/gitlab', issue_iid 9, and note_id 5, the tool call would be:
+        get_issue_note(project_id='gitlab-org/gitlab', issue_iid=9, note_id=5)
     - Given the URL https://gitlab.com/namespace/project/-/issues/103 and note_id 42, the tool call would be:
         get_issue_note(url="https://gitlab.com/namespace/project/-/issues/103", note_id=42)
 
@@ -637,4 +637,4 @@ class GetIssueNote(IssueBaseTool):
     ) -> str:
         if args.url:
             return f"Read comment #{args.note_id} on issue {args.url}"
-        return f"Read comment #{args.note_id} on issue #{args.issue_iid} in project {args.project_id}"
+        return f"Read comment #{args.note_id} on issue #{args.issue_iid} in {self.format_project_reference(args.project_id, args.url)}"
