@@ -1,8 +1,10 @@
+# pylint: disable=too-many-lines
 from contextlib import contextmanager
 from typing import Any, Type
 from unittest.mock import AsyncMock, MagicMock, Mock, PropertyMock, call, patch
 
 import pytest
+from gitlab_cloud_connector import CloudConnectorUser
 
 from ai_gateway.code_suggestions import CodeCompletions, CodeCompletionsLegacy
 from ai_gateway.code_suggestions.processing import (
@@ -38,6 +40,7 @@ from ai_gateway.models.base_text import (
 from ai_gateway.safety_attributes import SafetyAttributes
 from ai_gateway.tracking.instrumentator import SnowplowInstrumentator
 from ai_gateway.tracking.snowplow import SnowplowEvent, SnowplowEventContext
+from lib.billing_events.client import BillingEventsClient
 
 
 class InstrumentorMock(Mock):
@@ -873,4 +876,200 @@ class TestCodeCompletions:
                 "language": "python",
             },
             False,
+        )
+
+
+@pytest.mark.asyncio
+class TestCodeCompletionsBillingEvents:
+    @pytest.fixture(name="mock_user")
+    def mock_user_fixture(self):
+        return Mock(spec=CloudConnectorUser)
+
+    @pytest.fixture(name="mock_billing_client")
+    def mock_billing_client_fixture(self):
+        return Mock(spec=BillingEventsClient)
+
+    @pytest.fixture(name="use_case_with_billing")
+    def use_case_with_billing_fixture(self, mock_billing_client):
+        model = Mock(spec=TextGenModelBase)
+        type(model).input_token_limit = PropertyMock(return_value=2_048)
+        model.metadata = Mock(name="test-model", engine="test-engine")
+
+        use_case = CodeCompletions(
+            model=model,
+            tokenization_strategy=Mock(spec=TokenStrategyBase),
+            billing_event_client=mock_billing_client,
+        )
+        use_case.instrumentator = InstrumentorMock(spec=TextGenModelInstrumentator)
+        use_case.prompt_builder = Mock()
+        use_case.prompt_builder.build.return_value = Prompt(
+            prefix="test_prefix",
+            suffix="test_suffix",
+            metadata=MetadataPromptBuilder(
+                components={
+                    "prefix": MetadataCodeContent(length=10, length_tokens=2),
+                    "suffix": MetadataCodeContent(length=10, length_tokens=2),
+                }
+            ),
+        )
+
+        return use_case
+
+    async def test_billing_event_tracked_on_successful_completion(
+        self, use_case_with_billing, mock_user, mock_billing_client
+    ):
+        """Test that billing event is tracked when code completion is successful."""
+        expected_output_tokens = 25
+
+        use_case_with_billing.model.generate = AsyncMock(
+            return_value=TextGenModelOutput(
+                text="generated code",
+                score=0.8,
+                safety_attributes=SafetyAttributes(),
+                metadata=Mock(
+                    output_tokens=expected_output_tokens, max_output_tokens_used=False
+                ),
+            )
+        )
+
+        await use_case_with_billing.execute(
+            prefix="def hello",
+            suffix=":",
+            file_name="test.py",
+            editor_lang="python",
+            user=mock_user,
+        )
+
+        mock_billing_client.track_billing_event.assert_called_once_with(
+            user=mock_user,
+            event_type="code_suggestions",
+            category="CodeCompletions",
+            unit_of_measure="tokens",
+            quantity=expected_output_tokens,
+        )
+
+    async def test_no_billing_event_when_no_user_provided(
+        self, use_case_with_billing, mock_billing_client
+    ):
+        """Test that no billing event is tracked when user is not provided."""
+        use_case_with_billing.model.generate = AsyncMock(
+            return_value=TextGenModelOutput(
+                text="generated code",
+                score=0.8,
+                safety_attributes=SafetyAttributes(),
+                metadata=Mock(output_tokens=25, max_output_tokens_used=False),
+            )
+        )
+
+        await use_case_with_billing.execute(
+            prefix="def hello",
+            suffix=":",
+            file_name="test.py",
+            editor_lang="python",
+            # No user provided
+        )
+
+        mock_billing_client.track_billing_event.assert_not_called()
+
+    async def test_no_billing_event_when_no_billing_client(self, mock_user):
+        """Test that no billing event is tracked when billing client is not provided."""
+        model = Mock(spec=TextGenModelBase)
+        type(model).input_token_limit = PropertyMock(return_value=2_048)
+        model.metadata = Mock(name="test-model", engine="test-engine")
+
+        use_case = CodeCompletions(
+            model=model,
+            tokenization_strategy=Mock(spec=TokenStrategyBase),
+            # No billing client provided
+        )
+        use_case.instrumentator = InstrumentorMock(spec=TextGenModelInstrumentator)
+        use_case.prompt_builder = Mock()
+        use_case.prompt_builder.build.return_value = Prompt(
+            prefix="test_prefix",
+            suffix="test_suffix",
+            metadata=MetadataPromptBuilder(
+                components={
+                    "prefix": MetadataCodeContent(length=10, length_tokens=2),
+                    "suffix": MetadataCodeContent(length=10, length_tokens=2),
+                }
+            ),
+        )
+
+        use_case.model.generate = AsyncMock(
+            return_value=TextGenModelOutput(
+                text="generated code",
+                score=0.8,
+                safety_attributes=SafetyAttributes(),
+                metadata=Mock(output_tokens=25, max_output_tokens_used=False),
+            )
+        )
+
+        # This should not raise an exception
+        await use_case.execute(
+            prefix="def hello",
+            suffix=":",
+            file_name="test.py",
+            editor_lang="python",
+            user=mock_user,
+        )
+
+    async def test_billing_event_exception_handling(
+        self, use_case_with_billing, mock_user, mock_billing_client
+    ):
+        """Test that billing event exceptions are handled gracefully."""
+        use_case_with_billing.model.generate = AsyncMock(
+            return_value=TextGenModelOutput(
+                text="generated code",
+                score=0.8,
+                safety_attributes=SafetyAttributes(),
+                metadata=Mock(output_tokens=25, max_output_tokens_used=False),
+            )
+        )
+
+        # Make billing client raise an exception
+        mock_billing_client.track_billing_event.side_effect = Exception(
+            "Billing service unavailable"
+        )
+
+        # This should not raise an exception - billing errors should be handled gracefully
+        result = await use_case_with_billing.execute(
+            prefix="def hello",
+            suffix=":",
+            file_name="test.py",
+            editor_lang="python",
+            user=mock_user,
+        )
+
+        # Verify the completion still works despite billing error
+        assert result.text == "generated code"
+        mock_billing_client.track_billing_event.assert_called_once()
+
+    async def test_billing_event_with_zero_tokens(
+        self, use_case_with_billing, mock_user, mock_billing_client
+    ):
+        """Test that billing event is not tracked when output tokens is zero."""
+        use_case_with_billing.model.generate = AsyncMock(
+            return_value=TextGenModelOutput(
+                text="",
+                score=0.0,
+                safety_attributes=SafetyAttributes(),
+                metadata=Mock(output_tokens=0, max_output_tokens_used=False),
+            )
+        )
+
+        await use_case_with_billing.execute(
+            prefix="def hello",
+            suffix=":",
+            file_name="test.py",
+            editor_lang="python",
+            user=mock_user,
+        )
+
+        # Should still track billing event even with 0 tokens for consistency
+        mock_billing_client.track_billing_event.assert_called_once_with(
+            user=mock_user,
+            event_type="code_suggestions",
+            category="CodeCompletions",
+            unit_of_measure="tokens",
+            quantity=0,
         )
