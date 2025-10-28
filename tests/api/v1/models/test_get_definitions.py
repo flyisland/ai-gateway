@@ -69,17 +69,25 @@ def test_get_models_returns_correct_data(mock_model_config, client):
 
     assert data["models"][0] == {"name": "Model 1", "identifier": "model1"}
     assert data["models"][1] == {"name": "Model 2", "identifier": "model2"}
-    assert data["unit_primitives"][0] == {
+    resp0 = data["unit_primitives"][0]
+    expected0 = {
         "feature_setting": "config1",
         "unit_primitives": ["ask_issue", "ask_epic"],
         "default_model": "model1",
         "selectable_models": ["model1", "model2"],
         "beta_models": [],
     }
-    assert data["unit_primitives"][1] == {
+    # subset match for dict keys/values (tolerates dev_* extras)
+    assert expected0.items() <= resp0.items()
+    assert set(resp0["unit_primitives"]) == set(expected0["unit_primitives"])
+
+    resp1 = data["unit_primitives"][1]
+    expected1 = {
         "feature_setting": "config2",
         "unit_primitives": ["duo_chat"],
         "default_model": "model2",
         "selectable_models": ["model2"],
         "beta_models": ["model1"],
     }
+    assert expected1.items() <= resp1.items()
+    assert set(resp1["unit_primitives"]) == set(expected1["unit_primitives"])

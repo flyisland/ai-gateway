@@ -91,6 +91,9 @@ def test_get_unit_primitive_config(selection_config):
             default_model="gitlab-model-1",
             selectable_models=["gitlab-model-1"],
             beta_models=["gitlab-model-2"],
+            dev_selectable_models=[],
+            dev_default_model=None,
+            dev_group_ids=[],
         )
     ]
 
@@ -106,6 +109,9 @@ def test_get_unit_primitive_config_map(selection_config):
             default_model="gitlab-model-1",
             selectable_models=["gitlab-model-1"],
             beta_models=["gitlab-model-2"],
+            dev_selectable_models=[],
+            dev_default_model=None,
+            dev_group_ids=[],
         )
     }
 
@@ -125,6 +131,7 @@ def test_singleton_caches_yaml_loading():
     This is a regression test for a bug where __init__ was resetting the cache to None on every instantiation, causing
     YAML to be re-parsed on every request. Now we use a module-level singleton to ensure YAML is loaded only once.
     """
+    ModelSelectionConfig._instance = None
     # Track how many times yaml.safe_load is called
     original_safe_load = __import__("yaml").safe_load
     call_count = 0
