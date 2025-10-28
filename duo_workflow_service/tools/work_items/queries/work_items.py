@@ -30,6 +30,34 @@ query GetGroupWorkItem($fullPath: ID!, $iid: String!) {
                     name
                 }
                 archived
+                widgets {
+                    ... on WorkItemWidgetLinkedItems {
+                    type
+                    linkedItems {
+                        nodes {
+                        linkType
+                        workItemState
+                        workItem {
+                                id
+                                iid
+                            namespace {
+                                id
+                                fullPath
+                            }
+                            workItemType {
+                                name
+                            }
+                            title
+                            state
+                            createdAt
+                            closedAt
+                            webUrl
+                            reference(full: true)
+                        }
+                        }
+                    }
+                    }
+                }
             }
         }
     }
@@ -76,14 +104,14 @@ query GetProjectWorkItem($fullPath: ID!, $iid: String!) {
                         linkType
                         workItemState
                         workItem {
-                            id
-                            iid
+                                id
+                                iid
                             namespace {
-                            id
-                            fullPath
+                                id
+                                fullPath
                             }
                             workItemType {
-                            name
+                                name
                             }
                             title
                             state
