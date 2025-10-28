@@ -33,6 +33,7 @@ from contract import contract_pb2, contract_pb2_grpc
 from duo_workflow_service.components import tools_registry
 from duo_workflow_service.executor.outbox import OutboxSignal
 from duo_workflow_service.gitlab.connection_pool import connection_pool
+from duo_workflow_service.checkpointer.notifier import UserInterface
 from duo_workflow_service.interceptors.authentication_interceptor import (
     AuthenticationInterceptor,
 )
@@ -363,6 +364,7 @@ class DuoWorkflowService(contract_pb2_grpc.DuoWorkflowServicer):
         workflow_task = asyncio.create_task(workflow.run(goal))
 
         async def send_events() -> AsyncIterator[contract_pb2.Action]:
+            last_checkpoint_notified: Optional[int] = None
             while True:
                 item: contract_pb2.Action | OutboxSignal = (
                     await workflow.get_from_outbox()
@@ -372,10 +374,23 @@ class DuoWorkflowService(contract_pb2_grpc.DuoWorkflowServicer):
                     log.info("No more outbound requests. End send_events loop.")
                     break
 
-                if not isinstance(item, contract_pb2.Action):
+                if not (isinstance(item, contract_pb2.Action)):
                     raise RuntimeError(
-                        "Can not send an action that is not the Action type"
+                        "Can not send an action that is not the Action type or UserInterface"
                     )
+
+                if item.HasField('newCheckpoint'):
+                    # We use special optimized code path for
+                    # newCheckpoint as they happen very frequently.
+                    # If they get backed up in the queue we always
+                    # jump to the latest version and can save
+                    # ourselves sending incremental checkpoints.
+                    checkpoint_number = workflow.checkpoint_notifier.checkpoint_number
+                    if last_checkpoint_notified == checkpoint_number:
+                        log.info("Skipping already sent checkpoint", checkpoint_number=checkpoint_number)
+
+                    item.newCheckpoint.CopyFrom(workflow.checkpoint_notifier.most_recent_new_checkpoint())
+                    last_checkpoint_notified = checkpoint_number
 
                 log.info(
                     "Sending an outgoing action",

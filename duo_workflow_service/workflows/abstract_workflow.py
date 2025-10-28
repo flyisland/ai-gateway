@@ -89,6 +89,7 @@ class AbstractWorkflow(ABC):
     _workflow_metadata: dict[str, Any]
     is_done: bool = False
     last_error: BaseException | None = None
+    checkpoint_notifier: Optional[UserInterface] = None
     _workflow_type: CategoryEnum
     _stream: bool = False
     _additional_context: list[AdditionalContext] | None
@@ -249,7 +250,7 @@ class AbstractWorkflow(ABC):
                 user=user_for_registry,
                 language_server_version=self._language_server_version,
             )
-            checkpoint_notifier = UserInterface(outbox=self._outbox, goal=goal)
+            self.checkpoint_notifier = UserInterface(outbox=self._outbox, goal=goal)
 
             def on_gitlab_status_update(status: WorkflowStatusEventEnum):
                 self._last_gitlab_status = status
@@ -288,7 +289,7 @@ class AbstractWorkflow(ABC):
                         for step in state:
                             self.log.info(f"step: {step}")
                     else:
-                        await checkpoint_notifier.send_event(
+                        await self.checkpoint_notifier.send_event(
                             type=type, state=state, stream=self._stream
                         )
         except BaseException as e:
