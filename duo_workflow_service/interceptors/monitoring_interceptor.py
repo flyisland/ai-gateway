@@ -165,7 +165,7 @@ class MonitoringInterceptor(ServerInterceptor):
                 grpc_method_name,
                 servicer_context.code(),
             )
-        except Exception as e:
+        except BaseException as e:  # We handle all BaseException to ensure we include asyncio.CancelledError
             self._handle_error(
                 e,
                 grpc_type,
