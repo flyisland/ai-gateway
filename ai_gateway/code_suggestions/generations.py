@@ -1,6 +1,9 @@
 from pathlib import Path
 from typing import Any, AsyncIterator, Optional, Union
 
+import structlog
+from gitlab_cloud_connector import CloudConnectorUser
+
 from ai_gateway.code_suggestions.base import (
     CodeSuggestionsChunk,
     CodeSuggestionsOutput,
@@ -28,8 +31,11 @@ from ai_gateway.models.base_text import (
 )
 from ai_gateway.tracking.instrumentator import SnowplowInstrumentator
 from ai_gateway.tracking.snowplow import SnowplowEvent, SnowplowEventContext
+from lib.billing_events.client import BillingEventsClient
 
 __all__ = ["CodeGenerations"]
+
+log = structlog.stdlib.get_logger("codesuggestions")
 
 
 TPL_GENERATION_BASE = """
@@ -47,6 +53,7 @@ class CodeGenerations:
         model: TextGenModelBase,
         tokenization_strategy: TokenStrategyBase,
         snowplow_instrumentator: SnowplowInstrumentator,
+        billing_event_client: Optional[BillingEventsClient] = None,
     ):
         self.model = model
 
@@ -59,6 +66,7 @@ class CodeGenerations:
         )
         self.tokenization_strategy = tokenization_strategy
         self.snowplow_instrumentator = snowplow_instrumentator
+        self.billing_event_client = billing_event_client
 
     def _get_prompt(
         self, prefix: str, file_name: str, lang_id: Optional[LanguageId] = None
@@ -94,6 +102,7 @@ class CodeGenerations:
         snowplow_event_context: Optional[SnowplowEventContext] = None,
         prompt_enhancer: Optional[dict] = None,
         suffix: Optional[str] = None,
+        user: Optional[CloudConnectorUser] = None,
         **kwargs: Any,
     ) -> Union[CodeSuggestionsOutput, AsyncIterator[CodeSuggestionsChunk]]:
         lang_id = resolve_lang_id(file_name, editor_lang)
@@ -172,6 +181,7 @@ class CodeGenerations:
                         prefix=prefix,
                         watch_container=watch_container,
                         snowplow_event_context=snowplow_event_context,
+                        user=user,
                     )
 
             except ModelAPICallError as ex:
@@ -215,12 +225,35 @@ class CodeGenerations:
         watch_container: TextGenModelInstrumentator.WatchContainer,
         model_provider: Optional[str] = None,
         snowplow_event_context: Optional[SnowplowEventContext] = None,
+        user: Optional[CloudConnectorUser] = None,
     ) -> CodeSuggestionsOutput:
         watch_container.register_model_output_length(response.text)
         if response.score is not None:
             watch_container.register_model_score(response.score)
         if response.safety_attributes is not None:
             watch_container.register_safety_attributes(response.safety_attributes)
+
+        # Track billing event for code generations
+        if self.billing_event_client and user:
+            try:
+                output_tokens = self.tokenization_strategy.estimate_length(
+                    response.text
+                )[0]
+                self.billing_event_client.track_billing_event(
+                    user=user,
+                    event_type="code_generations",
+                    category=self.__class__.__name__,
+                    unit_of_measure="tokens",
+                    quantity=output_tokens,
+                )
+            except Exception as e:
+                log.error(
+                    "Failed to track billing event for code generations",
+                    error=str(e),
+                    output_tokens=self.tokenization_strategy.estimate_length(
+                        response.text
+                    )[0],
+                )
 
         processor = (
             PostProcessorAnthropic

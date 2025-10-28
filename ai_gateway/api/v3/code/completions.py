@@ -204,6 +204,7 @@ async def code_completion(
         editor_lang=payload.language_identifier,
         stream=payload.stream,
         code_context=code_context,
+        user=current_user.cloud_connector_user,
         snowplow_event_context=snowplow_event_context,
         **kwargs,
     )

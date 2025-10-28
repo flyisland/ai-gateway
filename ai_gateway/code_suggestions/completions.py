@@ -2,6 +2,7 @@ from typing import Any, AsyncIterator, Optional, Union
 
 import structlog
 from dependency_injector.providers import Factory
+from gitlab_cloud_connector import CloudConnectorUser
 
 from ai_gateway.code_suggestions.base import (
     CodeSuggestionsChunk,
@@ -36,6 +37,7 @@ from ai_gateway.models.base_text import (
 )
 from ai_gateway.tracking.instrumentator import SnowplowInstrumentator
 from ai_gateway.tracking.snowplow import SnowplowEvent, SnowplowEventContext
+from lib.billing_events.client import BillingEventsClient
 
 __all__ = ["CodeCompletionsLegacy", "CodeCompletions"]
 
@@ -125,6 +127,7 @@ class CodeCompletions:
         model: TextGenModelBase,
         tokenization_strategy: TokenStrategyBase,
         post_processor: Optional[Factory[PostProcessor]] = None,
+        billing_event_client: Optional[BillingEventsClient] = None,
     ):
         self.model = model
 
@@ -133,6 +136,7 @@ class CodeCompletions:
         )
 
         self.post_processor = post_processor
+        self.billing_event_client = billing_event_client
 
         # If you need the previous logic for building prompts using tree-sitter, refer to CodeCompletionsLegacy.
         # In the future, we plan to completely drop CodeCompletionsLegacy and move its logic to CodeCompletions
@@ -173,6 +177,7 @@ class CodeCompletions:
         raw_prompt: Optional[str | list[Message]] = None,
         code_context: Optional[list] = None,
         stream: bool = False,
+        user: Optional[CloudConnectorUser] = None,
         **kwargs: Any,
     ) -> Union[CodeSuggestionsOutput, AsyncIterator[CodeSuggestionsChunk]]:
         lang_id = resolve_lang_id(file_name, editor_lang)
@@ -230,7 +235,7 @@ class CodeCompletions:
                         return self._handle_stream(res)
 
                     return await self._handle_sync(
-                        prompt, res, lang_id, watch_container
+                        prompt, res, lang_id, watch_container, user
                     )
             except ModelAPICallError as ex:
                 watch_container.register_model_exception(str(ex), ex.code)
@@ -265,6 +270,7 @@ class CodeCompletions:
         response: TextGenModelOutput,
         lang_id: Optional[LanguageId],
         watch_container: TextGenModelInstrumentator.WatchContainer,
+        user: Optional[CloudConnectorUser] = None,
     ) -> CodeSuggestionsOutput:
         watch_container.register_model_output_length(response.text)
         watch_container.register_model_score(response.score)
@@ -273,6 +279,23 @@ class CodeCompletions:
         tokens_consumption_metadata = self._get_tokens_consumption_metadata(
             prompt, response
         )
+
+        # Track billing event for code suggestions
+        if self.billing_event_client and user:
+            try:
+                self.billing_event_client.track_billing_event(
+                    user=user,
+                    event_type="code_completions",
+                    category=self.__class__.__name__,
+                    unit_of_measure="tokens",
+                    quantity=tokens_consumption_metadata.output_tokens,
+                )
+            except Exception as e:
+                log.error(
+                    "Failed to track billing event for code suggestions",
+                    error=str(e),
+                    output_tokens=tokens_consumption_metadata.output_tokens,
+                )
 
         response_text = await self._get_response_text(
             response_text=response.text,

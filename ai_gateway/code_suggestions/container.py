@@ -21,6 +21,7 @@ from ai_gateway.models.base_chat import ChatModelBase
 from ai_gateway.models.base_text import TextGenModelBase
 from ai_gateway.tokenizer import init_tokenizer
 from ai_gateway.tracking.instrumentator import SnowplowInstrumentator
+from lib.billing_events.client import BillingEventsClient
 
 __all__ = [
     "ContainerCodeSuggestions",
@@ -37,6 +38,7 @@ class ContainerCodeGenerations(containers.DeclarativeContainer):
     agent_model = providers.Dependency(instance_of=TextGenModelBase)  # type: ignore[type-abstract]
 
     snowplow_instrumentator = providers.Dependency(instance_of=SnowplowInstrumentator)
+    billing_event_client = providers.Dependency(instance_of=BillingEventsClient)
 
     vertex = providers.Factory(
         CodeGenerations,
@@ -47,6 +49,7 @@ class ContainerCodeGenerations(containers.DeclarativeContainer):
             TokenizerTokenStrategy, tokenizer=tokenizer
         ),
         snowplow_instrumentator=snowplow_instrumentator,
+        billing_event_client=billing_event_client,
     )
 
     # We need to resolve the model based on model name provided in request payload
@@ -61,6 +64,7 @@ class ContainerCodeGenerations(containers.DeclarativeContainer):
             TokenizerTokenStrategy, tokenizer=tokenizer
         ),
         snowplow_instrumentator=snowplow_instrumentator,
+        billing_event_client=billing_event_client,
     )
 
     anthropic_chat_factory = providers.Factory(
@@ -70,6 +74,7 @@ class ContainerCodeGenerations(containers.DeclarativeContainer):
             TokenizerTokenStrategy, tokenizer=tokenizer
         ),
         snowplow_instrumentator=snowplow_instrumentator,
+        billing_event_client=billing_event_client,
     )
 
     litellm_factory = providers.Factory(
@@ -79,6 +84,7 @@ class ContainerCodeGenerations(containers.DeclarativeContainer):
             TokenizerTokenStrategy, tokenizer=tokenizer
         ),
         snowplow_instrumentator=snowplow_instrumentator,
+        billing_event_client=billing_event_client,
     )
 
     amazon_q_factory = providers.Factory(
@@ -88,6 +94,7 @@ class ContainerCodeGenerations(containers.DeclarativeContainer):
             TokenizerTokenStrategy, tokenizer=tokenizer
         ),
         snowplow_instrumentator=snowplow_instrumentator,
+        billing_event_client=billing_event_client,
     )
 
     agent_factory = providers.Factory(
@@ -97,6 +104,7 @@ class ContainerCodeGenerations(containers.DeclarativeContainer):
             TokenizerTokenStrategy, tokenizer=tokenizer
         ),
         snowplow_instrumentator=snowplow_instrumentator,
+        billing_event_client=billing_event_client,
     )
 
     anthropic_default = providers.Factory(
@@ -114,6 +122,7 @@ class ContainerCodeCompletions(containers.DeclarativeContainer):
     agent_model = providers.Dependency(instance_of=TextGenModelBase)  # type: ignore[type-abstract]
     amazon_q_model = providers.Dependency(instance_of=TextGenModelBase)  # type: ignore[type-abstract]
     snowplow_instrumentator = providers.Dependency(instance_of=SnowplowInstrumentator)
+    billing_event_client = providers.Dependency(instance_of=BillingEventsClient)
 
     config = providers.Configuration(strict=True)
 
@@ -144,6 +153,7 @@ class ContainerCodeCompletions(containers.DeclarativeContainer):
         tokenization_strategy=providers.Factory(
             TokenizerTokenStrategy, tokenizer=tokenizer
         ),
+        billing_event_client=billing_event_client,
     )
 
     litellm_factory = providers.Factory(
@@ -152,6 +162,7 @@ class ContainerCodeCompletions(containers.DeclarativeContainer):
         tokenization_strategy=providers.Factory(
             TokenizerTokenStrategy, tokenizer=tokenizer
         ),
+        billing_event_client=billing_event_client,
     )
 
     fireworks_factory = providers.Factory(
@@ -172,6 +183,7 @@ class ContainerCodeCompletions(containers.DeclarativeContainer):
             ],
             score_threshold=config.fireworks_score_threshold,
         ).provider,
+        billing_event_client=billing_event_client,
     )
 
     litellm_vertex_codestral_factory = providers.Factory(
@@ -189,6 +201,7 @@ class ContainerCodeCompletions(containers.DeclarativeContainer):
             extras=[PostProcessorOperation.STRIP_ASTERISKS],
             exclude=config.excl_post_process,
         ).provider,
+        billing_event_client=billing_event_client,
     )
 
     agent_factory = providers.Factory(
@@ -197,6 +210,7 @@ class ContainerCodeCompletions(containers.DeclarativeContainer):
         tokenization_strategy=providers.Factory(
             TokenizerTokenStrategy, tokenizer=tokenizer
         ),
+        billing_event_client=billing_event_client,
     )
 
     amazon_q_factory = providers.Factory(
@@ -205,6 +219,7 @@ class ContainerCodeCompletions(containers.DeclarativeContainer):
         tokenization_strategy=providers.Factory(
             TokenizerTokenStrategy, tokenizer=tokenizer
         ),
+        billing_event_client=billing_event_client,
     )
 
 
@@ -216,6 +231,7 @@ class ContainerCodeSuggestions(containers.DeclarativeContainer):
     tokenizer = providers.Singleton(init_tokenizer)
 
     snowplow = providers.DependenciesContainer()
+    billing_event = providers.DependenciesContainer()
 
     generations = providers.Container(
         ContainerCodeGenerations,
@@ -227,6 +243,7 @@ class ContainerCodeSuggestions(containers.DeclarativeContainer):
         agent_model=models.agent_model,
         amazon_q_model=models.amazon_q_model,
         snowplow_instrumentator=snowplow.instrumentator,
+        billing_event_client=billing_event.client,
     )
 
     completions = providers.Container(
@@ -240,4 +257,5 @@ class ContainerCodeSuggestions(containers.DeclarativeContainer):
         amazon_q_model=models.amazon_q_model,
         config=config,
         snowplow_instrumentator=snowplow.instrumentator,
+        billing_event_client=billing_event.client,
     )
