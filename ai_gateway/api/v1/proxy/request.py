@@ -12,6 +12,7 @@ from gitlab_cloud_connector import (
 from ai_gateway.abuse_detection import AbuseDetector
 from ai_gateway.api.auth_utils import StarletteUser
 from ai_gateway.api.feature_category import X_GITLAB_UNIT_PRIMITIVE
+from lib.billing_events.client import BillingEventsClient
 
 # It's implemented here, because eventually we want to restrict this endpoint to
 # ai_gateway_model_provider_proxy unit primitive only, so we won't rely on
@@ -89,3 +90,29 @@ async def _validate_request(
 
         description = UNIT_PRIMITIVE_AND_DESCRIPTION_MAPPING.get(unit_primitive, "")
         background_tasks.add_task(abuse_detector.detect, request, body, description)
+
+
+def track_billing_event(func):
+    @functools.wraps(func)
+    async def wrapper(
+        request: Request,
+        *args: typing.Any,
+        billing_event_client: BillingEventsClient,
+        **kwargs: typing.Any,
+    ) -> typing.Any:
+        response = await func(
+            request, *args, billing_event_client=billing_event_client, **kwargs
+        )
+
+        # Track event only after `func` returns so we don't trigger a billable event if an exception occurred
+        billing_event_client.track_billing_event(
+            request.user,
+            event_type="",  # TODO
+            category=__name__,
+            unit_of_measure="request",
+            quantity=1,
+        )
+
+        return response
+
+    return wrapper
