@@ -126,13 +126,19 @@ def test_container(mock_ai_gateway_container: containers.DeclarativeContainer):
                         {"provider": "gitlab", "identifier": "claude_sonnet_4_20250514"}
                     )
             else:
-                model_metadata = create_model_metadata(
-                    {
-                        "name": str(model_name),
-                        "endpoint": AnyUrl("http://localhost:4000"),
-                        "provider": "gitlab",
-                    }
-                )
+                # Skip directories that are prompt variants (like sonnet_4_5) rather than model families
+                # Prompt variants are resolved through the model's prompt_variant field, not as standalone models
+                try:
+                    model_metadata = create_model_metadata(
+                        {
+                            "name": str(model_name),
+                            "endpoint": AnyUrl("http://localhost:4000"),
+                            "provider": "gitlab",
+                        }
+                    )
+                except ValueError:
+                    # This is a prompt variant directory, not a model family directory - skip it
+                    continue
             prompt = registry.get(
                 prompt_id,
                 version,

@@ -171,7 +171,7 @@ class TestPrompt:
                 "prompt_version": prompt_version,
                 "model_metadata": input_model_metadata
                 and input_model_metadata.model_dump(
-                    exclude={"llm_definition_params", "family", "friendly_name"},
+                    exclude={"llm_definition_params", "family", "friendly_name", "prompt_variant"},
                     mode="json",
                 ),
             },
@@ -272,7 +272,7 @@ class TestMisdirectedRequest:
                 "inputs": {"name": "John", "age": 20},
                 "model_metadata": model_metadata
                 and model_metadata.model_dump(
-                    exclude={"llm_definition_params", "family", "friendly_name"},
+                    exclude={"llm_definition_params", "family", "friendly_name", "prompt_variant"},
                     mode="json",
                 ),
             },
