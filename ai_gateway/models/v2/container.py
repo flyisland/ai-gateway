@@ -6,7 +6,6 @@ from ai_gateway.integrations.amazon_q.chat import ChatAmazonQ
 from ai_gateway.models import mock
 from ai_gateway.models.base import init_anthropic_client, log_request
 from ai_gateway.models.v2.anthropic_claude import ChatAnthropic
-from ai_gateway.models.v2.chat_fireworks import ChatFireworks
 from ai_gateway.models.v2.chat_litellm import ChatLiteLLM
 from ai_gateway.prompts.typing import Model
 
@@ -19,10 +18,6 @@ def _litellm_factory(*args, **kwargs) -> Model:
 
     if kwargs.get("custom_llm_provider", "") == "vertex_ai":
         kwargs["client"] = AsyncHTTPHandler(event_hooks={"request": [log_request]})
-
-    # Use ChatFireworks for Fireworks models
-    if kwargs.get("custom_llm_provider", "") == "fireworks_ai":
-        return ChatFireworks(*args, **kwargs)
 
     return ChatLiteLLM(*args, **kwargs)
 
