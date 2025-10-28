@@ -32,6 +32,7 @@ class BaseModelParams(BaseModel):
     max_retries: int | None = 1
     model_class_provider: str | None = None
     custom_llm_provider: str | None = None
+    tool_choice: str | None = "any"
 
 
 class ChatLiteLLMParams(BaseModelParams):
@@ -39,6 +40,7 @@ class ChatLiteLLMParams(BaseModelParams):
     custom_llm_provider: str | None = None
     """Easily switch to huggingface, replicate, together ai, sagemaker, etc.
     Example - https://litellm.vercel.app/docs/providers/vllm#batch-completion"""
+    tool_choice: str | None = "required"
 
 
 class ChatAnthropicParams(BaseModelParams):

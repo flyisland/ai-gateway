@@ -246,7 +246,6 @@ class TestAgentComponentAttachNodes:
         # Check that tools include both toolset.bindable and AgentFinalOutput
         expected_tools = mock_toolset.bindable + [AgentFinalOutput]
         assert call_args[1]["tools"] == expected_tools
-        assert call_args[1]["tool_choice"] == "any"
 
         # Verify AgentNode creation
         mock_agent_node_cls.assert_called_once()

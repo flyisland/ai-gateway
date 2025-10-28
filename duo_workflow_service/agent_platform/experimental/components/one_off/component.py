@@ -92,14 +92,12 @@ class OneOffComponent(BaseComponent):
 
     def attach(self, graph: StateGraph, router: RouterProtocol) -> None:
         tools = self.toolset.bindable
-        tool_choice = "any"
 
         prompt = self.prompt_registry.get(
             self.prompt_id,
             self.prompt_version,
             model_metadata=current_model_metadata_context.get(),
             tools=tools,  # type: ignore[arg-type]
-            tool_choice=tool_choice,
         )
 
         # reuse existing agent_node

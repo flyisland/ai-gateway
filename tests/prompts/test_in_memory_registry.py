@@ -112,7 +112,7 @@ class TestInMemoryPromptRegistry:
             # Should use shared registry
             assert result == mock_remote_prompt
             in_memory_registry.shared_registry.get.assert_called_once_with(
-                prompt_id, prompt_version, None, None, None
+                prompt_id, prompt_version, None, None
             )
         else:
             # Should use local registry
