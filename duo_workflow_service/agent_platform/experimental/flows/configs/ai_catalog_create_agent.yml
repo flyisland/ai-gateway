@@ -1,0 +1,53 @@
+version: "experimental"
+environment: chat
+inputs:
+    - category: chat_context
+      input_schema:
+        form_specification:
+          type: object
+          description: Details on each of the form fields
+        form_id:
+          type: string
+          description: ID of the form where we will update values
+        form_state:
+          type: object
+          description: Current values for in the creation form
+components:
+  # Step 1: Fetch available tools
+#  - name: "fetch_tools_component"
+#    type: DeterministicStepComponent
+#    tool_name: "fetch_available_tools"
+#    max_correction_attempts: 3
+#    ui_log_events:
+#      - "on_tool_execution_success"
+#      - "on_tool_execution_failed"
+  # Step 2: Execute agent
+  - name: "ai_catalog_create_agent"
+    type: AgentComponent
+    prompt_id: "ai_catalog_create_agent"
+    prompt_version: "1.0.0"
+    toolset: []
+    ui_role_as: 'agent'
+#      - from: "context:fetch_tools_component.tool_responses"
+#        as: available_tools
+#      - from: "context:create_agent_form_specification"
+#        as: create_agent_form_specification
+#      - from: "context:create_agent_current_state"
+#        as: create_agent_current_state
+
+    inputs:
+#      - from: "context:fetch_tools_component.tool_responses"
+#        as: available_tools
+      - from: "context:chat_context.form_specification"
+        as: form_specification
+      - from: "context:chat_context.form_state"
+        as: form_state
+      - from: "context:chat_context.form_id"
+        as: form_id
+routers:
+  - from: "ai_catalog_create_agent"
+    to: "end"
+#  - from: "fetch_tools_component"
+#    to: "end"
+flow:
+  entry_point: "ai_catalog_create_agent"
