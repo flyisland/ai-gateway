@@ -406,7 +406,7 @@ configurable_unit_primitives:
     default_model: "claude_sonnet_4_5_20250929_vertex"
     selectable_models:
       - "claude_sonnet_4_20250514"
-      - "claude_sonnet_4_20250514_vertex"
+      - "claude_sonnet_4_5_20250929_vertex"
       - "claude_sonnet_4_5_20250929"
   - feature_setting: "programming_agent"
     unit_primitives:
@@ -414,7 +414,7 @@ configurable_unit_primitives:
     default_model: "claude_sonnet_4_5_20250929_vertex"
     selectable_models:
       - "claude_sonnet_4_20250514"
-      - "claude_sonnet_4_20250514_vertex"
+      - "claude_sonnet_4_5_20250929_vertex"
       - "claude_sonnet_4_5_20250929"
   - feature_setting: "push_to_remote"
     unit_primitives:
