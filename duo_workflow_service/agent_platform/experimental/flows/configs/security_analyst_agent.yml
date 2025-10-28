@@ -1,0 +1,51 @@
+# security_analyst_agent.yml
+version: "experimental"
+environment: chat-partial
+components:
+  - name: "security_analyst"
+    type: AgentComponent
+    prompt_id: "security_analyst_agent_prompt"
+    prompt_version: "^1.0.0"
+    inputs:
+      - from: "context:goal"
+        as: "user_request"
+      - from: "context:project_id"
+        as: "project_id"
+      - from: "context:trigger_type"
+        as: "trigger"
+    toolset:
+      # Issue Management Tools
+      - "create_issue"
+      - "get_issue"
+      - "create_issue_note"
+      - "update_issue"
+      # Merge Request Management Tools
+      - "create_merge_request"
+      - "get_merge_request"
+      - "update_merge_request"
+      - "create_merge_request_note"
+      - "list_all_merge_request_notes"
+      - "list_merge_request_diffs"
+      - "gitlab_merge_request_search"
+      # File System Tools
+      - "read_file"
+      - "list_dir"
+      # Vulnerability Management Tools
+      - "get_vulnerability_details"
+      - "list_vulnerabilities"
+      - "create_vulnerability_issue"
+      - "link_vulnerability_to_issue"
+      - "revert_to_detected_vulnerability"
+      - "update_vulnerability_severity"
+      - "dismiss_vulnerability"
+      - "confirm_vulnerability"
+    ui_log_events:
+      - "on_agent_final_answer"
+      - "on_tool_execution_success"
+      - "on_tool_execution_failed"
+    ui_role_as: "agent"
+
+routers: []
+
+flow:
+  entry_point: "security_analyst"
