@@ -1,8 +1,8 @@
-name: fix_pipeline_execution
+name: push_to_remote_prompt
 model:
   params:
     model_class_provider: litellm
-    max_tokens: 32_768
+    max_tokens: 2048
     max_retries: 3
 prompt_template:
   system: |

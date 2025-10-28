@@ -395,7 +395,7 @@ configurable_unit_primitives:
   - feature_setting: "create_merge_request"
     unit_primitives:
       - "duo_workflow_execute_workflow"
-    default_model: "claude_sonnet_4_20250514"
+    default_model: "claude_sonnet_4_20250514_vertex"
     selectable_models:
       - "claude_sonnet_4_20250514"
       - "claude_sonnet_4_20250514_vertex"
@@ -403,7 +403,7 @@ configurable_unit_primitives:
   - feature_setting: "developer_planner"
     unit_primitives:
       - "duo_workflow_execute_workflow"
-    default_model: "claude_sonnet_4_5_20250929"
+    default_model: "claude_sonnet_4_5_20250929_vertex"
     selectable_models:
       - "claude_sonnet_4_20250514"
       - "claude_sonnet_4_20250514_vertex"
@@ -411,7 +411,7 @@ configurable_unit_primitives:
   - feature_setting: "programming_agent"
     unit_primitives:
       - "duo_workflow_execute_workflow"
-    default_model: "claude_sonnet_4_5_20250929"
+    default_model: "claude_sonnet_4_5_20250929_vertex"
     selectable_models:
       - "claude_sonnet_4_20250514"
       - "claude_sonnet_4_20250514_vertex"
@@ -419,7 +419,7 @@ configurable_unit_primitives:
   - feature_setting: "push_to_remote"
     unit_primitives:
       - "duo_workflow_execute_workflow"
-    default_model: "claude_sonnet_4_20250514"
+    default_model: "claude_sonnet_4_20250514_vertex"
     selectable_models:
       - "claude_sonnet_4_20250514"
       - "claude_sonnet_4_20250514_vertex"
@@ -427,10 +427,8 @@ configurable_unit_primitives:
   - feature_setting: "list_available_tools"
     unit_primitives:
       - "duo_workflow_execute_workflow"
-    default_model: "claude_3_5_haiku_20241022"
+    default_model: "claude_sonnet_4_20250514_vertex"
     selectable_models:
-      - "claude_3_5_haiku_20241022"
-      - "claude_3_5_sonnet_20240620"
-      - "claude_3_haiku_20240307"
       - "claude_sonnet_4_20250514"
+      - "claude_3_5_sonnet_20240620"
       - "claude_sonnet_4_20250514_vertex"

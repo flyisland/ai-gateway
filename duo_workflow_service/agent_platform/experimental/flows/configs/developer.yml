@@ -25,9 +25,9 @@ components:
         as: "issue_details"
       - from: "context:workflow_id"
         as: "workflow_id"
-      - from: "context:inputs.merge_request.source_branch"
+      - from: "context:inputs.agent_platform_standard_context.source_branch"
         as: "source_branch"
-      - from: "context:inputs.merge_request.target_branch"
+      - from: "context:inputs.agent_platform_standard_context.target_branch"
         as: "target_branch"
     ui_log_events:
       - "on_tool_call_input"
@@ -163,7 +163,7 @@ components:
         as: "programming_agent_handover"
       - from: "context:draft_merge_request_creator.tool_responses"
         as: "merge_request_details"
-      - from: "context:inputs.merge_request.reviewer_id"
+      - from: "context:inputs.agent_platform_standard_context.reviewer_id"
         as: "reviewer_id"
       - from: "context:goal"
         as: "issue_url"
@@ -191,7 +191,7 @@ routers:
 flow:
   entry_point: "issue_parser"
   inputs:
-    - category: merge_request
+    - category: agent_platform_standard_context
       input_schema:
         source_branch:
           type: string
