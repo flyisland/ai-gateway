@@ -72,8 +72,8 @@ class CreateMergeRequest(DuoBaseTool):
     {PROJECT_IDENTIFICATION_DESCRIPTION}
 
     For example:
-    - Given project_id 13, source_branch "feature", target_branch "main", and title "New feature", the tool call would be:
-        create_merge_request(project_id=13, source_branch="feature", target_branch="main", title="New feature")
+    - Given project_id 'gitlab-org/gitlab', source_branch "feature", target_branch "main", and title "New feature", the tool call would be:
+        create_merge_request(project_id='gitlab-org/gitlab', source_branch="feature", target_branch="main", title="New feature")
     - Given the URL https://gitlab.com/namespace/project, source_branch "feature", target_branch "main", and title "New feature", the tool call would be:
         create_merge_request(url="https://gitlab.com/namespace/project", source_branch="feature", target_branch="main", title="New feature")
     """
@@ -136,7 +136,7 @@ class CreateMergeRequest(DuoBaseTool):
             return f"Create merge request from '{args.source_branch}' to '{args.target_branch}' in {args.url}"
         return (
             f"Create merge request from '{args.source_branch}' to '{args.target_branch}' "
-            f"in project {args.project_id}"
+            f"in {self.format_project_reference(args.project_id, args.url)}"
         )
 
 
@@ -147,8 +147,8 @@ class GetMergeRequest(DuoBaseTool):
     {MERGE_REQUEST_IDENTIFICATION_DESCRIPTION}
 
     For example:
-    - Given project_id 13 and merge_request_iid 9, the tool call would be:
-        get_merge_request(project_id=13, merge_request_iid=9)
+    - Given project_id 'gitlab-org/gitlab' and merge_request_iid 9, the tool call would be:
+        get_merge_request(project_id='gitlab-org/gitlab', merge_request_iid=9)
     - Given the URL https://gitlab.com/namespace/project/-/merge_requests/103, the tool call would be:
         get_merge_request(url="https://gitlab.com/namespace/project/-/merge_requests/103")
     """
@@ -193,7 +193,7 @@ class GetMergeRequest(DuoBaseTool):
         if args.url:
             return f"Read merge request {args.url}"
         return (
-            f"Read merge request !{args.merge_request_iid} in project {args.project_id}"
+            f"Read merge request !{args.merge_request_iid} in {self.format_project_reference(args.project_id, args.url)}"
         )
 
 
@@ -204,8 +204,8 @@ class ListMergeRequestDiffs(DuoBaseTool):
     {MERGE_REQUEST_IDENTIFICATION_DESCRIPTION}
 
     For example:
-    - Given project_id 13 and merge_request_iid 9, the tool call would be:
-        list_merge_request_diffs(project_id=13, merge_request_iid=9)
+    - Given project_id 'gitlab-org/gitlab' and merge_request_iid 9, the tool call would be:
+        list_merge_request_diffs(project_id='gitlab-org/gitlab', merge_request_iid=9)
     - Given the URL https://gitlab.com/namespace/project/-/merge_requests/103, the tool call would be:
         list_merge_request_diffs(url="https://gitlab.com/namespace/project/-/merge_requests/103")
     """
@@ -263,7 +263,7 @@ class ListMergeRequestDiffs(DuoBaseTool):
         if args.url:
             msg = f"View changes in merge request {args.url}"
         else:
-            msg = f"View changes in merge request !{args.merge_request_iid} in project {args.project_id}"
+            msg = f"View changes in merge request !{args.merge_request_iid} in {self.format_project_reference(args.project_id, args.url)}"
 
         if tool_response:
             excluded_files = json.loads(tool_response.content).get("excluded_files")
@@ -292,8 +292,8 @@ start with a backslash. Examples include /merge, /approve, /close, etc.
 {MERGE_REQUEST_IDENTIFICATION_DESCRIPTION}
 
 For example:
-- Given project_id 13, merge_request_iid 9, and body "This is a comment", the tool call would be:
-    create_merge_request_note(project_id=13, merge_request_iid=9, body="This is a comment")
+- Given project_id 'gitlab-org/gitlab', merge_request_iid 9, and body "This is a comment", the tool call would be:
+    create_merge_request_note(project_id='gitlab-org/gitlab', merge_request_iid=9, body="This is a comment")
 - Given the URL https://gitlab.com/namespace/project/-/merge_requests/103 and body "This is a comment", the tool call would be:
     create_merge_request_note(url="https://gitlab.com/namespace/project/-/merge_requests/103", body="This is a comment")
 
@@ -358,7 +358,7 @@ They are commands that are on their own line and start with a backslash. Example
     ) -> str:
         if args.url:
             return f"Add comment to merge request {args.url}"
-        return f"Add comment to merge request !{args.merge_request_iid} in project {args.project_id}"
+        return f"Add comment to merge request !{args.merge_request_iid} in {self.format_project_reference(args.project_id, args.url)}"
 
 
 class ListAllMergeRequestNotes(DuoBaseTool):
@@ -368,8 +368,8 @@ class ListAllMergeRequestNotes(DuoBaseTool):
     {MERGE_REQUEST_IDENTIFICATION_DESCRIPTION}
 
     For example:
-    - Given project_id 13 and merge_request_iid 9, the tool call would be:
-        list_all_merge_request_notes(project_id=13, merge_request_iid=9)
+    - Given project_id 'gitlab-org/gitlab' and merge_request_iid 9, the tool call would be:
+        list_all_merge_request_notes(project_id='gitlab-org/gitlab', merge_request_iid=9)
     - Given the URL https://gitlab.com/namespace/project/-/merge_requests/103, the tool call would be:
         list_all_merge_request_notes(url="https://gitlab.com/namespace/project/-/merge_requests/103")
     """
@@ -413,7 +413,7 @@ class ListAllMergeRequestNotes(DuoBaseTool):
     ) -> str:
         if args.url:
             return f"Read comments on merge request {args.url}"
-        return f"Read comments on merge request !{args.merge_request_iid} in project {args.project_id}"
+        return f"Read comments on merge request !{args.merge_request_iid} in {self.format_project_reference(args.project_id, args.url)}"
 
 
 class UpdateMergeRequestInput(MergeRequestResourceInput):
@@ -523,17 +523,17 @@ class ListMergeRequest(DuoBaseTool):
 
     For example:
     - List merge requests by author username:
-        gitlab_merge_request_search(project_id=13, author_username="janedoe1337")
+        gitlab_merge_request_search(project_id='gitlab-org/gitlab', author_username="janedoe1337")
     - List merge requests assigned to a specific user:
-        gitlab_merge_request_search(project_id=13, assignee_username="janedoe1337")
+        gitlab_merge_request_search(project_id='gitlab-org/gitlab', assignee_username="janedoe1337")
     - List all open merge requests:
-        gitlab_merge_request_search(project_id=13, state="opened")
+        gitlab_merge_request_search(project_id='gitlab-org/gitlab', state="opened")
     - List merge requests with specific labels:
-        gitlab_merge_request_search(project_id=13, labels="bug,urgent")
+        gitlab_merge_request_search(project_id='gitlab-org/gitlab', labels="bug,urgent")
     - Given the URL https://gitlab.com/namespace/project and author filter:
         gitlab_merge_request_search(url="https://gitlab.com/namespace/project", author_username="janedoe1337")
     - Search merge requests against their title and description
-        gitlab_merge_request_search(project_id=13, search="bug fix")
+        gitlab_merge_request_search(project_id='gitlab-org/gitlab', search="bug fix")
     """
     args_schema: Type[BaseModel] = ListMergeRequestInput
 
@@ -616,7 +616,7 @@ class ListMergeRequest(DuoBaseTool):
 
         if args.url:
             return f"List merge requests in {args.url} {filter_text}"
-        return f"List merge requests in project {args.project_id} {filter_text}"
+        return f"List merge requests in {self.format_project_reference(args.project_id, args.url)} {filter_text}"
 
 
 class UpdateMergeRequest(DuoBaseTool):
@@ -628,8 +628,8 @@ Max character limit of {DESCRIPTION_CHARACTER_LIMIT} characters.
 {MERGE_REQUEST_IDENTIFICATION_DESCRIPTION}
 
 For example:
-- Given project_id 13, merge_request_iid 9, and title "Updated title", the tool call would be:
-    update_merge_request(project_id=13, merge_request_iid=9, title="Updated title")
+- Given project_id 'gitlab-org/gitlab', merge_request_iid 9, and title "Updated title", the tool call would be:
+    update_merge_request(project_id='gitlab-org/gitlab', merge_request_iid=9, title="Updated title")
 - Given the URL https://gitlab.com/namespace/project/-/merge_requests/103 and title "Updated title", the tool call would be:
     update_merge_request(url="https://gitlab.com/namespace/project/-/merge_requests/103", title="Updated title")
     """
@@ -675,4 +675,4 @@ For example:
     ) -> str:
         if args.url:
             return f"Update merge request {args.url}"
-        return f"Update merge request !{args.merge_request_iid} in project {args.project_id}"
+        return f"Update merge request !{args.merge_request_iid} in {self.format_project_reference(args.project_id, args.url)}"

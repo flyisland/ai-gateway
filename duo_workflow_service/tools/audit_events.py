@@ -289,12 +289,12 @@ class ListProjectAuditEvents(BaseAuditEventsTool):
         - https://gitlab.com/group/subgroup/project
 
     Examples:
-    - List audit events for project with ID 7:
-        list_project_audit_events(project_id=7)
+    - List audit events for project:
+        list_project_audit_events(project_id='gitlab-org/gitlab')
     - List audit events for project by URL:
         list_project_audit_events(url="https://gitlab.com/gitlab-org/gitlab")
     - List recent audit events:
-        list_project_audit_events(project_id=7, created_after="2023-01-01T00:00:00Z")
+        list_project_audit_events(project_id='gitlab-org/gitlab', created_after="2023-01-01T00:00:00Z")
     """
     args_schema: Type[BaseModel] = ListProjectAuditEventsInput  # type: ignore
 
@@ -319,4 +319,4 @@ class ListProjectAuditEvents(BaseAuditEventsTool):
     ) -> str:
         if args.url:
             return f"List audit events for {args.url}"
-        return f"List audit events for project {args.project_id}"
+        return f"List audit events for {self.format_project_reference(args.project_id, args.url)}"

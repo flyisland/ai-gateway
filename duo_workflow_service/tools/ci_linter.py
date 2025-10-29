@@ -62,7 +62,7 @@ class CiLinter(DuoBaseTool):
     def format_display_message(
         self, args: CiLinterInput, _tool_response: Any = None
     ) -> str:
-        message = f"Validate CI/CD YAML configuration in context of project: {args.project_id}"
+        message = f"Validate CI/CD YAML configuration in context of {self.format_project_reference(str(args.project_id))}"
         if args.ref:
             message += f" (ref: {args.ref})"
         return message

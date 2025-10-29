@@ -39,8 +39,8 @@ class GetLogsFromJob(DuoBaseTool):
       - https://gitlab.com/group/subgroup/project/-/jobs/42
 
     For example:
-    - Given project_id 13 and job_id 9, the tool call would be:
-        get_job_logs(project_id=13, job_id=9)
+    - Given project_id 'gitlab-org/gitlab' and job_id 9, the tool call would be:
+        get_job_logs(project_id='gitlab-org/gitlab', job_id=9)
     - Given the URL https://gitlab.com/namespace/project/-/jobs/103, the tool call would be:
         get_job_logs(url="https://gitlab.com/namespace/project/-/jobs/103")
 
@@ -141,4 +141,4 @@ class GetLogsFromJob(DuoBaseTool):
     ) -> str:
         if args.url:
             return f"Get logs for {args.url}"
-        return f"Get logs for job #{args.job_id} in project {args.project_id}"
+        return f"Get logs for job #{args.job_id} in {self.format_project_reference(args.project_id, args.url)}"

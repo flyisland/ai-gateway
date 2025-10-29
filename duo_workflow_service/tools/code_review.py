@@ -33,7 +33,7 @@ class PostDuoCodeReview(DuoBaseTool):
     name: str = "post_duo_code_review"
     description: str = (
         "Post a Duo Code Review to a merge request.\n"
-        "Example: post_duo_code_review(project_id=123, merge_request_iid=45, "
+        "Example: post_duo_code_review(project_id='gitlab-org/gitlab', merge_request_iid=45, "
         'review_output="<review>...</review>")'
     )
     args_schema: Type[BaseModel] = PostDuoCodeReviewInput
@@ -85,7 +85,7 @@ class PostDuoCodeReview(DuoBaseTool):
         """Format a user-friendly display message."""
         return (
             f"Post Duo Code Review to merge request !{args.merge_request_iid} "
-            f"in project {args.project_id}"
+            f"in {self.format_project_reference(str(args.project_id))}"
         )
 
 
@@ -114,8 +114,8 @@ class BuildReviewMergeRequestContext(DuoBaseTool):
         "- project_id and merge_request_iid\n"
         "- GitLab URL (https://gitlab.com/namespace/project/-/merge_requests/42)\n"
         "Examples:\n"
-        "- build_review_merge_request_context(project_id=13, merge_request_iid=9)\n"
-        "- build_review_merge_request_context(project_id=13, merge_request_iid=9, only_diffs=True)\n"
+        "- build_review_merge_request_context(project_id='gitlab-org/gitlab', merge_request_iid=9)\n"
+        "- build_review_merge_request_context(project_id='gitlab-org/gitlab', merge_request_iid=9, only_diffs=True)\n"
         "- build_review_merge_request_context(url='https://gitlab.com/...')"
     )
     args_schema: Type[BaseModel] = BuildReviewMergeRequestContextInput
@@ -572,7 +572,7 @@ This formatting is only required for custom instruction comments. Regular review
         else:
             base_msg = (
                 f"Build review context for merge request !{args.merge_request_iid} "
-                f"in project {args.project_id}"
+                f"in {self.format_project_reference(args.project_id, args.url)}"
             )
 
         if args.only_diffs:

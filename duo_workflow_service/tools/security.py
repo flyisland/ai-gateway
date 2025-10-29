@@ -291,7 +291,7 @@ class ListVulnerabilities(DuoBaseTool):
         self, args: ListVulnerabilitiesInput, _tool_response: Any = None
     ) -> str:
         """Format a user-friendly display message."""
-        message = f"List vulnerabilities in project {args.project_full_path}"
+        message = f"List vulnerabilities in {self.format_project_reference(args.project_full_path)}"
         filters = []
 
         if args.severity:
@@ -548,7 +548,7 @@ class CreateVulnerabilityIssue(DuoBaseTool):
     def format_display_message(
         self, args: CreateVulnerabilityIssueInput, _tool_response: Any = None
     ) -> str:
-        return f"Create issue for vulnerabilities in project {args.project_full_path}"
+        return f"Create issue for vulnerabilities in {self.format_project_reference(args.project_full_path)}"
 
 
 class LinkVulnerabilityToIssueInput(BaseModel):

@@ -236,6 +236,59 @@ class DuoBaseTool(BaseTool):
                 errors,
             )
 
+    def format_project_reference(self, project_id: Optional[str] = None, url: Optional[str] = None) -> str:
+        """Format a project reference as human-readable name with hyperlink.
+        
+        Args:
+            project_id: The project ID (can be numeric or namespace/project format)
+            url: The project URL
+            
+        Returns:
+            A formatted string like "[namespace/project](https://gitlab.com/namespace/project)"
+            or falls back to "project {project_id}" if project metadata is not available
+        """
+        # If URL is provided, extract the project path from it
+        if url:
+            try:
+                # Extract project path from URL
+                from urllib.parse import urlparse
+                parsed = urlparse(url)
+                path_parts = parsed.path.strip('/').split('/')
+                if len(path_parts) >= 2:
+                    # For URLs like https://gitlab.com/namespace/project or https://gitlab.com/namespace/project/-/issues/1
+                    # Take the first two parts as namespace/project
+                    namespace_project = '/'.join(path_parts[:2])
+                    return f"[{namespace_project}]({parsed.scheme}://{parsed.netloc}/{namespace_project})"
+            except Exception:
+                pass
+        
+        # If we have project metadata available, use it
+        if self.project:
+            project_name = getattr(self.project, 'name', None)
+            project_namespace = getattr(self.project, 'namespace', None)
+            project_web_url = getattr(self.project, 'web_url', None)
+            
+            if project_namespace and project_name and project_web_url:
+                namespace_name = getattr(project_namespace, 'name', None) if hasattr(project_namespace, 'name') else str(project_namespace)
+                if namespace_name:
+                    project_path = f"{namespace_name}/{project_name}"
+                    return f"[{project_path}]({project_web_url})"
+            elif project_name and project_web_url:
+                return f"[{project_name}]({project_web_url})"
+        
+        # If project_id looks like namespace/project format, use it directly
+        if project_id and isinstance(project_id, str) and '/' in project_id:
+            # Construct URL from project_id if it's in namespace/project format
+            if hasattr(self, 'gitlab_host'):
+                gitlab_host = self.gitlab_host
+                if not gitlab_host.startswith('http'):
+                    gitlab_host = f"https://{gitlab_host}"
+                return f"[{project_id}]({gitlab_host}/{project_id})"
+            return project_id
+        
+        # Fallback to numeric project ID
+        return f"project {project_id}" if project_id else "project"
+
     def format_display_message(
         self, args: Any, _tool_response: Any = None
     ) -> Optional[str]:

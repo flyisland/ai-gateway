@@ -162,7 +162,7 @@ class GetRepositoryFile(RepositoryFileBaseTool):
 
         if args.url:
             return f"Get repository file content from {args.url}"
-        return f"Get repository file {args.file_path} from project {args.project_id} at ref {args.ref}"
+        return f"Get repository file {args.file_path} from {self.format_project_reference(args.project_id, args.url)} at ref {args.ref}"
 
 
 class RepositoryTreeResourceInput(ProjectResourceInput):
@@ -205,12 +205,12 @@ class ListRepositoryTree(DuoBaseTool):
     and whether to get a recursive tree.
 
     For example:
-    - Given project_id 13, the tool call would be:
-        list_repository_tree(project_id=13)
+    - Given project_id 'gitlab-org/gitlab', the tool call would be:
+        list_repository_tree(project_id='gitlab-org/gitlab')
     - To list files in a specific subdirectory with a specific branch:
-        list_repository_tree(project_id=13, path="src", ref="main")
+        list_repository_tree(project_id='gitlab-org/gitlab', path="src", ref="main")
     - To recursively list all files in a project:
-        list_repository_tree(project_id=13, recursive=True)
+        list_repository_tree(project_id='gitlab-org/gitlab', recursive=True)
     """
     args_schema: Type[BaseModel] = RepositoryTreeResourceInput  # type: ignore
 
@@ -277,4 +277,4 @@ class ListRepositoryTree(DuoBaseTool):
 
         if args.url:
             return f"List repository tree{recursive_str}{path_str}{ref_str} from {args.url}"
-        return f"List repository tree{recursive_str}{path_str}{ref_str} in project {args.project_id}"
+        return f"List repository tree{recursive_str}{path_str}{ref_str} in {self.format_project_reference(args.project_id, args.url)}"
