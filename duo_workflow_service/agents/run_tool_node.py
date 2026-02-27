@@ -6,6 +6,12 @@ from typing import Any, Generic, Protocol, TypeVar
 import structlog
 from langchain.tools import BaseTool
 
+from duo_workflow_service.audit_events.context import get_audit_collector
+from duo_workflow_service.audit_events.event_types import (
+    ToolExecutionFailedEvent,
+    ToolInvokedEvent,
+    ToolResponseReceivedEvent,
+)
 from duo_workflow_service.entities import MessageTypeEnum, ToolStatus, UiChatLog
 from duo_workflow_service.entities.state import ToolInfo, WorkflowState
 from duo_workflow_service.monitoring import duo_workflow_metrics
@@ -79,6 +85,16 @@ class RunToolNode(Generic[WorkflowStateT]):
         logs = []
 
         for tool_params in self._input_parser(state):
+            collector = get_audit_collector()
+            if collector:
+                collector.capture(
+                    ToolInvokedEvent(
+                        workflow_id="",
+                        tool_name=self._tool.name,
+                        tool_args=tool_params,
+                    )
+                )
+
             with duo_workflow_metrics.time_tool_call(
                 tool_name=self._tool.name, flow_type=self._flow_type.value
             ):
@@ -99,6 +115,15 @@ class RunToolNode(Generic[WorkflowStateT]):
                                 "tool_name": self._tool.name,
                             },
                         )
+                        if collector:
+                            collector.capture(
+                                ToolExecutionFailedEvent(
+                                    workflow_id="",
+                                    tool_name=self._tool.name,
+                                    error_type="SecurityException",
+                                    error_message=str(e),
+                                )
+                            )
                         output = e.format_user_message(self._tool.name)
                         outputs.append(output)
                         logs.append(
@@ -117,6 +142,17 @@ class RunToolNode(Generic[WorkflowStateT]):
                             )
                         )
                         continue
+
+            if collector:
+                response_str = str(output)
+                collector.capture(
+                    ToolResponseReceivedEvent(
+                        workflow_id="",
+                        tool_name=self._tool.name,
+                        response_content=response_str,
+                        response_length=len(response_str),
+                    )
+                )
 
             outputs.append(output)
             logs.append(

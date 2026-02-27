@@ -35,6 +35,8 @@ from langgraph.checkpoint.base import (
 from langgraph.checkpoint.memory import MemorySaver
 
 from ai_gateway.container import ContainerApplication
+from duo_workflow_service.audit_events.context import get_audit_collector
+from duo_workflow_service.audit_events.event_types import SessionEndedEvent
 from duo_workflow_service.checkpointer.gitlab_workflow_utils import (
     STATUS_TO_EVENT_PROPERTY,
     WorkflowStatusEventEnum,
@@ -345,6 +347,11 @@ class GitLabWorkflow(
                 event_name=event_name,
                 additional_properties=additional_properties,
             )
+
+            collector = get_audit_collector()
+            if collector:
+                self._session_start_time = time.monotonic()
+
             return self
         except (UnsupportedStatusEvent, ForbiddenStatusEvent) as e:
             reject_properties = InternalEventAdditionalProperties(
@@ -450,6 +457,32 @@ class GitLabWorkflow(
             EventPropertyEnum.WORKFLOW_RESUME_BY_USER,
         )
 
+    def _capture_audit_session_ended(self, exc_type, exc_value):
+        collector = get_audit_collector()
+        if not collector:
+            return
+
+        audit_status = "success"
+        if exc_type:
+            audit_status = "failure"
+            if isinstance(exc_value, asyncio.exceptions.CancelledError):
+                if str(exc_value) == AIO_CANCEL_STOP_WORKFLOW_REQUEST:
+                    audit_status = "stopped"
+                else:
+                    audit_status = "aborted"
+        duration = None
+        start = getattr(self, "_session_start_time", None)
+        if start:
+            duration = round(time.monotonic() - start, 3)
+        collector.capture(
+            SessionEndedEvent(
+                workflow_id=self._workflow_id,
+                status=audit_status,
+                duration_seconds=duration,
+                error_message=str(exc_value) if exc_value else None,
+            )
+        )
+
     @override
     async def __aexit__(self, exc_type, exc_value, trcback):
         """Handle workflow completion and tracking in both success and failure scenarios.
@@ -457,6 +490,8 @@ class GitLabWorkflow(
         Returns:
             bool: True if workflow completed successfully, False otherwise
         """
+        self._capture_audit_session_ended(exc_type, exc_value)
+
         # In case of exception in async context manager,
         # update status to DROP, track failure event,
         # and return False

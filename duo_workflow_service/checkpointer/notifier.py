@@ -8,6 +8,8 @@ import structlog
 from langchain_core.messages import AIMessageChunk, BaseMessage, BaseMessageChunk
 
 from contract import contract_pb2
+from duo_workflow_service.audit_events.context import get_audit_collector
+from duo_workflow_service.audit_events.event_types import UserOutputDisplayedEvent
 from duo_workflow_service.checkpointer.gitlab_workflow import (
     WORKFLOW_STATUS_TO_CHECKPOINT_STATUS,
 )
@@ -33,14 +35,16 @@ class _ThrottleState:
         self.trailing_task: Optional[asyncio.Task] = None
 
 
-class UserInterface:
+class UserInterface:  # pylint: disable=too-many-instance-attributes
     def __init__(
         self,
         outbox: Outbox,
         goal: str,
+        workflow_id: str = "",
     ):
         self.outbox = outbox
         self.goal = goal
+        self._workflow_id = workflow_id
         self.ui_chat_log: list[UiChatLog] = []
         self.status = WorkflowStatusEnum.NOT_STARTED
         self.steps: list[dict] = []
@@ -65,6 +69,19 @@ class UserInterface:
             self.status = state["status"]
             self.steps = state.get("plan", {}).get("steps", [])
             self.ui_chat_log = deepcopy(state["ui_chat_log"])
+
+            collector = get_audit_collector()
+            if collector and self.ui_chat_log:
+                latest = self.ui_chat_log[-1]
+                content = latest.get("content", "")
+                collector.capture(
+                    UserOutputDisplayedEvent(
+                        workflow_id=self._workflow_id,
+                        output_type=latest.get("message_type", "message"),
+                        content=content,
+                        content_length=len(content),
+                    )
+                )
 
             return await self._execute_action(throttle=False)
 
