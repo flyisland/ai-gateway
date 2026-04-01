@@ -572,9 +572,9 @@ class GitLabWorkflow(
                 user: CloudConnectorUser = current_user.get()
                 tool_executions = get_tool_executions() or []
                 self._billing_event_service.track_billing(
+                    user,
+                    self._workflow_type,
                     workflow_id=self._workflow_id,
-                    user=user,
-                    gl_context=self._workflow_type,
                     event=BillingEvent.DAP_FLOW_ON_COMPLETION,
                     execution_env=ExecutionEnvironment.DAP,
                     category=self.__class__.__name__,

@@ -699,9 +699,9 @@ class DuoWorkflowService(contract_pb2_grpc.DuoWorkflowServicer):
 
             try:
                 billing_service.track_billing(
-                    client_event.workflowID,
                     user,
                     gl_context,
+                    workflow_id=client_event.workflowID,
                     event=BillingEvent.DAP_FLOW_ON_COMPLETION,
                     execution_env=ExecutionEnvironment.DAP,
                     category=self.__class__.__name__,

@@ -83,10 +83,10 @@ class BillingEventService:
 
     def track_billing(
         self,
-        workflow_id: str,
         user: CloudConnectorUser,
         gl_context: GLReportingEventContext,
         *,
+        workflow_id: str | None = None,
         event: BillingEvent,
         execution_env: ExecutionEnvironment,
         category: str,
@@ -103,9 +103,10 @@ class BillingEventService:
         2. Operations from request context (via get_llm_operations)
 
         Args:
-            workflow_id: Unique identifier for the workflow being billed
             user: CloudConnectorUser containing user claims and authentication info
             gl_context: GitLab reporting event context with feature metadata
+            workflow_id: Optional unique identifier for the workflow being billed.
+                Not applicable for stateless operations like code suggestions.
             event: Type of billable event being tracked
             execution_env: Execution environment where the workflow ran (e.g., DAP)
             category: Location or category where the billing event occurred
@@ -135,7 +136,6 @@ class BillingEventService:
             raise ValueError("No LLM operations available for billing tracking")
 
         metadata: dict[str, Any] = {
-            "workflow_id": workflow_id,
             "feature_qualified_name": gl_context.feature_qualified_name,
             "feature_ai_catalog_item": gl_context.feature_ai_catalog_item,
             "execution_environment": execution_env.value,
@@ -143,6 +143,8 @@ class BillingEventService:
             "tool_names": tool_execs or [],
             "orbit_called": orbit_called,
         }
+        if workflow_id:
+            metadata["workflow_id"] = workflow_id
 
         self.client.track_billing_event(
             user,
