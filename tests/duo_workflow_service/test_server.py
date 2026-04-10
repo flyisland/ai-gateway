@@ -1772,6 +1772,7 @@ async def test_track_self_hosted_execute_workflow_billing_event(
                 }
             ],
             "tool_names": [],
+            "orbit_called": False,
         },
     )
 
