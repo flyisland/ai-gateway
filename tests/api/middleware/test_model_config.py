@@ -86,7 +86,7 @@ async def test_model_params_is_none_when_metadata_is_not_in_body(
 async def test_handles_large_request_body_with_model_metadata(middleware_test_client):
     """Test that model_metadata is extracted from large request bodies (chunked requests)"""
     model_params = {
-        "name": "general",
+        "name": "claude_3",
         "provider": "openai",
         "endpoint": "http://bedrockselfhostedmodel.com/",
         "api_key": "",
