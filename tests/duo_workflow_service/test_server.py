@@ -978,7 +978,7 @@ async def test_generate_token(mock_generate_token_response, mock_token_authority
     mock_generate_token_response.assert_called_once_with(
         token="token",
         expiresAt=one_hour_later,
-        server_capabilities=["tool_call_approval"],
+        server_capabilities=["tool_call_approval", "flow_semantic_versioning"],
     )
 
 
@@ -1088,7 +1088,7 @@ async def test_generate_token_with_legacy_duo_workflow_execute_workflow_up(
     mock_generate_token_response.assert_called_once_with(
         token="token",
         expiresAt=one_hour_later,
-        server_capabilities=["tool_call_approval"],
+        server_capabilities=["tool_call_approval", "flow_semantic_versioning"],
     )
 
 
@@ -1122,7 +1122,10 @@ async def test_generate_token_returns_server_capabilities(mock_token_authority):
     # Verify the response includes server capabilities
     assert response.token == "token"
     assert response.expiresAt == expires_at_timestamp
-    assert response.server_capabilities == ["tool_call_approval"]
+    assert response.server_capabilities == [
+        "tool_call_approval",
+        "flow_semantic_versioning",
+    ]
 
 
 @pytest.mark.asyncio
