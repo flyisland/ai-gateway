@@ -124,14 +124,37 @@ async def test_ascp_create_scan_incremental_with_base(
 
 
 @pytest.mark.asyncio
+async def test_ascp_create_scan_graphql_top_level_errors(
+    gitlab_client_mock,
+    metadata,
+):
+    """Top-level GraphQL errors (e.g. auth failures) are surfaced in the errors field."""
+    gitlab_client_mock.graphql = AsyncMock(
+        return_value={"errors": [{"message": "Unauthorized"}]},
+    )
+
+    tool = CreateAscpScan(metadata=metadata)
+
+    response = await tool._arun(
+        project_path="namespace/project",
+        commit_sha="abc123",
+    )
+
+    response_json = json.loads(response)
+    assert isinstance(response_json["errors"], list)
+    assert response_json["errors"] == ["Unauthorized"]
+    assert response_json["response"]["raw_response"] == {
+        "errors": [{"message": "Unauthorized"}]
+    }
+
+
+@pytest.mark.asyncio
 async def test_ascp_create_scan_response_without_ascp_scan_create(
     gitlab_client_mock,
     metadata,
 ):
-    """When response has no ascpScanCreate (e.g. top-level errors only), tool returns generic error."""
-    gitlab_client_mock.graphql = AsyncMock(
-        return_value={"errors": [{"message": "Unauthorized"}]},
-    )
+    """When response has no ascpScanCreate key and no top-level errors, returns generic error."""
+    gitlab_client_mock.graphql = AsyncMock(return_value={})
 
     tool = CreateAscpScan(metadata=metadata)
 
@@ -145,7 +168,6 @@ async def test_ascp_create_scan_response_without_ascp_scan_create(
     assert "response" in response_json
     assert isinstance(response_json["errors"], list)
     assert response_json["errors"][0] == "Failed to create ASCP scan."
-    assert response_json["response"]["raw_response"] == {}
 
 
 @pytest.mark.asyncio

@@ -1,0 +1,28 @@
+query listAscpComponents($projectPath: ID!, $first: Int, $title: String, $subDirectory: String, $after: String) {
+  project(fullPath: $projectPath) {
+    ascpComponents(first: $first, title: $title, subDirectory: $subDirectory, after: $after) {
+      nodes {
+        id
+        title
+        description
+        subDirectory
+        expectedUserBehavior
+        scan {
+          id
+          scanSequence
+          scanType
+        }
+        securityContext {
+          id
+          summary
+        }
+        createdAt
+        updatedAt
+      }
+      pageInfo {
+        hasNextPage
+        endCursor
+      }
+    }
+  }
+}
