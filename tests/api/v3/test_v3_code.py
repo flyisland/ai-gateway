@@ -1516,3 +1516,63 @@ class TestAmazonQIntegrationV3:
         assert set(body["metadata"]["enabled_feature_flags"]) == set(
             expected_response["metadata"]["enabled_feature_flags"]
         )
+
+
+class TestCustomModelsSSRF:
+    @pytest.fixture(name="config_values")
+    def config_values_fixture(self, assets_dir):
+        return {
+            "custom_models": {
+                "enabled": False,
+            },
+            "self_signed_jwt": {
+                "signing_key": open(assets_dir / "keys" / "signing_key.pem").read(),
+            },
+        }
+
+    @pytest.fixture(name="scopes")
+    def scopes_fixture(self):
+        return ["complete_code", "generate_code"]
+
+    @pytest.fixture(name="route")
+    def route_fixture(self):
+        return "/code/completions"
+
+    def test_completions_ssrf_model_metadata_endpoint_rejected_when_custom_models_disabled(
+        self,
+        mock_client: TestClient,
+        route: str,
+    ):
+        with pytest.raises(
+            ValueError, match="specifying custom models endpoint is disabled"
+        ):
+            mock_client.post(
+                route,
+                headers={
+                    "Authorization": "Bearer 12345",
+                    "X-Gitlab-Authentication-Type": "oidc",
+                    "X-GitLab-Instance-Id": "1234",
+                    "X-GitLab-Realm": "self-managed",
+                    "X-Gitlab-Global-User-Id": "test-user-id",
+                },
+                json={
+                    "prompt_components": [
+                        {
+                            "type": "code_editor_completion",
+                            "payload": {
+                                "file_name": "main.py",
+                                "content_above_cursor": "# test",
+                                "content_below_cursor": "\n",
+                                "language_identifier": "python",
+                            },
+                        }
+                    ],
+                    "model_metadata": {
+                        "endpoint": "http://internal-server.local/ssrf",
+                        "api_key": "malicious-key",
+                        "identifier": "provider/model",
+                        "name": "mistral",
+                        "provider": "litellm",
+                    },
+                },
+            )

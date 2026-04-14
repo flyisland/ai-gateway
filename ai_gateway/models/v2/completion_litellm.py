@@ -27,8 +27,10 @@ from langchain_core.callbacks import (
 from langchain_core.language_models.chat_models import BaseChatModel
 from langchain_core.messages import AIMessage, AIMessageChunk, BaseMessage
 from langchain_core.outputs import ChatGeneration, ChatGenerationChunk, ChatResult
+from langchain_core.runnables import Runnable
 
 from ai_gateway.model_selection.models import CompletionType
+from ai_gateway.models.base import validate_custom_endpoint
 from ai_gateway.models.fireworks_retry import (
     DEFAULT_FIREWORKS_ERRORS,
     create_fireworks_retry_decorator,
@@ -94,6 +96,8 @@ class CompletionLiteLLM(BaseChatModel):
     request_timeout: Optional[float] = 60.0
     max_retries: int = 1
     disable_streaming: bool = False
+    custom_models_enabled: bool = False
+    allowed_api_bases: frozenset[str] = frozenset()
 
     class Config:
         arbitrary_types_allowed = True
@@ -391,3 +395,13 @@ class CompletionLiteLLM(BaseChatModel):
             return ""
         choice = chunk.choices[0]
         return getattr(choice, "text", "") or ""
+
+    @override
+    def bind(self, **kwargs: Any) -> Runnable:
+        validate_custom_endpoint(
+            self.custom_models_enabled,
+            api_base=kwargs.get("api_base"),
+            api_key=kwargs.get("api_key"),
+            allowed_api_bases=self.allowed_api_bases,
+        )
+        return super().bind(**kwargs)

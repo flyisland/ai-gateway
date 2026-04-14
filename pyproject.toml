@@ -88,6 +88,7 @@ hiddenlayer-sdk = "^3.2.0"
 langchain = "^1.2.7"
 langchain-google-genai = "^4.2.0"
 pyroscope-io = "^1.0.1"
+detect-secrets = "^1.5.0"
 
 [[tool.poetry.source]]
 name = "gitlab_cloud_connector"

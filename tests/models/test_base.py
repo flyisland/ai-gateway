@@ -6,7 +6,7 @@ from anthropic import AsyncAnthropic
 from httpx import AsyncClient, Limits
 
 from ai_gateway.models import ModelMetadata
-from ai_gateway.models.base import init_anthropic_client
+from ai_gateway.models.base import init_anthropic_client, validate_custom_endpoint
 from ai_gateway.models.base_text import TextGenModelBase
 
 
@@ -76,3 +76,57 @@ def test_model_metadata_to_params_removes_api_base_for_specific_providers(provid
         "model": "model/identifier",
         "custom_llm_provider": provider,
     }
+
+
+class TestValidateCustomEndpoint:
+    def test_allows_when_custom_models_enabled(self):
+        # Should not raise regardless of api_base/api_key
+        validate_custom_endpoint(
+            True,
+            api_base="https://any.endpoint.example.com",
+            api_key="sk-secret",
+        )
+
+    def test_allows_when_neither_api_base_nor_key(self):
+        validate_custom_endpoint(False, api_base=None, api_key=None)
+
+    def test_raises_for_api_base_not_in_allowed(self):
+        with pytest.raises(ValueError, match="api_base is not allowed"):
+            validate_custom_endpoint(
+                False,
+                api_base="https://custom.example.com",
+                api_key=None,
+            )
+
+    def test_raises_for_api_key_without_api_base(self):
+        with pytest.raises(ValueError, match="api_key is not allowed"):
+            validate_custom_endpoint(False, api_base=None, api_key="sk-secret")
+
+    def test_allows_api_base_in_allowed_api_bases(self):
+        allowed = frozenset(["https://allowed.example.com"])
+        validate_custom_endpoint(
+            False,
+            api_base="https://allowed.example.com",
+            api_key=None,
+            allowed_api_bases=allowed,
+        )
+
+    def test_allows_trailing_slash_normalized_match(self):
+        allowed = frozenset(["https://allowed.example.com"])
+        # caller passes with trailing slash — should still match
+        validate_custom_endpoint(
+            False,
+            api_base="https://allowed.example.com/",
+            api_key=None,
+            allowed_api_bases=allowed,
+        )
+
+    def test_allows_trailing_slash_in_allowlist(self):
+        allowed = frozenset(["https://allowed.example.com/"])
+        # allowlist entry has trailing slash — caller without should still match
+        validate_custom_endpoint(
+            False,
+            api_base="https://allowed.example.com",
+            api_key=None,
+            allowed_api_bases=allowed,
+        )

@@ -11,6 +11,7 @@ from ai_gateway.models.base import (
     ModelAPIError,
     ModelMetadata,
     TokensConsumptionMetadata,
+    validate_custom_endpoint,
 )
 from ai_gateway.models.base_chat import ChatModelBase, Message, Role
 from ai_gateway.models.base_text import (
@@ -275,9 +276,9 @@ class LiteLlmChatModel(ChatModelBase):
         async_fireworks_client: Optional[AsyncOpenAI] = None,
         fireworks_api_base_url: str = "",
     ):
-        if not custom_models_enabled:
-            if endpoint is not None or api_key is not None:
-                raise ValueError("specifying custom models endpoint is disabled")
+        validate_custom_endpoint(
+            custom_models_enabled, api_base=endpoint, api_key=api_key
+        )
 
         if provider == KindModelProvider.MISTRALAI:
             api_key = provider_keys.get("mistral_api_key")
@@ -515,9 +516,9 @@ class LiteLlmTextGenModel(TextGenModelBase):
         using_cache: bool = True,
         fireworks_api_base_url: str = "",
     ):
-        if not custom_models_enabled:
-            if endpoint is not None or api_key is not None:
-                raise ValueError("specifying custom models endpoint is disabled")
+        validate_custom_endpoint(
+            custom_models_enabled, api_base=endpoint, api_key=api_key
+        )
 
         if provider == KindModelProvider.MISTRALAI:
             api_key = provider_keys.get("mistral_api_key")

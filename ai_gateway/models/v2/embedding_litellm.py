@@ -6,11 +6,13 @@ This module provides an embeddings adapter that integrates with the prompt regis
 from __future__ import annotations
 
 import logging
-from typing import Any, AsyncIterator, Dict, Iterator, Mapping, Optional
+from typing import Any, AsyncIterator, Dict, Iterator, Mapping, Optional, override
 
 import litellm
 from langchain_core.messages import AIMessage, AIMessageChunk
-from langchain_core.runnables import RunnableConfig, RunnableSerializable
+from langchain_core.runnables import Runnable, RunnableConfig, RunnableSerializable
+
+from ai_gateway.models.base import validate_custom_endpoint
 
 __all__ = ["EmbeddingLiteLLM", "EmbeddingBadRequestError", "EmbeddingRateLimitError"]
 
@@ -38,6 +40,7 @@ class EmbeddingLiteLLM(RunnableSerializable[Dict[str, Any], AIMessage]):
     api_key: Optional[str] = None
     request_timeout: Optional[float] = 60.0
     max_retries: int = 1
+    custom_models_enabled: bool = False
 
     # define unused attribute to satisfy the LLMModelProtocol interface
     disable_streaming: bool = False
@@ -147,6 +150,15 @@ class EmbeddingLiteLLM(RunnableSerializable[Dict[str, Any], AIMessage]):
         predictions = self._extract_predictions(response)
 
         return AIMessage(content=predictions)
+
+    @override
+    def bind(self, **kwargs: Any) -> "Runnable[Dict[str, Any], AIMessage]":
+        validate_custom_endpoint(
+            self.custom_models_enabled,
+            api_base=kwargs.get("api_base"),
+            api_key=kwargs.get("api_key"),
+        )
+        return super().bind(**kwargs)
 
     async def astream(  # type: ignore[override]
         self,

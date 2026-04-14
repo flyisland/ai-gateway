@@ -1390,6 +1390,44 @@ async def test_run_with_missing_plan_key(tools_executor):
 
 
 @pytest.mark.asyncio
+@pytest.mark.parametrize(
+    "all_tools",
+    [{"secret_tool": mock_tool(name="secret_tool", content="original content")}],
+)
+@pytest.mark.usefixtures("mock_datetime")
+@patch("duo_workflow_service.agents.tools_executor.redact_secrets_for_ui")
+async def test_tool_response_is_passed_to_redact_secrets_for_ui(
+    mock_redact, workflow_state, graph
+):
+    """redact_secrets_for_ui must receive the full ToolMessage, not just its .content.
+
+    Regression test: an earlier fix incorrectly extracted tool_response.content before
+    calling redact_secrets_for_ui, bypassing the redactor's own ToolMessage handling.
+    The redactor is now responsible for unwrapping objects with a 'content' attribute,
+    so tools_executor must pass the ToolMessage directly.
+    """
+    tool_message = ToolMessage(
+        content="original content", name="secret_tool", tool_call_id="fake-call-1"
+    )
+    mock_redact.return_value = tool_message
+
+    workflow_state["conversation_history"]["planner"] = [
+        AIMessage(
+            content=[{"type": "text", "text": "test"}],
+            tool_calls=[{"id": "redact-test-call", "name": "secret_tool", "args": {}}],
+            id="ai-msg-redact-test",
+        )
+    ]
+
+    await graph.ainvoke(workflow_state)
+
+    # redact_secrets_for_ui must receive the ToolMessage object, not a bare string
+    call_args = mock_redact.call_args
+    assert isinstance(call_args.args[0], ToolMessage)
+    assert call_args.kwargs["tool_name"] == "secret_tool"
+
+
+@pytest.mark.asyncio
 @pytest.mark.parametrize("all_tools", [{"test_tool": mock_tool()}])
 @pytest.mark.usefixtures("mock_datetime")
 async def test_skip_agent_msg_prevents_duplicate_messages(

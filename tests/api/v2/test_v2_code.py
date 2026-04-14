@@ -2465,3 +2465,60 @@ class TestAmazonQIntegration:
 
         assert response.status_code == status.HTTP_403_FORBIDDEN
         assert response.json() == {"detail": "Unauthorized to access code completions"}
+
+
+class TestCustomModelsSSRF:
+    @pytest.fixture(name="config_values")
+    def config_values_fixture(self, assets_dir, gcp_location):
+        return {
+            "custom_models": {
+                "enabled": False,
+            },
+            "self_signed_jwt": {
+                "signing_key": open(assets_dir / "keys" / "signing_key.pem").read(),
+            },
+            "model_endpoints": {
+                "fireworks_regional_endpoints": {
+                    gcp_location: {
+                        "qwen2p5-coder-7b": {
+                            "endpoint": "https://fireworks.endpoint",
+                            "identifier": "qwen2p5-coder-7b",
+                        },
+                    },
+                },
+            },
+        }
+
+    @pytest.fixture(name="scopes")
+    def scopes_fixture(self):
+        return ["complete_code", "generate_code"]
+
+    def test_completions_ssrf_model_endpoint_rejected_when_custom_models_disabled(
+        self,
+        mock_client: TestClient,
+    ):
+        with pytest.raises(
+            ValueError, match="specifying custom models endpoint is disabled"
+        ):
+            mock_client.post(
+                "/code/completions",
+                headers={
+                    "Authorization": "Bearer 12345",
+                    "X-Gitlab-Authentication-Type": "oidc",
+                    "X-GitLab-Instance-Id": "1234",
+                    "X-GitLab-Realm": "self-managed",
+                    "X-GitLab-Global-User-Id": "1234",
+                },
+                json={
+                    "model_provider": "litellm",
+                    "model_name": "codestral",
+                    "model_endpoint": "http://internal-server.local/ssrf",
+                    "model_identifier": "anthropic/codestral",
+                    "prompt_version": 1,
+                    "current_file": {
+                        "file_name": "t.py",
+                        "content_above_cursor": "x",
+                        "content_below_cursor": "",
+                    },
+                },
+            )
