@@ -48,7 +48,7 @@ class TestInternalEventsClientAIContext:
         """Create a client with mocked dependencies."""
         with (
             patch("lib.internal_events.client.requests.Session"),
-            patch("lib.internal_events.client.AsyncEmitter"),
+            patch("lib.internal_events.client.LoggingAsyncEmitter"),
             patch("lib.internal_events.client.Tracker") as tracker_class,
         ):
             tracker_class.return_value = mock_tracker

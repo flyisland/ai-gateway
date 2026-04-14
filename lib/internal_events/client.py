@@ -3,7 +3,7 @@ from typing import Any, Dict, List, Optional, Tuple
 
 import requests
 import structlog
-from snowplow_tracker import AsyncEmitter, SelfDescribingJson, StructuredEvent, Tracker
+from snowplow_tracker import SelfDescribingJson, StructuredEvent, Tracker
 
 from lib.internal_events.ai_context import AIContext
 from lib.internal_events.context import (
@@ -12,6 +12,7 @@ from lib.internal_events.context import (
     current_event_context,
     tracked_internal_events,
 )
+from lib.snowplow import LoggingAsyncEmitter
 
 __all__ = ["InternalEventsClient"]
 
@@ -37,7 +38,8 @@ class InternalEventsClient:
 
         if enabled:
             self._session = requests.Session()
-            self._emitter = AsyncEmitter(
+            self._emitter = LoggingAsyncEmitter(
+                logger=self._logger,
                 batch_size=batch_size,
                 thread_count=thread_count,
                 endpoint=endpoint,
