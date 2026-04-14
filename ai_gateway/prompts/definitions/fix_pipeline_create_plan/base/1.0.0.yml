@@ -9,6 +9,5 @@ prompt_template:
     {% include 'fix_pipeline_create_plan/system/1.0.0.jinja' %}
   user: |
     {% include 'fix_pipeline_create_plan/user/1.0.0.jinja' %}
-  placeholder: history
 params:
   timeout: 60

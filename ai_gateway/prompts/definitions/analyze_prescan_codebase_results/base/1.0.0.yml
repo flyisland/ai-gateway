@@ -9,6 +9,5 @@ prompt_template:
     {% include 'analyze_prescan_codebase_results/system/1.0.0.jinja' %}
   user: |
     {% include 'analyze_prescan_codebase_results/user/1.0.0.jinja' %}
-  placeholder: history
 params:
   timeout: 60

@@ -432,4 +432,3 @@ prompts:
         </feedback>
       user: |
         {{goal}}
-      placeholder: history

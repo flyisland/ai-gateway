@@ -9,6 +9,5 @@ prompt_template:
     {% include 'project_activity_create_summary_issue/system/1.0.0.jinja' %}
   user: |
     {% include 'project_activity_create_summary_issue/user/1.0.0.jinja' %}
-  placeholder: history
 params:
   timeout: 60

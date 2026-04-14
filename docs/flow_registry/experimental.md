@@ -209,10 +209,6 @@ Every AgentComponent requires a prompt that serves as the "instructions" for the
 capabilities, and response patterns.
 Prompts include placeholders that get replaced with actual data from the flow state.
 
-**Important for Multi-turn Conversations:** If your AgentComponent needs access to conversation history (for context in
-multi-turn interactions), include `placeholder: history` in your prompt template. This automatically provides the
-component's conversation history to the AI model.
-
 ##### Prompt Sources
 
 Flows can use prompts from two sources:
@@ -249,7 +245,6 @@ prompts:
       prompt_template:
           system: "You are a helpful assistant specialized in code analysis"
           user: "Task: {{goal}}"
-          placeholder: history  # Optional: include conversation history
       params:
           timeout: 180
 
@@ -688,9 +683,6 @@ with built-in error handling and retry logic.
 Unlike the `AgentComponent` which can engage in multi-turn conversations and generate additional tool calls after seeing
 results,
 `OneOffComponent` is constrained to a single round of tool generation and execution.
-
-**Note:** If your OneOffComponent prompt needs access to conversation history from previous interactions, include
-`placeholder: history` in your prompt template.
 
 #### Key Features
 

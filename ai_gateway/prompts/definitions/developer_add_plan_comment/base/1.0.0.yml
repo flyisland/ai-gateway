@@ -8,6 +8,5 @@ prompt_template:
     {% include 'developer_add_plan_comment/system/1.0.0.jinja' %}
   user: |
     {% include 'developer_add_plan_comment/user/1.0.0.jinja' %}
-  placeholder: history
 params:
   timeout: 60

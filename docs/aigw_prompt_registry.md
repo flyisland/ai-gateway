@@ -128,7 +128,9 @@ unit_primitives: # Required. Features that can use this prompt
 prompt_template: # Required. Templates for model interaction
     system: <string>                # Optional. System-level instructions (supports Jinja2)
     user: <string>                  # Required. User message template (supports Jinja2)
-    placeholder: <string>           # Optional. Creates MessagesPlaceholder for dynamic content (e.g., "history")
+    placeholder: <string>           # Optional. Explicitly declares a MessagesPlaceholder for dynamic content.
+                                    # Note: "history" is automatically added to every prompt and does not need
+                                    # to be declared here.
 
 params: # Optional. Request handling parameters
     timeout: <integer>              # Optional. Maximum response time in seconds (default: 30)
@@ -163,7 +165,6 @@ unit_primitives:
 prompt_template:
     system: "You are a code review assistant with access to previous conversations. {{ context }}"
     user: "Review this code: {{ code_diff }}"
-    placeholder: history  # Injects conversation history for context
 params:
     timeout: 120
     max_retries: 3
@@ -171,11 +172,13 @@ params:
 
 ### Message Placeholders
 
-The `placeholder` attribute allows you to include conversation history and other message sequences in your prompt templates.
+The `placeholder` attribute allows you to include message sequences in your prompt templates.
 
-- **Usage**: `placeholder: history` creates a LangChain `MessagesPlaceholder` that accepts lists of BaseMessage objects
+- **Usage**: `placeholder: <name>` creates a LangChain `MessagesPlaceholder` that accepts lists of BaseMessage objects
   or message tuples
-- **Auto-populated**: Only `"history"` is automatically populated by workflow system with conversation data
+- **Auto-injected history**: `"history"` is automatically added as an optional placeholder to every prompt by the
+  runtime. You do not need to declare `placeholder: history` in your prompt template — it is always available. If
+  history is not passed at invocation time, the placeholder renders as zero messages and has no effect.
 - **Custom names**: Other variable names require manual data provision at prompt invocation
 - **Data format**: Must be LangChain-compatible message objects, not arbitrary text
 
