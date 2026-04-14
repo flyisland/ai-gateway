@@ -8,6 +8,5 @@ prompt_template:
     {% include 'convert_ci_push_changes/system/1.0.0.jinja' %}
   user: |
     {% include 'convert_ci_push_changes/user/1.0.0.jinja' %}
-  placeholder: history
 params:
   timeout: 60

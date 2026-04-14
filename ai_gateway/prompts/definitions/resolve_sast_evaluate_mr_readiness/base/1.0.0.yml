@@ -29,4 +29,3 @@ prompt_template:
     <workflow_id>
     {{workflow_id}}
     </workflow_id>
-  placeholder: history

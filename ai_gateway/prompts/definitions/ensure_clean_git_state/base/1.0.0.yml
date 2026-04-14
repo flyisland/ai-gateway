@@ -9,6 +9,5 @@ prompt_template:
     {% include 'ensure_clean_git_state/system/1.0.0.jinja' %}
   user: |
     {% include 'ensure_clean_git_state/user/1.0.0.jinja' %}
-  placeholder: history
 params:
   timeout: 30

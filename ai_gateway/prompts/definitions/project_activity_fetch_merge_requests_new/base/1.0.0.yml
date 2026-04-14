@@ -9,6 +9,5 @@ prompt_template:
     {% include 'common/project_activity_fetch_merge_requests/1.0.0.jinja' %}
   user: |
     {% include 'project_activity_fetch_merge_requests_new/user/1.0.0.jinja' %}
-  placeholder: history
 params:
   timeout: 120

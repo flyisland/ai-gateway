@@ -47,4 +47,3 @@ prompts:
         Only include "select" and/or "clear" as needed.
       user: |
         {{goal}}
-      placeholder: history

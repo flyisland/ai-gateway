@@ -9,6 +9,5 @@ prompt_template:
     {% include 'validate_sast_fix_has_changes/system/1.0.0.jinja' %}
   user: |
     {% include 'validate_sast_fix_has_changes/user/1.0.0.jinja' %}
-  placeholder: history
 params:
   timeout: 30

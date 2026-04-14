@@ -58,4 +58,3 @@ prompts:
         The GitLab API accepts URL-encoded project paths (like `gitlab-org%2Fgitlab`) wherever it accepts numeric project IDs. Use this when people reference projects by path.
       user: |
         {{goal}}
-      placeholder: history
