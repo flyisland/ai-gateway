@@ -12,7 +12,22 @@ LIST_ASCP_SCANS_QUERY = (_GRAPHQL_DIR / "list_ascp_scans.graphql").read_text(
     encoding="utf-8",
 )
 
+CREATE_ASCP_COMPONENT_MUTATION = (
+    _GRAPHQL_DIR / "create_ascp_component.graphql"
+).read_text(encoding="utf-8")
+
+CREATE_ASCP_SECURITY_CONTEXT_MUTATION = (
+    _GRAPHQL_DIR / "create_ascp_security_context.graphql"
+).read_text(encoding="utf-8")
+
+LIST_ASCP_COMPONENTS_QUERY = (_GRAPHQL_DIR / "list_ascp_components.graphql").read_text(
+    encoding="utf-8"
+)
+
 __all__ = [
     "CREATE_ASCP_SCAN_MUTATION",
     "LIST_ASCP_SCANS_QUERY",
+    "CREATE_ASCP_COMPONENT_MUTATION",
+    "CREATE_ASCP_SECURITY_CONTEXT_MUTATION",
+    "LIST_ASCP_COMPONENTS_QUERY",
 ]

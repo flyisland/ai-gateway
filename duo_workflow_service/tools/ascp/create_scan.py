@@ -1,9 +1,11 @@
 from typing import Any, ClassVar, Optional, Type
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field
+from pydantic.alias_generators import to_camel
 
 from duo_workflow_service.tools.ascp.queries import CREATE_ASCP_SCAN_MUTATION
 from duo_workflow_service.tools.ascp.types import ScanTypeLiteral
+from duo_workflow_service.tools.ascp.utils import parse_graphql_errors
 from duo_workflow_service.tools.duo_base_tool import (
     LICENSED_FEATURE_SECURITY_DASHBOARD,
     DuoBaseTool,
@@ -28,6 +30,8 @@ class CreateAscpScanResponse(BaseModel):
 
 class CreateAscpScanInput(BaseModel):
     """Input model for the CreateAscpScan tool."""
+
+    model_config = ConfigDict(alias_generator=to_camel, populate_by_name=True)
 
     project_path: str = Field(
         description='Full path of the project (e.g., "namespace/project").',
@@ -83,23 +87,9 @@ class CreateAscpScan(DuoBaseTool):
         return f"Create ASCP scan for {args.project_path} at {args.commit_sha}"
 
     async def _execute(self, **kwargs: Any) -> str:
-        project_path = kwargs["project_path"]
-        commit_sha = kwargs["commit_sha"]
-        scan_type = kwargs.get("scan_type", "FULL")
-        base_scan_id = kwargs.get("base_scan_id")
-        base_commit_sha = kwargs.get("base_commit_sha")
-
-        input_data: dict[str, Any] = {
-            "projectPath": project_path,
-            "commitSha": commit_sha,
-            "scanType": scan_type,
-        }
-
-        if base_scan_id is not None:
-            input_data["baseScanId"] = base_scan_id
-        if base_commit_sha is not None:
-            input_data["baseCommitSha"] = base_commit_sha
-
+        input_data = CreateAscpScanInput.model_validate(kwargs).model_dump(
+            by_alias=True, exclude_none=True
+        )
         variables = {"input": input_data}
 
         try:
@@ -119,6 +109,14 @@ class CreateAscpScan(DuoBaseTool):
             return CreateAscpScanResponse(
                 errors=["GraphQL returned no response or invalid format"],
                 response=CreateAscpScanResponseBody(scan=None, raw_response=None),
+            ).model_dump_json()
+
+        graphql_errors = response.get("errors")
+        if graphql_errors:
+            messages = parse_graphql_errors(graphql_errors)
+            return CreateAscpScanResponse(
+                errors=messages,
+                response=CreateAscpScanResponseBody(scan=None, raw_response=response),
             ).model_dump_json()
 
         payload = response.get("ascpScanCreate") or {}

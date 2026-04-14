@@ -4,6 +4,7 @@ from pydantic import BaseModel, Field
 
 from duo_workflow_service.tools.ascp.queries import LIST_ASCP_SCANS_QUERY
 from duo_workflow_service.tools.ascp.types import ScanTypeLiteral
+from duo_workflow_service.tools.ascp.utils import parse_graphql_errors
 from duo_workflow_service.tools.duo_base_tool import (
     LICENSED_FEATURE_SECURITY_DASHBOARD,
     DuoBaseTool,
@@ -53,7 +54,7 @@ class ListAscpScansInput(BaseModel):
 
 
 class ListAscpScans(DuoBaseTool):
-    """Tool for listing ASCP (Application Security Context and Patterns) scans for a project.
+    """Tool for listing ASCP (Application Security Collaboration Platform) scans for a project.
 
     Returned JSON uses a single shape for success and error: {"errors": list[str],
     "response": {"scans": ... | null, "page_info": ... | null, "raw_response": ... | null}}.
@@ -125,15 +126,9 @@ class ListAscpScans(DuoBaseTool):
 
         graphql_errors = response.get("errors")
         if graphql_errors:
-            if not isinstance(graphql_errors, list):
-                graphql_errors = [str(graphql_errors)]
-            else:
-                graphql_errors = [
-                    e.get("message", str(e)) if isinstance(e, dict) else str(e)
-                    for e in graphql_errors
-                ]
+            messages = parse_graphql_errors(graphql_errors)
             return ListAscpScansResponse(
-                errors=graphql_errors,
+                errors=messages,
                 response=ListAscpScansResponseBody(
                     scans=None, page_info=None, raw_response=response
                 ),

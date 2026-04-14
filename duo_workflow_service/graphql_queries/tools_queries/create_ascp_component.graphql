@@ -1,0 +1,17 @@
+mutation createAscpComponent($input: AscpComponentCreateInput!) {
+  ascpComponentCreate(input: $input) {
+    component {
+      id
+      title
+      description
+      subDirectory
+      expectedUserBehavior
+      scan {
+        id
+      }
+      createdAt
+      updatedAt
+    }
+    errors
+  }
+}

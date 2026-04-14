@@ -1,0 +1,26 @@
+mutation createAscpSecurityContext($input: AscpSecurityContextCreateInput!) {
+  ascpSecurityContextCreate(input: $input) {
+    securityContext {
+      id
+      summary
+      authenticationModel
+      authorizationModel
+      dataSensitivity
+      scan {
+        id
+      }
+      securityGuidelines {
+        nodes {
+          id
+          name
+          operation
+          legitimateUse
+          securityBoundary
+          businessContext
+          severityIfViolated
+        }
+      }
+    }
+    errors
+  }
+}

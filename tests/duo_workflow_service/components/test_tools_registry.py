@@ -15,7 +15,13 @@ from duo_workflow_service.components.tools_registry import (
 )
 from duo_workflow_service.executor.outbox import Outbox
 from duo_workflow_service.gitlab.http_client import GitlabHttpClient
-from duo_workflow_service.tools.ascp import CreateAscpScan, ListAscpScans
+from duo_workflow_service.tools.ascp import (
+    CreateAscpComponent,
+    CreateAscpScan,
+    CreateAscpSecurityContext,
+    ListAscpComponents,
+    ListAscpScans,
+)
 from duo_workflow_service.tools.branch import CreateBranch
 from duo_workflow_service.tools.code_review import (
     BuildReviewMergeRequestContext,
@@ -144,6 +150,7 @@ _outbox = MagicMock(spec=Outbox)
                 "list_project_audit_events",
                 "get_current_user",
                 "ascp_list_scans",
+                "ascp_list_components",
                 "get_vulnerability_details",
                 "evaluate_vuln_fp_status",
                 "get_work_item",
@@ -224,7 +231,10 @@ _outbox = MagicMock(spec=Outbox)
                 "confirm_vulnerability",
                 "get_current_user",
                 "ascp_create_scan",
+                "ascp_create_component",
+                "ascp_create_security_context",
                 "ascp_list_scans",
+                "ascp_list_components",
                 "create_work_item",
                 "create_work_item_note",
                 "link_vulnerability_to_issue",
@@ -334,7 +344,12 @@ def test_registry_initialization_initialises_tools_with_correct_attributes(
         "create_plan": tools.CreatePlan(),
         "add_new_task": tools.AddNewTask(),
         "ascp_create_scan": CreateAscpScan(metadata=tool_metadata),
+        "ascp_create_component": CreateAscpComponent(metadata=tool_metadata),
+        "ascp_create_security_context": CreateAscpSecurityContext(
+            metadata=tool_metadata
+        ),
         "ascp_list_scans": ListAscpScans(metadata=tool_metadata),
+        "ascp_list_components": ListAscpComponents(metadata=tool_metadata),
         "remove_task": tools.RemoveTask(),
         "update_task_description": tools.UpdateTaskDescription(),
         "update_vulnerability_severity": tools.UpdateVulnerabilitySeverity(
