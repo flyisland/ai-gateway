@@ -30,10 +30,39 @@ __all__ = [
     "ModelBase",
     "grpc_connect_vertex",
     "init_anthropic_client",
+    "validate_custom_endpoint",
 ]
 
 log = structlog.stdlib.get_logger("models")
 request_log = get_request_logger("models")
+
+
+def validate_custom_endpoint(
+    custom_models_enabled: bool,
+    api_base: Optional[str],
+    api_key: Optional[str],
+    allowed_api_bases: frozenset[str] = frozenset(),
+) -> None:
+    """Raise ValueError if a custom endpoint is not permitted.
+
+    When custom_models_enabled is False, only endpoints explicitly listed in allowed_api_bases (operator-configured via
+    env vars) are accepted. URLs are compared after stripping trailing slashes so that semantically equivalent bases are
+    not rejected due to formatting differences.
+    """
+    if custom_models_enabled:
+        return
+    if api_base is not None and api_base.rstrip("/") in {
+        b.rstrip("/") for b in allowed_api_bases
+    }:
+        return
+    if api_base is not None:
+        raise ValueError(
+            "specifying custom models endpoint is disabled: api_base is not allowed"
+        )
+    if api_key is not None:
+        raise ValueError(
+            "specifying custom models endpoint is disabled: api_key is not allowed"
+        )
 
 
 class KindModelProvider(StrEnum):

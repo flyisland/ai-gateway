@@ -7,10 +7,24 @@ from langchain_core.runnables import Runnable
 from langchain_core.tools import BaseTool
 from langchain_openai import ChatOpenAI as _LChatOpenAI
 
+from ai_gateway.models.base import validate_custom_endpoint
+
 __all__ = ["ChatOpenAI"]
 
 
 class ChatOpenAI(_LChatOpenAI):
+    custom_models_enabled: bool = False
+    """Whether custom model endpoints are allowed."""
+
+    @override
+    def bind(self, **kwargs: Any) -> Runnable[LanguageModelInput, AIMessage]:
+        validate_custom_endpoint(
+            self.custom_models_enabled,
+            api_base=kwargs.get("api_base"),
+            api_key=kwargs.get("api_key"),
+        )
+        return super().bind(**kwargs)
+
     @override
     def bind_tools(
         self,

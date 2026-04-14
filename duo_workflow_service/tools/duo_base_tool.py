@@ -23,6 +23,7 @@ from duo_workflow_service.errors.typing import (
 from duo_workflow_service.gitlab.gitlab_api import Project
 from duo_workflow_service.gitlab.http_client import GitlabHttpClient, GitLabHttpResponse
 from duo_workflow_service.gitlab.url_parser import GitLabUrlParseError, GitLabUrlParser
+from duo_workflow_service.security.secret_redaction import redact_secrets
 from duo_workflow_service.security.tool_output_security import ToolTrustLevel
 from duo_workflow_service.tools.tool_output_manager import (
     TruncationConfig,
@@ -202,6 +203,9 @@ class DuoBaseTool(BaseTool):
             tool_name=self.name,
             truncation_config=self.truncation_config,
         )
+
+        # Redact any secret-like strings to prevent accidental leaking
+        tool_response = redact_secrets(response=tool_response, tool_name=self.name)
 
         return tool_response
 

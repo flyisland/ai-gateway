@@ -764,6 +764,69 @@ class TestUsageMetadata:
             ]
 
 
+class TestBind:
+    def test_bind_raises_when_custom_models_disabled_and_api_base_set(self):
+        model = CompletionLiteLLM(
+            model="codestral-2501",
+            completion_type=CompletionType.TEXT,
+            custom_models_enabled=False,
+        )
+        with pytest.raises(ValueError, match="api_base is not allowed"):
+            model.bind(api_base="https://custom.endpoint.example.com")
+
+    def test_bind_raises_when_custom_models_disabled_and_api_key_set(self):
+        model = CompletionLiteLLM(
+            model="codestral-2501",
+            completion_type=CompletionType.TEXT,
+            custom_models_enabled=False,
+        )
+        with pytest.raises(ValueError, match="api_key is not allowed"):
+            model.bind(api_key="sk-secret-key")
+
+    def test_bind_allows_when_api_base_in_allowed_api_bases(self):
+        allowed = frozenset(["https://allowed.endpoint.example.com"])
+        model = CompletionLiteLLM(
+            model="codestral-2501",
+            completion_type=CompletionType.TEXT,
+            custom_models_enabled=False,
+            allowed_api_bases=allowed,
+        )
+        bound = model.bind(api_base="https://allowed.endpoint.example.com")
+        assert bound is not None
+
+    def test_bind_allows_trailing_slash_normalized_api_base(self):
+        allowed = frozenset(["https://allowed.endpoint.example.com"])
+        model = CompletionLiteLLM(
+            model="codestral-2501",
+            completion_type=CompletionType.TEXT,
+            custom_models_enabled=False,
+            allowed_api_bases=allowed,
+        )
+        # trailing slash on caller side should still match
+        bound = model.bind(api_base="https://allowed.endpoint.example.com/")
+        assert bound is not None
+
+    def test_bind_allows_when_custom_models_enabled(self):
+        model = CompletionLiteLLM(
+            model="codestral-2501",
+            completion_type=CompletionType.TEXT,
+            custom_models_enabled=True,
+        )
+        bound = model.bind(
+            api_base="https://any.endpoint.example.com", api_key="sk-any-key"
+        )
+        assert bound is not None
+
+    def test_bind_allows_without_api_base_or_key(self):
+        model = CompletionLiteLLM(
+            model="codestral-2501",
+            completion_type=CompletionType.TEXT,
+            custom_models_enabled=False,
+        )
+        bound = model.bind(temperature=0.5)
+        assert bound is not None
+
+
 class TestFireworksRetry:
     @pytest.fixture
     def fireworks_model(self):

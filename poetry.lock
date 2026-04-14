@@ -1288,6 +1288,31 @@ url = "https://gitlab.com/api/v4/projects/78063949/packages/pypi/simple"
 reference = "litellm"
 
 [[package]]
+name = "detect-secrets"
+version = "1.5.0"
+description = "Tool for detecting secrets in the codebase"
+optional = false
+python-versions = "*"
+groups = ["main"]
+files = [
+    {file = "detect_secrets-1.5.0-py3-none-any.whl", hash = "sha256:e24e7b9b5a35048c313e983f76c4bd09dad89f045ff059e354f9943bf45aa060"},
+    {file = "detect_secrets-1.5.0.tar.gz", hash = "sha256:6bb46dcc553c10df51475641bb30fd69d25645cc12339e46c824c1e0c388898a"},
+]
+
+[package.dependencies]
+pyyaml = "*"
+requests = "*"
+
+[package.extras]
+gibberish = ["gibberish-detector"]
+word-list = ["pyahocorasick"]
+
+[package.source]
+type = "legacy"
+url = "https://gitlab.com/api/v4/projects/78063949/packages/pypi/simple"
+reference = "litellm"
+
+[[package]]
 name = "dill"
 version = "0.3.8"
 description = "serialize all of Python"
@@ -10079,4 +10104,4 @@ reference = "litellm"
 [metadata]
 lock-version = "2.1"
 python-versions = ">=3.12.0,<3.13.0"
-content-hash = "c8fcc985a5850ebd08345fa2c1fbc004f823a9f0a95fde03c4a4af6f53b95b78"
+content-hash = "74276d98b1431d2cdb2b0e0de84807c02f76a63e2320a9ec92862b6f36dfd071"

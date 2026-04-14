@@ -30,11 +30,8 @@ from duo_workflow_service.errors.typing import TierAccessDeniedException
 from duo_workflow_service.monitoring import duo_workflow_metrics
 from duo_workflow_service.security.prompt_security import SecurityException
 from duo_workflow_service.security.scanner_factory import apply_security_scanning
-from duo_workflow_service.tools import (
-    RunCommand,
-    Toolset,
-    format_tool_display_message,
-)
+from duo_workflow_service.security.secret_redaction import redact_secrets_for_ui
+from duo_workflow_service.tools import RunCommand, Toolset, format_tool_display_message
 from duo_workflow_service.tools.planner import PlannerTool
 from duo_workflow_service.tracking.errors import log_exception
 from lib.context import client_capabilities, extract_finish_reason
@@ -612,6 +609,7 @@ class ToolsExecutor:
         if project_name:
             tool_args = {**tool_args, "project_name": project_name}
 
+        tool_response = redact_secrets_for_ui(tool_response, tool_name=tool_name)
         return UiChatLog(
             message_type=MessageTypeEnum.TOOL,
             message_sub_type=tool_name,

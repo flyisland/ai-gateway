@@ -11,6 +11,8 @@ from langchain_core.runnables import Runnable
 from langchain_core.tools import BaseTool
 from pydantic import model_validator
 
+from ai_gateway.models.base import validate_custom_endpoint
+
 __all__ = ["ChatAnthropic"]
 
 
@@ -33,6 +35,9 @@ class ChatAnthropic(_LChatAnthropic):
 
     betas: Optional[list[str]] = None
     """Beta features to enable for the Anthropic client."""
+
+    custom_models_enabled: bool = False
+    """Whether custom model endpoints are allowed."""
 
     def _get_combined_headers(self) -> Optional[dict[str, str]]:
         """Get combined headers including default headers and beta features.
@@ -82,6 +87,15 @@ class ChatAnthropic(_LChatAnthropic):
         self._client = None  # type: ignore[assignment]
 
         return self
+
+    @override
+    def bind(self, **kwargs: Any) -> Runnable[LanguageModelInput, AIMessage]:
+        validate_custom_endpoint(
+            self.custom_models_enabled,
+            api_base=kwargs.get("api_base"),
+            api_key=kwargs.get("api_key"),
+        )
+        return super().bind(**kwargs)
 
     @override
     def _generate(

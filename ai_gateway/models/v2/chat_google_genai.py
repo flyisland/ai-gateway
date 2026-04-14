@@ -1,11 +1,16 @@
-from typing import Self, override
+from typing import Any, Self, override
 
 from google.genai import Client
 from google.genai.types import HttpOptions
+from langchain_core.language_models import LanguageModelInput
+from langchain_core.messages import AIMessage
+from langchain_core.runnables import Runnable
 from langchain_google_genai import ChatGoogleGenerativeAI as _LCChatGoogleGenerativeAI
 from langchain_google_genai._common import get_user_agent
 from langchain_google_genai.chat_models import _is_gemini_3_or_later
 from pydantic import model_validator
+
+from ai_gateway.models.base import validate_custom_endpoint
 
 __all__ = ["ChatGoogleGenerativeAI", "connect_google_gen_vertex_ai"]
 
@@ -29,6 +34,9 @@ def connect_google_gen_vertex_ai(
 
 
 class ChatGoogleGenerativeAI(_LCChatGoogleGenerativeAI):
+    custom_models_enabled: bool = False
+    """Whether custom model endpoints are allowed."""
+
     @model_validator(mode="after")
     @override
     def validate_environment(self) -> Self:
@@ -52,3 +60,12 @@ class ChatGoogleGenerativeAI(_LCChatGoogleGenerativeAI):
             raise ValueError(msg)
 
         return self
+
+    @override
+    def bind(self, **kwargs: Any) -> Runnable[LanguageModelInput, AIMessage]:
+        validate_custom_endpoint(
+            self.custom_models_enabled,
+            api_base=kwargs.get("api_base"),
+            api_key=kwargs.get("api_key"),
+        )
+        return super().bind(**kwargs)

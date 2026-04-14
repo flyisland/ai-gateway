@@ -214,13 +214,15 @@ class TestLiteLlmChatModel:
         assert model.metadata.endpoint is None
 
         if provider == KindModelProvider.LITELLM:
-            with pytest.raises(ValueError) as exc:
+            with pytest.raises(
+                ValueError, match="specifying custom models endpoint is disabled"
+            ):
                 LiteLlmChatModel.from_model_name(name=model_name, endpoint=endpoint)
-            assert str(exc.value) == "specifying custom models endpoint is disabled"
 
-            with pytest.raises(ValueError) as exc:
+            with pytest.raises(
+                ValueError, match="specifying custom models endpoint is disabled"
+            ):
                 LiteLlmChatModel.from_model_name(name=model_name, api_key="api-key")
-            assert str(exc.value) == "specifying custom models endpoint is disabled"
 
     @pytest.mark.asyncio
     async def test_generate(self, lite_llm_chat_model):
@@ -563,13 +565,15 @@ class TestLiteLlmTextGenModel:
         assert model.metadata.endpoint is None
 
         if provider == KindModelProvider.LITELLM:
-            with pytest.raises(ValueError) as exc:
+            with pytest.raises(
+                ValueError, match="specifying custom models endpoint is disabled"
+            ):
                 LiteLlmTextGenModel.from_model_name(name=model_name, endpoint=endpoint)
-            assert str(exc.value) == "specifying custom models endpoint is disabled"
 
-            with pytest.raises(ValueError) as exc:
+            with pytest.raises(
+                ValueError, match="specifying custom models endpoint is disabled"
+            ):
                 LiteLlmTextGenModel.from_model_name(name=model_name, api_key="api-key")
-            assert str(exc.value) == "specifying custom models endpoint is disabled"
 
         if provider == KindModelProvider.VERTEX_AI:
             with pytest.raises(ValueError) as exc:

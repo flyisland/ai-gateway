@@ -11,6 +11,7 @@ from duo_workflow_service.conversation.trimmer import (
 )
 from duo_workflow_service.entities.event import WorkflowEvent
 from duo_workflow_service.gitlab.gitlab_api import Namespace, Project
+from duo_workflow_service.security.secret_redaction import redact_secrets_for_ui
 from duo_workflow_service.workflows.type_definitions import AdditionalContext
 from lib.context import current_model_metadata_context
 
@@ -184,13 +185,20 @@ def _ui_chat_log_reducer(
 def build_tool_info(
     name: str, args: dict[str, Any], tool_response: Any = None
 ) -> ToolInfo:
-    """Build a ToolInfo dict, truncating tool_response strings to avoid large payloads.
+    """Build a ToolInfo dict for UiChatLog display.
 
-    Truncates string tool responses to TOOL_RESPONSE_MAX_DISPLAY_MSG characters to prevent bloating ui_chat_log payloads
-    and checkpoints with large tool outputs.
+    Applies two transformations to ``tool_response`` before storing it.
+    First, ``redact_secrets_for_ui`` replaces structured secrets (GitLab tokens,
+    JWTs, AWS keys, etc.) and high-entropy strings (Azure storage keys, generic
+    API blobs) with ``[REDACTED]``, using raised entropy thresholds so that git
+    SHAs, checksums, and UUIDs are left intact.
+    Second, string responses are capped at ``TOOL_RESPONSE_MAX_DISPLAY_MSG``
+    characters to prevent bloating ui_chat_log payloads and checkpoints with
+    large tool outputs.
     """
     info = ToolInfo(name=name, args=args)
     if tool_response is not None:
+        tool_response = redact_secrets_for_ui(tool_response, tool_name=name)
         if (
             isinstance(tool_response, str)
             and len(tool_response) > TOOL_RESPONSE_MAX_DISPLAY_MSG

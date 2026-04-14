@@ -25,6 +25,23 @@ __all__ = [
 litellm.module_level_aclient = AsyncHTTPHandler(event_hooks={"request": [log_request]})
 
 
+def _compute_fireworks_allowed_api_bases(
+    fireworks_api_base_url: str,
+    fireworks_regional_endpoints: dict[str, dict[str, dict[str, str]]],
+) -> frozenset[str]:
+    """Compute the set of allowed Fireworks API base URLs from operator configuration."""
+    bases = (
+        {fireworks_api_base_url.rstrip("/")}
+        if fireworks_api_base_url.strip()
+        else set()
+    )
+    for region_models in fireworks_regional_endpoints.values():
+        for model_config in region_models.values():
+            if endpoint := model_config.get("endpoint"):
+                bases.add(endpoint.rstrip("/"))
+    return frozenset(bases)
+
+
 def _init_google_chat_gen_vertex_ai_global_client(config: dict[str, Any]):
     client = connect_google_gen_vertex_ai(config["project"], "global")
     yield client
@@ -56,6 +73,12 @@ class ContainerModels(containers.DeclarativeContainer):
 
     http_async_client_anthropic = providers.Singleton(init_anthropic_client)
 
+    _fireworks_allowed_api_bases = providers.Singleton(
+        _compute_fireworks_allowed_api_bases,
+        fireworks_api_base_url=config.fireworks_api_base_url,
+        fireworks_regional_endpoints=config.model_endpoints.fireworks_regional_endpoints,
+    )
+
     _duo_workflow = providers.Callable(
         ConfigDuoWorkflow.model_validate, config.duo_workflow
     )
@@ -69,6 +92,7 @@ class ContainerModels(containers.DeclarativeContainer):
             betas=[
                 "context-1m-2025-08-07",
             ],
+            custom_models_enabled=config.custom_models.enabled,
         ),
         mocked=providers.Factory(mock.FakeModel),
         agentic=providers.Factory(
@@ -78,7 +102,11 @@ class ContainerModels(containers.DeclarativeContainer):
         ),
     )
 
-    openai_chat_fn = providers.Factory(ChatOpenAI, output_version="responses/v1")
+    openai_chat_fn = providers.Factory(
+        ChatOpenAI,
+        output_version="responses/v1",
+        custom_models_enabled=config.custom_models.enabled,
+    )
 
     google_chat_gen_vertex_ai_global_fn = providers.Factory(
         ChatGoogleGenerativeAI,
@@ -86,6 +114,7 @@ class ContainerModels(containers.DeclarativeContainer):
             _init_google_chat_gen_vertex_ai_global_client,
             config.google_cloud_platform,
         ),
+        custom_models_enabled=config.custom_models.enabled,
     )
 
     lite_llm_chat_fn = providers.Selector(
@@ -93,6 +122,7 @@ class ContainerModels(containers.DeclarativeContainer):
         original=providers.Factory(
             ChatLiteLLM,
             model_keys=config.model_keys,
+            custom_models_enabled=config.custom_models.enabled,
         ),
         mocked=providers.Factory(mock.FakeModel),
         agentic=providers.Factory(
@@ -112,6 +142,8 @@ class ContainerModels(containers.DeclarativeContainer):
         original=providers.Factory(
             CompletionLiteLLM,
             model_keys=config.model_keys,
+            custom_models_enabled=config.custom_models.enabled,
+            allowed_api_bases=_fireworks_allowed_api_bases,
         ),
         mocked=providers.Factory(mock.FakeCompletionModel),
         agentic=providers.Factory(mock.AgenticFakeModel),
@@ -121,6 +153,7 @@ class ContainerModels(containers.DeclarativeContainer):
         _mock_selector,
         original=providers.Factory(
             EmbeddingLiteLLM,
+            custom_models_enabled=config.custom_models.enabled,
         ),
         mocked=providers.Factory(mock.FakeEmbeddingModel),
     )
