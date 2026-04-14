@@ -157,16 +157,14 @@ def _format_tool_calls_as_text(
     return "\n".join(parts)
 
 
-def strip_tool_metadata_for_litellm(
+def strip_tool_metadata(
     messages: list[BaseMessage],
 ) -> list[BaseMessage]:
     """Convert tool-calling metadata to text representations for summarization.
 
-    Workaround for LiteLLM bug https://github.com/BerriAI/litellm/issues/24712
-    where LiteLLM raises UnsupportedParamsError when messages contain tool_calls
-    but no tools= param is specified. This only affects LiteLLM-backed providers
-    (e.g., Vertex AI). Once the upstream bug is fixed, this function should be
-    removed.
+    The compaction summarizer does not need tool-calling capability. LLM
+    providers (e.g. LiteLLM) reject messages containing tool_calls metadata
+    when no tools= parameter is provided.
 
     Transforms:
     - AIMessage with tool_calls -> AIMessage with text content + tool calls as text

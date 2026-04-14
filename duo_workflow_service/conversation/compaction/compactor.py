@@ -6,7 +6,6 @@ from langgraph.constants import TAG_NOSTREAM
 from structlog import get_logger
 
 from ai_gateway.prompts.typing import Model
-from ai_gateway.vendor.langchain_litellm.litellm import ChatLiteLLM
 from duo_workflow_service.conversation.compaction.schema import (
     CompactionConfig,
     CompactionResult,
@@ -16,7 +15,7 @@ from duo_workflow_service.conversation.compaction.token_estimator import (
 )
 from duo_workflow_service.conversation.compaction.utils import (
     slice_for_summarization,
-    strip_tool_metadata_for_litellm,
+    strip_tool_metadata,
 )
 from duo_workflow_service.entities.state import get_model_max_context_token_limit
 
@@ -108,11 +107,14 @@ class ConversationCompactor:
         try:
             summary = await self._invoke_summarizer(slices.to_summarize)
         except Exception as e:
-            log.warning(
+            log.error(
                 "Failed to summarize messages, keeping original",
                 error=str(e),
                 error_type=type(e).__name__,
+                llm_type=type(self._llm).__name__,
                 n_msgs=len(messages),
+                n_to_summarize=len(slices.to_summarize),
+                exc_info=True,
             )
             return CompactionResult(
                 messages=messages,
@@ -163,11 +165,7 @@ class ConversationCompactor:
         # TODO: migrate to prompt registry needed in
         # https://gitlab.com/gitlab-org/modelops/applied-ml/code-suggestions/ai-assist/-/work_items/2014
         log.info("Start compaction summarization llm call.")
-        # Workaround for LiteLLM bug https://github.com/BerriAI/litellm/issues/24712
-        # Only needed for LiteLLM-backed providers (e.g., Vertex AI).
-        # Remove this workaround once the upstream bug is fixed.
-        if isinstance(self._llm, ChatLiteLLM):
-            messages = strip_tool_metadata_for_litellm(messages)
+        messages = strip_tool_metadata(messages)
         result = await self._llm.ainvoke(
             [
                 SystemMessage(content=self._config.summarizer_system_prompt),

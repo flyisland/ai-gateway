@@ -5,7 +5,6 @@ from unittest.mock import AsyncMock, MagicMock, Mock, patch
 import pytest
 from langchain_core.messages import AIMessage, HumanMessage, ToolMessage
 
-from ai_gateway.vendor.langchain_litellm.litellm import ChatLiteLLM
 from duo_workflow_service.conversation.compaction import (
     CompactionConfig,
     CompactionTokenEstimator,
@@ -556,9 +555,9 @@ class TestInvokeSummarizerToolMetadataStripping:
         )
 
     @pytest.mark.asyncio
-    async def test_invoke_summarizer_strips_tool_metadata_for_litellm(self):
-        """When self._llm is ChatLiteLLM, tool metadata is stripped before invocation."""
-        mock_llm = MagicMock(spec=ChatLiteLLM)
+    async def test_invoke_summarizer_always_strips_tool_metadata(self):
+        """Tool metadata should always be stripped before summarization."""
+        mock_llm = MagicMock()
         mock_llm.ainvoke = AsyncMock(return_value=AIMessage(content="Summary."))
         compactor = self._create_compactor(mock_llm)
 
@@ -578,19 +577,3 @@ class TestInvokeSummarizerToolMetadataStripping:
         )
         assert "[Called tool 'read_file'" in all_content
         assert "[Tool result for 'read_file']" in all_content
-
-    @pytest.mark.asyncio
-    async def test_invoke_summarizer_does_not_strip_for_non_litellm(self):
-        """When self._llm is NOT ChatLiteLLM, messages are passed through unchanged."""
-        mock_llm = MagicMock()
-        mock_llm.ainvoke = AsyncMock(return_value=AIMessage(content="Summary."))
-        compactor = self._create_compactor(mock_llm)
-
-        await compactor._invoke_summarizer(list(_TOOL_MESSAGES))
-
-        call_args = mock_llm.ainvoke.call_args[0][0]
-        # The original tool-bearing messages should be present (sandwiched
-        # between the system and user prompts)
-        inner_msgs = call_args[1:-1]  # strip system/user prompt wrappers
-        assert any(isinstance(m, AIMessage) and m.tool_calls for m in inner_msgs)
-        assert any(isinstance(m, ToolMessage) for m in inner_msgs)

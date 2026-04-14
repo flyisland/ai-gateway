@@ -21,7 +21,7 @@ from duo_workflow_service.conversation.compaction import (
 )
 from duo_workflow_service.conversation.compaction.utils import (
     _format_tool_calls_as_text,
-    strip_tool_metadata_for_litellm,
+    strip_tool_metadata,
 )
 
 
@@ -881,8 +881,8 @@ class TestFormatToolCallsAsText:
             assert fragment in result
 
 
-class TestStripToolMetadataForLitellm:
-    """Test suite for strip_tool_metadata_for_litellm function."""
+class TestStripToolMetadata:
+    """Test suite for strip_tool_metadata function."""
 
     @pytest.mark.parametrize(
         "messages, checks",
@@ -1006,8 +1006,8 @@ class TestStripToolMetadataForLitellm:
             ),
         ],
     )
-    def test_strip_tool_metadata_for_litellm(self, messages, checks):
-        result = strip_tool_metadata_for_litellm(messages)
+    def test_strip_tool_metadata(self, messages, checks):
+        result = strip_tool_metadata(messages)
         for check in checks:
             assert check(result)
 
@@ -1033,7 +1033,7 @@ class TestStripToolMetadataForLitellm:
                 ],
             ),
         ]
-        cleaned = strip_tool_metadata_for_litellm(messages)
+        cleaned = strip_tool_metadata(messages)
         content = cleaned[0].content
         # Single text block + tool_use → simplified to string after filtering
         assert isinstance(content, str)
@@ -1066,7 +1066,7 @@ class TestStripToolMetadataForLitellm:
                 ],
             ),
         ]
-        cleaned = strip_tool_metadata_for_litellm(messages)
+        cleaned = strip_tool_metadata(messages)
         content = cleaned[0].content
         # Multiple text blocks remain as list
         assert isinstance(content, list)
@@ -1086,5 +1086,5 @@ class TestStripToolMetadataForLitellm:
     ):
         """AIMessage with no tool_calls is passed through as the same object."""
         msg = AIMessage(content="Just a normal response.")
-        cleaned = strip_tool_metadata_for_litellm([msg])
+        cleaned = strip_tool_metadata([msg])
         assert cleaned[0] is msg
