@@ -82,6 +82,8 @@ models:
       top_p: 1.0
       top_k: 1
       max_tokens: 8_192
+    prompt_params:
+      vertex_location: us-central1
 
   - name: "Gemini 2.5 Flash - Vertex"
     provider: "Vertex"
