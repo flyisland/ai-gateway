@@ -9,6 +9,7 @@ from uuid import uuid4
 import structlog
 from dependency_injector.wiring import Provide, inject
 from gitlab_cloud_connector import CloudConnectorUser
+from langchain_core.callbacks import BaseCallbackHandler
 from langchain_core.runnables import RunnableConfig
 
 # pylint disable are going to be fixed via
@@ -22,6 +23,11 @@ from langsmith import traceable, tracing_context
 from ai_gateway.container import ContainerApplication
 from ai_gateway.prompts import BasePromptRegistry
 from contract import contract_pb2
+from duo_workflow_service.audit_events.callback_handler import AuditEventCallbackHandler
+from duo_workflow_service.audit_events.client import AuditEventClient
+from duo_workflow_service.audit_events.collector import AuditEventCollector
+from duo_workflow_service.audit_events.context import audit_collector_context
+from duo_workflow_service.audit_events.event_types import SessionStartedEvent
 from duo_workflow_service.checkpointer.gitlab_workflow import GitLabWorkflow
 from duo_workflow_service.checkpointer.gitlab_workflow_utils import (
     SUCCESSFUL_WORKFLOW_EXECUTION_STATUSES,
@@ -117,6 +123,18 @@ class AbstractWorkflow(ABC):
         ],
         language_server_version: Optional[LanguageServerVersion] = None,
         preapproved_tools: Optional[list[str]] = [],
+        audit_event_enabled: bool = Provide[
+            ContainerApplication.audit_event.config.enabled  # type: ignore[attr-defined]
+        ],
+        audit_event_buffer_size: int = Provide[
+            ContainerApplication.audit_event.config.buffer_size  # type: ignore[attr-defined]
+        ],
+        audit_event_flush_interval: float = Provide[
+            ContainerApplication.audit_event.config.flush_interval_seconds  # type: ignore[attr-defined]
+        ],
+        audit_event_max_retries: int = Provide[
+            ContainerApplication.audit_event.config.max_retries  # type: ignore[attr-defined]
+        ],
     ):
         self._outbox = Outbox()
         self._workflow_id = workflow_id
@@ -136,6 +154,10 @@ class AbstractWorkflow(ABC):
         self._session_url: Optional[str] = None
         self._last_gitlab_status: WorkflowStatusEventEnum | None = None
         self._first_response_metric_recorded = False
+        self._audit_event_enabled = audit_event_enabled
+        self._audit_event_buffer_size = audit_event_buffer_size
+        self._audit_event_flush_interval = audit_event_flush_interval
+        self._audit_event_max_retries = audit_event_max_retries
 
     async def run(self, goal: str) -> None:
         with duo_workflow_metrics.time_workflow(
@@ -240,11 +262,60 @@ class AbstractWorkflow(ABC):
 
         return ui_chat_log[-1].get("content")
 
+    async def _init_audit_events(self, goal: str) -> Optional[AuditEventCollector]:
+        if not self._audit_event_enabled:
+            return None
+
+        audit_client = AuditEventClient(
+            http_client=self._http_client,
+            workflow_id=self._workflow_id,
+            max_retries=self._audit_event_max_retries,
+        )
+        audit_collector = AuditEventCollector(
+            client=audit_client,
+            buffer_size=self._audit_event_buffer_size,
+            flush_interval_seconds=self._audit_event_flush_interval,
+        )
+        await audit_collector.start()
+        audit_collector_context.set(audit_collector)
+        audit_collector.capture(
+            SessionStartedEvent(
+                workflow_id=self._workflow_id,
+                workflow_type=self._workflow_type.value,
+                goal=goal,
+            )
+        )
+        return audit_collector
+
+    async def _handle_non_values_stream_event(
+        self, event_type: str, state: Any
+    ) -> None:
+        if event_type == "updates":
+            for step in state:
+                self.log.info(f"step: {step}")
+        else:
+            assert self.checkpoint_notifier is not None
+            await self.checkpoint_notifier.send_event(
+                type=event_type, state=state, stream=self._stream
+            )
+
     @traceable
     async def _compile_and_run_graph(self, goal: str) -> str | None:
+        audit_collector = await self._init_audit_events(goal)
+
+        callbacks: list[BaseCallbackHandler] = (
+            [
+                AuditEventCallbackHandler(
+                    collector=audit_collector, workflow_id=self._workflow_id
+                )
+            ]
+            if audit_collector
+            else []
+        )
         graph_config: RunnableConfig = {
             "recursion_limit": self._recursion_limit(),
             "configurable": {"thread_id": self._workflow_id},
+            "callbacks": callbacks,
         }
         last_state = None
         compiled_graph = None
@@ -328,14 +399,12 @@ class AbstractWorkflow(ABC):
                     if type == "values":
                         self._record_first_response_metric()
                         last_state = state
-
-                    if type == "updates":
-                        for step in state:
-                            self.log.info(f"step: {step}")
-                    else:
+                        assert self.checkpoint_notifier is not None
                         await self.checkpoint_notifier.send_event(
                             type=type, state=state, stream=self._stream
                         )
+                    else:
+                        await self._handle_non_values_stream_event(type, state)
 
                 return self._extract_trace_output(last_state)
         except NotifiableException as e:
@@ -379,6 +448,8 @@ class AbstractWorkflow(ABC):
             raise TraceableException(e)
         finally:
             self.is_done = True
+            if audit_collector:
+                await audit_collector.close()
 
     async def get_graph_input(
         self, goal: str, status_event: str, checkpoint_tuple: Any

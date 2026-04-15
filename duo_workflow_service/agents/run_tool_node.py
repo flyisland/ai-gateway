@@ -82,7 +82,7 @@ class RunToolNode(Generic[WorkflowStateT]):
             with duo_workflow_metrics.time_tool_call(
                 tool_name=self._tool.name, flow_type=self._flow_type.value
             ):
-                if output := await self._tool._arun(**tool_params):
+                if output := await self._tool.ainvoke(tool_params):
                     set_hidden_layer_log_context(self._tool.name, tool_params)
                     try:
                         trust_level = getattr(self._tool, "trust_level", None)

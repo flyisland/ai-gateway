@@ -14,7 +14,7 @@ async def test_run_tool_node_execution():
     """Test RunToolNode execution with single tool parameter set."""
     # Mock setup
     tool = AsyncMock()
-    tool._arun = AsyncMock(return_value="tool_output")
+    tool.ainvoke = AsyncMock(return_value="tool_output")
     tool.name = "test_tool"
 
     input_parser = Mock(return_value=[{"param1": "value1"}])
@@ -33,7 +33,7 @@ async def test_run_tool_node_execution():
 
     # Verify
     input_parser.assert_called_once_with(state)
-    tool._arun.assert_called_once_with(param1="value1")
+    tool.ainvoke.assert_called_once_with({"param1": "value1"})
     output_parser.assert_called_once_with(["tool_output"], state)
 
     assert "ui_chat_log" in result
@@ -49,7 +49,7 @@ async def test_run_tool_node_multiple_params():
     """Test RunToolNode execution with multiple tool parameter sets."""
     # Mock setup
     tool = AsyncMock()
-    tool._arun = AsyncMock(side_effect=["output1", "output2"])
+    tool.ainvoke = AsyncMock(side_effect=["output1", "output2"])
     tool.name = "test_tool"
 
     input_parser = Mock(return_value=[{"param1": "value1"}, {"param1": "value2"}])
@@ -68,7 +68,7 @@ async def test_run_tool_node_multiple_params():
 
     # Verify
     input_parser.assert_called_once_with(state)
-    assert tool._arun.call_count == 2
+    assert tool.ainvoke.call_count == 2
     output_parser.assert_called_once_with(["output1", "output2"], state)
 
     assert len(result["ui_chat_log"]) == 2
@@ -84,7 +84,7 @@ async def test_run_tool_node_security_layer():
     # Mock setup
     tool = AsyncMock()
     # Return outputs with dangerous tags that should be encoded
-    tool._arun = AsyncMock(
+    tool.ainvoke = AsyncMock(
         side_effect=[
             "output1 with <goal>dangerous tag</goal>",
             "output2 with <system>another tag</system>",
@@ -108,7 +108,7 @@ async def test_run_tool_node_security_layer():
     assert result
     # Verify
     input_parser.assert_called_once_with(state)
-    assert tool._arun.call_count == 2
+    assert tool.ainvoke.call_count == 2
 
     # Verify that the output_parser received the secured outputs
     output_parser.assert_called_once()
