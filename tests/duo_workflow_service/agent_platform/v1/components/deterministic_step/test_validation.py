@@ -63,6 +63,27 @@ class MockSupersedesToolTool(BaseTool):
         return "mock_new"
 
 
+class MockNewestSchema(BaseModel):
+    """Mock schema for the top of a multi-level supersession chain."""
+
+    newest_param: str = Field(..., description="Newest parameter")
+
+
+class MockMultiLevelTool(BaseTool):
+    """Mock tool at the top of a two-level supersession chain.
+
+    MockMultiLevelTool -> MockSupersedesToolTool -> MockOldTool
+    """
+
+    name: str = "mock_tool"
+    description: str = "Top of a multi-level chain"
+    args_schema: type[BaseModel] = MockNewestSchema
+    supersedes: type[BaseTool] = MockSupersedesToolTool
+
+    def _run(self):
+        return "mock_newest"
+
+
 class TestExtractConfiguredParams:
     """Tests for extract_configured_params function."""
 
@@ -215,3 +236,34 @@ class TestSelectValidatedTool:
         assert result.metadata == mock_metadata
         assert result.metadata["gitlab_client"] == mock_metadata["gitlab_client"]
         assert result.metadata["project"] == mock_metadata["project"]
+
+    def test_multi_level_supersession_matches_bottom(self):
+        """Test that the full chain is walked to find a matching schema."""
+        tool = MockMultiLevelTool()
+        tool.metadata = {"key": "value"}
+        params = {"old_param1", "old_param2"}
+
+        result = select_validated_tool(tool, "mock_tool", params)
+
+        assert isinstance(result, MockOldTool)
+        assert result.metadata == tool.metadata
+
+    def test_multi_level_supersession_matches_middle(self):
+        """Test that the middle of the chain is returned when it matches."""
+        tool = MockMultiLevelTool()
+        tool.metadata = {"key": "value"}
+        params = {"param1", "param2"}  # MockSchema (MockSupersedesToolTool)
+
+        result = select_validated_tool(tool, "mock_tool", params)
+
+        assert isinstance(result, MockSupersedesToolTool)
+        assert result.metadata == tool.metadata
+
+    def test_multi_level_supersession_matches_none(self):
+        """Test that an error is raised when no level matches."""
+        tool = MockMultiLevelTool()
+        tool.metadata = {"key": "value"}
+        params = {"completely_wrong"}
+
+        with pytest.raises(ValueError, match="mock_tool"):
+            select_validated_tool(tool, "mock_tool", params)

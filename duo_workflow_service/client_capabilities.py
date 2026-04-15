@@ -2,6 +2,10 @@ from packaging.version import InvalidVersion, Version
 
 from lib.context import client_capabilities, gitlab_version
 
+# Minimum GitLab version that forwards client capability declarations via
+# workhorse.  This threshold can be removed once 18.7 is no longer supported.
+MIN_CAPABILITIES_VERSION = Version("18.7.0")
+
 
 def is_client_capable(capabilities: str | frozenset[str]) -> bool:
     """Check if the client supports all of the given capabilities.
@@ -20,7 +24,7 @@ def is_client_capable(capabilities: str | frozenset[str]) -> bool:
     except (InvalidVersion, TypeError):
         return False
 
-    if gl_version < Version("18.7.0"):
+    if gl_version < MIN_CAPABILITIES_VERSION:
         return False
 
     declared = client_capabilities.get()

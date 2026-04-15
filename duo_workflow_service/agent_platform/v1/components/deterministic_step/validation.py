@@ -59,11 +59,13 @@ def select_validated_tool(
         # Current tool validation failed - will try superseded tool below
         current_error = e
 
-    # Check if tool supersedes another and config matches old schema
-    if hasattr(tool, "supersedes") and tool.supersedes:
+    # Walk the full supersession chain looking for a schema that matches
+    # the configured parameters (e.g. ShellCommandWithTimeout -> ShellCommand
+    # -> RunCommand).
+    candidate = tool
+    while hasattr(candidate, "supersedes") and candidate.supersedes:
         try:
-            # Instantiate the superseded tool to access its schema
-            superseded_tool_instance = tool.supersedes(metadata=tool.metadata)
+            superseded_tool_instance = candidate.supersedes(metadata=tool.metadata)
         except Exception as e:
             raise ValueError(
                 f"Tool '{tool_name}' failed to instantiate superseded tool: {e}"
@@ -75,13 +77,14 @@ def select_validated_tool(
                     superseded_tool_instance.args_schema,
                     configured_params,
                 )
-                # Config matches old schema - use superseded tool with copied metadata
+                # Config matches this level's schema — use it.
                 return superseded_tool_instance
             except ValueError as e:
-                # Superseded tool also doesn't match - fall through to raise original error
                 current_error = e
 
-    # Neither current nor superseded tool matched - raise the original error
+        candidate = superseded_tool_instance
+
+    # No tool in the supersession chain matched — raise the last error
     raise ValueError(f"Tool '{tool_name}' {str(current_error)}") from current_error
 
 
