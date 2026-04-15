@@ -1,0 +1,14 @@
+name: conversation_compaction
+model:
+  params:
+    max_tokens: 8_192
+    max_retries: 1
+unit_primitive: duo_agent_platform
+prompt_template:
+  system: |
+    {% include 'conversation_compaction/system/1.0.0.jinja' %}
+  placeholder: history
+  user: |
+    {% include 'conversation_compaction/user/1.0.0.jinja' %}
+params:
+  timeout: 60

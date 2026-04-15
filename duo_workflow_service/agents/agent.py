@@ -209,7 +209,14 @@ def build_agent(
     )
 
     compactor = (
-        create_conversation_compactor(config=compaction, llm_model=prompt.model)
+        create_conversation_compactor(
+            config=compaction,
+            prompt_registry=prompt_registry,
+            user=user,
+            agent_name=name,
+            workflow_id=workflow_id,
+            workflow_type=workflow_type.value,
+        )
         if compaction
         else None
     )
