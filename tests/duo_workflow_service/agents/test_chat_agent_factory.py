@@ -247,7 +247,6 @@ class TestCreateAgent:
         mock_tools_registry,
         mock_toolset,
         mock_local_prompt_registry,
-        prompt,
     ):
         """Test that compactor is created when compaction=CompactionConfig()."""
         mock_is_feature_enabled.return_value = False
@@ -272,7 +271,11 @@ class TestCreateAgent:
         mock_create_compactor.assert_called_once()
         call_kwargs = mock_create_compactor.call_args.kwargs
         assert isinstance(call_kwargs["config"], CompactionConfig)
-        assert call_kwargs["llm_model"] == prompt.model
+        assert call_kwargs["prompt_registry"] == mock_local_prompt_registry
+        assert call_kwargs["user"] == user
+        assert call_kwargs["agent_name"] == "chat"
+        assert call_kwargs["workflow_id"] == "workflow_123"
+        assert call_kwargs["workflow_type"] == CategoryEnum.WORKFLOW_CHAT.value
 
     @patch(
         "duo_workflow_service.agents.chat_agent_factory.create_conversation_compactor"

@@ -107,7 +107,7 @@ def user_fixture():
     return CloudConnectorUser(
         authenticated=True,
         claims=UserClaims(
-            scopes=["duo_chat"],
+            scopes=["duo_chat", "duo_agent_platform"],
             issuer="gitlab-duo-workflow-service",
         ),
     )
@@ -1139,7 +1139,7 @@ async def test_compile_with_tools_override_and_flow_config(
     user = CloudConnectorUser(
         authenticated=True,
         claims=UserClaims(
-            scopes=["duo_chat"],
+            scopes=["duo_chat", "duo_agent_platform"],
             issuer="gitlab-duo-workflow-service",
         ),
     )

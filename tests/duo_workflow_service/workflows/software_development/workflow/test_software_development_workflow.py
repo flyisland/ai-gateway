@@ -4,7 +4,7 @@ from typing import Any
 from unittest.mock import ANY, AsyncMock, MagicMock, Mock, call, patch
 
 import pytest
-from gitlab_cloud_connector import CloudConnectorUser
+from gitlab_cloud_connector import CloudConnectorUser, UserClaims
 from langchain_core.messages import AIMessage, HumanMessage, SystemMessage
 from langgraph.checkpoint.base import CheckpointTuple
 from langgraph.checkpoint.memory import MemorySaver
@@ -48,6 +48,17 @@ class MockComponent:
         graph.add_edge(node_name, exit_node)
 
         return node_name
+
+
+@pytest.fixture(name="user")
+def user_fixture():
+    return CloudConnectorUser(
+        authenticated=True,
+        claims=UserClaims(
+            scopes=["duo_workflow_execute_workflow", "duo_agent_platform"],
+            issuer="gitlab-duo-workflow-service",
+        ),
+    )
 
 
 @pytest.fixture(name="flow_type")

@@ -1,11 +1,13 @@
 from typing import cast
 
-from langchain_core.messages import AIMessage, BaseMessage, HumanMessage, SystemMessage
-from langchain_core.runnables import Runnable, RunnableBinding
+from gitlab_cloud_connector import CloudConnectorUser
+from langchain_core.messages import AIMessage, BaseMessage, HumanMessage
+from langchain_core.prompts import ChatPromptTemplate
+from langchain_core.runnables import RunnableConfig
 from langgraph.constants import TAG_NOSTREAM
 from structlog import get_logger
 
-from ai_gateway.prompts.typing import Model
+from ai_gateway.prompts.base import BasePromptRegistry, Prompt
 from duo_workflow_service.conversation.compaction.schema import (
     CompactionConfig,
     CompactionResult,
@@ -18,8 +20,13 @@ from duo_workflow_service.conversation.compaction.utils import (
     strip_tool_metadata,
 )
 from duo_workflow_service.entities.state import get_model_max_context_token_limit
+from lib.context import StarletteUser
+from lib.context.model import get_model_metadata
 
 log = get_logger("compactor")
+
+COMPACTION_PROMPT_ID = "conversation_compaction"
+COMPACTION_PROMPT_VERSION = "^1.0.0"
 
 COMPACTION_CONTINUE_MESSAGE = (
     "Continue working on the task based on the conversation above."
@@ -35,18 +42,42 @@ class ConversationCompactor:
 
     def __init__(
         self,
-        llm_model: Runnable,
+        prompt_registry: BasePromptRegistry,
+        user: StarletteUser | CloudConnectorUser,
         config: CompactionConfig,
         token_estimator: CompactionTokenEstimator,
+        agent_name: str,
+        workflow_id: str,
+        workflow_type: str,
     ):
-        self._llm = llm_model
-        self._token_estimator = token_estimator
+        # Use the "small" model from the parent workflow's feature setting
+        # (e.g. duo_agent_platform → haiku). This ensures the compaction
+        # model follows the admin-configured model for the workflow while
+        # preferring a cheaper/faster variant.
+        # is_graph_node=True is a safety net: if no gRPC model metadata
+        # context is set (tests, edge cases), it falls back to
+        # duo_agent_platform instead of failing on an unknown feature
+        # setting derived from the prompt_id.
+        model_metadata = get_model_metadata("small")
+        self._prompt: Prompt = prompt_registry.get_on_behalf(
+            user,
+            COMPACTION_PROMPT_ID,
+            COMPACTION_PROMPT_VERSION,
+            model_metadata=model_metadata,
+            is_graph_node=True,
+            internal_event_extra={
+                "agent_name": agent_name,
+                "workflow_id": workflow_id,
+                "workflow_type": workflow_type,
+            },
+        )
         self._config = config
-        self._summary_prompt_tokens = self._token_estimator.estimate_arbitrary_messages(
-            [
-                SystemMessage(content=self._config.summarizer_system_prompt),
-                HumanMessage(content=self._config.summarizer_user_prompt),
-            ]
+        self._token_estimator = token_estimator
+        prompt_tpl = cast(ChatPromptTemplate, self._prompt.prompt_tpl)
+        self._prompt_overhead_tokens = (
+            self._token_estimator.estimate_arbitrary_messages(
+                prompt_tpl.format_messages(history=[])
+            )
         )
 
     def should_compact(self, messages: list[BaseMessage]) -> bool:
@@ -111,7 +142,6 @@ class ConversationCompactor:
                 "Failed to summarize messages, keeping original",
                 error=str(e),
                 error_type=type(e).__name__,
-                llm_type=type(self._llm).__name__,
                 n_msgs=len(messages),
                 n_to_summarize=len(slices.to_summarize),
                 exc_info=True,
@@ -162,18 +192,18 @@ class ConversationCompactor:
         for hiding internal LLM calls from stream_mode="messages" output.
         See: langgraph.constants.TAG_NOSTREAM
         """
-        # TODO: migrate to prompt registry needed in
-        # https://gitlab.com/gitlab-org/modelops/applied-ml/code-suggestions/ai-assist/-/work_items/2014
         log.info("Start compaction summarization llm call.")
+        # Strip tool metadata from messages before summarization.
+        # The summarizer only needs text content, and some LLM providers
+        # reject messages with tool_calls when no tools= param is specified.
+        # Stripping unconditionally is safe since we convert tool call/result
+        # info to human-readable text.
         messages = strip_tool_metadata(messages)
-        result = await self._llm.ainvoke(
-            [
-                SystemMessage(content=self._config.summarizer_system_prompt),
-                *messages,
-                HumanMessage(content=self._config.summarizer_user_prompt),
-            ],
-            config={"tags": [TAG_NOSTREAM], "run_name": "Compaction Summarization"},
-        )
+        config: RunnableConfig = {
+            "tags": [TAG_NOSTREAM],
+            "run_name": "Compaction Summarization",
+        }
+        result = await self._prompt.ainvoke({"history": messages}, config=config)
         return cast(AIMessage, result)
 
     def _calculate_compacted_tokens(
@@ -183,20 +213,27 @@ class ConversationCompactor:
         usage_metadata = summary.usage_metadata
         input_tokens = usage_metadata.get("input_tokens", 0) if usage_metadata else 0
         output_tokens = usage_metadata.get("output_tokens", 0) if usage_metadata else 0
-
         return (
-            original_tokens - input_tokens + self._summary_prompt_tokens + output_tokens
+            original_tokens
+            - (input_tokens - self._prompt_overhead_tokens)
+            + output_tokens
         )
 
 
 def create_conversation_compactor(
-    config: CompactionConfig, llm_model: Model
+    config: CompactionConfig,
+    prompt_registry: BasePromptRegistry,
+    user: StarletteUser | CloudConnectorUser,
+    agent_name: str,
+    workflow_id: str,
+    workflow_type: str,
 ) -> ConversationCompactor:
     return ConversationCompactor(
-        llm_model=cast(
-            Runnable,
-            llm_model.bound if isinstance(llm_model, RunnableBinding) else llm_model,
-        ),
+        prompt_registry=prompt_registry,
+        user=user,
         config=config,
         token_estimator=CompactionTokenEstimator(),
+        agent_name=agent_name,
+        workflow_id=workflow_id,
+        workflow_type=workflow_type,
     )

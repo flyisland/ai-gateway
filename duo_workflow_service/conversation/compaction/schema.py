@@ -6,25 +6,6 @@ from pydantic import BaseModel, ConfigDict, field_validator
 
 from duo_workflow_service.entities.state import MessageTypeEnum, UiChatLog
 
-SUMMARIZER_SYSTEM_PROMPT = """
-You are a helpful AI assistant tasked with summarizing conversations.
-When asked to summarize, provide a detailed but concise summary of the conversation.
-Focus on information that would be helpful for continuing the conversation, including:
-- What was done
-- What is currently being worked on
-- Which files are being modified
-- What needs to be done next
-- Key user requests, constraints, or preferences that should persist
-- Important technical decisions and why they were made
-"""
-
-SUMMARIZER_USER_PROMPT = """
-Provide a detailed prompt for continuing our conversation above. Focus on information
-that would be helpful for continuing the conversation, including what we did, what we're
-doing, which files we're working on, and what we're going to do next considering new
-session will not have access to our conversation.
-"""
-
 
 class CompactionConfig(BaseModel):
     """Configuration for conversation compaction."""
@@ -34,8 +15,6 @@ class CompactionConfig(BaseModel):
     max_recent_messages: int = 10
     recent_messages_token_budget: int = 40_000
     trim_threshold: float = 0.7
-    summarizer_system_prompt: str = SUMMARIZER_SYSTEM_PROMPT
-    summarizer_user_prompt: str = SUMMARIZER_USER_PROMPT
 
     @field_validator("max_recent_messages")
     @classmethod

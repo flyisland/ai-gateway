@@ -20,8 +20,6 @@ class TestCompactionConfig:
         assert config.max_recent_messages == 10
         assert config.recent_messages_token_budget == 40_000
         assert config.trim_threshold == 0.7
-        assert config.summarizer_system_prompt is not None
-        assert config.summarizer_user_prompt is not None
 
     def test_frozen(self):
         """Should be immutable (frozen model)."""

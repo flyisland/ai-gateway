@@ -426,7 +426,6 @@ def test_create_agent_with_compaction_config(
     user,
     mock_local_prompt_registry,
     tools,
-    prompt,
     gl_http_client,
 ):
     mock_compactor = Mock(spec=ConversationCompactor)
@@ -447,7 +446,12 @@ def test_create_agent_with_compaction_config(
     )
 
     mock_create_compactor.assert_called_once_with(
-        config=compaction_config, llm_model=prompt.model
+        config=compaction_config,
+        prompt_registry=mock_local_prompt_registry,
+        user=user,
+        agent_name="test_agent",
+        workflow_id="workflow_123",
+        workflow_type=CategoryEnum.WORKFLOW_SOFTWARE_DEVELOPMENT.value,
     )
     assert agent.compactor == mock_compactor
 

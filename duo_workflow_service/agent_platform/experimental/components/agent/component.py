@@ -395,7 +395,11 @@ class AgentComponent(AgentComponentBase):
                         if isinstance(self.compaction, CompactionConfig)
                         else CompactionConfig()
                     ),
-                    llm_model=prompt.model,
+                    prompt_registry=self.prompt_registry,
+                    user=self.user,
+                    agent_name=self.name,
+                    workflow_id=self.flow_id,
+                    workflow_type=self.flow_type.value,
                 )
                 if self.compaction
                 else None

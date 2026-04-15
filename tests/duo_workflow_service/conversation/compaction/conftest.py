@@ -1,0 +1,54 @@
+from unittest.mock import AsyncMock, MagicMock, patch
+
+import pytest
+from langchain_core.messages import HumanMessage, SystemMessage
+
+from duo_workflow_service.conversation.compaction import (
+    CompactionConfig,
+    create_conversation_compactor,
+)
+
+
+@pytest.fixture(name="compaction_config")
+def compaction_config_fixture():
+    return CompactionConfig()
+
+
+@pytest.fixture(name="mock_prompt")
+def mock_prompt_fixture():
+    """Mock Prompt with ainvoke and prompt_tpl stubbed."""
+    mock = AsyncMock()
+    mock.prompt_tpl = MagicMock()
+    mock.prompt_tpl.format_messages.return_value = [
+        SystemMessage(content="system prompt"),
+        HumanMessage(content="user prompt"),
+    ]
+    return mock
+
+
+@pytest.fixture(name="mock_prompt_registry")
+def mock_prompt_registry_fixture(mock_prompt):
+    """Mock BasePromptRegistry returning mock_prompt from get_on_behalf."""
+    mock_registry = MagicMock()
+    mock_registry.get_on_behalf.return_value = mock_prompt
+    return mock_registry
+
+
+@pytest.fixture(name="compactor")
+def compactor_fixture(compaction_config, mock_prompt_registry, user):
+    """Create a ConversationCompactor via the factory, using mock registry.
+
+    Patches get_model_metadata so the compactor doesn't depend on the gRPC model metadata context variable during tests.
+    """
+    with patch(
+        "duo_workflow_service.conversation.compaction.compactor.get_model_metadata",
+        return_value=None,
+    ):
+        return create_conversation_compactor(
+            config=compaction_config,
+            prompt_registry=mock_prompt_registry,
+            user=user,
+            agent_name="test_agent",
+            workflow_id="test_workflow",
+            workflow_type="test_type",
+        )
