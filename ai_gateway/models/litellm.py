@@ -72,6 +72,7 @@ class KindLiteLlmModel(StrEnum):
     MISTRAL = "mistral"
     MIXTRAL = "mixtral"
     DEEPSEEKCODER = "deepseekcoder"
+    CLAUDE_3 = "claude_3"
     GPT = "gpt"
     QWEN_2_5 = "qwen2p5-coder-7b"
     LLAMA3 = "llama3"
