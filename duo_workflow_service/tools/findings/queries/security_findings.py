@@ -141,66 +141,56 @@ fragment NamedList on VulnerabilityDetailNamedList {
   }
 }
 
-query GetSecurityReportFinding($projectFullPath: ID!, $pipelineId: CiPipelineID!, $findingUuid: String!) {
+query GetSecurityReportFinding($projectFullPath: ID!, $ref: String!, $findingUuid: String!) {
   project(fullPath: $projectFullPath) {
     id
     webUrl
     nameWithNamespace
-    pipeline(id: $pipelineId) {
-      id
-      iid
-      sha
-      ref
-      status
-      createdAt
-      securityReportFinding(uuid: $findingUuid) {
-        uuid
-        title
-        description
-        descriptionHtml
-        state
-        severity
-        solution
-        solutionHtml
-        reportType
-        falsePositive
-        dismissalReason
-        aiResolutionEnabled
-        aiResolutionAvailable
-        remediations {
-          diff
-          summary
-        }
-        scanner {
-          id
-          name
-        }
-        assets {
-          name
-          url
-        }
-        evidence {
-          summary
-          request {
-            body
-            headers {
-              name
-              value
-            }
-            method
+    pipelines(first: 1, ref: $ref) {
+      nodes {
+        id
+        iid
+        sha
+        ref
+        status
+        createdAt
+        securityReportFinding(uuid: $findingUuid) {
+          uuid
+          title
+          description
+          descriptionHtml
+          state
+          severity
+          solution
+          solutionHtml
+          reportType
+          falsePositive
+          dismissalReason
+          aiResolutionEnabled
+          aiResolutionAvailable
+          remediations {
+            diff
+            summary
+          }
+          scanner {
+            id
+            name
+          }
+          assets {
+            name
             url
           }
-          response {
-            body
-            reasonPhrase
-            statusCode
-            headers {
-              name
-              value
+          evidence {
+            summary
+            request {
+              body
+              headers {
+                name
+                value
+              }
+              method
+              url
             }
-          }
-          supportingMessages {
-            name
             response {
               body
               reasonPhrase
@@ -210,92 +200,104 @@ query GetSecurityReportFinding($projectFullPath: ID!, $pipelineId: CiPipelineID!
                 value
               }
             }
-          }
-          source {
-            name
-          }
-        }
-        location {
-          ... on VulnerabilityLocationSast {
-            startLine
-            endLine
-            file
-            blobPath
-          }
-          ... on VulnerabilityLocationSecretDetection {
-            startLine
-            endLine
-            file
-            blobPath
-          }
-          ... on VulnerabilityLocationDependencyScanning {
-            blobPath
-            file
-          }
-          ... on VulnerabilityLocationContainerScanning {
-            image
-            operatingSystem
-          }
-          ... on VulnerabilityLocationCoverageFuzzing {
-            startLine
-            endLine
-            file
-            blobPath
-            crashAddress
-            crashType
-            stacktraceSnippet
-            vulnerableMethod
-            vulnerableClass
-          }
-          ... on VulnerabilityLocationDast {
-            hostname
-            path
-          }
-        }
-        links {
-          name
-          url
-        }
-        identifiers {
-          name
-          url
-          externalType
-          externalId
-        }
-        issueLinks {
-          nodes {
-            id
-            linkType
-            issue {
-              id
-              iid
-              createdAt
-              webUrl
+            supportingMessages {
+              name
+              response {
+                body
+                reasonPhrase
+                statusCode
+                headers {
+                  name
+                  value
+                }
+              }
+            }
+            source {
+              name
             }
           }
-        }
-        details {
-          __typename
-          ...List
-          ...Table
-          ...NamedList
-          ...NonNestedReportTypes
-        }
-        dismissedAt
-        dismissedBy {
-          id
-          name
-          username
-          webUrl
-        }
-        stateComment
-        vulnerability {
-          id
-          presentOnDefaultBranch
-        }
-        userPermissions {
-          adminVulnerability
-          createIssue
+          location {
+            ... on VulnerabilityLocationSast {
+              startLine
+              endLine
+              file
+              blobPath
+            }
+            ... on VulnerabilityLocationSecretDetection {
+              startLine
+              endLine
+              file
+              blobPath
+            }
+            ... on VulnerabilityLocationDependencyScanning {
+              blobPath
+              file
+            }
+            ... on VulnerabilityLocationContainerScanning {
+              image
+              operatingSystem
+            }
+            ... on VulnerabilityLocationCoverageFuzzing {
+              startLine
+              endLine
+              file
+              blobPath
+              crashAddress
+              crashType
+              stacktraceSnippet
+              vulnerableMethod
+              vulnerableClass
+            }
+            ... on VulnerabilityLocationDast {
+              hostname
+              path
+            }
+          }
+          links {
+            name
+            url
+          }
+          identifiers {
+            name
+            url
+            externalType
+            externalId
+          }
+          issueLinks {
+            nodes {
+              id
+              linkType
+              issue {
+                id
+                iid
+                createdAt
+                webUrl
+              }
+            }
+          }
+          details {
+            __typename
+            ...List
+            ...Table
+            ...NamedList
+            ...NonNestedReportTypes
+          }
+          dismissedAt
+          dismissedBy {
+            id
+            name
+            username
+            webUrl
+          }
+          stateComment
+          vulnerability {
+            id
+            presentOnDefaultBranch
+          }
+          userPermissions {
+            adminVulnerability
+            createIssue
+          }
         }
       }
     }
@@ -347,7 +349,7 @@ query SearchRecentPipelines($projectPath: ID!, $first: Int!) {
 LIST_SECURITY_FINDINGS_QUERY = """
 query PipelineFindings(
     $fullPath: ID!
-    $pipelineId: CiPipelineID!
+    $ref: String!
     $first: Int
     $after: String
     $severity: [String!]
@@ -357,155 +359,72 @@ query PipelineFindings(
 ) {
     project(fullPath: $fullPath) {
         id
-        pipeline(id: $pipelineId) {
-            id
-            iid
-            sha
-            ref
-            status
-            securityReportFindings(
-                after: $after
-                first: $first
-                severity: $severity
-                reportType: $reportType
-                scanner: $scanner
-                state: $state
-            ) {
-                nodes {
-                    uuid
-                    title
-                    description
-                    severity
-                    state
-                    reportType
-                    dismissalReason
-                    falsePositive
-                    aiResolutionAvailable
-                    aiResolutionEnabled
-
-                    identifiers {
-                        externalType
-                        name
-                    }
-
-                    scanner {
-                        id
-                        name
-                        vendor
-                    }
-
-                    location {
-                        ... on VulnerabilityLocationSast {
-                            file
-                            startLine
-                            endLine
-                        }
-                        ... on VulnerabilityLocationSecretDetection {
-                            file
-                            startLine
-                        }
-                        ... on VulnerabilityLocationDependencyScanning {
-                            file
-                        }
-                        ... on VulnerabilityLocationContainerScanning {
-                            image
-                            operatingSystem
-                        }
-                    }
-
-                    vulnerability {
-                        id
+        pipelines(first: 1, ref: $ref) {
+            nodes {
+                id
+                iid
+                sha
+                ref
+                status
+                securityReportFindings(
+                    after: $after
+                    first: $first
+                    severity: $severity
+                    reportType: $reportType
+                    scanner: $scanner
+                    state: $state
+                ) {
+                    nodes {
+                        uuid
+                        title
+                        description
+                        severity
                         state
-                    }
-                }
-                pageInfo {
-                    hasNextPage
-                    endCursor
-                }
-            }
-        }
-    }
-}
-"""
+                        reportType
+                        dismissalReason
+                        falsePositive
+                        aiResolutionAvailable
+                        aiResolutionEnabled
 
-# Alternative query that still uses IID if needed
-LIST_SECURITY_FINDINGS_QUERY_WITH_IID = """
-query PipelineFindings(
-    $fullPath: ID!
-    $pipelineIid: ID!
-    $first: Int
-    $after: String
-    $severity: [String!]
-    $reportType: [String!]
-    $scanner: [String!]
-    $state: [VulnerabilityState!]
-) {
-    project(fullPath: $fullPath) {
-        id
-        pipeline(iid: $pipelineIid) {
-            id
-            iid
-            sha
-            ref
-            status
-            securityReportFindings(
-                after: $after
-                first: $first
-                severity: $severity
-                reportType: $reportType
-                scanner: $scanner
-                state: $state
-            ) {
-                nodes {
-                    uuid
-                    title
-                    description
-                    severity
-                    state
-                    reportType
-                    dismissalReason
-                    falsePositive
-                    aiResolutionAvailable
-                    aiResolutionEnabled
-
-                    identifiers {
-                        externalType
-                        name
-                    }
-
-                    scanner {
-                        id
-                        name
-                        vendor
-                    }
-
-                    location {
-                        ... on VulnerabilityLocationSast {
-                            file
-                            startLine
-                            endLine
+                        identifiers {
+                            externalType
+                            name
                         }
-                        ... on VulnerabilityLocationSecretDetection {
-                            file
-                            startLine
+
+                        scanner {
+                            id
+                            name
+                            vendor
                         }
-                        ... on VulnerabilityLocationDependencyScanning {
-                            file
+
+                        location {
+                            ... on VulnerabilityLocationSast {
+                                file
+                                startLine
+                                endLine
+                            }
+                            ... on VulnerabilityLocationSecretDetection {
+                                file
+                                startLine
+                            }
+                            ... on VulnerabilityLocationDependencyScanning {
+                                file
+                            }
+                            ... on VulnerabilityLocationContainerScanning {
+                                image
+                                operatingSystem
+                            }
                         }
-                        ... on VulnerabilityLocationContainerScanning {
-                            image
-                            operatingSystem
+
+                        vulnerability {
+                            id
+                            state
                         }
                     }
-
-                    vulnerability {
-                        id
-                        state
+                    pageInfo {
+                        hasNextPage
+                        endCursor
                     }
-                }
-                pageInfo {
-                    hasNextPage
-                    endCursor
                 }
             }
         }

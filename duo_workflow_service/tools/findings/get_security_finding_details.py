@@ -1,5 +1,5 @@
 import json
-from typing import Any, ClassVar, Type, Union
+from typing import Any, ClassVar, Type
 
 from langchain_core.tools import ToolException
 from pydantic import BaseModel, Field
@@ -19,24 +19,13 @@ class GetSecurityFindingDetailsInput(BaseModel):
     project_full_path: str = Field(
         description="The full path of the project (e.g., 'group/project')."
     )
-
     uuid: str = Field(
         description="The UUID of the security finding (e.g., 'abc-123-def-456')."
     )
-    pipeline_id: Union[int, str] = Field(
-        description="""
-        The pipeline ID as an integer (e.g., 12345) or GraphQL GID
-        (e.g., 'gid://gitlab/Ci::Pipeline/12345').
-        """,
+    ref: str = Field(
+        description="The branch or tag ref the pipeline was run for. "
+        "For an MR, use the MR source branch name (e.g., 'my-feature-branch')."
     )
-
-    def get_pipeline_gid(self) -> str:
-        """Convert pipeline_id to GID format if needed."""
-        if isinstance(self.pipeline_id, int):
-            return f"gid://gitlab/Ci::Pipeline/{self.pipeline_id}"
-        if isinstance(self.pipeline_id, str) and self.pipeline_id.startswith("gid://"):
-            return self.pipeline_id
-        return f"gid://gitlab/Ci::Pipeline/{self.pipeline_id}"
 
 
 class GetSecurityFindingDetails(DuoBaseTool):
@@ -45,20 +34,22 @@ class GetSecurityFindingDetails(DuoBaseTool):
     tier_check_licensed_feature: ClassVar[str] = LICENSED_FEATURE_SECURITY_DASHBOARD
     name: str = "get_security_finding_details"
     description: str = """
-    Use this tool to get details for a specific security finding identified by its UUID and pipeline ID.
+    Use this tool to get details for a specific security finding identified by its UUID and branch ref.
 
     A "Security Finding" is a potential vulnerability discovered in a pipeline scan.
     It is an ephemeral object identified by a UUID.
 
-    **Use this tool when you have both a UUID and pipeline ID.**
+    **Use this tool when you have a UUID and the ref (MR source branch name).**
+
+    The `ref` is the source branch of the MR the pipeline ran on.
 
     This is different from a "Vulnerability", which is a persisted record on the default branch and has a numeric ID.
-    **Do NOT use this tool for numeric vulnerability IDs; when you have a numeric vulnerability ID, use the 'get_vulnerability_details' tool.**
+    **Do NOT use this tool for numeric vulnerability IDs; use the 'get_vulnerability_details' tool instead.**
 
     For example:
         get_security_finding_details(
             uuid="1e9a2bf7-0450-5894-8db5-895c98e39deb",
-            pipeline_id=12345,
+            ref="my-feature-branch",
             project_full_path="namespace/project"
         )
     """
@@ -67,35 +58,22 @@ class GetSecurityFindingDetails(DuoBaseTool):
     async def _execute(self, **kwargs: Any) -> str:
         project_path = kwargs.pop("project_full_path")
         uuid = kwargs.pop("uuid")
-        pipeline_id_raw = kwargs.pop("pipeline_id")
+        ref = kwargs.pop("ref")
 
         try:
-            input_model = GetSecurityFindingDetailsInput(
-                project_full_path=project_path, uuid=uuid, pipeline_id=pipeline_id_raw
-            )
-            pipeline_gid = input_model.get_pipeline_gid()
-            return await self._fetch_finding_from_pipeline(
-                project_path, pipeline_gid, uuid
-            )
-
+            return await self._fetch_finding_from_pipeline(project_path, ref, uuid)
         except Exception as e:
             raise ToolException(
                 f"An unexpected error occurred while fetching the security finding: {str(e)}"
             )
 
     async def _fetch_finding_from_pipeline(
-        self, project_path: str, pipeline_gid: str, finding_uuid: str
+        self, project_path: str, ref: str, finding_uuid: str
     ) -> str:
-        """Fetch a security finding by UUID from a specific pipeline using the pipeline's GID.
-
-        Args:
-            project_path: Full path to the project (e.g., 'namespace/project')
-            pipeline_gid: Pipeline GraphQL ID (e.g., 'gid://gitlab/Ci::Pipeline/12345')
-            finding_uuid: Security finding UUID (e.g., '1e9a2bf7-0450-5894-8db5-895c98e39deb')
-        """
+        """Fetch a security finding by UUID using project.pipelines(first: 1, ref:)."""
         variables = {
             "projectFullPath": project_path,
-            "pipelineId": pipeline_gid,
+            "ref": ref,
             "findingUuid": finding_uuid,
         }
 
@@ -119,11 +97,13 @@ class GetSecurityFindingDetails(DuoBaseTool):
                 {"error": "Project not found or access denied", "project": project_path}
             )
 
-        pipeline = project.get("pipeline")
-        if not pipeline:
+        pipeline_nodes = (project.get("pipelines") or {}).get("nodes") or []
+        if not pipeline_nodes:
             return json.dumps(
-                {"error": "Pipeline not found", "pipeline_id": pipeline_gid}
+                {"error": f"No pipeline found for ref '{ref}'", "ref": ref}
             )
+
+        pipeline = pipeline_nodes[0]
 
         finding = pipeline.get("securityReportFinding")
         if not finding:
@@ -131,7 +111,7 @@ class GetSecurityFindingDetails(DuoBaseTool):
                 {
                     "error": "Security finding not found in the specified pipeline",
                     "uuid": finding_uuid,
-                    "pipeline_id": pipeline_gid,
+                    "ref": ref,
                 }
             )
 
@@ -164,10 +144,6 @@ class GetSecurityFindingDetails(DuoBaseTool):
         self, args: GetSecurityFindingDetailsInput, _tool_response: Any = None
     ) -> str:
         """Formats a user-friendly message for the UI log."""
-
-        if isinstance(args.pipeline_id, int):
-            pipeline_numeric_id = str(args.pipeline_id)
-        else:
-            pipeline_numeric_id = args.pipeline_id.split("/")[-1]
-
-        return f"Get details for security finding {args.uuid[:8]}... from pipeline {pipeline_numeric_id}"
+        return (
+            f"Get details for security finding {args.uuid[:8]}... on ref '{args.ref}'"
+        )

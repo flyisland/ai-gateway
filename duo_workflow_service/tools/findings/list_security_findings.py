@@ -55,7 +55,10 @@ class ListSecurityFindingsInput(BaseModel):
     project_full_path: str = Field(
         description="The full path of the GitLab project (e.g., 'namespace/project' or 'group/subgroup/project')",
     )
-    pipeline_id: str = Field(description="Pipeline ID to get findings from (required)")
+    ref: str = Field(
+        description="The branch or tag ref the pipeline was run for. "
+        "For an MR, use the MR source branch name (e.g., 'my-feature-branch')."
+    )
     severity: Optional[list[SecurityFindingSeverity | str]] = Field(
         default=None,
         description="Filter by severity levels (e.g., [CRITICAL, HIGH]). If not specified, all severities returned.",
@@ -95,30 +98,25 @@ class ListSecurityFindings(DuoBaseTool):
     description: str = """List ephemeral security findings from a specific GitLab pipeline security scan.
 
     Use this tool to see all potential vulnerabilities found in a single pipeline run, such as for a Merge Request.
-    This tool requires a `pipeline_id` to operate.
+    This tool requires `project_full_path` and `ref` (the MR source branch name) to operate.
+
+    The `ref` is the source branch of the MR the pipeline ran on.
 
     **Do NOT use this tool to list vulnerabilities for an entire project; use 'list_vulnerabilities' for that.**
 
     For example:
-    - List all findings in a pipeline:
+    - List all findings for an MR's source branch:
         list_security_findings(
             project_full_path="gitlab-org/gitlab",
-            pipeline_id="gid://gitlab/Ci::Pipeline/12345"
+            ref="my-feature-branch"
         )
 
     - List only critical SAST findings:
         list_security_findings(
             project_full_path="gitlab-org/gitlab",
-            pipeline_id="gid://gitlab/Ci::Pipeline/12345",
+            ref="my-feature-branch",
             severity=[SecurityFindingSeverity.CRITICAL],
             report_type=[SecurityFindingReportType.SAST]
-        )
-
-    - List non-dismissed findings:
-        list_security_findings(
-            project_full_path="gitlab-org/gitlab",
-            pipeline_id="gid://gitlab/Ci::Pipeline/12345",
-            state=[SecurityFindingState.DETECTED, SecurityFindingState.CONFIRMED]
         )
     """
     args_schema: Type[BaseModel] = ListSecurityFindingsInput
@@ -142,7 +140,7 @@ class ListSecurityFindings(DuoBaseTool):
     def _build_query_variables(
         self,
         project_path: str,
-        pipeline_id: str,
+        ref: str,
         per_page: int,
         cursor: Optional[str],
         severity: Optional[list[SecurityFindingSeverity | str]],
@@ -153,7 +151,7 @@ class ListSecurityFindings(DuoBaseTool):
         """Build GraphQL query variables."""
         variables: dict[str, Any] = {
             "fullPath": project_path,
-            "pipelineId": pipeline_id,
+            "ref": ref,
             "first": per_page,
         }
 
@@ -222,7 +220,7 @@ class ListSecurityFindings(DuoBaseTool):
     async def _fetch_findings(
         self,
         project_path: str,
-        pipeline_id: str,
+        ref: str,
         fetch_all_pages: bool,
         per_page: int,
         severity: Optional[list[SecurityFindingSeverity | str]],
@@ -230,15 +228,19 @@ class ListSecurityFindings(DuoBaseTool):
         scanner: Optional[list[str]],
         state: Optional[list[SecurityFindingState | str]],
     ) -> dict[str, Any]:
-        """Fetch findings from GitLab API with pagination."""
-        all_findings = []
+        """Fetch findings from GitLab GraphQL API with pagination.
+
+        Uses project.pipelines(first: 1, ref: $ref) which resolves all pipeline types regardless of source (push,
+        merge_request_event, etc.).
+        """
+        all_findings: list[dict[str, Any]] = []
         cursor = None
         pipeline_info = None
 
         while True:
             variables = self._build_query_variables(
                 project_path,
-                pipeline_id,
+                ref,
                 per_page,
                 cursor,
                 severity,
@@ -267,20 +269,22 @@ class ListSecurityFindings(DuoBaseTool):
                     f"Project not found or access denied: {project_path}"
                 )
 
-            pipeline_data = project_data.get("pipeline")
-            if not pipeline_data:
+            pipeline_nodes = (project_data.get("pipelines") or {}).get("nodes") or []
+            if not pipeline_nodes:
                 raise ToolException(
-                    f"Pipeline not found: {pipeline_id} in project {project_path}"
+                    f"No pipeline found for ref '{ref}' in project {project_path}"
                 )
+
+            pipeline_data = pipeline_nodes[0]
 
             if pipeline_info is None:
                 pipeline_info = self._extract_pipeline_info(pipeline_data)
 
-            findings_data = pipeline_data.get("securityReportFindings", {})
-            findings = findings_data.get("nodes", [])
+            findings_data = pipeline_data.get("securityReportFindings") or {}
+            findings = findings_data.get("nodes") or []
             all_findings.extend(findings)
 
-            page_info = findings_data.get("pageInfo", {})
+            page_info = findings_data.get("pageInfo") or {}
             has_next = page_info.get("hasNextPage", False)
             cursor = page_info.get("endCursor")
 
@@ -292,7 +296,7 @@ class ListSecurityFindings(DuoBaseTool):
     async def _execute(self, **kwargs: Any) -> str:
         """Execute the security findings listing."""
         project_path = kwargs.pop("project_full_path")
-        pipeline_id = kwargs.pop("pipeline_id")
+        ref = kwargs.pop("ref")
 
         try:
             fetch_all_pages = kwargs.pop("fetch_all_pages", True)
@@ -307,7 +311,7 @@ class ListSecurityFindings(DuoBaseTool):
 
             result = await self._fetch_findings(
                 project_path,
-                pipeline_id,
+                ref,
                 fetch_all_pages,
                 per_page,
                 severity,
@@ -357,7 +361,9 @@ class ListSecurityFindings(DuoBaseTool):
         self, args: ListSecurityFindingsInput, _tool_response: Any = None
     ) -> str:
         """Format user-friendly display message."""
-        message = f"List security findings from pipeline {args.pipeline_id} in {args.project_full_path}"
+        message = (
+            f"List security findings for ref '{args.ref}' in {args.project_full_path}"
+        )
 
         filters = []
         if args.severity:
