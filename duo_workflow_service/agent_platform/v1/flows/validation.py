@@ -41,12 +41,15 @@ from ai_gateway.prompts.base import Prompt
 from ai_gateway.response_schemas.registry import ResponseSchemaRegistry
 from duo_workflow_service.agent_platform.v1.flows.base import Flow
 from duo_workflow_service.agent_platform.v1.flows.flow_config import FlowConfig
+from duo_workflow_service.client_capabilities import MIN_CAPABILITIES_VERSION
 from duo_workflow_service.components.tools_registry import (
     _AGENT_PRIVILEGES,
+    _CAPABILITY_DEPENDENT_TOOLS,
     ToolMetadata,
     ToolsRegistry,
 )
 from duo_workflow_service.executor.outbox import Outbox
+from lib.context import client_capabilities, gitlab_version
 from lib.events import GLReportingEventContext
 from lib.internal_events.client import InternalEventsClient
 
@@ -129,6 +132,16 @@ def _make_validation_tools_registry() -> ToolsRegistry:
     """Build a real ``ToolsRegistry`` suitable for dry-run flow validation.
 
     All agent privileges are granted so every named tool resolves correctly.
+    All client capabilities are enabled so that capability-dependent tools
+    are registered.
+
+    Note:
+        This validates that configs compile when *all* capabilities are present.
+        It does **not** test backward compatibility for older clients that lack
+        certain capabilities. A config that relies on a capability-dependent
+        tool will pass validation here even though it would fail at runtime on
+        an instance that does not advertise the required capability.
+
     ``ToolMetadata`` fields that require live infrastructure (gitlab client,
     project) are ``None`` — tool instances store but never access them until
     ``_arun`` / ``_execute`` is called.
@@ -142,14 +155,30 @@ def _make_validation_tools_registry() -> ToolsRegistry:
         gitlab_host="",
         project=None,
     )
-    all_privileges = list(_AGENT_PRIVILEGES.keys())
-    return ToolsRegistry(
-        enabled_tools=all_privileges,
-        preapproved_tools=all_privileges,
-        tool_call_approvals={},
-        tool_metadata=stub_metadata,
-        mcp_tools=[],
-    )
+
+    # Enable every capability so the registry includes all tool variants.
+    # Without this, capability-gated tools are omitted and configs that rely
+    # on their parameter schemas fail validation.
+    all_capabilities: set[str] = set()
+    for tool_cls in _CAPABILITY_DEPENDENT_TOOLS:
+        caps: frozenset[str] = getattr(tool_cls, "required_capability", frozenset())
+        all_capabilities.update(caps)
+
+    # Temporarily set context vars so ToolsRegistry registers all tools.
+    version_token = gitlab_version.set(str(MIN_CAPABILITIES_VERSION))
+    caps_token = client_capabilities.set(all_capabilities)
+    try:
+        all_privileges = list(_AGENT_PRIVILEGES.keys())
+        return ToolsRegistry(
+            enabled_tools=all_privileges,
+            preapproved_tools=all_privileges,
+            tool_call_approvals={},
+            tool_metadata=stub_metadata,
+            mcp_tools=[],
+        )
+    finally:
+        gitlab_version.reset(version_token)
+        client_capabilities.reset(caps_token)
 
 
 class DryRunFlowValidator(Flow):
