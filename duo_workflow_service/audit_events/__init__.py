@@ -1,3 +1,4 @@
+from duo_workflow_service.audit_events.callback_handler import AuditEventCallbackHandler
 from duo_workflow_service.audit_events.client import AuditEventClient
 from duo_workflow_service.audit_events.collector import AuditEventCollector
 from duo_workflow_service.audit_events.context import (
@@ -22,6 +23,7 @@ from duo_workflow_service.audit_events.event_types import (
 
 __all__ = [
     "AuditEvent",
+    "AuditEventCallbackHandler",
     "AuditEventClient",
     "AuditEventCollector",
     "AuditEventType",
