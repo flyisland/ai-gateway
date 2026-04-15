@@ -19,53 +19,57 @@ PIPELINE_FINDINGS_JSON = """
   "data": {
     "project": {
       "id": "gid://gitlab/Project/26",
-      "pipeline": {
-        "id": "gid://gitlab/Ci::Pipeline/3886",
-        "iid": "273",
-        "sha": "b791334f7a9e72ba8796002c1ef7573d50c17676",
-        "ref": "security/sast-fix-773-173",
-        "status": "SUCCESS",
-        "securityReportFindings": {
-          "nodes": [
-            {
-              "uuid": "1e9a2bf7-0450-5894-8db5-895c98e39deb",
-              "title": "OS Command Injection",
-              "severity": "HIGH",
-              "state": "DETECTED",
-              "reportType": "SAST",
-              "falsePositive": false,
-              "aiResolutionAvailable": true,
-              "location": { "file": "pkg/admin/admin.go" },
-              "vulnerability": null
-            },
-            {
-              "uuid": "6ce00f15-dc81-5d6b-8482-cf24b4dd91e6",
-              "title": "Path Traversal",
-              "severity": "HIGH",
-              "state": "DISMISSED",
-              "reportType": "SAST",
-              "falsePositive": true,
-              "aiResolutionAvailable": true,
-              "location": { "file": "pkg/image/imageUploader.go" },
-              "vulnerability": { "id": "gid://gitlab/Vulnerability/123" }
-            },
-            {
-              "uuid": "e25ae55f-4239-5929-a777-4e429dfc4acd",
-              "title": "Improper handling of highly compressed data",
-              "severity": "MEDIUM",
-              "state": "DETECTED",
-              "reportType": "SAST",
-              "falsePositive": false,
-              "aiResolutionAvailable": false,
-              "location": { "file": "pkg/image/imageUploader.go" },
-              "vulnerability": null
+      "pipelines": {
+        "nodes": [
+          {
+            "id": "gid://gitlab/Ci::Pipeline/3886",
+            "iid": "273",
+            "sha": "b791334f7a9e72ba8796002c1ef7573d50c17676",
+            "ref": "security/sast-fix-773-173",
+            "status": "SUCCESS",
+            "securityReportFindings": {
+              "nodes": [
+                {
+                  "uuid": "1e9a2bf7-0450-5894-8db5-895c98e39deb",
+                  "title": "OS Command Injection",
+                  "severity": "HIGH",
+                  "state": "DETECTED",
+                  "reportType": "SAST",
+                  "falsePositive": false,
+                  "aiResolutionAvailable": true,
+                  "location": { "file": "pkg/admin/admin.go" },
+                  "vulnerability": null
+                },
+                {
+                  "uuid": "6ce00f15-dc81-5d6b-8482-cf24b4dd91e6",
+                  "title": "Path Traversal",
+                  "severity": "HIGH",
+                  "state": "DISMISSED",
+                  "reportType": "SAST",
+                  "falsePositive": true,
+                  "aiResolutionAvailable": true,
+                  "location": { "file": "pkg/image/imageUploader.go" },
+                  "vulnerability": { "id": "gid://gitlab/Vulnerability/123" }
+                },
+                {
+                  "uuid": "e25ae55f-4239-5929-a777-4e429dfc4acd",
+                  "title": "Improper handling of highly compressed data",
+                  "severity": "MEDIUM",
+                  "state": "DETECTED",
+                  "reportType": "SAST",
+                  "falsePositive": false,
+                  "aiResolutionAvailable": false,
+                  "location": { "file": "pkg/image/imageUploader.go" },
+                  "vulnerability": null
+                }
+              ],
+              "pageInfo": {
+                "hasNextPage": false,
+                "endCursor": "OA"
+              }
             }
-          ],
-          "pageInfo": {
-            "hasNextPage": false,
-            "endCursor": "OA"
           }
-        }
+        ]
       }
     }
   }
@@ -104,15 +108,15 @@ class TestListSecurityFindings:
             return_value=pipeline_findings_response_data
         )
         tool = ListSecurityFindings(metadata=metadata)
-        input_data = {
-            "project_full_path": "gitlab-duo/myproject",
-            "pipeline_id": "273",
-        }
-        response_str = await tool.arun(input_data)
+        response_str = await tool.arun(
+            {
+                "project_full_path": "gitlab-duo/myproject",
+                "ref": "security/sast-fix-773-173",
+            }
+        )
         response = json.loads(response_str)
 
         assert "error" not in response
-        assert "findings" in response
         assert len(response["findings"]) == 3
         assert response["pipeline"]["iid"] == "273"
 
@@ -129,7 +133,7 @@ class TestListSecurityFindings:
         gitlab_client_mock.apost.assert_called_once()
         call_body = json.loads(gitlab_client_mock.apost.call_args[1]["body"])
         assert call_body["variables"]["fullPath"] == "gitlab-duo/myproject"
-        assert call_body["variables"]["pipelineId"] == "273"
+        assert call_body["variables"]["ref"] == "security/sast-fix-773-173"
 
     async def test_arun_with_filters(
         self, gitlab_client_mock, metadata, pipeline_findings_response_data
@@ -142,17 +146,21 @@ class TestListSecurityFindings:
         await tool.arun(
             {
                 "project_full_path": "gitlab-duo/myproject",
-                "pipeline_id": "273",
+                "ref": "security/sast-fix-773-173",
                 "severity": [SecurityFindingSeverity.HIGH],
                 "report_type": [SecurityFindingReportType.SAST],
             }
         )
-
-        gitlab_client_mock.apost.assert_called_once()
         call_body = json.loads(gitlab_client_mock.apost.call_args[1]["body"])
         variables = call_body["variables"]
         assert variables["severity"] == ["HIGH"]
         assert variables["reportType"] == ["SAST"]
+        query = call_body["query"]
+        assert "location {" in query
+        assert "... on VulnerabilityLocationSast {" in query
+        assert "... on VulnerabilityLocationSecretDetection {" in query
+        assert "... on VulnerabilityLocationDependencyScanning {" in query
+        assert "... on VulnerabilityLocationContainerScanning {" in query
 
     async def test_arun_include_dismissed_false(
         self, gitlab_client_mock, metadata, pipeline_findings_response_data
@@ -165,12 +173,10 @@ class TestListSecurityFindings:
         await tool.arun(
             {
                 "project_full_path": "gitlab-duo/myproject",
-                "pipeline_id": "273",
+                "ref": "security/sast-fix-773-173",
                 "include_dismissed": False,
             }
         )
-
-        gitlab_client_mock.apost.assert_called_once()
         call_body = json.loads(gitlab_client_mock.apost.call_args[1]["body"])
         variables = call_body["variables"]
         assert "state" in variables
@@ -179,27 +185,35 @@ class TestListSecurityFindings:
     async def test_arun_pagination(self, gitlab_client_mock, metadata):
         """Test that the tool correctly handles pagination."""
         page1_data = json.loads(PIPELINE_FINDINGS_JSON)
-        page1_data["data"]["project"]["pipeline"]["securityReportFindings"]["nodes"] = (
-            page1_data["data"]["project"]["pipeline"]["securityReportFindings"][
-                "nodes"
-            ][:1]
-        )
-        page1_data["data"]["project"]["pipeline"]["securityReportFindings"][
-            "pageInfo"
-        ] = {
+        page1_data["data"]["project"]["pipelines"]["nodes"][0][
+            "securityReportFindings"
+        ]["nodes"] = page1_data["data"]["project"]["pipelines"]["nodes"][0][
+            "securityReportFindings"
+        ][
+            "nodes"
+        ][
+            :1
+        ]
+        page1_data["data"]["project"]["pipelines"]["nodes"][0][
+            "securityReportFindings"
+        ]["pageInfo"] = {
             "hasNextPage": True,
             "endCursor": "cursor123",
         }
 
         page2_data = json.loads(PIPELINE_FINDINGS_JSON)
-        page2_data["data"]["project"]["pipeline"]["securityReportFindings"]["nodes"] = (
-            page2_data["data"]["project"]["pipeline"]["securityReportFindings"][
-                "nodes"
-            ][1:]
-        )
-        page2_data["data"]["project"]["pipeline"]["securityReportFindings"][
-            "pageInfo"
-        ] = {
+        page2_data["data"]["project"]["pipelines"]["nodes"][0][
+            "securityReportFindings"
+        ]["nodes"] = page2_data["data"]["project"]["pipelines"]["nodes"][0][
+            "securityReportFindings"
+        ][
+            "nodes"
+        ][
+            1:
+        ]
+        page2_data["data"]["project"]["pipelines"]["nodes"][0][
+            "securityReportFindings"
+        ]["pageInfo"] = {
             "hasNextPage": False,
             "endCursor": None,
         }
@@ -209,15 +223,13 @@ class TestListSecurityFindings:
         response_str = await tool.arun(
             {
                 "project_full_path": "gitlab-duo/myproject",
-                "pipeline_id": "273",
+                "ref": "security/sast-fix-773-173",
                 "fetch_all_pages": True,
             }
         )
-
         response = json.loads(response_str)
         assert len(response["findings"]) == 3
         assert gitlab_client_mock.apost.call_count == 2
-
         second_call_body = json.loads(
             gitlab_client_mock.apost.call_args_list[1][1]["body"]
         )
@@ -228,32 +240,44 @@ class TestListSecurityFindings:
         gitlab_client_mock.apost = AsyncMock(return_value={"data": {"project": None}})
         tool = ListSecurityFindings(metadata=metadata)
         with pytest.raises(ToolException) as exc_info:
-            await tool._arun(project_full_path="non/existent", pipeline_id="273")
+            await tool._arun(
+                project_full_path="non/existent",
+                ref="some-branch",
+            )
         assert "Project not found or access denied" in str(exc_info.value)
 
-    async def test_arun_pipeline_not_found(self, gitlab_client_mock, metadata):
-        """Test error handling when the pipeline is not found raises ToolException."""
+    async def test_arun_no_pipeline_for_ref(self, gitlab_client_mock, metadata):
+        """Test error handling when no pipeline is found for the given ref."""
         gitlab_client_mock.apost = AsyncMock(
-            return_value={"data": {"project": {"pipeline": None}}}
+            return_value={
+                "data": {
+                    "project": {
+                        "id": "gid://gitlab/Project/26",
+                        "pipelines": {"nodes": []},
+                    }
+                }
+            }
         )
         tool = ListSecurityFindings(metadata=metadata)
         with pytest.raises(ToolException) as exc_info:
             await tool._arun(
-                project_full_path="gitlab-duo/myproject", pipeline_id="999"
+                project_full_path="gitlab-duo/myproject",
+                ref="nonexistent-branch",
             )
-        assert "Pipeline not found" in str(exc_info.value)
+        assert "No pipeline found for ref" in str(exc_info.value)
 
     async def test_arun_graphql_errors(self, gitlab_client_mock, metadata):
         """Test handling of GraphQL errors in response raises ToolException."""
-        mock_response = {
-            "errors": [{"message": "Field 'securityReportFindings' doesn't exist"}]
-        }
-        gitlab_client_mock.apost = AsyncMock(return_value=mock_response)
+        gitlab_client_mock.apost = AsyncMock(
+            return_value={
+                "errors": [{"message": "Field 'securityReportFindings' doesn't exist"}]
+            }
+        )
         tool = ListSecurityFindings(metadata=metadata)
         with pytest.raises(ToolException) as exc_info:
             await tool._arun(
                 project_full_path="gitlab-duo/myproject",
-                pipeline_id="123",
+                ref="security/sast-fix-773-173",
             )
         assert "GraphQL errors" in str(exc_info.value)
 
@@ -261,47 +285,19 @@ class TestListSecurityFindings:
         """Test handling of generic exceptions."""
         gitlab_client_mock.apost.side_effect = Exception("Network Error")
         tool = ListSecurityFindings(metadata=metadata)
-
         with pytest.raises(ToolException) as exc_info:
             await tool.arun(
                 {
                     "project_full_path": "gitlab-duo/myproject",
-                    "uuid": "some-uuid",
-                    "pipeline_id": "123",
+                    "ref": "security/sast-fix-773-173",
                 }
             )
         assert "Failed to list security findings: Network Error" in str(exc_info.value)
-
-    async def test_format_display_message(self):
-        """Test the user-friendly display message formatting."""
-        tool = ListSecurityFindings(metadata={})
-
-        args_no_filters = ListSecurityFindingsInput(
-            project_full_path="group/project", pipeline_id="123"
-        )
-        msg_no_filters = tool.format_display_message(args_no_filters)
-        assert (
-            msg_no_filters
-            == "List security findings from pipeline 123 in group/project"
-        )
-
-        args_with_filters = ListSecurityFindingsInput(
-            project_full_path="group/project",
-            pipeline_id="123",
-            severity=[SecurityFindingSeverity.CRITICAL, SecurityFindingSeverity.HIGH],
-            report_type=[SecurityFindingReportType.SAST],
-            state=[SecurityFindingState.DETECTED],
-        )
-        msg_with_filters = tool.format_display_message(args_with_filters)
-        assert "severity: CRITICAL, HIGH" in msg_with_filters
-        assert "type: SAST" in msg_with_filters
-        assert "state: DETECTED" in msg_with_filters
 
     async def test_arun_with_gitlab_http_response(
         self, gitlab_client_mock, metadata, pipeline_findings_response_data
     ):
         """Test that the tool correctly handles GitLabHttpResponse objects."""
-        # Create a GitLabHttpResponse object wrapping the response data
         http_response = GitLabHttpResponse(
             status_code=200,
             body=pipeline_findings_response_data,
@@ -309,15 +305,14 @@ class TestListSecurityFindings:
         )
         gitlab_client_mock.apost = AsyncMock(return_value=http_response)
         tool = ListSecurityFindings(metadata=metadata)
-        input_data = {
-            "project_full_path": "gitlab-duo/myproject",
-            "pipeline_id": "273",
-        }
-        response_str = await tool.arun(input_data)
+        response_str = await tool.arun(
+            {
+                "project_full_path": "gitlab-duo/myproject",
+                "ref": "security/sast-fix-773-173",
+            }
+        )
         response = json.loads(response_str)
-
         assert "error" not in response
-        assert "findings" in response
         assert len(response["findings"]) == 3
         assert response["pipeline"]["iid"] == "273"
 
@@ -325,12 +320,11 @@ class TestListSecurityFindings:
         self, gitlab_client_mock, metadata
     ):
         """Test handling of GraphQL errors in GitLabHttpResponse raises ToolException."""
-        mock_response_data = {
-            "errors": [{"message": "Field 'securityReportFindings' doesn't exist"}]
-        }
         http_response = GitLabHttpResponse(
             status_code=200,
-            body=mock_response_data,
+            body={
+                "errors": [{"message": "Field 'securityReportFindings' doesn't exist"}]
+            },
             headers={"content-type": "application/json"},
         )
         gitlab_client_mock.apost = AsyncMock(return_value=http_response)
@@ -339,6 +333,32 @@ class TestListSecurityFindings:
             await tool.arun(
                 {
                     "project_full_path": "gitlab-duo/myproject",
-                    "pipeline_id": "123",
+                    "pipeline_id": "gid://gitlab/Ci::Pipeline/3886",
+                    "ref": "security/sast-fix-773-173",
                 }
             )
+
+    async def test_format_display_message(self):
+        """Test the user-friendly display message formatting."""
+        tool = ListSecurityFindings(metadata={})
+
+        args_no_filters = ListSecurityFindingsInput(
+            project_full_path="group/project",
+            ref="main",
+        )
+        assert (
+            tool.format_display_message(args_no_filters)
+            == "List security findings for ref 'main' in group/project"
+        )
+
+        args_with_filters = ListSecurityFindingsInput(
+            project_full_path="group/project",
+            ref="main",
+            severity=[SecurityFindingSeverity.CRITICAL, SecurityFindingSeverity.HIGH],
+            report_type=[SecurityFindingReportType.SAST],
+            state=[SecurityFindingState.DETECTED],
+        )
+        msg = tool.format_display_message(args_with_filters)
+        assert "severity: CRITICAL, HIGH" in msg
+        assert "type: SAST" in msg
+        assert "state: DETECTED" in msg
