@@ -1,6 +1,7 @@
 import json
 from typing import Any, Type
 
+from langchain_core.tools import ToolException
 from packaging.version import InvalidVersion, Version
 from pydantic import BaseModel, Field
 
@@ -93,11 +94,9 @@ class RunGLQLQuery(DuoBaseTool):
             gl_version = version_18_5
 
         if gl_version < version_18_6:
-            return json.dumps(
-                {
-                    "error": "GLQL API is only available in GitLab 18.6 and later. "
-                    f"Current GitLab version: {gitlab_version.get() or 'unknown'}"
-                }
+            raise ToolException(
+                "GLQL API is only available in GitLab 18.6 and later. "
+                f"Current GitLab version: {gitlab_version.get() or 'unknown'}"
             )
 
         request_body = {"glql_yaml": glql_yaml}

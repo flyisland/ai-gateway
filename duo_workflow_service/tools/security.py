@@ -644,7 +644,7 @@ class LinkVulnerabilityToMergeRequest(DuoBaseTool):
             gl_version = version_18_2
 
         if gl_version < version_18_5:
-            return json.dumps({"error": "This tool is not available"})
+            raise ToolException("This tool is not available")
 
         vulnerability_id = str(kwargs.pop("vulnerability_id"))
         merge_request_id = str(kwargs.pop("merge_request_id"))

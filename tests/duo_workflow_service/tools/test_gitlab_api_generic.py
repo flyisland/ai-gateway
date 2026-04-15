@@ -104,10 +104,9 @@ class TestGitLabApiGet:
     @pytest.mark.asyncio
     async def test_get_error_no_endpoint(self, gitlab_api_get_tool):
         """Test error when endpoint is not provided."""
-        result = await gitlab_api_get_tool._execute()
-        result_json = json.loads(result)
-        assert "error" in result_json
-        assert "The 'endpoint' parameter must be provided" in result_json["error"]
+        with pytest.raises(ToolException) as exc_info:
+            await gitlab_api_get_tool._execute()
+        assert "The 'endpoint' parameter must be provided" in str(exc_info.value)
 
     @pytest.mark.asyncio
     @pytest.mark.parametrize(
@@ -438,12 +437,9 @@ class TestGitLabGraphQL:
             }
         }
         """
-        result = await gitlab_graphql_tool._execute(query=mutation)
-
-        # Verify
-        result_json = json.loads(result)
-        assert "error" in result_json
-        assert "mutations and subscriptions are not allowed" in result_json["error"]
+        with pytest.raises(ToolException) as exc_info:
+            await gitlab_graphql_tool._execute(query=mutation)
+        assert "mutations and subscriptions are not allowed" in str(exc_info.value)
 
     @pytest.mark.asyncio
     async def test_graphql_subscription_blocked(self, gitlab_graphql_tool):
@@ -458,12 +454,9 @@ class TestGitLabGraphQL:
             }
         }
         """
-        result = await gitlab_graphql_tool._execute(query=subscription)
-
-        # Verify
-        result_json = json.loads(result)
-        assert "error" in result_json
-        assert "mutations and subscriptions are not allowed" in result_json["error"]
+        with pytest.raises(ToolException) as exc_info:
+            await gitlab_graphql_tool._execute(query=subscription)
+        assert "mutations and subscriptions are not allowed" in str(exc_info.value)
 
     @pytest.mark.asyncio
     async def test_graphql_subscription_with_comments_blocked(
@@ -483,12 +476,9 @@ class TestGitLabGraphQL:
             }
         }
         """
-        result = await gitlab_graphql_tool._execute(query=subscription)
-
-        # Verify subscription is still detected
-        result_json = json.loads(result)
-        assert "error" in result_json
-        assert "mutations and subscriptions are not allowed" in result_json["error"]
+        with pytest.raises(ToolException) as exc_info:
+            await gitlab_graphql_tool._execute(query=subscription)
+        assert "mutations and subscriptions are not allowed" in str(exc_info.value)
 
     @pytest.mark.asyncio
     async def test_graphql_mutation_with_comment_blocked(self, gitlab_graphql_tool):
@@ -512,12 +502,9 @@ class TestGitLabGraphQL:
             }
         }
         """
-        result = await gitlab_graphql_tool._execute(query=mutation)
-
-        # Verify mutation is still detected
-        result_json = json.loads(result)
-        assert "error" in result_json
-        assert "mutations and subscriptions are not allowed" in result_json["error"]
+        with pytest.raises(ToolException) as exc_info:
+            await gitlab_graphql_tool._execute(query=mutation)
+        assert "mutations and subscriptions are not allowed" in str(exc_info.value)
 
     @pytest.mark.asyncio
     async def test_graphql_mutation_with_fragment_blocked(self, gitlab_graphql_tool):
@@ -545,12 +532,9 @@ class TestGitLabGraphQL:
             }
         }
         """
-        result = await gitlab_graphql_tool._execute(query=mutation)
-
-        # Verify mutation is still detected
-        result_json = json.loads(result)
-        assert "error" in result_json
-        assert "mutations and subscriptions are not allowed" in result_json["error"]
+        with pytest.raises(ToolException) as exc_info:
+            await gitlab_graphql_tool._execute(query=mutation)
+        assert "mutations and subscriptions are not allowed" in str(exc_info.value)
 
     @pytest.mark.parametrize(
         "exploit_query",
@@ -620,11 +604,9 @@ class TestGitLabGraphQL:
             "{ clientMutationId } }"
         )
         gitlab_client_mock.apost = AsyncMock()
-        result = await gitlab_graphql_tool._execute(query=exploit_query)
-
-        result_json = json.loads(result)
-        assert "error" in result_json
-        assert "mutations and subscriptions are not allowed" in result_json["error"]
+        with pytest.raises(ToolException) as exc_info:
+            await gitlab_graphql_tool._execute(query=exploit_query)
+        assert "mutations and subscriptions are not allowed" in str(exc_info.value)
         gitlab_client_mock.apost.assert_not_called()
 
     @pytest.mark.asyncio

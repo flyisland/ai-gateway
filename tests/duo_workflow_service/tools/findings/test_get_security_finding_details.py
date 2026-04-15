@@ -134,17 +134,17 @@ class TestGetSecurityFindingDetails:
         }
         gitlab_client_mock.apost = AsyncMock(return_value=mock_response)
         tool = GetSecurityFindingDetails(metadata=metadata)
-        response_str = await tool.arun(
-            {
-                "project_full_path": "gitlab-duo/myproject",
-                "uuid": "not-found-uuid",
-                "ref": "security/sast-fix-773-173",
-            }
-        )
-        error_response = json.loads(response_str)
-        assert "error" in error_response
-        assert "Security finding not found" in error_response["error"]
-        assert error_response["uuid"] == "not-found-uuid"
+        with pytest.raises(ToolException) as exc_info:
+            await tool.arun(
+                {
+                    "project_full_path": "gitlab-duo/myproject",
+                    "uuid": "not-found-uuid",
+                    "ref": "security/sast-fix-773-173",
+                }
+            )
+        assert "Security finding not found" in str(exc_info.value)
+        assert "not-found-uuid" in str(exc_info.value)
+        assert "security/sast-fix-773-173" in str(exc_info.value)
 
     async def test_arun_no_pipeline_for_ref(self, gitlab_client_mock, metadata):
         """Test case where no pipeline is found for the given ref."""
@@ -158,31 +158,29 @@ class TestGetSecurityFindingDetails:
         }
         gitlab_client_mock.apost = AsyncMock(return_value=mock_response)
         tool = GetSecurityFindingDetails(metadata=metadata)
-        response_str = await tool.arun(
-            {
-                "project_full_path": "gitlab-duo/myproject",
-                "uuid": "some-uuid",
-                "ref": "nonexistent-branch",
-            }
-        )
-        error_response = json.loads(response_str)
-        assert "error" in error_response
-        assert "No pipeline found for ref" in error_response["error"]
+        with pytest.raises(ToolException) as exc_info:
+            await tool.arun(
+                {
+                    "project_full_path": "gitlab-duo/myproject",
+                    "uuid": "some-uuid",
+                    "ref": "nonexistent-branch",
+                }
+            )
+        assert "No pipeline found for ref" in str(exc_info.value)
 
     async def test_arun_project_not_found(self, gitlab_client_mock, metadata):
         """Test case where the project is not found."""
         gitlab_client_mock.apost = AsyncMock(return_value={"data": {"project": None}})
         tool = GetSecurityFindingDetails(metadata=metadata)
-        response_str = await tool.arun(
-            {
-                "project_full_path": "gitlab-duo/nonexistent",
-                "uuid": "some-uuid",
-                "ref": "main",
-            }
-        )
-        error_response = json.loads(response_str)
-        assert "error" in error_response
-        assert "Project not found or access denied" in error_response["error"]
+        with pytest.raises(ToolException) as exc_info:
+            await tool.arun(
+                {
+                    "project_full_path": "gitlab-duo/nonexistent",
+                    "uuid": "some-uuid",
+                    "ref": "main",
+                }
+            )
+        assert "Project not found or access denied" in str(exc_info.value)
 
     async def test_arun_graphql_errors(self, gitlab_client_mock, metadata):
         """Test handling of GraphQL errors in response."""
@@ -192,16 +190,15 @@ class TestGetSecurityFindingDetails:
             }
         )
         tool = GetSecurityFindingDetails(metadata=metadata)
-        response_str = await tool.arun(
-            {
-                "project_full_path": "gitlab-duo/myproject",
-                "uuid": "some-uuid",
-                "ref": "main",
-            }
-        )
-        error_response = json.loads(response_str)
-        assert "error" in error_response
-        assert error_response["error"] == "GraphQL query failed"
+        with pytest.raises(ToolException) as exc_info:
+            await tool.arun(
+                {
+                    "project_full_path": "gitlab-duo/myproject",
+                    "uuid": "some-uuid",
+                    "ref": "main",
+                }
+            )
+        assert "GraphQL query failed" in str(exc_info.value)
 
     async def test_arun_exception(self, gitlab_client_mock, metadata):
         """Test handling of a generic exception during API call."""
@@ -241,6 +238,30 @@ class TestGetSecurityFindingDetails:
         response = json.loads(response_str)
         assert "error" not in response
         assert response["finding"]["uuid"] == "1e9a2bf7-0450-5894-8db5-895c98e39deb"
+
+    async def test_arun_with_gitlab_http_response_errors(
+        self, gitlab_client_mock, metadata
+    ):
+        """Test handling of GraphQL errors in GitLabHttpResponse."""
+        mock_response_data = {
+            "errors": [{"message": "Field 'securityReportFinding' doesn't exist"}]
+        }
+        http_response = GitLabHttpResponse(
+            status_code=200,
+            body=mock_response_data,
+            headers={"content-type": "application/json"},
+        )
+        gitlab_client_mock.apost = AsyncMock(return_value=http_response)
+        tool = GetSecurityFindingDetails(metadata=metadata)
+        with pytest.raises(ToolException) as exc_info:
+            await tool.arun(
+                {
+                    "project_full_path": "gitlab-duo/myproject",
+                    "uuid": "some-uuid",
+                    "ref": "main",
+                }
+            )
+        assert "GraphQL query failed" in str(exc_info.value)
 
 
 class TestFormatDisplayMessage:
