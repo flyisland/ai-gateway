@@ -3,7 +3,6 @@ import fnmatch
 import html
 import json
 import re
-import secrets
 from typing import Any, Dict, List, Optional, Type
 from urllib.parse import quote
 
@@ -425,10 +424,7 @@ class BuildReviewMergeRequestContext(DuoBaseTool):
         return output
 
     def _format_output(self, context: dict) -> str:
-        """Format output with unique delimiters and escaped user content."""
-
-        # Generate unpredictable boundary ID
-        boundary_id = secrets.token_hex(16)
+        """Format output with escaped user content."""
 
         # Escape user-controlled fields to prevent HTML/XML injection
         title = html.escape(context["mr_data"].get("title") or "")
@@ -446,13 +442,7 @@ class BuildReviewMergeRequestContext(DuoBaseTool):
 
         files_section = self._format_original_files(context.get("files_content", {}))
 
-        # Unique delimiters per request - unpredictable to attackers
-        delimiter_start = f"═══UNTRUSTED_CONTENT_START_{boundary_id}═══"
-        delimiter_end = f"═══UNTRUSTED_CONTENT_END_{boundary_id}═══"
-
-        content = f"""{delimiter_start}
-
-Here are the merge request details for you to review:
+        return f"""Here are the merge request details for you to review:
 
 <input>
 <mr_title>
@@ -470,11 +460,7 @@ Here are the merge request details for you to review:
 </git_diffs>
 
 {files_section}
-</input>
-
-{delimiter_end}"""
-
-        return f"BOUNDARY_ID:{boundary_id}\n\n{content}"
+</input>"""
 
     def _format_custom_instructions(
         self, custom_instructions: List[Dict[str, Any]]
