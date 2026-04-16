@@ -129,6 +129,7 @@ LEGACY_MODEL_MAPPING = {
         "1.1.0-dev": "claude_sonnet_4_20250514",
         "1.1.0": "claude_sonnet_4_20250514",
         "1.2.0-dev": "gemini_2_5_flash_vertex",
+        "1.2.0": "claude_sonnet_4_6_vertex",
         "2.0.0": "claude_sonnet_4_20250514_vertex",
         "2.0.1": "claude_sonnet_4_20250514_vertex",
         "2.0.2-dev": "claude_sonnet_4_20250514_vertex",
@@ -180,7 +181,16 @@ LEGACY_MODEL_MAPPING = {
 }
 
 
+PROMPT_ID_TO_FEATURE_SETTING: dict[str, str] = {
+    "code_suggestions/completions": "code_completions",
+    "code_suggestions/generations": "code_generations",
+}
+
+
 def feature_setting_for_prompt_id(prompt_id: str) -> str:
+    if prompt_id in PROMPT_ID_TO_FEATURE_SETTING:
+        return PROMPT_ID_TO_FEATURE_SETTING[prompt_id]
+
     feature_setting = prompt_id.split("/", 1)[0]
 
     # the folder for chat in the definitions doesn't match the feature_setting name
