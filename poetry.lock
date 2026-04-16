@@ -6470,19 +6470,19 @@ reference = "litellm"
 
 [[package]]
 name = "pyroscope-io"
-version = "1.0.4"
+version = "1.0.5"
 description = "Pyroscope Python integration"
 optional = false
 python-versions = ">=3.10"
 groups = ["main"]
 files = [
-    {file = "pyroscope_io-1.0.4-cp310-abi3-macosx_11_0_arm64.whl", hash = "sha256:b161d729efc8b793fafe4c6cc0d9d449473dfbeb72919aa5de1a33fd37f28db6"},
-    {file = "pyroscope_io-1.0.4-cp310-abi3-macosx_11_0_x86_64.whl", hash = "sha256:5b9fa727bf934fce772abb245fb33451fb57b6ad646cb2826e2bff0d656f464f"},
-    {file = "pyroscope_io-1.0.4-cp310-abi3-manylinux2014_aarch64.manylinux_2_17_aarch64.whl", hash = "sha256:7d1defd792d582ab963cd1946c8853d5b30eda7b060bdf10ecc53e8a7395ec39"},
-    {file = "pyroscope_io-1.0.4-cp310-abi3-manylinux2014_x86_64.manylinux_2_17_x86_64.whl", hash = "sha256:62c4c6de74882ab37cb91e7f8d7af35749d6513c557e2857f9f443c463713d68"},
-    {file = "pyroscope_io-1.0.4-cp310-abi3-musllinux_1_2_aarch64.whl", hash = "sha256:a30a950bffbc58f6a7d40d543fa2856acffa850149882bd50858c5000dead1ba"},
-    {file = "pyroscope_io-1.0.4-cp310-abi3-musllinux_1_2_x86_64.whl", hash = "sha256:e0a689e0b872020a3490e4eb6166da9a393750206606a6bae13c1f6ae44ec0fd"},
-    {file = "pyroscope_io-1.0.4.tar.gz", hash = "sha256:b191ce8e2445e34591f250a23c1fa03e3b7a6ce0cf461fdf4f1a21bfd1c7da40"},
+    {file = "pyroscope_io-1.0.5-cp310-abi3-macosx_11_0_arm64.whl", hash = "sha256:a1887c5eef64cad2c87300ce0100395824a9fd713954ba43760e684910b2f187"},
+    {file = "pyroscope_io-1.0.5-cp310-abi3-macosx_11_0_x86_64.whl", hash = "sha256:91d72c282efc3625cd2be7e0e03a766b02a0cf178674f31bc1083a726e81fa39"},
+    {file = "pyroscope_io-1.0.5-cp310-abi3-manylinux2014_aarch64.manylinux_2_17_aarch64.whl", hash = "sha256:4bf5abd56fcfe62428ecea271d58af35996d79ec6933b833a72c49b5e1df9f93"},
+    {file = "pyroscope_io-1.0.5-cp310-abi3-manylinux2014_x86_64.manylinux_2_17_x86_64.whl", hash = "sha256:3d58bff22e94e864ad9c6444e22cb1a90a0b51fb3ba22534652f25d3aa136ae3"},
+    {file = "pyroscope_io-1.0.5-cp310-abi3-musllinux_1_2_aarch64.whl", hash = "sha256:a64b782c40967bc91d2d912eab7cb4bc3004bf6111286a1158ff79755e040ef0"},
+    {file = "pyroscope_io-1.0.5-cp310-abi3-musllinux_1_2_x86_64.whl", hash = "sha256:f0b202bcd3fa76457ddeeae7982ce019e9cac426d4f77c225f8bf2a6e9776f2a"},
+    {file = "pyroscope_io-1.0.5.tar.gz", hash = "sha256:f1059bbc6fa23b3a2b7bca80fcc7c67afa5bb7c1eba425f74b82fa81a82eef54"},
 ]
 
 [package.dependencies]
