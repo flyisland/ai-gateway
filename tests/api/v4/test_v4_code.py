@@ -84,7 +84,7 @@ class TestEditorContentCompletionStream:
 
         expected_model_metadata = {
             "engine": "agent",
-            "name": "Code Completions",
+            "name": "Codestral 22B Code Completions",
         }
 
         expected_feature_flags = {"flag_a", "flag_b"}
@@ -128,6 +128,11 @@ class TestEditorContentGenerationStream:
                 "code_suggestions/generations",
                 None,
                 "1.2.0-dev",
+            ),
+            (
+                "code_suggestions/generations",
+                None,
+                "1.2.0",
             ),
         ],
     )

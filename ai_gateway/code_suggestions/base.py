@@ -113,6 +113,10 @@ SAAS_PROMPT_MODEL_MAP = {
         "model_provider": ModelProvider.VERTEX_AI,
         "model_version": KindVertexTextModel.GEMINI_2_5_FLASH,
     },
+    "1.2.0": {
+        "model_provider": ModelProvider.VERTEX_AI,
+        "model_version": KindAnthropicModel.CLAUDE_SONNET_4_6_VERTEX,
+    },
     "3.0.2-dev": {
         "model_provider": ModelProvider.ANTHROPIC,
         "model_version": KindAnthropicModel.CLAUDE_SONNET_4_5,
