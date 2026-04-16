@@ -46,7 +46,7 @@ class TestAgentLogWriter:
         assert args.record["content"] == content
         assert args.record["correlation_id"] == correlation_id
         assert args.record["additional_context"] == additional_context
-        assert args.record["message_type"] == MessageTypeEnum.AGENT
+        assert args.record["message_type"] == MessageTypeEnum.REQUEST
         assert args.record["status"] is None
 
 
