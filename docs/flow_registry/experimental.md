@@ -157,15 +157,16 @@ needed to complete its task.
 #### Optional Parameters
 
 - **description**: Human-readable description of the agent's purpose and capabilities. **Required when the agent is
-  used as a sub-agent** (listed in another agent's `managed_agents`). The supervisor uses this description to help
+  used as a sub-agent** (listed in another agent's `subagents`). The supervisor uses this description to help
   the LLM decide when to delegate tasks to this agent.
 - **prompt_version**: Semantic version constraint (e.g., `"^1.0.0"`). If omitted or `null`, uses locally defined prompt
   from flow YAML.
 - **inputs**: List of input data sources (default: `["context:goal"]`)
 - **toolset**: List of tools available to the agent
-- **managed_agents**: List of sub-agent names this agent supervises. When provided, the agent runs in
+- **subagents**: List of subagent config dicts this agent supervises. When provided, the agent runs in
   [Supervisor Mode](#supervisor-mode) and gains access to `delegate_task` and `final_response_tool` automatically.
-  Every name must correspond to another `AgentComponent` with a `description` field in the same flow config.
+  Each entry is a dict that must contain a `"name"` key whose value corresponds to another `AgentComponent` with a
+  `description` field in the same flow config.
 - **max_delegations**: Maximum number of `delegate_task` calls allowed before the supervisor is forced to call
   `final_response_tool`. Must be ≥ 1 when set. When omitted (default), no delegation limit is enforced. Only
   applicable in Supervisor Mode.
@@ -181,11 +182,11 @@ AgentComponent can be used in three modes:
 1. **Standalone Mode**: Used as a regular component in the flow. The `description` field is optional.
 1. **Managed Mode**: Used as a sub-agent delegated to by a supervisor agent. In this mode:
    - The `description` field is **required**
-   - The component must be listed in the supervisor's `managed_agents`
+   - The component must be listed in the supervisor's `subagents`
    - The supervisor binds the agent to subsession-scoped conversation history
    - Output keys are dynamically resolved based on the active subsession
 1. **Supervisor Mode**: Orchestrates multiple specialised sub-agents via explicit delegation. Enabled by providing the
-   `managed_agents` parameter. See [Supervisor Mode](#supervisor-mode) below.
+   `subagents` parameter. See [Supervisor Mode](#supervisor-mode) below.
 
 #### Available Tools
 
@@ -389,7 +390,7 @@ components:
 
 #### Supervisor Mode
 
-When `managed_agents` is provided, the AgentComponent acts as a supervisor that orchestrates multiple specialized
+When `subagents` is provided, the AgentComponent acts as a supervisor that orchestrates multiple specialized
 sub-agents via explicit delegation. The supervisor runs a standard ReAct loop but has access to a `delegate_task` tool
 in addition to its regular tools. When the LLM calls `delegate_task`, the framework:
 
@@ -404,8 +405,8 @@ delegation result.
 
 ##### Supervisor Constraints
 
-- `managed_agents` must contain at least one name.
-- Every name in `managed_agents` must reference an `AgentComponent` with a `description` field defined in the same
+- `subagents` must contain at least one entry.
+- Every entry's `name` value in `subagents` must reference an `AgentComponent` with a `description` field defined in the same
   flow config.
 - An `AgentComponent` may be owned by at most one supervisor; the flow builder removes it from the top-level component
   list once claimed.
@@ -445,9 +446,9 @@ components:
     - name: "supervisor"
       type: AgentComponent
       prompt_id: "supervisor_agent"
-      managed_agents:
-          - "developer"
-          - "tester"
+      subagents:
+          - name: "developer"
+          - name: "tester"
       max_delegations: 20
       toolset:
           - "get_issue"
@@ -1112,9 +1113,9 @@ components:
       prompt_id: "supervisor_agent"
       prompt_version: "^1.0.0"
       inputs: [ "context:goal" ]
-      managed_agents:
-          - "developer"
-          - "tester"
+      subagents:
+          - name: "developer"
+          - name: "tester"
       max_delegations: 20
       toolset:
           - "get_issue"

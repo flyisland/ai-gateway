@@ -1,4 +1,4 @@
-from typing import Annotated, Any, ClassVar, Optional, Self
+from typing import Annotated, Any, ClassVar, Optional, Self, TypedDict
 
 from dependency_injector.wiring import inject
 from langchain_core.messages import AIMessage, BaseMessage
@@ -22,7 +22,7 @@ from duo_workflow_service.agent_platform.experimental.components.base import (
     RouterProtocol,
 )
 from duo_workflow_service.agent_platform.experimental.components.supervisor.delegate_task import (
-    ManagedAgentConfig,
+    SubagentDescriptor,
     build_delegate_task_model,
 )
 from duo_workflow_service.agent_platform.experimental.components.supervisor.ui_log import (
@@ -53,7 +53,63 @@ from duo_workflow_service.conversation.compaction import (
     create_conversation_compactor,
 )
 
-__all__ = ["SupervisorAgentComponent"]
+__all__ = ["SubagentConfig", "SupervisorAgentComponent", "extract_subagent_names"]
+
+
+class SubagentConfig(TypedDict):
+    """Descriptor for a subagent entry in the YAML flow configuration.
+
+    Represents a single entry in the ``subagents`` list of a
+    ``SupervisorAgentComponent`` config block.  Only ``name`` is required.
+    In case optional fields are introduced in the future, the ``NotRequired``
+    type qualifier can be applied to those fields.
+
+    Example YAML entry::
+
+        subagents:
+            - name: "developer"
+            - name: "tester"
+
+    Attributes:
+        name: The agent name.  Must match a component defined in the same
+            flow config.  **Required.**
+    """
+
+    name: str
+
+
+def extract_subagent_names(subagents: list[SubagentConfig]) -> list[str]:
+    """Extract agent names from a subagents list of configs.
+
+    Each entry in ``subagents`` is a :class:`SubagentConfig`
+    that must contain at least a ``"name"`` key.
+
+    Args:
+        subagents: List of :class:`SubagentConfig` entries from the YAML config.
+
+    Returns:
+        Ordered list of agent name strings.
+
+    Raises:
+        ValueError: If any entry is not a dict or is missing the ``"name"`` key,
+            or if any name appears more than once in the list.
+    """
+    names: list[str] = []
+    for entry in subagents:
+        if not isinstance(entry, dict) or "name" not in entry:
+            raise ValueError(
+                f"Each subagents entry must be a dict with a 'name' key, "
+                f"got: {entry!r}"
+            )
+        name = entry["name"]
+        if name in names:
+            raise ValueError(
+                f"Duplicate subagent name '{name}' found in subagents list. "
+                f"Each subagent name must be unique."
+            )
+        names.append(name)
+
+    return names
 
 
 class _SubagentRouter:
@@ -178,57 +234,62 @@ class SupervisorAgentComponent(AgentComponentBase):
 
     @model_validator(mode="before")
     @classmethod
-    def validate_and_consume_managed_agents(cls, data: Any) -> Any:
-        """Validate managed_agents, select subagents from the pool, and consume managed_agents.
+    def validate_and_consume_subagents(cls, data: Any) -> Any:
+        """Validate subagents, select subagents from the pool, and consume subagents.
 
-        The YAML config declares ``managed_agents: [...]`` as the human-facing
-        list of subagent names.  The factory passes the full pool of already-built
+        The YAML config declares ``subagents: [...]`` as the human-facing list of
+        :class:`SubagentConfig` entries.  Each entry must contain at least a
+        ``"name"`` key.  The factory passes the full pool of already-built
         components as ``subagent_components``.
 
+        Example YAML::
+
+            subagents:
+                - name: "developer"
+                - name: "tester"
+
         This validator centralises all subagent-selection logic.
-        It validates that ``managed_agents`` is non-empty, selects only the
-        named agents from the ``subagent_components`` pool (raising
-        ``ValueError`` for any missing name), validates that every selected
-        subagent exposes ``bind_to_supervisor``, replaces
-        ``subagent_components`` with the filtered dict, and removes
-        ``managed_agents`` so the runtime model uses
+        It validates that ``subagents`` is non-empty (raising ``ValueError`` for
+        an empty or absent list), extracts agent names from each
+        :class:`SubagentConfig` entry, selects only the named agents from the
+        ``subagent_components`` pool (raising ``ValueError`` for any missing
+        name), validates that every selected subagent exposes
+        ``bind_to_supervisor``, replaces ``subagent_components`` with the
+        filtered dict, and removes ``subagents`` so the runtime model uses
         ``subagent_components.keys()`` as the source of truth.
         """
         if isinstance(data, dict):
-            managed_agents = data.pop("managed_agents", None)
+            subagents: list[SubagentConfig] = data.pop("subagents", [])
             all_components = data.pop("subagent_components", {})
 
-            if managed_agents is None:
-                raise ValueError(
-                    "SupervisorAgentComponent requires managed_agents to be provided."
-                )
-
-            if not managed_agents:
+            if not subagents:
                 raise ValueError(
                     "SupervisorAgentComponent requires at least one managed agent."
                 )
 
             selected_components: dict[str, Any] = {}
-            for agent_name in managed_agents:
+            for agent_name in extract_subagent_names(subagents):
                 if agent_name not in all_components:
                     raise ValueError(
                         f"Managed agent '{agent_name}' not found in subagent_components. "
                         f"Available: {list(all_components.keys())}"
                     )
-                selected_components[agent_name] = all_components[agent_name]
 
-            # Replace the full pool with only the selected subagents
-            data["subagent_components"] = selected_components
+                component = all_components[agent_name]
 
-            for name, component in selected_components.items():
                 if not hasattr(component, "bind_to_supervisor") or not callable(
                     getattr(component, "bind_to_supervisor")
                 ):
                     raise ValueError(
-                        f"Managed agent '{name}' of type '{type(component).__name__}' "
+                        f"Managed agent '{agent_name}' of type '{type(component).__name__}' "
                         f"does not have a bind_to_supervisor method. "
                         f"Managed agents must have a bind_to_supervisor method."
                     )
+
+                selected_components[agent_name] = component
+
+            # Replace the full pool with only the selected subagents
+            data["subagent_components"] = selected_components
 
         return data
 
@@ -239,7 +300,7 @@ class SupervisorAgentComponent(AgentComponentBase):
             raise ValueError(
                 "SupervisorAgentComponent requires at least one subagent component."
             )
-        self._delegate_task_cls = build_delegate_task_model(self.managed_agents_config)
+        self._delegate_task_cls = build_delegate_task_model(self.subagents_config)
         return self
 
     @property
@@ -248,10 +309,10 @@ class SupervisorAgentComponent(AgentComponentBase):
         return list(self.subagent_components.keys())
 
     @property
-    def managed_agents_config(self) -> list[ManagedAgentConfig]:
+    def subagents_config(self) -> list[SubagentDescriptor]:
         """Derive name+description config for each managed subagent."""
         return [
-            ManagedAgentConfig(name=name, description=component.description)
+            SubagentDescriptor(name=name, description=component.description)
             for name, component in self.subagent_components.items()
         ]
 

@@ -4,10 +4,14 @@ from typing import ClassVar, Optional, Self, TypedDict
 from langchain_core.messages import AIMessage
 from pydantic import BaseModel, ConfigDict, Field, create_model
 
-__all__ = ["DelegateTask", "ManagedAgentConfig", "build_delegate_task_model"]
+__all__ = [
+    "DelegateTask",
+    "SubagentDescriptor",
+    "build_delegate_task_model",
+]
 
 
-class ManagedAgentConfig(TypedDict):
+class SubagentDescriptor(TypedDict):
     """Name and description of a managed subagent, used to build the delegate_task tool."""
 
     name: str
@@ -15,17 +19,17 @@ class ManagedAgentConfig(TypedDict):
 
 
 def build_delegate_task_model(
-    managed_agents_config: list[ManagedAgentConfig],
+    subagents: list[SubagentDescriptor],
 ) -> type["DelegateTask"]:
     """Build a DelegateTask Pydantic model with a dynamically generated SubagentEnum.
 
-    The SubagentEnum is generated from the managed_agents_config list, constraining
+    The SubagentEnum is generated from the subagents list, constraining
     the LLM at the tool-calling level to only valid subagent names.  Each enum
     member's description is embedded in the field description so the LLM knows
     what each subagent specialises in.
 
     Args:
-        managed_agents_config: List of dicts with ``name`` and ``description``
+        subagents: List of dicts with ``name`` and ``description``
             for each managed subagent.
 
     Returns:
@@ -33,12 +37,12 @@ def build_delegate_task_model(
         subagent_name.
     """
     subagent_enum = StrEnum(  # type: ignore[misc]
-        "SubagentEnum", {cfg["name"]: cfg["name"] for cfg in managed_agents_config}
+        "SubagentEnum", {cfg["name"]: cfg["name"] for cfg in subagents}
     )
 
     enum_values = [member.value for member in subagent_enum]
     agent_descriptions = "\n".join(
-        f"- {cfg['name']}: {cfg['description']}" for cfg in managed_agents_config
+        f"- {cfg['name']}: {cfg['description']}" for cfg in subagents
     )
 
     dynamic_model = create_model(
@@ -74,7 +78,7 @@ class DelegateTask(BaseModel):
         with any other tool calls in the same message.
 
     The actual model used at runtime is built dynamically by build_delegate_task_model() with a SubagentEnum generated
-    from the managed_agents list.
+    from the subagents list.
     """
 
     model_config = ConfigDict(title="delegate_task", frozen=True)
