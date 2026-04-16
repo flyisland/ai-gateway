@@ -14,8 +14,10 @@ Name your branch based on this context:
 <branch_handling_strategy>
 1. Fetch origin using the run_git_command tool
 2. Checkout a new branch using the run_git_command tool to track `origin/{{ ref }}`
-3. Push the new branch
-4. On failure: change the branch name and try to push again.
+3. Use `run_git_command` with command=`push` and args=`origin <branch-name>` to push the new branch to origin.
+   You MUST push even though there are no commits yet — the remote may reject the branch name.
+   {% include 'common/push_retry/1.0.0.jinja' %}
+4. If the push fails because the branch name is rejected by the remote, rename the branch and start again from step 2.
 5. Respond with the result
 </branch_handling_strategy>
 
