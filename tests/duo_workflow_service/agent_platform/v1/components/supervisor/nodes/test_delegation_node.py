@@ -8,11 +8,11 @@ from langchain_core.messages import AIMessage, HumanMessage, ToolMessage
 from duo_workflow_service.agent_platform.experimental.components.supervisor.delegate_task import (
     DelegateTask,
 )
-from duo_workflow_service.agent_platform.experimental.components.supervisor.nodes.delegation_node import (
+from duo_workflow_service.agent_platform.experimental.state import FlowStateKeys
+from duo_workflow_service.agent_platform.v1.components.supervisor.nodes.delegation_node import (
     DelegationFatalError,
     DelegationNode,
 )
-from duo_workflow_service.agent_platform.experimental.state import FlowStateKeys
 
 
 class TestDelegationNodeNewSession:

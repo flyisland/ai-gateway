@@ -25,11 +25,6 @@ from duo_workflow_service.agent_platform.experimental.components.supervisor.dele
     ManagedAgentConfig,
     build_delegate_task_model,
 )
-from duo_workflow_service.agent_platform.experimental.components.supervisor.nodes import (
-    SUBSESSION_KEY_SEPARATOR,
-    DelegationNode,
-    SubagentReturnNode,
-)
 from duo_workflow_service.agent_platform.experimental.components.supervisor.ui_log import (
     UILogEventsSupervisor,
 )
@@ -47,6 +42,11 @@ from duo_workflow_service.agent_platform.experimental.ui_log import (
 )
 from duo_workflow_service.agent_platform.utils.tool_event_tracker import (
     ToolEventTracker,
+)
+from duo_workflow_service.agent_platform.v1.components.supervisor.nodes import (
+    SUBSESSION_KEY_SEPARATOR,
+    DelegationNode,
+    SubagentReturnNode,
 )
 from duo_workflow_service.conversation.compaction import (
     CompactionConfig,

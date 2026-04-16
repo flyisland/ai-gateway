@@ -8,11 +8,11 @@ from langchain_core.messages import AIMessage, ToolMessage
 from duo_workflow_service.agent_platform.experimental.components.supervisor.delegate_task import (
     DelegateTask,
 )
-from duo_workflow_service.agent_platform.experimental.components.supervisor.nodes.subagent_return_node import (
-    SubagentReturnNode,
-)
 from duo_workflow_service.agent_platform.experimental.state import FlowStateKeys, IOKey
 from duo_workflow_service.agent_platform.experimental.state.base import RuntimeIOKey
+from duo_workflow_service.agent_platform.v1.components.supervisor.nodes.subagent_return_node import (
+    SubagentReturnNode,
+)
 
 
 @pytest.fixture(name="final_answer_runtime_key")
