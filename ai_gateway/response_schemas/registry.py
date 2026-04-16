@@ -4,10 +4,10 @@ from pathlib import Path
 from typing import NamedTuple, Type
 
 import structlog.stdlib
-from poetry.core.constraints.version import Version, parse_constraint
 
 from ai_gateway.response_schemas.base import BaseAgentOutput, BaseResponseSchemaRegistry
 from ai_gateway.response_schemas.converter import json_schema_to_pydantic
+from lib.version import resolve_version
 
 __all__ = ["ResponseSchemaRegistered", "ResponseSchemaRegistry"]
 
@@ -78,31 +78,5 @@ class ResponseSchemaRegistry(BaseResponseSchemaRegistry):
         schema_version: str,
     ) -> dict:
         """Resolves version constraint and return matching response_schemas."""
-
-        # Parse constraint according to poetry rules. See
-        # https://python-poetry.org/docs/dependency-specification/#version-constraints
-        constraint = parse_constraint(schema_version)
-        all_versions = [Version.parse(v) for v in versions.keys()]
-
-        # Only stable versions for non-exact constraints (e.g. ^1.0.0, ~1.0.0)
-        if not constraint.is_simple():
-            all_versions = [v for v in all_versions if v.is_stable()]
-
-        compatible = list(filter(constraint.allows, all_versions))
-
-        if not compatible:
-            log.error(
-                f"No compatible versions found for schema: {schema_version}",
-                versions=versions,
-                schema_version=schema_version,
-            )
-            raise ValueError(
-                f"No compatible versions found for schema: {schema_version}"
-            )
-
-        # Return highest compatible version
-        compatible.sort(reverse=True)
-        resolved = str(compatible[0])
-
-        log.info("Resolved version", requested=schema_version, resolved=resolved)
+        resolved = resolve_version(versions.keys(), schema_version)
         return versions[resolved]

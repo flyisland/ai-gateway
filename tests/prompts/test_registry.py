@@ -589,9 +589,7 @@ class TestLocalPromptRegistry:  # pylint: disable=too-many-public-methods
         with pytest.raises(ValueError) as exc_info:
             registry.get("test", "2.0.0")
 
-        assert (
-            str(exc_info.value) == "No prompt version found matching the query: 2.0.0"
-        )
+        assert "No version matching '2.0.0'" in str(exc_info.value)
 
     @pytest.mark.usefixtures("mock_fs")
     @pytest.mark.parametrize(

@@ -245,7 +245,7 @@ class TestResponseSchemaRegistry:
 
     def test_no_compatible_version_raises_error(self, registry: ResponseSchemaRegistry):
         """Test error when no version matches constraint."""
-        with pytest.raises(ValueError, match="No compatible versions found"):
+        with pytest.raises(ValueError, match="No version matching"):
             registry.get("general/structured_response", "2.0.0")
 
     def test_schema_caching(self, registry: ResponseSchemaRegistry):

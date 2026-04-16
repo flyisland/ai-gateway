@@ -284,11 +284,9 @@ class TestFlowConfig:
         assert config.version == "experimental"
 
     def test_flowconfig_from_yaml_config_file_not_found(self):
-        """Test loading YAML config raises FileNotFoundError for missing file."""
-        with pytest.raises(FileNotFoundError) as exc_info:
+        """Test loading YAML config raises ValueError for missing flow."""
+        with pytest.raises(ValueError, match="No version matching"):
             FlowConfig.from_yaml_config("nonexistent")
-
-        assert "nonexistent/1.0.0 file not found" in str(exc_info.value)
 
     def test_flowconfig_from_yaml_config_invalid_yaml(self, tmp_path):
         """Test loading invalid YAML raises YAMLError."""
@@ -344,7 +342,7 @@ class TestFlowConfig:
         symlink_yml.symlink_to(real_file)
 
         with patch.object(FlowConfig, "DIRECTORY_PATH", Path(tmp_path)):
-            with pytest.raises(ValueError, match="Symlinks are not allowed"):
+            with pytest.raises(ValueError, match="No version matching"):
                 FlowConfig.from_yaml_config("my_flow")
 
     @pytest.mark.parametrize(

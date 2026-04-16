@@ -11,6 +11,7 @@ from duo_workflow_service.agent_platform.v1.components import (
     BaseComponent,
     ComponentRegistry,
 )
+from lib.version import resolve_version
 
 __all__ = [
     "BaseFlowConfig",
@@ -107,13 +108,18 @@ class BaseFlowConfig(BaseModel):
 
         Args:
             flow_id: Flow name (e.g. "developer").
-            flow_version: Explicit version (e.g. "2.0.0"). None uses the default (1.0.0).
+            flow_version: Version constraint (e.g. "1.0.0", "^1.0.0"). None uses the default (1.0.0).
+                Supports the same constraint syntax as Poetry — see
+                https://python-poetry.org/docs/dependency-specification/#version-constraints
                 Path traversal is prevented by _safe_resolve.
         """
-        version = flow_version or DEFAULT_FLOW_VERSION
+        version_query = flow_version or DEFAULT_FLOW_VERSION
+        base_path = cls.DIRECTORY_PATH.resolve()
+        flow_dir = _safe_resolve(base_path / flow_id, base_path)
+        available = [f.stem for f in flow_dir.glob("*.yml") if not f.is_symlink()]
+        version = resolve_version(available, version_query)
         try:
-            base_path = cls.DIRECTORY_PATH.resolve()
-            yaml_path = _safe_resolve(base_path / flow_id / f"{version}.yml", base_path)
+            yaml_path = _safe_resolve(flow_dir / f"{version}.yml", base_path)
             with open(yaml_path, "r", encoding="utf-8") as file:
                 yaml_content = yaml.safe_load(file)
             return cls(**yaml_content)
