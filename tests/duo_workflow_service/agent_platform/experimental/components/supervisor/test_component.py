@@ -90,7 +90,7 @@ def _make_supervisor(
     mock_toolset,
     mock_prompt_registry,
     mock_internal_event_client,
-    managed_agent_names,
+    subagent_names,
     max_delegations,
     subagent_components,
     mock_schema_registry,
@@ -108,7 +108,7 @@ def _make_supervisor(
         toolset=mock_toolset,
         prompt_registry=mock_prompt_registry,
         internal_event_client=mock_internal_event_client,
-        managed_agents=managed_agent_names,
+        subagents=subagent_names,
         max_delegations=max_delegations,
         subagent_components=subagent_components,
         schema_registry=mock_schema_registry,
@@ -126,7 +126,7 @@ def make_supervisor_fixture(
     mock_toolset,
     mock_prompt_registry,
     mock_internal_event_client,
-    managed_agent_names,
+    subagent_names,
     max_delegations,
     mock_sub_agents,
     mock_schema_registry,
@@ -148,7 +148,7 @@ def make_supervisor_fixture(
             mock_toolset,
             mock_prompt_registry,
             mock_internal_event_client,
-            managed_agent_names,
+            subagent_names,
             max_delegations,
             subagent_components if subagent_components is not None else mock_sub_agents,
             mock_schema_registry,
@@ -228,7 +228,7 @@ class TestSupervisorAgentComponentInit:
     """Tests for SupervisorAgentComponent initialization."""
 
     @pytest.mark.parametrize(
-        ("managed_agents", "max_delegations", "subagent_components_key", "match"),
+        ("subagents_override", "max_delegations", "subagent_components_key", "match"),
         [
             ([], 5, "empty", "at least one managed agent"),
             (None, 0, None, "max_delegations must be at least 1"),
@@ -236,14 +236,35 @@ class TestSupervisorAgentComponentInit:
             (None, 5, "empty", "not found in subagent_components"),
             (None, 5, "missing_tester", "Managed agent 'tester' not found"),
             (None, 5, "wrong_type", "does not have a bind_to_supervisor method"),
+            (
+                [{"name": "developer"}, "tester"],
+                5,
+                None,
+                "must be a dict with a 'name' key",
+            ),
+            (
+                [{"role": "developer"}],
+                5,
+                None,
+                "must be a dict with a 'name' key",
+            ),
+            (
+                [{"name": "developer"}, {"name": "developer"}],
+                5,
+                None,
+                "Duplicate subagent name 'developer'",
+            ),
         ],
         ids=[
-            "empty_managed_agents",
+            "empty_subagents",
             "zero_max_delegations",
             "negative_max_delegations",
             "empty_subagent_components",
             "missing_subagent",
             "wrong_type_subagent",
+            "entry_is_plain_string",
+            "entry_dict_missing_name_key",
+            "duplicate_subagent_name",
         ],
     )
     def test_invalid_params_raise(
@@ -255,13 +276,13 @@ class TestSupervisorAgentComponentInit:
         mock_toolset,
         mock_prompt_registry,
         mock_internal_event_client,
-        managed_agent_names,
+        subagent_names,
         max_delegations,
         mock_sub_agents,
         mock_schema_registry,
         developer_name,
         tester_name,
-        managed_agents,
+        subagents_override,
         subagent_components_key,
         match,
     ):
@@ -292,13 +313,17 @@ class TestSupervisorAgentComponentInit:
                 mock_toolset,
                 mock_prompt_registry,
                 mock_internal_event_client,
-                managed_agents if managed_agents is not None else managed_agent_names,
+                (
+                    subagents_override
+                    if subagents_override is not None
+                    else subagent_names
+                ),
                 max_delegations,
                 subagent_components_by_key[subagent_components_key],
                 mock_schema_registry,
             )
 
-    def test_none_managed_agents_raises(
+    def test_none_subagents_raises(
         self,
         supervisor_name,
         flow_id,
@@ -311,8 +336,8 @@ class TestSupervisorAgentComponentInit:
         mock_sub_agents,
         mock_schema_registry,
     ):
-        """Test that passing managed_agents=None raises ValueError to prevent UnboundLocalError."""
-        with pytest.raises(ValueError, match="managed_agents to be provided"):
+        """Test that passing subagents=None raises ValueError."""
+        with pytest.raises(ValueError, match="at least one managed agent"):
             _make_supervisor(
                 supervisor_name,
                 flow_id,
@@ -321,7 +346,7 @@ class TestSupervisorAgentComponentInit:
                 mock_toolset,
                 mock_prompt_registry,
                 mock_internal_event_client,
-                None,  # managed_agents explicitly None
+                None,  # subagents explicitly None
                 max_delegations,
                 mock_sub_agents,
                 mock_schema_registry,
@@ -336,7 +361,7 @@ class TestSupervisorAgentComponentInit:
         mock_toolset,
         mock_prompt_registry,
         mock_internal_event_client,
-        managed_agent_names,
+        subagent_names,
         mock_sub_agents,
         mock_schema_registry,
     ):
@@ -349,7 +374,7 @@ class TestSupervisorAgentComponentInit:
             mock_toolset,
             mock_prompt_registry,
             mock_internal_event_client,
-            managed_agent_names,
+            subagent_names,
             max_delegations=None,
             subagent_components=mock_sub_agents,
             mock_schema_registry=mock_schema_registry,
@@ -610,7 +635,7 @@ class TestSupervisorExecutionFlow:
         mock_toolset,
         mock_prompt_registry,
         mock_internal_event_client,
-        managed_agent_names,
+        subagent_names,
         max_delegations,
         mock_schema_registry,
     ):
@@ -626,7 +651,7 @@ class TestSupervisorExecutionFlow:
             mock_toolset,
             mock_prompt_registry,
             mock_internal_event_client,
-            managed_agent_names,
+            subagent_names,
             max_delegations,
             mock_sub_agents,
             mock_schema_registry,
@@ -662,7 +687,7 @@ class TestSupervisorExecutionFlow:
         mock_toolset,
         mock_prompt_registry,
         mock_internal_event_client,
-        managed_agent_names,
+        subagent_names,
         max_delegations,
         mock_schema_registry,
     ):
@@ -678,7 +703,7 @@ class TestSupervisorExecutionFlow:
             mock_toolset,
             mock_prompt_registry,
             mock_internal_event_client,
-            managed_agent_names,
+            subagent_names,
             max_delegations,
             mock_sub_agents,
             mock_schema_registry,
@@ -819,7 +844,7 @@ class TestSupervisorExecutionFlow:
         mock_toolset,
         mock_prompt_registry,
         mock_internal_event_client,
-        managed_agent_names,
+        subagent_names,
         max_delegations,
         mock_sub_agents,
         mock_schema_registry,
@@ -836,7 +861,7 @@ class TestSupervisorExecutionFlow:
             mock_toolset,
             mock_prompt_registry,
             mock_internal_event_client,
-            managed_agent_names,
+            subagent_names,
             max_delegations,
             mock_sub_agents,
             mock_schema_registry,

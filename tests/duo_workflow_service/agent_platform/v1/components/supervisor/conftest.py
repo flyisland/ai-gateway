@@ -14,7 +14,7 @@ from duo_workflow_service.agent_platform.experimental.components.agent.nodes.age
 )
 from duo_workflow_service.agent_platform.experimental.components.supervisor.delegate_task import (
     DelegateTask,
-    ManagedAgentConfig,
+    SubagentDescriptor,
     build_delegate_task_model,
 )
 from duo_workflow_service.agent_platform.experimental.state import FlowStateKeys, IOKey
@@ -70,20 +70,24 @@ def tester_description_fixture():
     return "Writes and runs tests."
 
 
-@pytest.fixture(name="managed_agent_names")
-def managed_agent_names_fixture(developer_name, tester_name):
-    """Fixture for managed agent names list (plain strings, for tests that need just names)."""
-    return [developer_name, tester_name]
+@pytest.fixture(name="subagent_names")
+def subagent_names_fixture(developer_name, tester_name):
+    """Fixture for subagents list of dicts.
+
+    Each entry is a ``dict[str, str]`` with at least a ``"name"`` key,
+    matching the YAML config format accepted by SupervisorAgentComponent.
+    """
+    return [{"name": developer_name}, {"name": tester_name}]
 
 
-@pytest.fixture(name="managed_agents_config")
-def managed_agents_config_fixture(
+@pytest.fixture(name="subagent_descriptors")
+def subagent_descriptors_fixture(
     developer_name, developer_description, tester_name, tester_description
 ):
-    """Fixture for managed agent config list (name + description) passed to build_delegate_task_model."""
+    """Fixture for subagent descriptor list (name + description) passed to build_delegate_task_model."""
     return [
-        ManagedAgentConfig(name=developer_name, description=developer_description),
-        ManagedAgentConfig(name=tester_name, description=tester_description),
+        SubagentDescriptor(name=developer_name, description=developer_description),
+        SubagentDescriptor(name=tester_name, description=tester_description),
     ]
 
 
@@ -132,9 +136,9 @@ def ui_history_fixture():
 
 
 @pytest.fixture(name="delegate_task_cls")
-def delegate_task_cls_fixture(managed_agents_config):
+def delegate_task_cls_fixture(subagent_descriptors):
     """Fixture for dynamically built DelegateTask model."""
-    return build_delegate_task_model(managed_agents_config)
+    return build_delegate_task_model(subagent_descriptors)
 
 
 @pytest.fixture(name="delegate_tool_call_id")

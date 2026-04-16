@@ -17,6 +17,9 @@ from duo_workflow_service.agent_platform.experimental.components.base import (
     BaseComponent,
     EndComponent,
 )
+from duo_workflow_service.agent_platform.experimental.components.supervisor.component import (
+    extract_subagent_names,
+)
 from duo_workflow_service.agent_platform.experimental.flows.flow_config import (
     FlowConfig,
     load_component_class,
@@ -290,16 +293,23 @@ class Flow(AbstractWorkflow):
     ) -> bool:
         """Check if a component has dependencies that haven't been built yet.
 
-        A component has unresolved dependencies when it declares ``managed_agents``
+        A component has unresolved dependencies when it declares ``subagents``
         and at least one of those agents has not yet been built.  This applies to
         both ``SupervisorAgentComponent`` (explicit type) and ``AgentComponent``
-        configs that include ``managed_agents`` (resolved via the factory).
+        configs that include ``subagents`` (resolved via the factory).
         """
-        managed_agent_names = comp_config.get("managed_agents", [])
-        if not managed_agent_names:
+        subagents = comp_config.get("subagents", [])
+        if not subagents:
             return False
 
-        return any(name not in components for name in managed_agent_names)
+        try:
+            subagent_names = extract_subagent_names(subagents)
+        except ValueError as exc:
+            comp_name = comp_config.get("name", "<unknown>")
+            raise ValueError(
+                f"Component '{comp_name}' has a malformed subagents entry: {exc}"
+            ) from exc
+        return any(name not in components for name in subagent_names)
 
     def _instantiate_component(
         self,

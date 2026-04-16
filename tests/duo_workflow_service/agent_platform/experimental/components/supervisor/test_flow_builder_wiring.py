@@ -4,8 +4,13 @@
 
 from unittest.mock import Mock, patch
 
+import pytest
+
 from duo_workflow_service.agent_platform.experimental.components.base import (
     BaseComponent,
+)
+from duo_workflow_service.agent_platform.experimental.components.supervisor.component import (
+    extract_subagent_names,
 )
 from duo_workflow_service.agent_platform.experimental.flows.base import Flow
 from duo_workflow_service.agent_platform.experimental.flows.flow_config import (
@@ -41,7 +46,7 @@ class TestFlowBuilderSupervisorWiring:
                     "type": "AgentComponent",
                     "prompt_id": "supervisor_prompt",
                     "toolset": ["get_issue"],
-                    "managed_agents": ["developer"],
+                    "subagents": [{"name": "developer"}],
                     "max_delegations": 10,
                 },
             ],
@@ -58,6 +63,30 @@ class TestFlowBuilderSupervisorWiring:
         # After developer is built
         components["developer"] = Mock(spec=BaseComponent)
         assert not flow._has_unresolved_dependencies(config.components[1], components)
+
+    def test_has_unresolved_dependencies_raises_for_malformed_subagent_entry(self):
+        """Test that a malformed subagents entry raises ValueError with component name."""
+        config = FlowConfig(
+            version="experimental",
+            environment="remote",
+            components=[
+                {
+                    "name": "supervisor",
+                    "type": "AgentComponent",
+                    "prompt_id": "supervisor_prompt",
+                    "toolset": [],
+                    "subagents": ["developer"],  # plain string instead of dict
+                    "max_delegations": 10,
+                },
+            ],
+            routers=[{"from": "supervisor", "to": "end"}],
+            flow=FlowConfigMetadata(entry_point="supervisor"),
+        )
+
+        flow = self._make_flow(config)
+
+        with pytest.raises(ValueError, match="supervisor"):
+            flow._has_unresolved_dependencies(config.components[0], {})
 
     def test_has_unresolved_dependencies_false_for_regular_component(self):
         """Test that regular components are never deferred."""
@@ -149,7 +178,7 @@ class TestFlowBuilderSupervisorWiring:
                     "type": "AgentComponent",
                     "prompt_id": "prompt",
                     "toolset": [],
-                    "managed_agents": ["developer"],
+                    "subagents": [{"name": "developer"}],
                     "max_delegations": 5,
                 },
             ],
@@ -185,3 +214,38 @@ class TestFlowBuilderSupervisorWiring:
         assert "developer" not in existing_components
         # The supervisor itself must be present
         assert "supervisor" in existing_components
+
+
+class TestExtractSubagentNames:
+    """Unit tests for the extract_subagent_names helper."""
+
+    def test_returns_names_in_order(self):
+        """Valid entries return names in the original order."""
+        subagents = [{"name": "alpha"}, {"name": "beta"}, {"name": "gamma"}]
+        assert extract_subagent_names(subagents) == ["alpha", "beta", "gamma"]
+
+    def test_raises_for_plain_string_entry(self):
+        """A plain string entry raises ValueError."""
+        with pytest.raises(ValueError, match="must be a dict with a 'name' key"):
+            extract_subagent_names(["developer"])
+
+    def test_raises_for_dict_missing_name_key(self):
+        """A dict without a 'name' key raises ValueError."""
+        with pytest.raises(ValueError, match="must be a dict with a 'name' key"):
+            extract_subagent_names([{"role": "developer"}])
+
+    def test_raises_for_duplicate_name(self):
+        """Duplicate subagent names raise ValueError."""
+        subagents = [{"name": "developer"}, {"name": "tester"}, {"name": "developer"}]
+        with pytest.raises(ValueError, match="Duplicate subagent name 'developer'"):
+            extract_subagent_names(subagents)
+
+    def test_raises_for_duplicate_name_adjacent(self):
+        """Adjacent duplicate subagent names raise ValueError."""
+        subagents = [{"name": "developer"}, {"name": "developer"}]
+        with pytest.raises(ValueError, match="Duplicate subagent name 'developer'"):
+            extract_subagent_names(subagents)
+
+    def test_empty_list_returns_empty(self):
+        """An empty list returns an empty list without error."""
+        assert not extract_subagent_names([])

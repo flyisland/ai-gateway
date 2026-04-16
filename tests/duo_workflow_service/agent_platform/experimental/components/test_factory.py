@@ -43,7 +43,7 @@ class TestAgentComponentFactoryRegistry:
         assert "AgentComponent" in registry
 
     def test_supervisor_component_not_registered_under_own_name(self):
-        """SupervisorAgentComponent is not registered directly; use AgentComponent with managed_agents."""
+        """SupervisorAgentComponent is not registered directly; use AgentComponent with subagents."""
         registry = ComponentRegistry.instance()
         # pylint: disable-next=unsupported-membership-test
         assert "SupervisorAgentComponent" not in registry
@@ -80,7 +80,7 @@ class TestAgentComponentFactoryRegistry:
             user=user,
             prompt_id="supervisor_prompt",
             toolset=mock_toolset,
-            managed_agents=["developer"],
+            subagents=[{"name": "developer"}],
             max_delegations=5,
             _built_components=built_components,
             prompt_registry=mock_prompt_registry,
@@ -98,7 +98,7 @@ class TestAgentComponentFactoryRegistry:
 class TestAgentComponentFactoryDispatch:
     """Test suite verifying factory dispatch logic."""
 
-    def test_factory_creates_agent_component_without_managed_agents(
+    def test_factory_creates_agent_component_without_subagents(
         self,
         flow_id,
         flow_type,
@@ -108,7 +108,7 @@ class TestAgentComponentFactoryDispatch:
         mock_schema_registry,
         user,
     ):
-        """Factory returns AgentComponent when managed_agents is absent."""
+        """Factory returns AgentComponent when subagents is absent."""
         component = agent_component_factory(
             name="my_agent",
             flow_id=flow_id,
@@ -124,7 +124,7 @@ class TestAgentComponentFactoryDispatch:
         assert isinstance(component, _AgentComponentClass)
         assert not isinstance(component, _SupervisorAgentComponentClass)
 
-    def test_factory_creates_agent_component_with_empty_managed_agents(
+    def test_factory_creates_agent_component_with_empty_subagents(
         self,
         flow_id,
         flow_type,
@@ -134,7 +134,7 @@ class TestAgentComponentFactoryDispatch:
         mock_schema_registry,
         user,
     ):
-        """Factory returns AgentComponent when managed_agents is an empty list (falsy)."""
+        """Factory returns AgentComponent when subagents is an empty list (falsy)."""
         component = agent_component_factory(
             name="my_agent",
             flow_id=flow_id,
@@ -142,7 +142,7 @@ class TestAgentComponentFactoryDispatch:
             user=user,
             prompt_id="test_prompt",
             toolset=mock_toolset,
-            managed_agents=[],
+            subagents=[],
             prompt_registry=mock_prompt_registry,
             internal_event_client=mock_internal_event_client,
             schema_registry=mock_schema_registry,

@@ -3,12 +3,12 @@
 This module provides a factory that is registered in the ``ComponentRegistry``
 under the name ``"AgentComponent"``.  The factory transparently dispatches to
 either :class:`AgentComponent` or :class:`SupervisorAgentComponent` depending
-on whether the ``managed_agents`` keyword argument is present in the component
+on whether the ``subagents`` keyword argument is present in the component
 configuration.
 
 This allows flow authors to use a single ``type: AgentComponent`` declaration
 for both standalone agents and supervisor agents, reducing the perceived
-complexity of the framework.  When ``managed_agents`` is present and non-empty
+complexity of the framework.  When ``subagents`` is present and non-empty
 the factory creates a :class:`SupervisorAgentComponent`; otherwise it creates
 a plain :class:`AgentComponent`.
 
@@ -16,8 +16,8 @@ When creating a :class:`SupervisorAgentComponent`, the factory passes the
 shared ``_built_components`` dict (injected by the flow builder) as
 ``subagent_components``.  All subagent-selection and validation logic is
 centralised in
-:meth:`SupervisorAgentComponent.validate_and_consume_managed_agents`, which
-filters the pool to only the agents named in ``managed_agents``.
+:meth:`SupervisorAgentComponent.validate_and_consume_subagents`, which
+filters the pool to only the agents named in ``subagents``.
 
 The factory does **not** mutate ``_built_components`` — removing consumed
 subagents from the shared dict is the responsibility of the flow builder
@@ -52,13 +52,13 @@ __all__ = ["agent_component_factory"]
 def agent_component_factory(**kwargs: Any) -> AgentComponentBase:
     """Dispatch to AgentComponent or SupervisorAgentComponent.
 
-    Inspects the ``managed_agents`` keyword argument to decide which concrete
+    Inspects the ``subagents`` keyword argument to decide which concrete
     component class to instantiate:
 
-    - If ``managed_agents`` is present (and non-empty): SupervisorAgentComponent.
+    - If ``subagents`` is present (and non-empty): SupervisorAgentComponent.
         The factory passes the shared ``_built_components`` dict as
         ``subagent_components`` so that
-        :meth:`SupervisorAgentComponent.validate_and_consume_managed_agents`
+        :meth:`SupervisorAgentComponent.validate_and_consume_subagents`
         can select and validate the named subagents.  The dict is passed
         read-only — removing consumed subagents is the caller's responsibility.
     - Otherwise: plain AgentComponent.
@@ -71,7 +71,7 @@ def agent_component_factory(**kwargs: Any) -> AgentComponentBase:
     Args:
         **kwargs: Component constructor arguments as parsed from the flow YAML,
             plus ``_built_components`` injected by the flow builder.
-            The ``managed_agents`` key is the discriminator.
+            The ``subagents`` key is the discriminator.
 
     Returns:
         The created :class:`AgentComponentBase` instance (either
@@ -79,7 +79,7 @@ def agent_component_factory(**kwargs: Any) -> AgentComponentBase:
     """
     built_components: dict[str, BaseComponent] = kwargs.pop("_built_components", {})
 
-    if kwargs.get("managed_agents"):
+    if kwargs.get("subagents"):
         return SupervisorAgentComponent(subagent_components=built_components, **kwargs)
 
     return AgentComponent(**kwargs)
