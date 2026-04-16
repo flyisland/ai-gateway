@@ -2014,3 +2014,146 @@ class TestContextManagementTokenReduction:
             f"Context management should reduce input tokens: "
             f"with_cm={tokens_with_cm}, without_cm={tokens_without_cm}"
         )
+
+
+class TestBuildModelExtraHeaders:
+    """Tests for merging AIGW_CUSTOM_MODELS__EXTRA_HEADERS with YAML extra_headers."""
+
+    @pytest.fixture(name="capturing_model_factory")
+    def capturing_model_factory_fixture(self, model: FakeModel):
+        class CapturingFactory:
+            def __init__(self):
+                self.captured_kwargs: dict[str, Any] = {}
+
+            def __call__(self, **kwargs: Any) -> FakeModel:
+                self.captured_kwargs.update(kwargs)
+                return model
+
+        return CapturingFactory()
+
+    def test_custom_models_extra_headers_none(
+        self,
+        capturing_model_factory,
+        model_config,
+    ):
+        """When custom_models_extra_headers is None, no extra_headers should be set beyond what the model config
+        provides."""
+        Prompt._build_model(
+            Prompt,
+            model_factory=capturing_model_factory,
+            config=model_config,
+            model_metadata=None,
+            disable_streaming=False,
+            custom_models_extra_headers=None,
+        )
+
+        assert "extra_headers" not in capturing_model_factory.captured_kwargs
+
+    def test_custom_models_extra_headers_empty_dict(
+        self,
+        capturing_model_factory,
+        model_config,
+    ):
+        """When custom_models_extra_headers is an empty dict, it should be treated as falsy and no merging should
+        occur."""
+        Prompt._build_model(
+            Prompt,
+            model_factory=capturing_model_factory,
+            config=model_config,
+            model_metadata=None,
+            disable_streaming=False,
+            custom_models_extra_headers={},
+        )
+
+        assert "extra_headers" not in capturing_model_factory.captured_kwargs
+
+    def test_extra_headers_merged_env_and_yaml(
+        self,
+        capturing_model_factory,
+    ):
+        """When both env and YAML extra_headers are set, they should be merged with YAML values taking precedence over
+        env values."""
+        env_headers = {
+            "x-env-header": "env-value",
+            "x-shared-header": "env-shared-value",
+        }
+        config = ModelConfig(
+            params=ChatLiteLLMParams(
+                model="test_model",
+                extra_headers={
+                    "x-yaml-header": "yaml-value",
+                    "x-shared-header": "yaml-shared-value",
+                },
+            )
+        )
+
+        Prompt._build_model(
+            Prompt,
+            model_factory=capturing_model_factory,
+            config=config,
+            model_metadata=None,
+            disable_streaming=False,
+            custom_models_extra_headers=env_headers,
+        )
+
+        result_headers = capturing_model_factory.captured_kwargs["extra_headers"]
+        # Env-only header is preserved
+        assert result_headers["x-env-header"] == "env-value"
+        # YAML-only header is preserved
+        assert result_headers["x-yaml-header"] == "yaml-value"
+        # Shared key: YAML wins over env
+        assert result_headers["x-shared-header"] == "yaml-shared-value"
+
+    def test_extra_headers_env_only(
+        self,
+        capturing_model_factory,
+        model_config,
+    ):
+        """When only env extra_headers are set (no YAML), only env headers should appear."""
+        env_headers = {"x-env-header": "env-value"}
+
+        Prompt._build_model(
+            Prompt,
+            model_factory=capturing_model_factory,
+            config=model_config,
+            model_metadata=None,
+            disable_streaming=False,
+            custom_models_extra_headers=env_headers,
+        )
+
+        result_headers = capturing_model_factory.captured_kwargs["extra_headers"]
+        assert result_headers == {"x-env-header": "env-value"}
+
+    def test_warning_logged_when_yaml_overrides_env_headers(
+        self,
+        capturing_model_factory,
+    ):
+        """A warning should be logged when YAML extra_headers override keys from AIGW_CUSTOM_MODELS__EXTRA_HEADERS."""
+        env_headers = {
+            "x-env-only": "env-value",
+            "x-shared": "env-shared-value",
+        }
+        config = ModelConfig(
+            params=ChatLiteLLMParams(
+                model="test_model",
+                extra_headers={
+                    "x-yaml-only": "yaml-value",
+                    "x-shared": "yaml-shared-value",
+                },
+            )
+        )
+
+        with capture_logs() as cap_logs:
+            Prompt._build_model(
+                Prompt,
+                model_factory=capturing_model_factory,
+                config=config,
+                model_metadata=None,
+                disable_streaming=False,
+                custom_models_extra_headers=env_headers,
+            )
+
+        warning_logs = [l for l in cap_logs if l.get("log_level") == "warning"]
+        assert len(warning_logs) == 1
+        assert "overriding" in warning_logs[0]["event"].lower()
+        assert warning_logs[0]["overridden_keys"] == ["x-shared"]

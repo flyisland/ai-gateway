@@ -75,6 +75,7 @@ class ContainerPrompts(containers.DeclarativeContainer):
         model_limits=providers.Factory(ConfigModelLimits, config.model_engine_limits),
         custom_models_enabled=config.custom_models.enabled,
         disable_streaming=config.custom_models.disable_streaming,
+        custom_models_extra_headers=config.custom_models.extra_headers,
         bind_tools_cache=bind_tools_cache,
         duo_chat_max_tokens=config.duo_chat.max_tokens,
     )

@@ -740,6 +740,11 @@ class ChatLiteLLM(BaseChatModel):
 
         message_dicts, params = self._create_message_dicts(messages, stop)
         params = {**params, **kwargs}
+        if params.get("extra_headers"):
+            logger.debug(
+                "extra_headers being sent to LLM",
+                extra={"extra_header_names": list(params["extra_headers"].keys())},
+            )
         response = await self.acompletion_with_retry(
             messages=message_dicts, run_manager=run_manager, **params
         )

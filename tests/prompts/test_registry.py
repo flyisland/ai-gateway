@@ -1351,6 +1351,7 @@ class TestLocalPromptRegistry:  # pylint: disable=too-many-public-methods
             prompt_config,
             model_metadata,
             disable_streaming=registry.disable_streaming,
+            custom_models_extra_headers=registry.custom_models_extra_headers,
             tool_choice="auto",
             internal_event_client=registry.internal_event_client,
             extra_kwarg="value",
