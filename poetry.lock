@@ -2245,21 +2245,22 @@ reference = "litellm"
 
 [[package]]
 name = "google-cloud-discoveryengine"
-version = "0.13.11"
+version = "0.18.0"
 description = "Google Cloud Discoveryengine API client library"
 optional = false
-python-versions = ">=3.7"
+python-versions = ">=3.9"
 groups = ["main"]
 files = [
-    {file = "google_cloud_discoveryengine-0.13.11-py3-none-any.whl", hash = "sha256:0d0df371bf8c85a3ddf32048ee6b985da6da623cf66701c19d110426c0105f82"},
-    {file = "google_cloud_discoveryengine-0.13.11.tar.gz", hash = "sha256:0eb7298b163aaa4a281a389a625fa62d0b418682de788d19ed1f561f21ecac7a"},
+    {file = "google_cloud_discoveryengine-0.18.0-py3-none-any.whl", hash = "sha256:632585a880ba316382d9e795269689c65412e466135d07ceb097a619bf26230e"},
+    {file = "google_cloud_discoveryengine-0.18.0.tar.gz", hash = "sha256:fcd3dd1292c46b08c51fff70ea5278d2b0383ad096bc5a4e04b502e0e00dc257"},
 ]
 
 [package.dependencies]
-google-api-core = {version = ">=1.34.1,<2.0.dev0 || >=2.11.dev0,<3.0.0", extras = ["grpc"]}
+google-api-core = {version = ">=2.11.0,<3.0.0", extras = ["grpc"]}
 google-auth = ">=2.14.1,<2.24.0 || >2.24.0,<2.25.0 || >2.25.0,<3.0.0"
+grpcio = ">=1.33.2,<2.0.0"
 proto-plus = ">=1.22.3,<2.0.0"
-protobuf = ">=3.20.2,<4.21.0 || >4.21.0,<4.21.1 || >4.21.1,<4.21.2 || >4.21.2,<4.21.3 || >4.21.3,<4.21.4 || >4.21.4,<4.21.5 || >4.21.5,<7.0.0"
+protobuf = ">=4.25.8,<8.0.0"
 
 [package.source]
 type = "legacy"
@@ -10097,4 +10098,4 @@ reference = "litellm"
 [metadata]
 lock-version = "2.1"
 python-versions = ">=3.12.0,<3.13.0"
-content-hash = "74276d98b1431d2cdb2b0e0de84807c02f76a63e2320a9ec92862b6f36dfd071"
+content-hash = "0bfd4184daed11b5e1ffb6aaab3bbc563af090c76f4f47c49f8261f41c42e2a0"
