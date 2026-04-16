@@ -283,6 +283,7 @@ class Prompt(RunnableBinding[Any, BaseMessage]):
         model_metadata: Optional[TypeModelMetadata] = None,
         prompt_template_factory: Optional[TypePromptTemplateFactory] = None,
         disable_streaming: bool = False,
+        custom_models_extra_headers: Optional[dict[str, str]] = None,
         tools: Optional[List[BaseTool]] = None,
         tool_choice: Optional[str] = None,
         bind_tools_cache: Optional[BindToolsCacheProtocol] = None,
@@ -305,6 +306,7 @@ class Prompt(RunnableBinding[Any, BaseMessage]):
             model_metadata,
             disable_streaming,
             max_tokens_override,
+            custom_models_extra_headers,
         )
 
         if tools and isinstance(model, BaseChatModel):
@@ -427,6 +429,7 @@ class Prompt(RunnableBinding[Any, BaseMessage]):
         model_metadata: Optional[TypeModelMetadata],
         disable_streaming: bool,
         max_tokens_override: Optional[int] = None,
+        custom_models_extra_headers: Optional[dict[str, str]] = None,
     ) -> Model:
         # The params in the prompt file have higher precedence than the ones in the model definition
         llm_params = (
@@ -451,6 +454,7 @@ class Prompt(RunnableBinding[Any, BaseMessage]):
         # Precedence (highest wins): config.params > dynamic_params > llm_params
         # - llm_params: static params from models.yml
         # - dynamic_params: extracted from model identifier (e.g., custom_llm_provider)
+        # - AIGW_CUSTOM_MODELS__EXTRA_HEADERS: environment defaults for `extra_headers` (merged)
         # - config.params: prompt-specific configuration from YAML files
         model_factory_args = {
             "disable_streaming": disable_streaming,
@@ -463,6 +467,23 @@ class Prompt(RunnableBinding[Any, BaseMessage]):
 
         if max_tokens_override is not None:
             model_factory_args["max_tokens"] = max_tokens_override
+
+        # Merge extra_headers from env config (lowest precedence) with any from YAML
+        if custom_models_extra_headers:
+            yaml_headers = model_factory_args.get("extra_headers") or {}
+
+            # Warn when YAML headers override environment variable headers
+            overridden_keys = set(custom_models_extra_headers) & set(yaml_headers)
+            if overridden_keys:
+                log.warning(
+                    "YAML extra_headers overriding AIGW_CUSTOM_MODELS__EXTRA_HEADERS values",
+                    overridden_keys=sorted(overridden_keys),
+                )
+
+            model_factory_args["extra_headers"] = {
+                **custom_models_extra_headers,
+                **yaml_headers,
+            }
 
         return model_factory(**model_factory_args)
 

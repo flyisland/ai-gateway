@@ -202,6 +202,7 @@ class LocalPromptRegistry(BasePromptRegistry):
         model_limits: ConfigModelLimits,
         custom_models_enabled: bool,
         disable_streaming: bool = False,
+        custom_models_extra_headers: dict[str, str] | None = None,
         bind_tools_cache: Optional[BindToolsCacheProtocol] = None,
         duo_chat_max_tokens: Optional[int] = None,
     ):
@@ -210,6 +211,7 @@ class LocalPromptRegistry(BasePromptRegistry):
         self.model_factories = model_factories
         self.custom_models_enabled = custom_models_enabled
         self.disable_streaming = disable_streaming
+        self.custom_models_extra_headers = custom_models_extra_headers
         self.bind_tools_cache = bind_tools_cache
         self.duo_chat_max_tokens = duo_chat_max_tokens
 
@@ -488,6 +490,7 @@ class LocalPromptRegistry(BasePromptRegistry):
             config,
             model_metadata,
             disable_streaming=self.disable_streaming,
+            custom_models_extra_headers=self.custom_models_extra_headers,
             tool_choice=tool_choice,
             internal_event_client=self.internal_event_client,
             **kwargs,
@@ -502,6 +505,7 @@ class LocalPromptRegistry(BasePromptRegistry):
         model_limits: ConfigModelLimits,
         custom_models_enabled: bool = False,
         disable_streaming: bool = False,
+        custom_models_extra_headers: dict[str, str] | None = None,
         bind_tools_cache: Optional[BindToolsCacheProtocol] = None,
         duo_chat_max_tokens: Optional[int] = None,
     ) -> "LocalPromptRegistry":
@@ -522,6 +526,7 @@ class LocalPromptRegistry(BasePromptRegistry):
             model_limits,
             custom_models_enabled,
             disable_streaming,
+            custom_models_extra_headers,
             bind_tools_cache,
             duo_chat_max_tokens,
         )
