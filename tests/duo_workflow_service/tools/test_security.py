@@ -2012,7 +2012,7 @@ async def test_link_vulnerability_to_merge_request_version_18_6_works(
 async def test_link_vulnerability_to_merge_request_version_below_18_5_fails(
     gitlab_client_mock, metadata
 ):
-    """Test that the tool returns an error when GitLab version is below 18.5."""
+    """Test that the tool raises ToolException when GitLab version is below 18.5."""
     with patch(
         "duo_workflow_service.tools.security.gitlab_version"
     ) as mock_gitlab_version:
@@ -2024,12 +2024,10 @@ async def test_link_vulnerability_to_merge_request_version_below_18_5_fails(
             "merge_request_id": "gid://gitlab/MergeRequest/456",
         }
 
-        response = await tool.arun(test_input)
-        error_response = json.loads(response)
+        with pytest.raises(ToolException) as exc_info:
+            await tool.arun(test_input)
 
-        # Should return error for version below 18.5
-        assert "error" in error_response
-        assert error_response["error"] == "This tool is not available"
+        assert str(exc_info.value) == "This tool is not available"
 
         # Verify that no API call was made
         gitlab_client_mock.apost.assert_not_called()
@@ -2039,7 +2037,7 @@ async def test_link_vulnerability_to_merge_request_version_below_18_5_fails(
 async def test_link_vulnerability_to_merge_request_invalid_version_fails(
     gitlab_client_mock, metadata
 ):
-    """Test that the tool returns error when GitLab version is invalid (uses fallback 18.2.0)."""
+    """Test that the tool raises ToolException when GitLab version is invalid (uses fallback 18.2.0)."""
     with patch(
         "duo_workflow_service.tools.security.gitlab_version"
     ) as mock_gitlab_version:
@@ -2051,12 +2049,10 @@ async def test_link_vulnerability_to_merge_request_invalid_version_fails(
             "merge_request_id": "gid://gitlab/MergeRequest/456",
         }
 
-        response = await tool.arun(test_input)
-        error_response = json.loads(response)
+        with pytest.raises(ToolException) as exc_info:
+            await tool.arun(test_input)
 
-        # Should return error with fallback version (18.2.0 < 18.5)
-        assert "error" in error_response
-        assert error_response["error"] == "This tool is not available"
+        assert str(exc_info.value) == "This tool is not available"
 
         # Verify that no API call was made
         gitlab_client_mock.apost.assert_not_called()

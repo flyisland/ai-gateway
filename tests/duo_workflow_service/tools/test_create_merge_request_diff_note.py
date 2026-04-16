@@ -2,6 +2,7 @@ import json
 from unittest.mock import AsyncMock, Mock
 
 import pytest
+from langchain_core.tools import ToolException
 
 from duo_workflow_service.gitlab.gitlab_api import Project
 from duo_workflow_service.gitlab.http_client import GitLabHttpResponse
@@ -227,17 +228,16 @@ async def test_create_diff_note_no_line_provided(gitlab_client_mock, metadata):
     """Test error when neither old_line nor new_line is provided."""
     tool = CreateMergeRequestDiffNote(metadata=metadata)
 
-    response = await tool._arun(
-        project_id=1,
-        merge_request_iid=9,
-        body="Missing line info",
-        old_path="src/main.py",
-        new_path="src/main.py",
-    )
+    with pytest.raises(ToolException) as exc_info:
+        await tool._arun(
+            project_id=1,
+            merge_request_iid=9,
+            body="Missing line info",
+            old_path="src/main.py",
+            new_path="src/main.py",
+        )
 
-    result = json.loads(response)
-    assert "error" in result
-    assert "old_line or new_line" in result["error"]
+    assert "old_line or new_line" in str(exc_info.value)
 
 
 @pytest.mark.asyncio
@@ -251,17 +251,15 @@ async def test_create_diff_note_diff_refs_fetch_failure(gitlab_client_mock, meta
 
     tool = CreateMergeRequestDiffNote(metadata=metadata)
 
-    response = await tool._arun(
-        project_id=1,
-        merge_request_iid=999,
-        body="Note",
-        old_path="src/main.py",
-        new_path="src/main.py",
-        new_line=1,
-    )
-
-    result = json.loads(response)
-    assert "error" in result
+    with pytest.raises(ToolException):
+        await tool._arun(
+            project_id=1,
+            merge_request_iid=999,
+            body="Note",
+            old_path="src/main.py",
+            new_path="src/main.py",
+            new_line=1,
+        )
 
 
 @pytest.mark.asyncio
@@ -275,17 +273,15 @@ async def test_create_diff_note_diff_refs_missing(gitlab_client_mock, metadata):
 
     tool = CreateMergeRequestDiffNote(metadata=metadata)
 
-    response = await tool._arun(
-        project_id=1,
-        merge_request_iid=9,
-        body="Note",
-        old_path="src/main.py",
-        new_path="src/main.py",
-        new_line=1,
-    )
-
-    result = json.loads(response)
-    assert "error" in result
+    with pytest.raises(ToolException):
+        await tool._arun(
+            project_id=1,
+            merge_request_iid=9,
+            body="Note",
+            old_path="src/main.py",
+            new_path="src/main.py",
+            new_line=1,
+        )
 
 
 @pytest.mark.asyncio
@@ -298,17 +294,17 @@ async def test_create_diff_note_post_exception(
 
     tool = CreateMergeRequestDiffNote(metadata=metadata)
 
-    response = await tool._arun(
-        project_id=1,
-        merge_request_iid=9,
-        body="Note",
-        old_path="src/main.py",
-        new_path="src/main.py",
-        new_line=1,
-    )
+    with pytest.raises(ToolException) as exc_info:
+        await tool._arun(
+            project_id=1,
+            merge_request_iid=9,
+            body="Note",
+            old_path="src/main.py",
+            new_path="src/main.py",
+            new_line=1,
+        )
 
-    result = json.loads(response)
-    assert result == {"error": "API error"}
+    assert str(exc_info.value) == "API error"
 
 
 @pytest.mark.asyncio
@@ -321,19 +317,18 @@ async def test_create_diff_note_with_url_error(
 ):
     tool = CreateMergeRequestDiffNote(metadata=metadata)
 
-    response = await tool._arun(
-        url=url,
-        project_id=project_id,
-        merge_request_iid=merge_request_iid,
-        body="Note",
-        old_path="src/main.py",
-        new_path="src/main.py",
-        new_line=1,
-    )
+    with pytest.raises(ToolException) as exc_info:
+        await tool._arun(
+            url=url,
+            project_id=project_id,
+            merge_request_iid=merge_request_iid,
+            body="Note",
+            old_path="src/main.py",
+            new_path="src/main.py",
+            new_line=1,
+        )
 
-    result = json.loads(response)
-    assert "error" in result
-    assert error_contains in result["error"]
+    assert error_contains in str(exc_info.value)
 
     gitlab_client_mock.aget.assert_not_called()
     gitlab_client_mock.apost.assert_not_called()

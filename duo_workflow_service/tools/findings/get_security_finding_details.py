@@ -62,6 +62,8 @@ class GetSecurityFindingDetails(DuoBaseTool):
 
         try:
             return await self._fetch_finding_from_pipeline(project_path, ref, uuid)
+        except ToolException:
+            raise
         except Exception as e:
             raise ToolException(
                 f"An unexpected error occurred while fetching the security finding: {str(e)}"
@@ -87,32 +89,25 @@ class GetSecurityFindingDetails(DuoBaseTool):
         response = self._process_http_response(identifier="query", response=response)
 
         if "errors" in response:
-            return json.dumps(
-                {"error": "GraphQL query failed", "errors": response["errors"]}
+            raise ToolException(
+                f"GraphQL query failed: {json.dumps(response['errors'])}"
             )
 
         project = response.get("data", {}).get("project")
         if not project:
-            return json.dumps(
-                {"error": "Project not found or access denied", "project": project_path}
-            )
+            raise ToolException(f"Project not found or access denied: {project_path}")
 
         pipeline_nodes = (project.get("pipelines") or {}).get("nodes") or []
         if not pipeline_nodes:
-            return json.dumps(
-                {"error": f"No pipeline found for ref '{ref}'", "ref": ref}
-            )
+            raise ToolException(f"No pipeline found for ref '{ref}'")
 
         pipeline = pipeline_nodes[0]
 
         finding = pipeline.get("securityReportFinding")
         if not finding:
-            return json.dumps(
-                {
-                    "error": "Security finding not found in the specified pipeline",
-                    "uuid": finding_uuid,
-                    "ref": ref,
-                }
+            raise ToolException(
+                f"Security finding not found in the specified pipeline: "
+                f"uuid={finding_uuid}, ref={ref}"
             )
 
         result = {

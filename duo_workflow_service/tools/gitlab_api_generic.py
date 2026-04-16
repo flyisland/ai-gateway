@@ -163,11 +163,9 @@ class GitLabApiGet(DuoBaseTool):
             JSON string with the API response or error information
         """
         if not endpoint:
-            return json.dumps(
-                {
-                    "error": "The 'endpoint' parameter must be provided",
-                    "details": "Please provide an API endpoint path",
-                }
+            raise ToolException(
+                "The 'endpoint' parameter must be provided. "
+                "Please provide an API endpoint path."
             )
 
         endpoint = validate_api_endpoint(endpoint)
@@ -383,15 +381,10 @@ class GitLabGraphQL(DuoBaseTool):
         document: DocumentNode = parse_graphql(query)
 
         if self._document_contains_mutation_or_subscription(document):
-            return json.dumps(
-                {
-                    "error": "GraphQL mutations and subscriptions are not allowed",
-                    "details": (
-                        "This tool only supports read-only queries. "
-                        "Mutations and subscriptions are not supported. "
-                        "Use specialized tools for write operations."
-                    ),
-                }
+            raise ToolException(
+                "GraphQL mutations and subscriptions are not allowed. "
+                "This tool only supports read-only queries. "
+                "Use specialized tools for write operations."
             )
 
         # SECURITY: Send the normalized AST, not the raw input, to Rails.

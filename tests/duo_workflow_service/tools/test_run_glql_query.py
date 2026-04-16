@@ -140,21 +140,21 @@ async def test_version_check(version, should_succeed, glql_tool, mock_gitlab_cli
     ) as mock_version:
         mock_version.get.return_value = version
 
-        response = await glql_tool.arun(
-            {"glql_yaml": "```glql\nquery: type = Issue\n```"}
-        )
-        parsed = json.loads(response)
-
         if should_succeed:
+            response = await glql_tool.arun(
+                {"glql_yaml": "```glql\nquery: type = Issue\n```"}
+            )
+            parsed = json.loads(response)
             assert (
                 "error" not in parsed
                 or "GLQL API is only available" not in parsed.get("error", "")
             )
             mock_gitlab_client.apost.assert_called_once()
         else:
-            assert "error" in parsed
-            assert (
-                "GLQL API is only available in GitLab 18.6 and later" in parsed["error"]
+            with pytest.raises(ToolException) as exc_info:
+                await glql_tool.arun({"glql_yaml": "```glql\nquery: type = Issue\n```"})
+            assert "GLQL API is only available in GitLab 18.6 and later" in str(
+                exc_info.value
             )
             mock_gitlab_client.apost.assert_not_called()
 

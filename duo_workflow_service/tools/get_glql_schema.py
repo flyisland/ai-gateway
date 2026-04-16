@@ -1,6 +1,7 @@
 import json
 from typing import Any, Type
 
+from langchain_core.tools import ToolException
 from pydantic import BaseModel, Field
 
 from duo_workflow_service.tools.duo_base_tool import DuoBaseTool
@@ -398,10 +399,8 @@ class GetGlqlSchema(DuoBaseTool):
         result = {}
         for src in sources:
             if src not in _SCHEMAS:
-                return json.dumps(
-                    {
-                        "error": f"Unknown data source: {src}. Supported: {', '.join(_SCHEMAS.keys())}"
-                    }
+                raise ToolException(
+                    f"Unknown data source: {src}. Supported: {', '.join(_SCHEMAS.keys())}"
                 )
             result[src] = _SCHEMAS[src]
 

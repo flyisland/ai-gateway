@@ -3,6 +3,7 @@
 import json
 
 import pytest
+from langchain_core.tools import ToolException
 
 from duo_workflow_service.tools.get_glql_schema import _SCHEMAS, GetGlqlSchema
 
@@ -46,18 +47,18 @@ async def test_comma_separated_sources(schema_tool):
 
 @pytest.mark.asyncio
 async def test_unknown_data_source(schema_tool):
-    """Returns error for unknown data source."""
-    result = json.loads(await schema_tool._execute(data_source="Unknown"))
-    assert "error" in result
-    assert "Unknown" in result["error"]
+    """Raises ToolException for unknown data source."""
+    with pytest.raises(ToolException) as exc_info:
+        await schema_tool._execute(data_source="Unknown")
+    assert "Unknown" in str(exc_info.value)
 
 
 @pytest.mark.asyncio
 async def test_unknown_in_comma_separated(schema_tool):
-    """Returns error if any comma-separated source is unknown."""
-    result = json.loads(await schema_tool._execute(data_source="Pipeline,Foo"))
-    assert "error" in result
-    assert "Foo" in result["error"]
+    """Raises ToolException if any comma-separated source is unknown."""
+    with pytest.raises(ToolException) as exc_info:
+        await schema_tool._execute(data_source="Pipeline,Foo")
+    assert "Foo" in str(exc_info.value)
 
 
 @pytest.mark.asyncio

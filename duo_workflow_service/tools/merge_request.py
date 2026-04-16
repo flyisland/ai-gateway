@@ -699,16 +699,14 @@ For example:
         )
 
         if validation_result.errors:
-            return json.dumps({"error": "; ".join(validation_result.errors)})
+            raise ToolException("; ".join(validation_result.errors))
 
         if not validation_result.project_id or not validation_result.merge_request_iid:
-            return json.dumps(
-                {"error": "Missing required identifiers after validation"}
-            )
+            raise ToolException("Missing required identifiers after validation")
 
         if old_line is None and new_line is None:
-            return json.dumps(
-                {"error": "At least one of old_line or new_line must be provided."}
+            raise ToolException(
+                "At least one of old_line or new_line must be provided."
             )
 
         try:
@@ -716,7 +714,7 @@ For example:
                 validation_result.project_id, validation_result.merge_request_iid
             )
         except Exception as e:
-            return json.dumps({"error": str(e)})
+            raise ToolException(str(e)) from e
 
         position: dict[str, Any] = {
             "position_type": "text",
@@ -751,7 +749,7 @@ For example:
 
             return json.dumps({"created_diff_note": response})
         except Exception as e:
-            return json.dumps({"error": str(e)})
+            raise ToolException(str(e)) from e
 
     async def _fetch_diff_refs(
         self, project_id: str, merge_request_iid: int
