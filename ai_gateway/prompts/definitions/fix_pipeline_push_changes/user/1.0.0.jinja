@@ -25,11 +25,7 @@ Follow these exact steps in order:
       --no-verify
   </git_command>
 
-  If the push fails, use the feedback to change your commit messages and push again.
-
-  <retry_limit>
-    You may attempt a maximum of 5 different commit messages. If all attempts fail, report the failure.
-  </retry_limit>
+  {% include 'common/push_retry/1.0.0.jinja' %}
 </step>
 
 <step number="3">
