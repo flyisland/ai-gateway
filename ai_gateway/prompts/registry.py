@@ -6,7 +6,6 @@ from typing import Any, List, NamedTuple, Optional, Type, cast, override
 import structlog
 import yaml
 from langchain.tools import BaseTool
-from poetry.core.constraints.version import Version, parse_constraint
 
 from ai_gateway.config import ConfigModelLimits
 from ai_gateway.model_metadata import (
@@ -22,6 +21,7 @@ from ai_gateway.prompts.embedding import embedding_prompt_template_factory
 from ai_gateway.prompts.typing import TypeModelFactory, TypePromptTemplateFactory
 from lib.internal_events.client import InternalEventsClient
 from lib.internal_events.context import current_event_context
+from lib.version import resolve_version
 
 __all__ = ["LocalPromptRegistry", "PromptRegistered"]
 
@@ -264,30 +264,8 @@ class LocalPromptRegistry(BasePromptRegistry):
     def _get_prompt_config(
         self, versions: dict[str, PromptConfig], prompt_version: str
     ) -> PromptConfig:
-        # Parse constraint according to poetry rules. See
-        # https://python-poetry.org/docs/dependency-specification/#version-constraints
-        constraint = parse_constraint(prompt_version)
-        all_versions = [Version.parse(version) for version in versions.keys()]
-
-        # If the query is not "simple" (in other words, it's not referencing specific versions but is a constraint or
-        # set of constraints, for example a range) we only want to consider stable versions. This allows us to not
-        # auto-serve dev/rc versions to clients using queries like `^1.0.0`
-        if not constraint.is_simple():
-            all_versions = [version for version in all_versions if version.is_stable()]
-
-        compatible_versions = list(filter(constraint.allows, all_versions))
-        if not compatible_versions:
-            log.info(
-                "No compatible versions found",
-                versions=versions,
-                prompt_version=prompt_version,
-            )
-            raise ValueError(
-                f"No prompt version found matching the query: {prompt_version}"
-            )
-        compatible_versions.sort(reverse=True)
-
-        return versions[str(compatible_versions[0])]
+        resolved = resolve_version(versions.keys(), prompt_version)
+        return versions[resolved]
 
     def _default_model_metadata(
         self, prompt_id: str, prompt_version: str, is_graph_node: bool = False

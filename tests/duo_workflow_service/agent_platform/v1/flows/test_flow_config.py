@@ -284,11 +284,9 @@ class TestFlowConfig:
         assert config.version == "v1"
 
     def test_flowconfig_from_yaml_config_file_not_found(self):
-        """Test loading YAML config raises FileNotFoundError for missing file."""
-        with pytest.raises(FileNotFoundError) as exc_info:
+        """Test loading YAML config raises ValueError for missing flow."""
+        with pytest.raises(ValueError, match="No version matching"):
             FlowConfig.from_yaml_config("nonexistent")
-
-        assert "nonexistent/1.0.0 file not found" in str(exc_info.value)
 
     def test_flowconfig_from_yaml_config_invalid_yaml(self, tmp_path):
         """Test loading invalid YAML raises YAMLError."""
@@ -344,7 +342,7 @@ class TestFlowConfig:
         symlink_yml.symlink_to(real_file)
 
         with patch.object(FlowConfig, "DIRECTORY_PATH", Path(tmp_path)):
-            with pytest.raises(ValueError, match="Symlinks are not allowed"):
+            with pytest.raises(ValueError, match="No version matching"):
                 FlowConfig.from_yaml_config("my_flow")
 
     @pytest.mark.parametrize(
@@ -746,26 +744,70 @@ class TestListConfigs:
         assert result[0]["flow_version"] == "1.0.0"
 
 
-class TestFromYamlConfigExplicitVersion:
-    """Test from_yaml_config with explicit flow_version parameter."""
+class TestFromYamlConfigVersionResolution:
+    """Test from_yaml_config with version constraints (semver resolution)."""
 
-    def test_loads_explicit_version(self, tmp_path):
-        """from_yaml_config('myflow', '2.0.0') should load configs/myflow/2.0.0.yml."""
+    @pytest.fixture()
+    def flow_dir(self, tmp_path):
+        """Create a flow directory with multiple version files."""
+        d = tmp_path / "myflow"
+        d.mkdir()
+        return d
+
+    @staticmethod
+    def _write_config(path, environment="ambient"):
         config_data = {
             "flow": {"entry_point": "agent"},
             "components": [{"name": "agent", "type": "AgentComponent"}],
             "routers": [{"from": "agent", "to": "end"}],
-            "environment": "ambient",
+            "environment": environment,
             "version": "v1",
         }
+        path.write_text(yaml.dump(config_data))
 
-        flow_dir = tmp_path / "myflow"
-        flow_dir.mkdir()
-        yaml_file = flow_dir / "2.0.0.yml"
-        yaml_file.write_text(yaml.dump(config_data))
-
+    def test_exact_version(self, tmp_path, flow_dir):
+        self._write_config(flow_dir / "2.0.0.yml")
         with patch.object(FlowConfig, "DIRECTORY_PATH", tmp_path):
             result = FlowConfig.from_yaml_config("myflow", "2.0.0")
-
         assert result.environment == "ambient"
-        assert result.version == "v1"
+
+    def test_caret_constraint_picks_highest(self, tmp_path, flow_dir):
+        self._write_config(flow_dir / "1.0.0.yml", environment="ambient")
+        self._write_config(flow_dir / "1.2.0.yml", environment="chat")
+        self._write_config(flow_dir / "2.0.0.yml", environment="chat-partial")
+        with patch.object(FlowConfig, "DIRECTORY_PATH", tmp_path):
+            result = FlowConfig.from_yaml_config("myflow", "^1.0.0")
+        assert result.environment == "chat"
+
+    def test_tilde_constraint(self, tmp_path, flow_dir):
+        self._write_config(flow_dir / "1.0.0.yml", environment="ambient")
+        self._write_config(flow_dir / "1.0.5.yml", environment="chat")
+        self._write_config(flow_dir / "1.1.0.yml", environment="chat-partial")
+        with patch.object(FlowConfig, "DIRECTORY_PATH", tmp_path):
+            result = FlowConfig.from_yaml_config("myflow", "~1.0.0")
+        assert result.environment == "chat"
+
+    def test_no_compatible_version_raises(self, tmp_path, flow_dir):
+        self._write_config(flow_dir / "1.0.0.yml")
+        with patch.object(FlowConfig, "DIRECTORY_PATH", tmp_path):
+            with pytest.raises(ValueError, match="No version matching"):
+                FlowConfig.from_yaml_config("myflow", "^2.0.0")
+
+    def test_range_constraint_excludes_prerelease(self, tmp_path, flow_dir):
+        self._write_config(flow_dir / "1.0.0.yml", environment="ambient")
+        self._write_config(flow_dir / "1.1.0-rc1.yml", environment="chat")
+        with patch.object(FlowConfig, "DIRECTORY_PATH", tmp_path):
+            result = FlowConfig.from_yaml_config("myflow", "^1.0.0")
+        assert result.environment == "ambient"
+
+    def test_exact_prerelease_still_works(self, tmp_path, flow_dir):
+        self._write_config(flow_dir / "1.1.0-rc1.yml", environment="chat")
+        with patch.object(FlowConfig, "DIRECTORY_PATH", tmp_path):
+            result = FlowConfig.from_yaml_config("myflow", "1.1.0-rc1")
+        assert result.environment == "chat"
+
+    def test_default_version_used_when_none(self, tmp_path, flow_dir):
+        self._write_config(flow_dir / "1.0.0.yml")
+        with patch.object(FlowConfig, "DIRECTORY_PATH", tmp_path):
+            result = FlowConfig.from_yaml_config("myflow")
+        assert result.environment == "ambient"
