@@ -24,7 +24,7 @@ MYPY_LINT_TODO_DIR ?= --exclude "ai_gateway/models/litellm.py" \
 	--exclude "ai_gateway/code_suggestions/completions.py"
 
 EDITORCONFIG_LINT_WORKING_DIR ?=
-CODESPELL_LINT_WORKING_DIR ?= ${ROOT_DIR}
+CODESPELL_LINT_WORKING_DIR ?=
 COMPOSE_FILES := -f docker-compose.dev.yaml
 ifneq (,$(wildcard docker-compose.override.yaml))
 COMPOSE_FILES += -f docker-compose.override.yaml
