@@ -6,9 +6,9 @@ from pydantic import BaseModel
 from lib.billing_events.client import BillingEvent, BillingEventsClient
 from lib.context.llm_operations import get_llm_operations
 from lib.events.base import GLReportingEventContext
-from lib.events.contextvar import self_hosted_dap_billing_enabled
 
 __all__ = [
+    "SelfHostedLLMOperations",
     "ExecutionEnvironment",
     "LLMOperation",
     "BillingEventService",
@@ -95,9 +95,8 @@ class BillingEventService:
         """Track billing for a workflow execution with LLM operation metadata.
 
         LLM operations are retrieved in priority order:
-        1. Self-hosted standardized operations (if self_hosted_dap_billing_enabled)
-        2. Explicitly provided operations (llm_ops parameter)
-        3. Operations from request context (via get_llm_operations)
+        1. Explicitly provided operations (llm_ops parameter)
+        2. Operations from request context (via get_llm_operations)
 
         Args:
             workflow_id: Unique identifier for the workflow being billed
@@ -119,12 +118,7 @@ class BillingEventService:
             For self-hosted deployments, standardized placeholder operations are used since
             actual token counts and model details are not available from self-hosted providers.
         """
-        # Retrieve LLM operations based on deployment type and availability
-        if self_hosted_dap_billing_enabled.get():
-            llm_operations = [
-                ops.model_dump() for ops in SelfHostedLLMOperations.get_operations()
-            ]
-        elif llm_ops:
+        if llm_ops:
             llm_operations = [ops.model_dump() for ops in llm_ops]
         elif raw_ops := get_llm_operations():
             # Context-based: validate raw dicts from request context and convert to serializable format
