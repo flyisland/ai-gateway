@@ -1,5 +1,6 @@
 from typing import Any, Optional, Type
 
+from langchain_core.tools import ToolException
 from pydantic import BaseModel, ConfigDict, Field
 from pydantic.alias_generators import to_camel
 
@@ -8,20 +9,10 @@ from duo_workflow_service.tools.ascp.utils import parse_graphql_errors
 from duo_workflow_service.tools.duo_base_tool import DuoBaseTool
 
 
-class CreateAscpComponentResponseBody(BaseModel):
-    """Nested response: component entity and raw API payload."""
-
-    component: Optional[dict[str, Any]] = None
-    raw_response: Optional[dict[str, Any]] = None
-
-
 class CreateAscpComponentResponse(BaseModel):
-    """Unified response shape for success and error."""
+    """Response model for creating an ASCP component."""
 
-    errors: list[str] = Field(default_factory=list)
-    response: CreateAscpComponentResponseBody = Field(
-        default_factory=CreateAscpComponentResponseBody
-    )
+    component: dict[str, Any]
 
 
 class CreateAscpComponentInput(BaseModel):
@@ -54,10 +45,7 @@ class CreateAscpComponentInput(BaseModel):
 class CreateAscpComponent(DuoBaseTool):
     """Tool for creating an ASCP (Application Security Collaboration Platform) component.
 
-    Returned JSON uses a single shape for success and error: {"errors": list[str],
-    "response": {"component": ... | null, "raw_response": ... | null}}. Success when
-    errors is empty and response.component is set; on error, errors is non-empty and
-    response contains component and/or raw_response (raw API payload) when available.
+    On success, returns JSON with the created component details. On error, raises ToolException with error details.
     """
 
     name: str = "ascp_create_component"
@@ -91,38 +79,19 @@ class CreateAscpComponent(DuoBaseTool):
         )
         variables = {"input": input_data}
 
-        try:
-            response = await self.gitlab_client.graphql(
-                CREATE_ASCP_COMPONENT_MUTATION,
-                variables,
-            )
-        except Exception as e:
-            return CreateAscpComponentResponse(
-                errors=[
-                    f"ascp_create_component failed: {type(e).__name__}: {e!s}",
-                ],
-                response=CreateAscpComponentResponseBody(
-                    component=None, raw_response=None
-                ),
-            ).model_dump_json()
+        response = await self.gitlab_client.graphql(
+            CREATE_ASCP_COMPONENT_MUTATION,
+            variables,
+        )
 
         if not isinstance(response, dict):
-            return CreateAscpComponentResponse(
-                errors=["GraphQL returned no response or invalid format"],
-                response=CreateAscpComponentResponseBody(
-                    component=None, raw_response=None
-                ),
-            ).model_dump_json()
+            raise ToolException("GraphQL returned no response or invalid format")
 
         graphql_errors = response.get("errors")
         if graphql_errors:
             messages = parse_graphql_errors(graphql_errors)
-            return CreateAscpComponentResponse(
-                errors=messages,
-                response=CreateAscpComponentResponseBody(
-                    component=None, raw_response=response
-                ),
-            ).model_dump_json()
+            exc_message = "; ".join(messages)
+            raise ToolException(exc_message)
 
         payload = response.get("ascpComponentCreate") or {}
 
@@ -132,24 +101,9 @@ class CreateAscpComponent(DuoBaseTool):
         if errors:
             if not isinstance(errors, list):
                 errors = [str(errors)]
-            return CreateAscpComponentResponse(
-                errors=errors,
-                response=CreateAscpComponentResponseBody(
-                    component=component, raw_response=payload
-                ),
-            ).model_dump_json()
+            raise ToolException("; ".join(errors))
 
         if not component or not component.get("id"):
-            return CreateAscpComponentResponse(
-                errors=["Failed to create ASCP component."],
-                response=CreateAscpComponentResponseBody(
-                    component=component, raw_response=payload
-                ),
-            ).model_dump_json()
+            raise ToolException("Failed to create ASCP component.")
 
-        return CreateAscpComponentResponse(
-            errors=[],
-            response=CreateAscpComponentResponseBody(
-                component=component, raw_response=None
-            ),
-        ).model_dump_json()
+        return CreateAscpComponentResponse(component=component).model_dump_json()

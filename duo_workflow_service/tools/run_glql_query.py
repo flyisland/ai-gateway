@@ -6,7 +6,6 @@ from packaging.version import InvalidVersion, Version
 from pydantic import BaseModel, Field
 
 from duo_workflow_service.tools.duo_base_tool import DuoBaseTool
-from duo_workflow_service.tracking.errors import log_exception
 from lib.context import gitlab_version
 
 
@@ -85,13 +84,14 @@ class RunGLQLQuery(DuoBaseTool):
         """
         # GLQL API is only available from 18.6+
         version_18_6 = Version("18.6.0")
-        version_18_5 = Version("18.5.0")
 
         try:
             gl_version = Version(str(gitlab_version.get() or ""))
-        except (InvalidVersion, TypeError) as ex:
-            log_exception(ex)
-            gl_version = version_18_5
+        except (InvalidVersion, TypeError):
+            raise ToolException(
+                "GLQL API is only available in GitLab 18.6 and later. "
+                f"Current GitLab version: {gitlab_version.get() or 'unknown'}"
+            )
 
         if gl_version < version_18_6:
             raise ToolException(

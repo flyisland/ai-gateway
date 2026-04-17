@@ -1,5 +1,6 @@
 from typing import Any, ClassVar, Optional, Type
 
+from langchain_core.tools import ToolException
 from pydantic import BaseModel, ConfigDict, Field
 from pydantic.alias_generators import to_camel
 
@@ -12,20 +13,10 @@ from duo_workflow_service.tools.duo_base_tool import (
 )
 
 
-class CreateAscpScanResponseBody(BaseModel):
-    """Nested response: scan entity and raw API payload."""
-
-    scan: Optional[dict[str, Any]] = None
-    raw_response: Optional[dict[str, Any]] = None
-
-
 class CreateAscpScanResponse(BaseModel):
-    """Unified response shape for success and error."""
+    """Response model for creating an ASCP scan."""
 
-    errors: list[str] = Field(default_factory=list)
-    response: CreateAscpScanResponseBody = Field(
-        default_factory=CreateAscpScanResponseBody
-    )
+    scan: dict[str, Any]
 
 
 class CreateAscpScanInput(BaseModel):
@@ -56,10 +47,7 @@ class CreateAscpScanInput(BaseModel):
 class CreateAscpScan(DuoBaseTool):
     """Tool for creating an ASCP (Application Security Collaboration Platform) scan.
 
-    Returned JSON uses a single shape for success and error: {"errors": list[str],
-    "response": {"scan": ... | null, "raw_response": ... | null}}. Success when
-    errors is empty and response.scan is set; on error, errors is non-empty and
-    response contains scan and/or raw_response (raw API payload) when available.
+    On success, returns JSON with the created scan details. On error, raises ToolException with error details.
     """
 
     tier_check_licensed_feature: ClassVar[str] = LICENSED_FEATURE_SECURITY_DASHBOARD
@@ -92,32 +80,19 @@ class CreateAscpScan(DuoBaseTool):
         )
         variables = {"input": input_data}
 
-        try:
-            response = await self.gitlab_client.graphql(
-                CREATE_ASCP_SCAN_MUTATION,
-                variables,
-            )
-        except Exception as e:
-            return CreateAscpScanResponse(
-                errors=[
-                    f"ascp_create_scan failed: {type(e).__name__}: {e!s}",
-                ],
-                response=CreateAscpScanResponseBody(scan=None, raw_response=None),
-            ).model_dump_json()
+        response = await self.gitlab_client.graphql(
+            CREATE_ASCP_SCAN_MUTATION,
+            variables,
+        )
 
         if not isinstance(response, dict):
-            return CreateAscpScanResponse(
-                errors=["GraphQL returned no response or invalid format"],
-                response=CreateAscpScanResponseBody(scan=None, raw_response=None),
-            ).model_dump_json()
+            raise ToolException("GraphQL returned no response or invalid format")
 
         graphql_errors = response.get("errors")
         if graphql_errors:
             messages = parse_graphql_errors(graphql_errors)
-            return CreateAscpScanResponse(
-                errors=messages,
-                response=CreateAscpScanResponseBody(scan=None, raw_response=response),
-            ).model_dump_json()
+            exc_message = "; ".join(messages)
+            raise ToolException(exc_message)
 
         payload = response.get("ascpScanCreate") or {}
 
@@ -127,18 +102,9 @@ class CreateAscpScan(DuoBaseTool):
         if errors:
             if not isinstance(errors, list):
                 errors = [str(errors)]
-            return CreateAscpScanResponse(
-                errors=errors,
-                response=CreateAscpScanResponseBody(scan=scan, raw_response=payload),
-            ).model_dump_json()
+            raise ToolException("; ".join(errors))
 
         if not scan or not scan.get("id"):
-            return CreateAscpScanResponse(
-                errors=["Failed to create ASCP scan."],
-                response=CreateAscpScanResponseBody(scan=scan, raw_response=payload),
-            ).model_dump_json()
+            raise ToolException("Failed to create ASCP scan.")
 
-        return CreateAscpScanResponse(
-            errors=[],
-            response=CreateAscpScanResponseBody(scan=scan, raw_response=None),
-        ).model_dump_json()
+        return CreateAscpScanResponse(scan=scan).model_dump_json()

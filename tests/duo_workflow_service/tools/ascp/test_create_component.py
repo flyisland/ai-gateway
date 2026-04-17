@@ -3,6 +3,7 @@ import json
 from unittest.mock import AsyncMock, Mock
 
 import pytest
+from langchain_core.tools import ToolException
 
 from duo_workflow_service.tools.ascp.create_component import (
     CreateAscpComponent,
@@ -65,12 +66,10 @@ async def test_ascp_create_component_success(
     )
 
     response_json = json.loads(response)
-    assert "errors" in response_json
-    assert "response" in response_json
-    assert response_json["errors"] == []
-    assert response_json["response"]["component"] == created_component_data_fixture
-    assert response_json["response"]["component"]["title"] == "Authentication Service"
-    assert response_json["response"]["component"]["subDirectory"] == "services/auth"
+    assert "component" in response_json
+    assert response_json["component"] == created_component_data_fixture
+    assert response_json["component"]["title"] == "Authentication Service"
+    assert response_json["component"]["subDirectory"] == "services/auth"
 
     gitlab_client_mock.graphql.assert_called_once()
     call_args = gitlab_client_mock.graphql.call_args[0]
@@ -115,14 +114,9 @@ async def test_ascp_create_component_with_optional_fields(
     )
 
     response_json = json.loads(response)
-    assert response_json["errors"] == []
+    assert response_json["component"]["description"] == "Handles user authentication"
     assert (
-        response_json["response"]["component"]["description"]
-        == "Handles user authentication"
-    )
-    assert (
-        response_json["response"]["component"]["expectedUserBehavior"]
-        == "Users log in via OAuth"
+        response_json["component"]["expectedUserBehavior"] == "Users log in via OAuth"
     )
 
     call_args = gitlab_client_mock.graphql.call_args[0]
@@ -135,26 +129,22 @@ async def test_ascp_create_component_graphql_top_level_errors(
     gitlab_client_mock,
     metadata,
 ):
-    """Top-level GraphQL errors (e.g. auth failures) are surfaced in the errors field."""
+    """Top-level GraphQL errors (e.g. auth failures) raise ToolException."""
     gitlab_client_mock.graphql = AsyncMock(
         return_value={"errors": [{"message": "Unauthorized"}]},
     )
 
     tool = CreateAscpComponent(metadata=metadata)
 
-    response = await tool._arun(
-        project_path="namespace/project",
-        title="Auth Service",
-        sub_directory="services/auth",
-        scan_id="gid://gitlab/Ascp::Scan/1",
-    )
+    with pytest.raises(ToolException) as exc_info:
+        await tool._arun(
+            project_path="namespace/project",
+            title="Auth Service",
+            sub_directory="services/auth",
+            scan_id="gid://gitlab/Ascp::Scan/1",
+        )
 
-    response_json = json.loads(response)
-    assert isinstance(response_json["errors"], list)
-    assert response_json["errors"] == ["Unauthorized"]
-    assert response_json["response"]["raw_response"] == {
-        "errors": [{"message": "Unauthorized"}]
-    }
+    assert "Unauthorized" in str(exc_info.value)
 
 
 @pytest.mark.asyncio
@@ -162,23 +152,20 @@ async def test_ascp_create_component_response_without_key(
     gitlab_client_mock,
     metadata,
 ):
-    """When response has no ascpComponentCreate key and no top-level errors, returns generic error."""
+    """When response has no ascpComponentCreate key and no top-level errors, raises ToolException."""
     gitlab_client_mock.graphql = AsyncMock(return_value={})
 
     tool = CreateAscpComponent(metadata=metadata)
 
-    response = await tool._arun(
-        project_path="namespace/project",
-        title="Auth Service",
-        sub_directory="services/auth",
-        scan_id="gid://gitlab/Ascp::Scan/1",
-    )
+    with pytest.raises(ToolException) as exc_info:
+        await tool._arun(
+            project_path="namespace/project",
+            title="Auth Service",
+            sub_directory="services/auth",
+            scan_id="gid://gitlab/Ascp::Scan/1",
+        )
 
-    response_json = json.loads(response)
-    assert "errors" in response_json
-    assert "response" in response_json
-    assert isinstance(response_json["errors"], list)
-    assert response_json["errors"][0] == "Failed to create ASCP component."
+    assert "Failed to create ASCP component" in str(exc_info.value)
 
 
 @pytest.mark.asyncio
@@ -197,18 +184,15 @@ async def test_ascp_create_component_mutation_errors(
 
     tool = CreateAscpComponent(metadata=metadata)
 
-    response = await tool._arun(
-        project_path="namespace/project",
-        title="Auth Service",
-        sub_directory="services/auth",
-        scan_id="gid://gitlab/Ascp::Scan/999",
-    )
+    with pytest.raises(ToolException) as exc_info:
+        await tool._arun(
+            project_path="namespace/project",
+            title="Auth Service",
+            sub_directory="services/auth",
+            scan_id="gid://gitlab/Ascp::Scan/999",
+        )
 
-    response_json = json.loads(response)
-    assert "errors" in response_json
-    assert "response" in response_json
-    assert isinstance(response_json["errors"], list)
-    assert "Scan not found" in response_json["errors"][0]
+    assert "Scan not found" in str(exc_info.value)
 
 
 @pytest.mark.asyncio
@@ -216,7 +200,7 @@ async def test_ascp_create_component_multiple_errors(
     gitlab_client_mock,
     metadata,
 ):
-    """When mutation returns multiple errors, all appear in the tool response."""
+    """When mutation returns multiple errors, they are joined in ToolException."""
     gitlab_client_mock.graphql = AsyncMock(
         return_value={
             "ascpComponentCreate": {
@@ -228,15 +212,17 @@ async def test_ascp_create_component_multiple_errors(
 
     tool = CreateAscpComponent(metadata=metadata)
 
-    response = await tool._arun(
-        project_path="namespace/project",
-        title="Auth Service",
-        sub_directory="services/auth",
-        scan_id="gid://gitlab/Ascp::Scan/1",
-    )
+    with pytest.raises(ToolException) as exc_info:
+        await tool._arun(
+            project_path="namespace/project",
+            title="Auth Service",
+            sub_directory="services/auth",
+            scan_id="gid://gitlab/Ascp::Scan/1",
+        )
 
-    response_json = json.loads(response)
-    assert response_json["errors"] == ["Error one", "Error two"]
+    error_msg = str(exc_info.value)
+    assert "Error one" in error_msg
+    assert "Error two" in error_msg
 
 
 @pytest.mark.asyncio
@@ -250,21 +236,14 @@ async def test_ascp_create_component_exception(
 
     tool = CreateAscpComponent(metadata=metadata)
 
-    response = await tool._arun(
-        project_path="namespace/project",
-        title="Auth Service",
-        sub_directory="services/auth",
-        scan_id="gid://gitlab/Ascp::Scan/1",
-    )
-
-    response_json = json.loads(response)
-    assert "errors" in response_json
-    assert "response" in response_json
-    assert isinstance(response_json["errors"], list)
-    assert len(response_json["errors"]) == 1
-    assert "ascp_create_component" in response_json["errors"][0]
-    assert "ConnectionError" in response_json["errors"][0]
-    assert "Network failure" in response_json["errors"][0]
+    # Exceptions propagate directly
+    with pytest.raises(ConnectionError, match="Network failure"):
+        await tool._arun(
+            project_path="namespace/project",
+            title="Auth Service",
+            sub_directory="services/auth",
+            scan_id="gid://gitlab/Ascp::Scan/1",
+        )
 
 
 @pytest.mark.asyncio
@@ -272,25 +251,20 @@ async def test_ascp_create_component_malformed_response(
     gitlab_client_mock,
     metadata,
 ):
-    """Non-dict response (e.g. None) must return JSON with error list."""
+    """Non-dict response (e.g. None) raises ToolException."""
     gitlab_client_mock.graphql = AsyncMock(return_value=None)
 
     tool = CreateAscpComponent(metadata=metadata)
 
-    response = await tool._arun(
-        project_path="namespace/project",
-        title="Auth Service",
-        sub_directory="services/auth",
-        scan_id="gid://gitlab/Ascp::Scan/1",
-    )
+    with pytest.raises(ToolException) as exc_info:
+        await tool._arun(
+            project_path="namespace/project",
+            title="Auth Service",
+            sub_directory="services/auth",
+            scan_id="gid://gitlab/Ascp::Scan/1",
+        )
 
-    response_json = json.loads(response)
-    assert "errors" in response_json
-    assert "response" in response_json
-    assert isinstance(response_json["errors"], list)
-    assert any(
-        "no response or invalid format" in msg for msg in response_json["errors"]
-    )
+    assert "no response or invalid format" in str(exc_info.value)
 
 
 @pytest.mark.asyncio
@@ -298,7 +272,7 @@ async def test_ascp_create_component_missing_component_id(
     gitlab_client_mock,
     metadata,
 ):
-    """When mutation returns component without id, tool returns error."""
+    """When mutation returns component without id, tool raises ToolException."""
     gitlab_client_mock.graphql = AsyncMock(
         return_value={
             "ascpComponentCreate": {
@@ -310,17 +284,15 @@ async def test_ascp_create_component_missing_component_id(
 
     tool = CreateAscpComponent(metadata=metadata)
 
-    response = await tool._arun(
-        project_path="namespace/project",
-        title="Auth Service",
-        sub_directory="services/auth",
-        scan_id="gid://gitlab/Ascp::Scan/1",
-    )
+    with pytest.raises(ToolException) as exc_info:
+        await tool._arun(
+            project_path="namespace/project",
+            title="Auth Service",
+            sub_directory="services/auth",
+            scan_id="gid://gitlab/Ascp::Scan/1",
+        )
 
-    response_json = json.loads(response)
-    assert "errors" in response_json
-    assert isinstance(response_json["errors"], list)
-    assert "Failed to create ASCP component" in response_json["errors"][0]
+    assert "Failed to create ASCP component" in str(exc_info.value)
 
 
 def test_ascp_create_component_format_display_message():

@@ -2024,10 +2024,12 @@ async def test_link_vulnerability_to_merge_request_version_below_18_5_fails(
             "merge_request_id": "gid://gitlab/MergeRequest/456",
         }
 
+        # Should raise ToolException for version below 18.5
         with pytest.raises(ToolException) as exc_info:
             await tool.arun(test_input)
 
-        assert str(exc_info.value) == "This tool is not available"
+        assert "This tool is not available" in str(exc_info.value)
+        assert "requires GitLab 18.5 or later" in str(exc_info.value)
 
         # Verify that no API call was made
         gitlab_client_mock.apost.assert_not_called()
@@ -2037,11 +2039,11 @@ async def test_link_vulnerability_to_merge_request_version_below_18_5_fails(
 async def test_link_vulnerability_to_merge_request_invalid_version_fails(
     gitlab_client_mock, metadata
 ):
-    """Test that the tool raises ToolException when GitLab version is invalid (uses fallback 18.2.0)."""
+    """Test that the tool propagates InvalidVersion exception when GitLab version is invalid."""
     with patch(
         "duo_workflow_service.tools.security.gitlab_version"
     ) as mock_gitlab_version:
-        mock_gitlab_version.get.side_effect = InvalidVersion("invalid version")
+        mock_gitlab_version.get.return_value = "invalid version"
 
         tool = LinkVulnerabilityToMergeRequest(metadata=metadata)
         test_input = {
@@ -2049,10 +2051,9 @@ async def test_link_vulnerability_to_merge_request_invalid_version_fails(
             "merge_request_id": "gid://gitlab/MergeRequest/456",
         }
 
-        with pytest.raises(ToolException) as exc_info:
+        # Should propagate InvalidVersion exception
+        with pytest.raises(InvalidVersion):
             await tool.arun(test_input)
-
-        assert str(exc_info.value) == "This tool is not available"
 
         # Verify that no API call was made
         gitlab_client_mock.apost.assert_not_called()

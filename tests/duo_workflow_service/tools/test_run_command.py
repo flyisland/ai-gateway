@@ -1,10 +1,11 @@
+# pylint: disable=file-naming-for-tests
 from typing import List
 from unittest import mock
 from unittest.mock import AsyncMock, MagicMock
 
 import pytest
+from langchain.tools import ToolException
 
-from contract import contract_pb2
 from duo_workflow_service.tools.command import (
     _DEFAULT_COMMAND_TIMEOUT_SECONDS,
     RunCommand,
@@ -95,9 +96,6 @@ async def test_run_command_success(
         ("python", "script.py", False, None),
         ("echo", None, False, None),
         ("echo", "", False, None),
-        # Malformed quotes (shlex.split raises ValueError)
-        ("echo", '"unclosed quote', True, "Invalid argument syntax"),
-        ("echo", "it's a trap", True, "Invalid argument syntax"),
     ],
 )
 @mock.patch("duo_workflow_service.tools.command._execute_action")
@@ -115,6 +113,23 @@ async def test_run_command_validation(
         assert isinstance(result, str)
     else:
         execute_action_mock.assert_called_once()
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    ("program", "args"),
+    [
+        ("echo", '"unclosed quote'),
+        ("echo", "it's a trap"),
+    ],
+)
+async def test_run_command_malformed_quotes(program, args):
+    """Malformed quotes should raise ToolException."""
+    run_command = RunCommand(name="run_command", description="Run a shell command")
+
+    with pytest.raises(ToolException) as exc_info:
+        await run_command._arun(program=program, args=args)
+    assert "Invalid argument syntax" in str(exc_info.value)
 
 
 def test_run_command_format_display_message():

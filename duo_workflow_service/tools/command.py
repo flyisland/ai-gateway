@@ -2,6 +2,7 @@ import shlex
 import textwrap
 from typing import Any, ClassVar, List, Optional, Type
 
+from langchain_core.tools import ToolException
 from pydantic import BaseModel, Field
 
 from contract import contract_pb2
@@ -62,7 +63,9 @@ Instead of '{disallowed_operator}' please use {self.name} multiple times consecu
         try:
             arguments = shlex.split(args)
         except ValueError as e:
-            return f"Invalid argument syntax: {e}. Check for unclosed quotes."
+            raise ToolException(
+                f"Invalid argument syntax: {e}. Check for unclosed quotes."
+            )
 
         run_command_kwargs: dict = {
             "program": program,

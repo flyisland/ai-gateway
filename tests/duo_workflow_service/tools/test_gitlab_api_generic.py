@@ -439,6 +439,8 @@ class TestGitLabGraphQL:
         """
         with pytest.raises(ToolException) as exc_info:
             await gitlab_graphql_tool._execute(query=mutation)
+
+        # Verify
         assert "mutations and subscriptions are not allowed" in str(exc_info.value)
 
     @pytest.mark.asyncio
@@ -456,6 +458,8 @@ class TestGitLabGraphQL:
         """
         with pytest.raises(ToolException) as exc_info:
             await gitlab_graphql_tool._execute(query=subscription)
+
+        # Verify
         assert "mutations and subscriptions are not allowed" in str(exc_info.value)
 
     @pytest.mark.asyncio
@@ -478,6 +482,8 @@ class TestGitLabGraphQL:
         """
         with pytest.raises(ToolException) as exc_info:
             await gitlab_graphql_tool._execute(query=subscription)
+
+        # Verify subscription is still detected
         assert "mutations and subscriptions are not allowed" in str(exc_info.value)
 
     @pytest.mark.asyncio
@@ -504,6 +510,8 @@ class TestGitLabGraphQL:
         """
         with pytest.raises(ToolException) as exc_info:
             await gitlab_graphql_tool._execute(query=mutation)
+
+        # Verify mutation is still detected
         assert "mutations and subscriptions are not allowed" in str(exc_info.value)
 
     @pytest.mark.asyncio
@@ -534,6 +542,8 @@ class TestGitLabGraphQL:
         """
         with pytest.raises(ToolException) as exc_info:
             await gitlab_graphql_tool._execute(query=mutation)
+
+        # Verify mutation is still detected
         assert "mutations and subscriptions are not allowed" in str(exc_info.value)
 
     @pytest.mark.parametrize(
@@ -606,6 +616,7 @@ class TestGitLabGraphQL:
         gitlab_client_mock.apost = AsyncMock()
         with pytest.raises(ToolException) as exc_info:
             await gitlab_graphql_tool._execute(query=exploit_query)
+
         assert "mutations and subscriptions are not allowed" in str(exc_info.value)
         gitlab_client_mock.apost.assert_not_called()
 
@@ -661,13 +672,13 @@ class TestGitLabGraphQL:
 
         # Execute tool
         query = 'query { project(fullPath: "test") { invalidField } }'
-        result = await gitlab_graphql_tool._execute(query=query)
+        with pytest.raises(ToolException) as exc_info:
+            await gitlab_graphql_tool._execute(query=query)
 
         # Verify
-        result_json = json.loads(result)
-        assert "error" in result_json
-        assert "GraphQL query returned errors" in result_json["error"]
-        assert len(result_json["graphql_errors"]) == 1
+        error_message = str(exc_info.value)
+        assert "GraphQL query returned errors" in error_message
+        assert "Field not found" in error_message
 
     @pytest.mark.asyncio
     async def test_graphql_api_failure(self, gitlab_graphql_tool, gitlab_client_mock):

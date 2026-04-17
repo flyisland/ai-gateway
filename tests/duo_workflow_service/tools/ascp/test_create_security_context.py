@@ -3,6 +3,7 @@ import json
 from unittest.mock import AsyncMock, Mock
 
 import pytest
+from langchain_core.tools import ToolException
 
 from duo_workflow_service.tools.ascp.create_security_context import (
     CreateAscpSecurityContext,
@@ -83,15 +84,10 @@ async def test_ascp_create_security_context_success(
     )
 
     response_json = json.loads(response)
-    assert "errors" in response_json
-    assert "response" in response_json
-    assert response_json["errors"] == []
+    assert "security_context" in response_json
+    assert response_json["security_context"] == created_security_context_data_fixture
     assert (
-        response_json["response"]["security_context"]
-        == created_security_context_data_fixture
-    )
-    assert (
-        response_json["response"]["security_context"]["id"]
+        response_json["security_context"]["id"]
         == "gid://gitlab/Ascp::SecurityContext/1"
     )
 
@@ -272,12 +268,9 @@ async def test_ascp_create_security_context_with_optional_fields(
     )
 
     response_json = json.loads(response)
-    assert response_json["errors"] == []
-    assert (
-        response_json["response"]["security_context"]["authenticationModel"] == "OAuth2"
-    )
-    assert response_json["response"]["security_context"]["authorizationModel"] == "RBAC"
-    assert response_json["response"]["security_context"]["dataSensitivity"] == "HIGH"
+    assert response_json["security_context"]["authenticationModel"] == "OAuth2"
+    assert response_json["security_context"]["authorizationModel"] == "RBAC"
+    assert response_json["security_context"]["dataSensitivity"] == "HIGH"
 
     call_args = gitlab_client_mock.graphql.call_args[0]
     assert call_args[1]["input"]["authenticationModel"] == "OAuth2"
@@ -290,26 +283,22 @@ async def test_ascp_create_security_context_graphql_top_level_errors(
     gitlab_client_mock,
     metadata,
 ):
-    """Top-level GraphQL errors (e.g. auth failures) are surfaced in the errors field."""
+    """Top-level GraphQL errors (e.g. auth failures) raise ToolException."""
     gitlab_client_mock.graphql = AsyncMock(
         return_value={"errors": [{"message": "Unauthorized"}]},
     )
 
     tool = CreateAscpSecurityContext(metadata=metadata)
 
-    response = await tool._arun(
-        project_path="namespace/project",
-        component_id="gid://gitlab/Ascp::Component/1",
-        scan_id="gid://gitlab/Ascp::Scan/1",
-        guidelines=[{"name": "Test", "operation": "READ"}],
-    )
+    with pytest.raises(ToolException) as exc_info:
+        await tool._arun(
+            project_path="namespace/project",
+            component_id="gid://gitlab/Ascp::Component/1",
+            scan_id="gid://gitlab/Ascp::Scan/1",
+            guidelines=[{"name": "Test", "operation": "READ"}],
+        )
 
-    response_json = json.loads(response)
-    assert isinstance(response_json["errors"], list)
-    assert response_json["errors"] == ["Unauthorized"]
-    assert response_json["response"]["raw_response"] == {
-        "errors": [{"message": "Unauthorized"}]
-    }
+    assert "Unauthorized" in str(exc_info.value)
 
 
 @pytest.mark.asyncio
@@ -317,21 +306,20 @@ async def test_ascp_create_security_context_response_without_key(
     gitlab_client_mock,
     metadata,
 ):
-    """When response has no ascpSecurityContextCreate key and no top-level errors, returns generic error."""
+    """When response has no ascpSecurityContextCreate key and no top-level errors, raises ToolException."""
     gitlab_client_mock.graphql = AsyncMock(return_value={})
 
     tool = CreateAscpSecurityContext(metadata=metadata)
 
-    response = await tool._arun(
-        project_path="namespace/project",
-        component_id="gid://gitlab/Ascp::Component/1",
-        scan_id="gid://gitlab/Ascp::Scan/1",
-        guidelines=[{"name": "Test", "operation": "READ"}],
-    )
+    with pytest.raises(ToolException) as exc_info:
+        await tool._arun(
+            project_path="namespace/project",
+            component_id="gid://gitlab/Ascp::Component/1",
+            scan_id="gid://gitlab/Ascp::Scan/1",
+            guidelines=[{"name": "Test", "operation": "READ"}],
+        )
 
-    response_json = json.loads(response)
-    assert isinstance(response_json["errors"], list)
-    assert response_json["errors"][0] == "Failed to create ASCP security context."
+    assert "Failed to create ASCP security context" in str(exc_info.value)
 
 
 @pytest.mark.asyncio
@@ -350,16 +338,15 @@ async def test_ascp_create_security_context_mutation_errors(
 
     tool = CreateAscpSecurityContext(metadata=metadata)
 
-    response = await tool._arun(
-        project_path="namespace/project",
-        component_id="gid://gitlab/Ascp::Component/999",
-        scan_id="gid://gitlab/Ascp::Scan/1",
-        guidelines=[{"name": "Test", "operation": "READ"}],
-    )
+    with pytest.raises(ToolException) as exc_info:
+        await tool._arun(
+            project_path="namespace/project",
+            component_id="gid://gitlab/Ascp::Component/999",
+            scan_id="gid://gitlab/Ascp::Scan/1",
+            guidelines=[{"name": "Test", "operation": "READ"}],
+        )
 
-    response_json = json.loads(response)
-    assert isinstance(response_json["errors"], list)
-    assert "Component not found" in response_json["errors"][0]
+    assert "Component not found" in str(exc_info.value)
 
 
 @pytest.mark.asyncio
@@ -367,7 +354,7 @@ async def test_ascp_create_security_context_multiple_errors(
     gitlab_client_mock,
     metadata,
 ):
-    """When mutation returns multiple errors, all appear in the tool response."""
+    """When mutation returns multiple errors, they are joined in ToolException."""
     gitlab_client_mock.graphql = AsyncMock(
         return_value={
             "ascpSecurityContextCreate": {
@@ -379,15 +366,17 @@ async def test_ascp_create_security_context_multiple_errors(
 
     tool = CreateAscpSecurityContext(metadata=metadata)
 
-    response = await tool._arun(
-        project_path="namespace/project",
-        component_id="gid://gitlab/Ascp::Component/1",
-        scan_id="gid://gitlab/Ascp::Scan/1",
-        guidelines=[{"name": "Test", "operation": "READ"}],
-    )
+    with pytest.raises(ToolException) as exc_info:
+        await tool._arun(
+            project_path="namespace/project",
+            component_id="gid://gitlab/Ascp::Component/1",
+            scan_id="gid://gitlab/Ascp::Scan/1",
+            guidelines=[{"name": "Test", "operation": "READ"}],
+        )
 
-    response_json = json.loads(response)
-    assert response_json["errors"] == ["Error one", "Error two"]
+    error_msg = str(exc_info.value)
+    assert "Error one" in error_msg
+    assert "Error two" in error_msg
 
 
 @pytest.mark.asyncio
@@ -401,19 +390,14 @@ async def test_ascp_create_security_context_exception(
 
     tool = CreateAscpSecurityContext(metadata=metadata)
 
-    response = await tool._arun(
-        project_path="namespace/project",
-        component_id="gid://gitlab/Ascp::Component/1",
-        scan_id="gid://gitlab/Ascp::Scan/1",
-        guidelines=[{"name": "Test", "operation": "READ"}],
-    )
-
-    response_json = json.loads(response)
-    assert isinstance(response_json["errors"], list)
-    assert len(response_json["errors"]) == 1
-    assert "ascp_create_security_context" in response_json["errors"][0]
-    assert "ConnectionError" in response_json["errors"][0]
-    assert "Network failure" in response_json["errors"][0]
+    # Exceptions propagate directly
+    with pytest.raises(ConnectionError, match="Network failure"):
+        await tool._arun(
+            project_path="namespace/project",
+            component_id="gid://gitlab/Ascp::Component/1",
+            scan_id="gid://gitlab/Ascp::Scan/1",
+            guidelines=[{"name": "Test", "operation": "READ"}],
+        )
 
 
 @pytest.mark.asyncio
@@ -421,23 +405,20 @@ async def test_ascp_create_security_context_malformed_response(
     gitlab_client_mock,
     metadata,
 ):
-    """Non-dict response (e.g. None) must return JSON with error list."""
+    """Non-dict response (e.g. None) raises ToolException."""
     gitlab_client_mock.graphql = AsyncMock(return_value=None)
 
     tool = CreateAscpSecurityContext(metadata=metadata)
 
-    response = await tool._arun(
-        project_path="namespace/project",
-        component_id="gid://gitlab/Ascp::Component/1",
-        scan_id="gid://gitlab/Ascp::Scan/1",
-        guidelines=[{"name": "Test", "operation": "READ"}],
-    )
+    with pytest.raises(ToolException) as exc_info:
+        await tool._arun(
+            project_path="namespace/project",
+            component_id="gid://gitlab/Ascp::Component/1",
+            scan_id="gid://gitlab/Ascp::Scan/1",
+            guidelines=[{"name": "Test", "operation": "READ"}],
+        )
 
-    response_json = json.loads(response)
-    assert isinstance(response_json["errors"], list)
-    assert any(
-        "no response or invalid format" in msg for msg in response_json["errors"]
-    )
+    assert "no response or invalid format" in str(exc_info.value)
 
 
 @pytest.mark.asyncio
@@ -445,7 +426,7 @@ async def test_ascp_create_security_context_missing_id(
     gitlab_client_mock,
     metadata,
 ):
-    """When mutation returns security_context without id, tool returns error."""
+    """When mutation returns security_context without id, tool raises ToolException."""
     gitlab_client_mock.graphql = AsyncMock(
         return_value={
             "ascpSecurityContextCreate": {
@@ -457,16 +438,15 @@ async def test_ascp_create_security_context_missing_id(
 
     tool = CreateAscpSecurityContext(metadata=metadata)
 
-    response = await tool._arun(
-        project_path="namespace/project",
-        component_id="gid://gitlab/Ascp::Component/1",
-        scan_id="gid://gitlab/Ascp::Scan/1",
-        guidelines=[{"name": "Test", "operation": "READ"}],
-    )
+    with pytest.raises(ToolException) as exc_info:
+        await tool._arun(
+            project_path="namespace/project",
+            component_id="gid://gitlab/Ascp::Component/1",
+            scan_id="gid://gitlab/Ascp::Scan/1",
+            guidelines=[{"name": "Test", "operation": "READ"}],
+        )
 
-    response_json = json.loads(response)
-    assert isinstance(response_json["errors"], list)
-    assert "Failed to create ASCP security context" in response_json["errors"][0]
+    assert "Failed to create ASCP security context" in str(exc_info.value)
 
 
 def test_ascp_create_security_context_format_display_message():

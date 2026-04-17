@@ -3,6 +3,7 @@ import json
 from unittest.mock import AsyncMock, Mock
 
 import pytest
+from langchain_core.tools import ToolException
 
 from duo_workflow_service.tools.ascp.list_components import (
     DEFAULT_PAGE_SIZE,
@@ -69,14 +70,11 @@ async def test_ascp_list_components_success(
     response = await tool._arun(project_path="namespace/project")
 
     response_json = json.loads(response)
-    assert response_json["errors"] == []
-    assert "response" in response_json
-    assert len(response_json["response"]["components"]) == 2
-    assert (
-        response_json["response"]["components"][0]["title"] == "Authentication Service"
-    )
-    assert response_json["response"]["page_info"]["has_next_page"] is False
-    assert response_json["response"]["raw_response"] is None
+    assert "components" in response_json
+    assert "page_info" in response_json
+    assert len(response_json["components"]) == 2
+    assert response_json["components"][0]["title"] == "Authentication Service"
+    assert response_json["page_info"]["has_next_page"] is False
 
     gitlab_client_mock.graphql.assert_called_once()
     call_args = gitlab_client_mock.graphql.call_args[0]
@@ -110,9 +108,8 @@ async def test_ascp_list_components_pagination_cursor(
     response = await tool._arun(project_path="namespace/project", first=10)
 
     response_json = json.loads(response)
-    assert response_json["errors"] == []
-    assert response_json["response"]["page_info"]["has_next_page"] is True
-    assert response_json["response"]["page_info"]["end_cursor"] == "cursor123"
+    assert response_json["page_info"]["has_next_page"] is True
+    assert response_json["page_info"]["end_cursor"] == "cursor123"
 
     # Caller passes end_cursor as after to fetch next page
     await tool._arun(project_path="namespace/project", first=10, after="cursor123")
@@ -173,8 +170,7 @@ async def test_ascp_list_components_empty_result(
     response = await tool._arun(project_path="namespace/project")
 
     response_json = json.loads(response)
-    assert response_json["errors"] == []
-    assert response_json["response"]["components"] == []
+    assert response_json["components"] == []
 
 
 @pytest.mark.asyncio
@@ -182,21 +178,17 @@ async def test_ascp_list_components_project_not_found(
     gitlab_client_mock,
     metadata,
 ):
-    """When project is null, tool returns error in unified response shape."""
+    """When project is null, tool raises ToolException."""
     gitlab_client_mock.graphql = AsyncMock(
         return_value={"project": None},
     )
 
     tool = ListAscpComponents(metadata=metadata)
 
-    response = await tool._arun(project_path="namespace/nonexistent")
+    with pytest.raises(ToolException) as exc_info:
+        await tool._arun(project_path="namespace/nonexistent")
 
-    response_json = json.loads(response)
-    assert isinstance(response_json["errors"], list)
-    assert len(response_json["errors"]) == 1
-    assert "not found or not accessible" in response_json["errors"][0]
-    assert response_json["response"]["components"] is None
-    assert response_json["response"]["raw_response"] == {"project": None}
+    assert "not found or not accessible" in str(exc_info.value)
 
 
 @pytest.mark.asyncio
@@ -204,7 +196,7 @@ async def test_ascp_list_components_graphql_top_level_errors(
     gitlab_client_mock,
     metadata,
 ):
-    """Top-level GraphQL errors (e.g. auth failures) are surfaced in the errors field."""
+    """Top-level GraphQL errors (e.g. auth failures) raise ToolException."""
     gitlab_client_mock.graphql = AsyncMock(
         return_value={
             "errors": [
@@ -216,13 +208,12 @@ async def test_ascp_list_components_graphql_top_level_errors(
 
     tool = ListAscpComponents(metadata=metadata)
 
-    response = await tool._arun(project_path="namespace/project")
+    with pytest.raises(ToolException) as exc_info:
+        await tool._arun(project_path="namespace/project")
 
-    response_json = json.loads(response)
-    assert isinstance(response_json["errors"], list)
-    assert "Unauthorized" in response_json["errors"]
-    assert "Feature not enabled" in response_json["errors"]
-    assert response_json["response"]["raw_response"] is not None
+    error_msg = str(exc_info.value)
+    assert "Unauthorized" in error_msg
+    assert "Feature not enabled" in error_msg
 
 
 @pytest.mark.asyncio
@@ -230,22 +221,16 @@ async def test_ascp_list_components_exception(
     gitlab_client_mock,
     metadata,
 ):
-    """Network errors return error in unified response shape (no ToolException raised)."""
+    """Network errors propagate directly."""
     gitlab_client_mock.graphql = AsyncMock(
         side_effect=ConnectionError("Network failure"),
     )
 
     tool = ListAscpComponents(metadata=metadata)
 
-    response = await tool._arun(project_path="namespace/project")
-
-    response_json = json.loads(response)
-    assert isinstance(response_json["errors"], list)
-    assert len(response_json["errors"]) == 1
-    assert "ascp_list_components failed" in response_json["errors"][0]
-    assert "ConnectionError" in response_json["errors"][0]
-    assert "Network failure" in response_json["errors"][0]
-    assert response_json["response"]["components"] is None
+    # Exceptions propagate directly
+    with pytest.raises(ConnectionError, match="Network failure"):
+        await tool._arun(project_path="namespace/project")
 
 
 @pytest.mark.asyncio
@@ -253,18 +238,15 @@ async def test_ascp_list_components_malformed_response(
     gitlab_client_mock,
     metadata,
 ):
-    """Non-dict response returns error in unified response shape."""
+    """Non-dict response raises ToolException."""
     gitlab_client_mock.graphql = AsyncMock(return_value=None)
 
     tool = ListAscpComponents(metadata=metadata)
 
-    response = await tool._arun(project_path="namespace/project")
+    with pytest.raises(ToolException) as exc_info:
+        await tool._arun(project_path="namespace/project")
 
-    response_json = json.loads(response)
-    assert isinstance(response_json["errors"], list)
-    assert any(
-        "no response or invalid format" in msg for msg in response_json["errors"]
-    )
+    assert "no response or invalid format" in str(exc_info.value)
 
 
 @pytest.mark.asyncio
@@ -326,19 +308,13 @@ async def test_ascp_list_components_full_request_and_response(
     assert variables["after"] == after
 
     response_json = json.loads(response)
-    assert response_json["errors"] == []
     expected_nodes = full_response["project"]["ascpComponents"]["nodes"]
     expected_page_info = full_response["project"]["ascpComponents"]["pageInfo"]
-    assert response_json["response"]["components"] == expected_nodes
+    assert response_json["components"] == expected_nodes
     assert (
-        response_json["response"]["page_info"]["has_next_page"]
-        == expected_page_info["hasNextPage"]
+        response_json["page_info"]["has_next_page"] == expected_page_info["hasNextPage"]
     )
-    assert (
-        response_json["response"]["page_info"]["end_cursor"]
-        == expected_page_info["endCursor"]
-    )
-    assert response_json["response"]["raw_response"] is None
+    assert response_json["page_info"]["end_cursor"] == expected_page_info["endCursor"]
 
 
 def test_ascp_list_components_format_display_message():

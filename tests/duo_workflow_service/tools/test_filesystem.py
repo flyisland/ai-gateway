@@ -21,7 +21,6 @@ from duo_workflow_service.tools.filesystem import (  # Mkdir,
     MkdirInput,
     ReadFile,
     ReadFileChunked,
-    ReadFileChunkedInput,
     ReadFileInput,
     ReadFiles,
     ReadFilesInput,
@@ -494,13 +493,11 @@ class TestReadFiles:
         tool.metadata = metadata
         file_paths = ["file1.py", "nonexistent.py"]
 
-        response = await tool._arun(file_paths)
-
-        assert response == "Could not read files"
-
-        mock_outbox.put_action_and_wait_for_response.assert_called_once()
-        action = mock_outbox.put_action_and_wait_for_response.call_args[0][0]
-        assert action.runReadFiles.filepaths == file_paths
+        # Empty protobuf response leads to empty string which causes JSONDecodeError
+        with pytest.raises(
+            ToolException, match="Could not parse file contents as JSON"
+        ):
+            await tool._arun(file_paths)
 
     @pytest.mark.asyncio
     async def test_read_files_with_none_response(self):
@@ -515,13 +512,11 @@ class TestReadFiles:
         tool.metadata = metadata
         file_paths = ["file1.py", "nonexistent.py"]
 
-        response = await tool._arun(file_paths)
-
-        assert response == "Could not read files"
-
-        mock_outbox.put_action_and_wait_for_response.assert_called_once()
-        action = mock_outbox.put_action_and_wait_for_response.call_args[0][0]
-        assert action.runReadFiles.filepaths == file_paths
+        # Empty protobuf response leads to empty string which causes JSONDecodeError
+        with pytest.raises(
+            ToolException, match="Could not parse file contents as JSON"
+        ):
+            await tool._arun(file_paths)
 
     @pytest.mark.asyncio
     async def test_read_files_with_error_response(self):
@@ -543,6 +538,57 @@ class TestReadFiles:
         file_paths = ["file1.py", "nonexistent.py"]
 
         with pytest.raises(ToolException, match="Action error: Error reading files"):
+            await tool._arun(file_paths)
+
+    @pytest.mark.asyncio
+    async def test_read_files_with_json_decode_error(self):
+        mock_outbox = MagicMock()
+        mock_outbox.put_action_and_wait_for_response = AsyncMock(
+            return_value=contract_pb2.ClientEvent(
+                actionResponse=contract_pb2.ActionResponse(
+                    plainTextResponse=contract_pb2.PlainTextResponse(
+                        response="invalid json {{{", error=""
+                    )
+                )
+            )
+        )
+
+        metadata = {"outbox": mock_outbox}
+
+        tool = ReadFiles(description="Read multiple files")
+        tool.metadata = metadata
+        file_paths = ["file1.py", "file2.py"]
+
+        with pytest.raises(
+            ToolException, match="Could not parse file contents as JSON"
+        ):
+            await tool._arun(file_paths)
+
+    @pytest.mark.asyncio
+    async def test_read_files_with_json_decode_error_and_executor_error(self):
+        # Note: This test verifies that when plainTextResponse has both error and response,
+        # the error is raised by _execute_action_and_get_action_response before we even
+        # try to parse JSON, so we get the Action error, not the JSON parse error
+        mock_outbox = MagicMock()
+        mock_outbox.put_action_and_wait_for_response = AsyncMock(
+            return_value=contract_pb2.ClientEvent(
+                actionResponse=contract_pb2.ActionResponse(
+                    plainTextResponse=contract_pb2.PlainTextResponse(
+                        response="invalid json {{{", error="Some executor error"
+                    )
+                )
+            )
+        )
+
+        metadata = {"outbox": mock_outbox}
+
+        tool = ReadFiles(description="Read multiple files")
+        tool.metadata = metadata
+        file_paths = ["file1.py", "file2.py"]
+
+        # When plainTextResponse.error is set, _execute_action_and_get_action_response
+        # raises before we get to JSON parsing
+        with pytest.raises(ToolException, match="Action error: Some executor error"):
             await tool._arun(file_paths)
 
     @pytest.mark.asyncio

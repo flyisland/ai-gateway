@@ -1,5 +1,6 @@
 from typing import Any, ClassVar, Optional, Type
 
+from langchain_core.tools import ToolException
 from pydantic import BaseModel, Field
 
 from duo_workflow_service.tools.ascp.queries import LIST_ASCP_SCANS_QUERY
@@ -14,21 +15,11 @@ DEFAULT_PAGE_SIZE = 50
 MAX_PAGE_SIZE = 100
 
 
-class ListAscpScansResponseBody(BaseModel):
-    """Nested response: scans list, page_info, and raw API payload."""
-
-    scans: Optional[list[dict[str, Any]]] = None
-    page_info: Optional[dict[str, Any]] = None
-    raw_response: Optional[dict[str, Any]] = None
-
-
 class ListAscpScansResponse(BaseModel):
-    """Unified response shape for success and error."""
+    """Response model for listing ASCP scans."""
 
-    errors: list[str] = Field(default_factory=list)
-    response: ListAscpScansResponseBody = Field(
-        default_factory=ListAscpScansResponseBody
-    )
+    scans: list[dict[str, Any]]
+    page_info: dict[str, Any]
 
 
 class ListAscpScansInput(BaseModel):
@@ -56,10 +47,7 @@ class ListAscpScansInput(BaseModel):
 class ListAscpScans(DuoBaseTool):
     """Tool for listing ASCP (Application Security Collaboration Platform) scans for a project.
 
-    Returned JSON uses a single shape for success and error: {"errors": list[str],
-    "response": {"scans": ... | null, "page_info": ... | null, "raw_response": ... | null}}.
-    Success when errors is empty and response.scans / response.page_info are set; on error,
-    errors is non-empty and response contains raw_response (raw GraphQL payload) when available.
+    On success, returns JSON with scans list and pagination info. On error, raises ToolException with error details.
     """
 
     tier_check_licensed_feature: ClassVar[str] = LICENSED_FEATURE_SECURITY_DASHBOARD
@@ -101,47 +89,23 @@ class ListAscpScans(DuoBaseTool):
         if after is not None:
             variables["after"] = after
 
-        try:
-            response = await self.gitlab_client.graphql(
-                LIST_ASCP_SCANS_QUERY,
-                variables,
-            )
-        except Exception as e:
-            return ListAscpScansResponse(
-                errors=[
-                    f"ascp_list_scans failed: {type(e).__name__}: {e!s}",
-                ],
-                response=ListAscpScansResponseBody(
-                    scans=None, page_info=None, raw_response=None
-                ),
-            ).model_dump_json()
+        response = await self.gitlab_client.graphql(
+            LIST_ASCP_SCANS_QUERY,
+            variables,
+        )
 
         if not isinstance(response, dict):
-            return ListAscpScansResponse(
-                errors=["GraphQL returned no response or invalid format"],
-                response=ListAscpScansResponseBody(
-                    scans=None, page_info=None, raw_response=None
-                ),
-            ).model_dump_json()
+            raise ToolException("GraphQL returned no response or invalid format")
 
         graphql_errors = response.get("errors")
         if graphql_errors:
             messages = parse_graphql_errors(graphql_errors)
-            return ListAscpScansResponse(
-                errors=messages,
-                response=ListAscpScansResponseBody(
-                    scans=None, page_info=None, raw_response=response
-                ),
-            ).model_dump_json()
+            exc_message = "; ".join(messages)
+            raise ToolException(exc_message)
 
         project = response.get("project")
         if project is None:
-            return ListAscpScansResponse(
-                errors=["Project not found or access denied"],
-                response=ListAscpScansResponseBody(
-                    scans=None, page_info=None, raw_response=response
-                ),
-            ).model_dump_json()
+            raise ToolException("Project not found or access denied")
 
         ascp_scans = project.get("ascpScans") or {}
         nodes = ascp_scans.get("nodes") or []
@@ -152,8 +116,5 @@ class ListAscpScans(DuoBaseTool):
             "end_cursor": page_info.get("endCursor"),
         }
         return ListAscpScansResponse(
-            errors=[],
-            response=ListAscpScansResponseBody(
-                scans=nodes, page_info=page_info_dict, raw_response=None
-            ),
+            scans=nodes, page_info=page_info_dict
         ).model_dump_json()
