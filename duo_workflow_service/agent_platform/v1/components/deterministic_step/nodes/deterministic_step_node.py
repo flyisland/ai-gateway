@@ -1,4 +1,4 @@
-from typing import Any
+from typing import Any, Sequence
 
 import structlog
 from langchain_core.tools import BaseTool
@@ -14,6 +14,7 @@ from duo_workflow_service.agent_platform.v1.components.deterministic_step.ui_log
 from duo_workflow_service.agent_platform.v1.state import (
     FlowState,
     IOKey,
+    RuntimeIOKey,
     get_vars_from_state,
     merge_nested_dict,
 )
@@ -37,7 +38,7 @@ class DeterministicStepNode:
         *,
         name: str,
         tool_name: str,
-        inputs: list[IOKey],
+        inputs: Sequence[IOKey | RuntimeIOKey],
         ui_history: UIHistory[
             UILogWriterDeterministicStep, UILogEventsDeterministicStep
         ],

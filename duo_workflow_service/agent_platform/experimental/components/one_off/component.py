@@ -152,13 +152,13 @@ class OneOffComponent(AgentComponentBase):
                 writer_class=UILogWriterOneOffTools,
             ),
             tracker=tracker,
-            tool_calls_key=self._tool_calls_key.to_iokey(  # type: ignore[arg-type]
+            tool_calls_key=self._tool_calls_key.to_iokey(
                 {IOKeyTemplate.COMPONENT_NAME_TEMPLATE: self.name}
             ),
-            tool_responses_key=self._tool_responses_key.to_iokey(  # type: ignore[arg-type]
+            tool_responses_key=self._tool_responses_key.to_iokey(
                 {IOKeyTemplate.COMPONENT_NAME_TEMPLATE: self.name}
             ),
-            execution_result_key=self._execution_result_key.to_iokey(  # type: ignore[arg-type]
+            execution_result_key=self._execution_result_key.to_iokey(
                 {IOKeyTemplate.COMPONENT_NAME_TEMPLATE: self.name}
             ),
             conversation_history_key=IOKey(

@@ -1,12 +1,17 @@
 # pylint: disable=too-many-lines
+from unittest.mock import Mock
+
 import pytest
 from langchain_core.messages import AIMessage, HumanMessage, SystemMessage
 from pydantic import ValidationError
 
 from duo_workflow_service.agent_platform.v1.state import (
+    BaseIOKey,
     FlowState,
     IOKey,
+    IOKeyFactory,
     IOKeyTemplate,
+    RuntimeIOKey,
     conversation_history_replace_reducer,
     create_nested_dict,
     get_vars_from_state,
@@ -1130,6 +1135,65 @@ class TestIOKeyTemplate:
         assert io_key.target == "context"
         assert io_key.subkeys == ["component1", "config"]
 
+    def test_to_iokey_preserves_optional(self):
+        """Test that to_iokey preserves the optional field from the template."""
+        template = IOKeyTemplate(
+            target="context", subkeys=["<name>", "config"], optional=True
+        )
+        replacements = {"<name>": "component1"}
+
+        io_key = template.to_iokey(replacements)
+
+        assert isinstance(io_key, IOKey)
+        assert io_key.optional is True
+
+    def test_template_constants_are_defined(self):
+        """Test that all expected template constants are defined on IOKeyTemplate."""
+        assert IOKeyTemplate.COMPONENT_NAME_TEMPLATE == "<name>"
+        assert (
+            IOKeyTemplate.SENDS_RESPONSE_TO_COMPONENT_NAME_TEMPLATE
+            == "<sends_response_to_component>"
+        )
+        assert IOKeyTemplate.SUPERVISOR_NAME_TEMPLATE == "<supervisor_name>"
+        assert IOKeyTemplate.SUBAGENT_NAME_TEMPLATE == "<subagent_name>"
+        assert IOKeyTemplate.SUBSESSION_ID_TEMPLATE == "<subsession_id>"
+
+    def test_supervisor_name_template_replacement(self):
+        """Test using SUPERVISOR_NAME_TEMPLATE constant for replacement."""
+        template = IOKeyTemplate(
+            target="context",
+            subkeys=[IOKeyTemplate.SUPERVISOR_NAME_TEMPLATE, "goal"],
+        )
+        replacements = {IOKeyTemplate.SUPERVISOR_NAME_TEMPLATE: "my_supervisor"}
+
+        io_key = template.to_iokey(replacements)
+
+        assert io_key.subkeys == ["my_supervisor", "goal"]
+
+    def test_subagent_name_template_replacement(self):
+        """Test using SUBAGENT_NAME_TEMPLATE constant for replacement."""
+        template = IOKeyTemplate(
+            target="context",
+            subkeys=[IOKeyTemplate.SUBAGENT_NAME_TEMPLATE, "result"],
+        )
+        replacements = {IOKeyTemplate.SUBAGENT_NAME_TEMPLATE: "my_subagent"}
+
+        io_key = template.to_iokey(replacements)
+
+        assert io_key.subkeys == ["my_subagent", "result"]
+
+    def test_subsession_id_template_replacement(self):
+        """Test using SUBSESSION_ID_TEMPLATE constant for replacement."""
+        template = IOKeyTemplate(
+            target="context",
+            subkeys=[IOKeyTemplate.SUBSESSION_ID_TEMPLATE, "output"],
+        )
+        replacements = {IOKeyTemplate.SUBSESSION_ID_TEMPLATE: "session-123"}
+
+        io_key = template.to_iokey(replacements)
+
+        assert io_key.subkeys == ["session-123", "output"]
+
 
 class TestIOKeyLiteralField:
     """Test IOKey literal field functionality."""
@@ -1401,3 +1465,158 @@ class TestIntegration:
         assert len(variables["main"]) == 2
         assert isinstance(variables["main"][0], SystemMessage)
         assert len(variables["ui_chat_log"]) == 2
+
+
+class TestBaseIOKey:
+    """Tests for BaseIOKey class."""
+
+    def test_template_variable_name_raises_not_implemented(self):
+        """BaseIOKey.template_variable_name raises NotImplementedError.
+
+        Concrete subclasses must override this property to provide their own resolution logic.
+        """
+        key = BaseIOKey(alias="my_alias")
+        with pytest.raises(NotImplementedError):
+            _ = key.template_variable_name
+
+    def test_alias_is_optional(self):
+        """BaseIOKey does not require alias — it is Optional[str] = None."""
+        key = BaseIOKey()
+        assert key.alias is None
+
+    def test_base_io_key_is_not_io_key(self):
+        """BaseIOKey is not an IOKey instance."""
+        key = BaseIOKey(alias="my_alias")
+        assert not isinstance(key, IOKey)
+
+    def test_base_io_key_optional_fields(self):
+        """BaseIOKey optional fields have correct defaults."""
+        key = BaseIOKey()
+        assert key.subkeys is None
+        assert key.literal is False
+        assert key.optional is False
+
+    def test_io_key_is_base_io_key(self):
+        """IOKey is a subclass of BaseIOKey."""
+        key = IOKey(target="status")
+        assert isinstance(key, BaseIOKey)
+
+    def test_io_key_template_is_base_io_key(self):
+        """IOKeyTemplate is a subclass of BaseIOKey (via IOKey)."""
+        key = IOKeyTemplate(target="status")
+        assert isinstance(key, BaseIOKey)
+        assert isinstance(key, IOKey)
+
+
+class TestRuntimeIOKey:
+    """Tests for RuntimeIOKey class."""
+
+    @pytest.fixture
+    def base_state(self) -> FlowState:
+        return {
+            "status": WorkflowStatusEnum.EXECUTION,
+            "conversation_history": {},
+            "ui_chat_log": [],
+            "context": {"agent": {"final_answer": "hello"}},
+        }
+
+    @pytest.fixture
+    def resolved_key(self) -> IOKey:
+        return IOKey(target="context", subkeys=["agent", "final_answer"])
+
+    def test_alias_is_required(self):
+        """RuntimeIOKey requires alias to be provided."""
+        with pytest.raises(ValidationError):
+            RuntimeIOKey(factory=lambda _: IOKey(target="status"))
+
+    def test_template_variable_name_returns_alias(self, resolved_key):
+        """template_variable_name returns the alias."""
+        key = RuntimeIOKey(alias="final_answer", factory=lambda _: resolved_key)
+        assert key.template_variable_name == "final_answer"
+
+    def test_to_iokey_delegates_to_factory(self, base_state, resolved_key):
+        """to_iokey(state) calls the factory with state and returns the result."""
+        key = RuntimeIOKey(alias="final_answer", factory=lambda _: resolved_key)
+        result = key.to_iokey(base_state)
+        assert result is resolved_key
+
+    def test_to_iokey_passes_state_to_factory(self, base_state):
+        """to_iokey passes the state to the factory callable."""
+        factory = Mock(return_value=IOKey(target="status"))
+        key = RuntimeIOKey(alias="status", factory=factory)
+        key.to_iokey(base_state)
+        factory.assert_called_once_with(base_state)
+
+    def test_value_from_state_delegates_to_resolved_key(self, base_state, resolved_key):
+        """value_from_state resolves the key and reads from state."""
+        key = RuntimeIOKey(alias="final_answer", factory=lambda _: resolved_key)
+        value = key.value_from_state(base_state)
+        assert value == "hello"
+
+    def test_template_variable_from_state_delegates_to_resolved_key(
+        self, base_state, resolved_key
+    ):
+        """template_variable_from_state resolves the key and returns its template variable."""
+        key = RuntimeIOKey(alias="final_answer", factory=lambda _: resolved_key)
+        result = key.template_variable_from_state(base_state)
+        assert result == {"final_answer": "hello"}
+
+    def test_runtime_io_key_is_subclass_of_base_io_key(self, resolved_key):
+        """RuntimeIOKey is a subclass of BaseIOKey but not IOKey."""
+        key = RuntimeIOKey(alias="final_answer", factory=lambda _: resolved_key)
+        assert isinstance(key, BaseIOKey)
+        assert not isinstance(key, IOKey)
+
+    def test_factory_can_use_state_to_resolve_dynamic_key(self, base_state):
+        """Factory can use runtime state to determine which key to resolve."""
+
+        def dynamic_factory(state):
+            subsession_id = state["context"]["agent"]["final_answer"]
+            return IOKey(target="context", subkeys=["agent", subsession_id])
+
+        key = RuntimeIOKey(alias="result", factory=dynamic_factory)
+        resolved = key.to_iokey(base_state)
+        assert resolved.subkeys == ["agent", "hello"]
+
+    def test_target_attribute_does_not_exist(self, resolved_key):
+        """RuntimeIOKey has no ``target`` field.
+
+        ``target`` belongs to ``IOKey``, not ``BaseIOKey``.  Since
+        ``RuntimeIOKey`` inherits from ``BaseIOKey`` directly, accessing
+        ``target`` raises ``AttributeError``.  Callers must use
+        ``to_iokey(state).target`` to obtain the resolved target.
+        """
+        key = RuntimeIOKey(alias="final_answer", factory=lambda _: resolved_key)
+        with pytest.raises(AttributeError):
+            _ = key.target
+
+    def test_to_nested_dict_delegates_to_resolved_key(self, base_state, resolved_key):
+        """to_nested_dict(value, state) resolves the key and delegates to IOKey.to_nested_dict."""
+        key = RuntimeIOKey(alias="final_answer", factory=lambda _: resolved_key)
+        result = key.to_nested_dict("world", base_state)
+        assert result == {"context": {"agent": {"final_answer": "world"}}}
+
+    def test_to_nested_dict_uses_state_to_resolve_key(self, base_state):
+        """to_nested_dict passes state to the factory to resolve the concrete key."""
+        factory = Mock(return_value=IOKey(target="status"))
+        key = RuntimeIOKey(alias="status", factory=factory)
+        result = key.to_nested_dict("active", base_state)
+        factory.assert_called_once_with(base_state)
+        assert result == {"status": "active"}
+
+    def test_get_vars_from_state_with_runtime_io_key(self, base_state, resolved_key):
+        """get_vars_from_state works with a mix of IOKey and RuntimeIOKey."""
+        runtime_key = RuntimeIOKey(alias="final_answer", factory=lambda _: resolved_key)
+        static_key = IOKey(target="status")
+
+        variables = get_vars_from_state([static_key, runtime_key], base_state)
+
+        assert variables["status"] == WorkflowStatusEnum.EXECUTION
+        assert variables["final_answer"] == "hello"
+
+    def test_io_key_factory_type_alias(self):
+        """IOKeyFactory is a callable type alias for (FlowState) -> IOKey."""
+        # Verify it can be used as a type annotation
+        factory: IOKeyFactory = lambda state: IOKey(target="status")
+        key = RuntimeIOKey(alias="status", factory=factory)
+        assert key.alias == "status"
