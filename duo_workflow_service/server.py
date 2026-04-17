@@ -88,6 +88,7 @@ from lib.billing_events import (
     BillingEvent,
     BillingEventService,
     ExecutionEnvironment,
+    SelfHostedLLMOperations,
 )
 from lib.context import client_capabilities, language_server_version
 from lib.events import GLReportingEventContext
@@ -706,6 +707,7 @@ class DuoWorkflowService(contract_pb2_grpc.DuoWorkflowServicer):
                     category=self.__class__.__name__,
                     unit_of_measure="request",
                     quantity=1,
+                    llm_ops=SelfHostedLLMOperations.get_operations(),
                 )
 
                 log.info(

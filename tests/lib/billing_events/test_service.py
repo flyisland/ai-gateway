@@ -224,19 +224,17 @@ class TestBillingEventService:
                 category="test_category",
             )
 
-    @patch("lib.billing_events.service.self_hosted_dap_billing_enabled")
     @patch("lib.billing_events.service.get_llm_operations")
     @pytest.mark.parametrize(
         ("explicit_ops_provided", "expected_model"),
         [
-            (False, "self-hosted-model"),  # Self-hosted takes priority over context
-            (True, "self-hosted-model"),  # Self-hosted takes priority over explicit
+            (False, "context-model"),  # Context ops used when no explicit ops provided
+            (True, "claude-3-5-sonnet"),  # Explicit ops take priority over context
         ],
     )
     def test_track_billing_operation_priority(
         self,
         mock_get_llm_operations,
-        mock_self_hosted_enabled,
         billing_service,
         billing_client,
         user,
@@ -245,8 +243,7 @@ class TestBillingEventService:
         explicit_ops_provided,
         expected_model,
     ):
-        """Test operation priority: self-hosted > explicit > context."""
-        mock_self_hosted_enabled.get.return_value = True
+        """Test operation priority: explicit > context."""
         mock_get_llm_operations.return_value = [
             {
                 "model_id": "context-model",
@@ -268,7 +265,6 @@ class TestBillingEventService:
             llm_ops=[llm_operation] if explicit_ops_provided else None,
         )
 
-        mock_get_llm_operations.assert_not_called()
         metadata = get_call_metadata(billing_client)
         assert metadata["llm_operations"][0]["model_id"] == expected_model
 

@@ -49,6 +49,7 @@ from duo_workflow_service.workflows.type_definitions import (
     AdditionalContext,
 )
 from lib.billing_events import BillingEvent, ExecutionEnvironment
+from lib.billing_events.service import SelfHostedLLMOperations
 from lib.context import client_capabilities
 from lib.events import GLReportingEventContext
 from lib.internal_events.context import InternalEventAdditionalProperties
@@ -1773,6 +1774,7 @@ async def test_track_self_hosted_execute_workflow_billing_event(_mock_container)
         category="DuoWorkflowService",
         unit_of_measure="request",
         quantity=1,
+        llm_ops=SelfHostedLLMOperations.get_operations(),
     )
 
 
