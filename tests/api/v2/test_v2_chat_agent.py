@@ -871,6 +871,112 @@ class TestReActAgentStream:
                 },
                 "duo_classic",
             ),
+            (
+                CloudConnectorUser(
+                    authenticated=True,
+                    claims=UserClaims(scopes=["duo_classic_chat"]),
+                ),
+                AgentRequest(
+                    messages=[
+                        Message(role=Role.USER, content="@GitLabDuo explain this diff")
+                    ]
+                ),
+                200,
+                "",
+                [
+                    call(
+                        "request_duo_classic_chat",
+                        category="ai_gateway.api.v2.chat.agent",
+                    )
+                ],
+                None,
+                {
+                    "custom_models": {"enabled": True},
+                    "process_level_feature_flags": {
+                        "duo_classic_chat_duo_core_cutoff": True
+                    },
+                },
+                "duo_core",
+            ),
+            # Preamble user message (injected MR context) precedes the @GitLabDuo trigger.
+            # The first user message has no ping; the last one does. Must be allowed.
+            (
+                CloudConnectorUser(
+                    authenticated=True,
+                    claims=UserClaims(scopes=["duo_classic_chat"]),
+                ),
+                AgentRequest(
+                    messages=[
+                        Message(
+                            role=Role.USER,
+                            content="Here is the MR diff: +added line\n-removed line",
+                        ),
+                        Message(
+                            role=Role.USER,
+                            content="@GitLabDuo explain this diff",
+                        ),
+                    ]
+                ),
+                200,
+                "",
+                [
+                    call(
+                        "request_duo_classic_chat",
+                        category="ai_gateway.api.v2.chat.agent",
+                    )
+                ],
+                None,
+                {
+                    "custom_models": {"enabled": True},
+                    "process_level_feature_flags": {
+                        "duo_classic_chat_duo_core_cutoff": True
+                    },
+                },
+                "duo_core",
+            ),
+            # Second ReAct step: user message with @GitLabDuo is NOT the last message;
+            # last message is the assistant scratchpad (content=None). Must still be allowed.
+            (
+                CloudConnectorUser(
+                    authenticated=True,
+                    claims=UserClaims(scopes=["duo_classic_chat"]),
+                ),
+                AgentRequest(
+                    messages=[
+                        Message(role=Role.USER, content="@GitLabDuo explain this diff"),
+                        Message(
+                            role=Role.ASSISTANT,
+                            content=None,
+                            agent_scratchpad=[
+                                AgentStep(
+                                    action=AgentToolAction(
+                                        thought="thought",
+                                        tool="merge_request_reader",
+                                        tool_input="{}",
+                                    ),
+                                    observation="MR data",
+                                )
+                            ],
+                        ),
+                    ]
+                ),
+                200,
+                "",
+                [
+                    call(
+                        "request_duo_classic_chat",
+                        category="ai_gateway.api.v2.chat.agent",
+                    )
+                ],
+                None,
+                {
+                    "custom_models": {"enabled": True},
+                    "process_level_feature_flags": {
+                        "duo_classic_chat_duo_core_cutoff": True
+                    },
+                },
+                "duo_core",
+            ),
         ],
     )
     async def test_authorization_with_duo_core_cutoff(

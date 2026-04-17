@@ -55,15 +55,41 @@ async def get_gl_agent_remote_executor_factory():
 def authorize_duo_core(
     request: Request,
     config: providers.Configuration,
+    agent_request: AgentRequest,
 ):
     if (
         request.headers.get(X_GITLAB_FEATURE_ENABLEMENT_TYPE_HEADER) == "duo_core"
         and config.process_level_feature_flags.duo_classic_chat_duo_core_cutoff()
     ):
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="Duo Core no longer authorized to access Duo Classic Chat",
-        )
+        # @GitLabDuo is present in the message when the request originates from
+        # DuoCodeReviewChatWorker, which is triggered by a user mentioning @GitLabDuo in an
+        # MR note. Classic Duo Chat requests never contain @GitLabDuo, so its presence
+        # reliably identifies a code review request — a flow that Duo Core users are still
+        # permitted to use.
+        #
+        # We search from the end of the message list because the @GitLabDuo mention is always
+        # the most recent user message (it's what triggers DuoCodeReviewChatWorker). Earlier
+        # user messages may be injected context (e.g. MR diff) that does not contain the ping.
+        # We also can't rely on messages[-1] alone: the Rails ReAct loop appends an assistant
+        # scratchpad message (content=None) after each tool execution and calls again, so the
+        # last message is often the assistant entry, not the user message.
+        try:
+            content = next(
+                (
+                    m.content
+                    for m in reversed(agent_request.messages)
+                    if m.role == Role.USER and m.content
+                ),
+                "",
+            )
+        except (IndexError, AttributeError, TypeError):
+            content = ""
+
+        if "@GitLabDuo" not in content:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Duo Core no longer authorized to access Duo Classic Chat",
+            )
 
 
 def authorize_additional_context(
@@ -188,7 +214,7 @@ async def chat(
 ):
     agent = get_agent(current_user, prompt_registry)
 
-    authorize_duo_core(request, config)
+    authorize_duo_core(request, config, agent_request)
     authorize_additional_context(current_user, agent_request, internal_event_client)
 
     async def _stream_handler(stream_events: AsyncIterator[TypeAgentEvent]):
