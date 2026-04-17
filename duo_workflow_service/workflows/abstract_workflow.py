@@ -37,7 +37,10 @@ from duo_workflow_service.checkpointer.notifier import UserInterface
 from duo_workflow_service.components import ToolsRegistry
 from duo_workflow_service.entities import DuoWorkflowStateType, WorkflowStatusEnum
 from duo_workflow_service.entities.state import MessageTypeEnum, ToolStatus, UiChatLog
-from duo_workflow_service.errors.typing import NotifiableException
+from duo_workflow_service.errors.typing import (
+    GENERIC_WORKFLOW_ERROR_MESSAGE,
+    NotifiableException,
+)
 from duo_workflow_service.executor.outbox import Outbox, OutboxSignal
 from duo_workflow_service.gitlab.events import get_event
 from duo_workflow_service.gitlab.executor_http_client import ExecutorGitLabHttpClient
@@ -407,44 +410,45 @@ class AbstractWorkflow(ABC):
                         await self._handle_non_values_stream_event(type, state)
 
                 return self._extract_trace_output(last_state)
-        except NotifiableException as e:
-            # Retrieve the original exception from the NotifiableException
-            self.last_error = e.__cause__
-
-            await self.checkpoint_notifier.send_event(
-                type="values",
-                state={
-                    "status": WorkflowStatusEnum.ERROR,
-                    "ui_chat_log": [
-                        UiChatLog(
-                            message_type=MessageTypeEnum.AGENT,
-                            message_sub_type=None,
-                            content=str(e),
-                            timestamp=datetime.now(timezone.utc).isoformat(),
-                            status=ToolStatus.FAILURE,
-                            correlation_id=None,
-                            tool_info=None,
-                            additional_context=None,
-                            message_id=f"error-{str(uuid4())}",
-                        )
-                    ],
-                },
-                stream=self._stream,
-            )
-            raise TraceableException(e)
         except BaseException as e:
-            self.last_error = e
-            if str(e) == AIO_CANCEL_STOP_WORKFLOW_REQUEST:
+            is_notifiable = isinstance(e, NotifiableException)
+            is_cancel = str(e) == AIO_CANCEL_STOP_WORKFLOW_REQUEST
+
+            self.last_error = e.__cause__ if is_notifiable else e
+
+            # This needs to come before the send_event so we don't mess up the ui_chat_log
+            if not is_notifiable and not is_cancel:
+                await self._handle_workflow_failure(e, compiled_graph, graph_config)
+
+            if is_cancel:
                 # when workflow is cancelled with AIO_CANCEL_STOP_WORKFLOW_REQUEST, a new checkpoint is not created and
                 # internal workflow state is not updated, thus the clients don't receive a newCheckpoint notification
                 # here we send a notification with stopped status for clients to react accordingly
-                await self.checkpoint_notifier.send_event(
-                    type="values",
-                    state={"status": WorkflowStatusEnum.CANCELLED, "ui_chat_log": []},
-                    stream=self._stream,
-                )
+                status = WorkflowStatusEnum.CANCELLED
+                ui_chat_log = []
             else:
-                await self._handle_workflow_failure(e, compiled_graph, graph_config)
+                status = WorkflowStatusEnum.ERROR
+                content = str(e) if is_notifiable else GENERIC_WORKFLOW_ERROR_MESSAGE
+                ui_chat_log = [
+                    UiChatLog(
+                        message_type=MessageTypeEnum.AGENT,
+                        message_sub_type=None,
+                        content=content,
+                        timestamp=datetime.now(timezone.utc).isoformat(),
+                        status=ToolStatus.FAILURE,
+                        correlation_id=None,
+                        tool_info=None,
+                        additional_context=None,
+                        message_id=f"error-{str(uuid4())}",
+                    )
+                ]
+
+            await self.checkpoint_notifier.send_event(
+                type="values",
+                state={"status": status, "ui_chat_log": ui_chat_log},
+                stream=self._stream,
+            )
+
             raise TraceableException(e)
         finally:
             self.is_done = True

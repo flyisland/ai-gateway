@@ -30,6 +30,9 @@ from duo_workflow_service.agent_platform.experimental.state.base import (
     FlowEvent,
     FlowEventType,
 )
+from duo_workflow_service.agent_platform.v1.flows.base import (
+    persist_error_to_ui_chat_log,
+)
 from duo_workflow_service.checkpointer.gitlab_workflow_utils import (
     WorkflowStatusEventEnum,
 )
@@ -455,3 +458,17 @@ class Flow(AbstractWorkflow):
         log_exception(
             error, extra={"workflow_id": self._workflow_id, "source": __name__}
         )
+
+        if compiled_graph is not None:
+            existing_logs = (
+                list(self.checkpoint_notifier.ui_chat_log)
+                if self.checkpoint_notifier
+                else []
+            )
+            await persist_error_to_ui_chat_log(
+                compiled_graph=compiled_graph,
+                graph_config=graph_config,
+                existing_logs=existing_logs,
+                log=self.log,
+                workflow_id=self._workflow_id,
+            )

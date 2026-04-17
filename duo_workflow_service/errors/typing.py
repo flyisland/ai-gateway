@@ -1,5 +1,11 @@
 from langchain_core.tools import ToolException
 
+GENERIC_WORKFLOW_ERROR_MESSAGE = (
+    "There was an error processing your request in the"
+    " Duo Agent Platform, please contact support if"
+    " the issue persists."
+)
+
 
 class NotifiableException(Exception):
     pass
