@@ -1499,6 +1499,24 @@ class TestCodeCompletions:
 class TestGitLabModelProvider:
     """Tests for the GitLab model provider functionality."""
 
+    @staticmethod
+    def _make_mock_suggestion(
+        engine: str, name: str, text: str = "test completion"
+    ) -> Mock:
+        """Create a mock CodeSuggestionsOutput with model_metadata pre-configured."""
+        mock_suggestion = Mock()
+        mock_suggestion.text = text
+        mock_suggestion.score = 1.0
+        mock_suggestion.lang = "python"
+        mock_suggestion.metadata = None
+
+        mock_model_metadata = Mock()
+        mock_model_metadata.engine = engine
+        mock_model_metadata.name = name
+        mock_suggestion.model_metadata = mock_model_metadata
+
+        return mock_suggestion
+
     @pytest.mark.parametrize(
         (
             "provider",
@@ -1556,17 +1574,9 @@ class TestGitLabModelProvider:
             params=ChatLiteLLMParams(temperature=0.0, max_tokens=4096),
         )
 
-        mock_suggestion = Mock()
-        mock_suggestion.text = "test completion"
-        mock_suggestion.score = 1.0
-
-        mock_model_metadata = Mock()
-        mock_model_metadata.engine = expected_engine
-        mock_model_metadata.name = expected_model_name
-        mock_suggestion.model_metadata = mock_model_metadata
-
-        mock_suggestion.lang = "python"
-        mock_suggestion.metadata = None
+        mock_suggestion = self._make_mock_suggestion(
+            engine=expected_engine, name=expected_model_name
+        )
 
         def _mock_build_side_effect(*args, **kwargs):
             internal_event_client = args[6]
@@ -1644,17 +1654,9 @@ class TestGitLabModelProvider:
             params=ChatLiteLLMParams(temperature=0.0, max_tokens=4096),
         )
 
-        mock_suggestion = Mock()
-        mock_suggestion.text = "test completion"
-        mock_suggestion.score = 1.0
-
-        mock_model_metadata = Mock()
-        mock_model_metadata.engine = "vertex-ai"
-        mock_model_metadata.name = "codestral-2508"
-        mock_suggestion.model_metadata = mock_model_metadata
-
-        mock_suggestion.lang = "python"
-        mock_suggestion.metadata = None
+        mock_suggestion = self._make_mock_suggestion(
+            engine="vertex-ai", name="codestral-2508"
+        )
 
         with (
             patch(
@@ -1718,17 +1720,9 @@ class TestGitLabModelProvider:
             params=ChatLiteLLMParams(temperature=0.0, max_tokens=4096),
         )
 
-        mock_suggestion = Mock()
-        mock_suggestion.text = "test completion"
-        mock_suggestion.score = 1.0
-
-        mock_model = Mock()
-        mock_model.engine = "vertex-ai"
-        mock_model.name = "codestral-2508"
-        mock_suggestion.model = mock_model
-
-        mock_suggestion.lang = "python"
-        mock_suggestion.metadata = None
+        mock_suggestion = self._make_mock_suggestion(
+            engine="vertex-ai", name="codestral-2508"
+        )
 
         with (
             patch(
@@ -1794,17 +1788,9 @@ class TestGitLabModelProvider:
             params=ChatLiteLLMParams(temperature=0.0, max_tokens=4096),
         )
 
-        mock_suggestion = Mock()
-        mock_suggestion.text = "test completion"
-        mock_suggestion.score = 1.0
-
-        mock_model_metadata = Mock()
-        mock_model_metadata.engine = "vertex-ai"
-        mock_model_metadata.name = "claude-sonnet-4-20250929"
-        mock_suggestion.model_metadata = mock_model_metadata
-
-        mock_suggestion.lang = "python"
-        mock_suggestion.metadata = None
+        mock_suggestion = self._make_mock_suggestion(
+            engine="vertex-ai", name="claude-sonnet-4-20250929"
+        )
 
         with (
             patch(
@@ -1888,17 +1874,9 @@ class TestGitLabModelProvider:
             params=ChatLiteLLMParams(**params),
         )
 
-        mock_suggestion = Mock()
-        mock_suggestion.text = "test completion"
-        mock_suggestion.score = 1.0
-
-        mock_model = Mock()
-        mock_model.engine = "test-engine"
-        mock_model.name = "test-model"
-        mock_suggestion.model_metadata = mock_model
-
-        mock_suggestion.lang = "python"
-        mock_suggestion.metadata = None
+        mock_suggestion = self._make_mock_suggestion(
+            engine="test-engine", name="test-model"
+        )
 
         with (
             patch(
