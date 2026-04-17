@@ -1,5 +1,6 @@
 from typing import Any, Optional, Type
 
+from langchain_core.tools import ToolException
 from pydantic import BaseModel, ConfigDict, Field
 from pydantic.alias_generators import to_camel
 
@@ -43,20 +44,10 @@ class AscpSecurityGuidelineInput(BaseModel):
     )
 
 
-class CreateAscpSecurityContextResponseBody(BaseModel):
-    """Nested response: security context entity and raw API payload."""
-
-    security_context: Optional[dict[str, Any]] = None
-    raw_response: Optional[dict[str, Any]] = None
-
-
 class CreateAscpSecurityContextResponse(BaseModel):
-    """Unified response shape for success and error."""
+    """Response model for creating an ASCP security context."""
 
-    errors: list[str] = Field(default_factory=list)
-    response: CreateAscpSecurityContextResponseBody = Field(
-        default_factory=CreateAscpSecurityContextResponseBody
-    )
+    security_context: dict[str, Any]
 
 
 class CreateAscpSecurityContextInput(BaseModel):
@@ -101,10 +92,8 @@ class CreateAscpSecurityContextInput(BaseModel):
 class CreateAscpSecurityContext(DuoBaseTool):
     """Tool for creating an ASCP (Application Security Collaboration Platform) security context.
 
-    Returned JSON uses a single shape for success and error: {"errors": list[str],
-    "response": {"security_context": ... | null, "raw_response": ... | null}}. Success when
-    errors is empty and response.security_context is set; on error, errors is non-empty and
-    response contains security_context and/or raw_response (raw API payload) when available.
+    On success, returns JSON with the created security context details. On error, raises ToolException with error
+    details.
     """
 
     name: str = "ascp_create_security_context"
@@ -142,38 +131,19 @@ class CreateAscpSecurityContext(DuoBaseTool):
         )
         variables = {"input": input_data}
 
-        try:
-            response = await self.gitlab_client.graphql(
-                CREATE_ASCP_SECURITY_CONTEXT_MUTATION,
-                variables,
-            )
-        except Exception as e:
-            return CreateAscpSecurityContextResponse(
-                errors=[
-                    f"ascp_create_security_context failed: {type(e).__name__}: {e!s}",
-                ],
-                response=CreateAscpSecurityContextResponseBody(
-                    security_context=None, raw_response=None
-                ),
-            ).model_dump_json()
+        response = await self.gitlab_client.graphql(
+            CREATE_ASCP_SECURITY_CONTEXT_MUTATION,
+            variables,
+        )
 
         if not isinstance(response, dict):
-            return CreateAscpSecurityContextResponse(
-                errors=["GraphQL returned no response or invalid format"],
-                response=CreateAscpSecurityContextResponseBody(
-                    security_context=None, raw_response=None
-                ),
-            ).model_dump_json()
+            raise ToolException("GraphQL returned no response or invalid format")
 
         graphql_errors = response.get("errors")
         if graphql_errors:
             messages = parse_graphql_errors(graphql_errors)
-            return CreateAscpSecurityContextResponse(
-                errors=messages,
-                response=CreateAscpSecurityContextResponseBody(
-                    security_context=None, raw_response=response
-                ),
-            ).model_dump_json()
+            exc_message = "; ".join(messages)
+            raise ToolException(exc_message)
 
         payload = response.get("ascpSecurityContextCreate") or {}
 
@@ -183,24 +153,11 @@ class CreateAscpSecurityContext(DuoBaseTool):
         if errors:
             if not isinstance(errors, list):
                 errors = [str(errors)]
-            return CreateAscpSecurityContextResponse(
-                errors=errors,
-                response=CreateAscpSecurityContextResponseBody(
-                    security_context=security_context, raw_response=payload
-                ),
-            ).model_dump_json()
+            raise ToolException("; ".join(errors))
 
         if not security_context or not security_context.get("id"):
-            return CreateAscpSecurityContextResponse(
-                errors=["Failed to create ASCP security context."],
-                response=CreateAscpSecurityContextResponseBody(
-                    security_context=security_context, raw_response=payload
-                ),
-            ).model_dump_json()
+            raise ToolException("Failed to create ASCP security context.")
 
         return CreateAscpSecurityContextResponse(
-            errors=[],
-            response=CreateAscpSecurityContextResponseBody(
-                security_context=security_context, raw_response=None
-            ),
+            security_context=security_context
         ).model_dump_json()

@@ -1,3 +1,4 @@
+# pylint: disable=file-naming-for-tests
 import json
 from unittest.mock import AsyncMock, Mock
 
@@ -224,7 +225,7 @@ async def test_create_diff_note_with_renamed_file(
 
 
 @pytest.mark.asyncio
-async def test_create_diff_note_no_line_provided(gitlab_client_mock, metadata):
+async def test_create_diff_note_no_line_provided(metadata):
     """Test error when neither old_line nor new_line is provided."""
     tool = CreateMergeRequestDiffNote(metadata=metadata)
 
@@ -242,7 +243,7 @@ async def test_create_diff_note_no_line_provided(gitlab_client_mock, metadata):
 
 @pytest.mark.asyncio
 async def test_create_diff_note_diff_refs_fetch_failure(gitlab_client_mock, metadata):
-    """Test error when fetching diff_refs fails (non-JSON body triggers JSONDecodeError)."""
+    """Test error when fetching diff_refs fails."""
     mr_error_response = GitLabHttpResponse(
         status_code=404,
         body="Not Found",
@@ -273,7 +274,7 @@ async def test_create_diff_note_diff_refs_missing(gitlab_client_mock, metadata):
 
     tool = CreateMergeRequestDiffNote(metadata=metadata)
 
-    with pytest.raises(ToolException):
+    with pytest.raises(ToolException) as exc_info:
         await tool._arun(
             project_id=1,
             merge_request_iid=9,
@@ -282,6 +283,8 @@ async def test_create_diff_note_diff_refs_missing(gitlab_client_mock, metadata):
             new_path="src/main.py",
             new_line=1,
         )
+
+    assert "diff_refs not available" in str(exc_info.value)
 
 
 @pytest.mark.asyncio
@@ -304,7 +307,7 @@ async def test_create_diff_note_post_exception(
             new_line=1,
         )
 
-    assert str(exc_info.value) == "API error"
+    assert "API error" in str(exc_info.value)
 
 
 @pytest.mark.asyncio
@@ -439,7 +442,8 @@ async def test_create_diff_note_with_url_success(
                 new_path="src/main.py",
                 new_line=10,
             ),
-            "Add inline diff note to src/main.py:new_line=10 in merge request https://gitlab.com/namespace/project/-/merge_requests/42",
+            "Add inline diff note to src/main.py:new_line=10 in merge request "
+            "https://gitlab.com/namespace/project/-/merge_requests/42",
         ),
         (
             CreateMergeRequestDiffNoteInput(
@@ -449,7 +453,8 @@ async def test_create_diff_note_with_url_success(
                 new_path="src/main.py",
                 old_line=5,
             ),
-            "Add inline diff note to src/main.py:old_line=5 in merge request https://gitlab.com/namespace/project/-/merge_requests/42",
+            "Add inline diff note to src/main.py:old_line=5 in merge request "
+            "https://gitlab.com/namespace/project/-/merge_requests/42",
         ),
     ],
 )

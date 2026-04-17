@@ -1,8 +1,8 @@
-# pylint: disable=file-naming-for-tests
 import json
 from unittest.mock import AsyncMock, Mock
 
 import pytest
+from langchain_core.tools import ToolException
 
 from duo_workflow_service.tools.ascp.create_scan import (
     CreateAscpScan,
@@ -64,12 +64,10 @@ async def test_ascp_create_scan_success(
     )
 
     response_json = json.loads(response)
-    assert "errors" in response_json
-    assert "response" in response_json
-    assert response_json["errors"] == []
-    assert response_json["response"]["scan"] == created_scan_data_fixture
-    assert response_json["response"]["scan"]["scanType"] == "FULL"
-    assert response_json["response"]["scan"]["commitSha"] == "abc123def456789"
+    assert "scan" in response_json
+    assert response_json["scan"] == created_scan_data_fixture
+    assert response_json["scan"]["scanType"] == "FULL"
+    assert response_json["scan"]["commitSha"] == "abc123def456789"
 
     gitlab_client_mock.graphql.assert_called_once()
     call_args = gitlab_client_mock.graphql.call_args[0]
@@ -110,12 +108,9 @@ async def test_ascp_create_scan_incremental_with_base(
     )
 
     response_json = json.loads(response)
-    assert response_json["errors"] == []
-    assert response_json["response"]["scan"]["scanType"] == "INCREMENTAL"
-    assert (
-        response_json["response"]["scan"]["baseScan"]["id"]
-        == "gid://gitlab/Ascp::Scan/0"
-    )
+    assert "scan" in response_json
+    assert response_json["scan"]["scanType"] == "INCREMENTAL"
+    assert response_json["scan"]["baseScan"]["id"] == "gid://gitlab/Ascp::Scan/0"
 
     call_args = gitlab_client_mock.graphql.call_args[0]
     assert call_args[1]["input"]["scanType"] == "INCREMENTAL"
@@ -128,24 +123,20 @@ async def test_ascp_create_scan_graphql_top_level_errors(
     gitlab_client_mock,
     metadata,
 ):
-    """Top-level GraphQL errors (e.g. auth failures) are surfaced in the errors field."""
+    """Top-level GraphQL errors (e.g. auth failures) raise ToolException."""
     gitlab_client_mock.graphql = AsyncMock(
         return_value={"errors": [{"message": "Unauthorized"}]},
     )
 
     tool = CreateAscpScan(metadata=metadata)
 
-    response = await tool._arun(
-        project_path="namespace/project",
-        commit_sha="abc123",
-    )
+    with pytest.raises(ToolException) as exc_info:
+        await tool._arun(
+            project_path="namespace/project",
+            commit_sha="abc123",
+        )
 
-    response_json = json.loads(response)
-    assert isinstance(response_json["errors"], list)
-    assert response_json["errors"] == ["Unauthorized"]
-    assert response_json["response"]["raw_response"] == {
-        "errors": [{"message": "Unauthorized"}]
-    }
+    assert "Unauthorized" in str(exc_info.value)
 
 
 @pytest.mark.asyncio
@@ -158,16 +149,13 @@ async def test_ascp_create_scan_response_without_ascp_scan_create(
 
     tool = CreateAscpScan(metadata=metadata)
 
-    response = await tool._arun(
-        project_path="namespace/project",
-        commit_sha="abc123",
-    )
+    with pytest.raises(ToolException) as exc_info:
+        await tool._arun(
+            project_path="namespace/project",
+            commit_sha="abc123",
+        )
 
-    response_json = json.loads(response)
-    assert "errors" in response_json
-    assert "response" in response_json
-    assert isinstance(response_json["errors"], list)
-    assert response_json["errors"][0] == "Failed to create ASCP scan."
+    assert "Failed to create ASCP scan" in str(exc_info.value)
 
 
 @pytest.mark.asyncio
@@ -186,16 +174,13 @@ async def test_ascp_create_scan_mutation_errors(
 
     tool = CreateAscpScan(metadata=metadata)
 
-    response = await tool._arun(
-        project_path="namespace/project",
-        commit_sha="invalid",
-    )
+    with pytest.raises(ToolException) as exc_info:
+        await tool._arun(
+            project_path="namespace/project",
+            commit_sha="invalid",
+        )
 
-    response_json = json.loads(response)
-    assert "errors" in response_json
-    assert "response" in response_json
-    assert isinstance(response_json["errors"], list)
-    assert "Invalid commit SHA" in response_json["errors"][0]
+    assert "Invalid commit SHA" in str(exc_info.value)
 
 
 @pytest.mark.asyncio
@@ -203,7 +188,7 @@ async def test_ascp_create_scan_mutation_multiple_errors(
     gitlab_client_mock,
     metadata,
 ):
-    """When mutation returns multiple errors, all appear in the tool response."""
+    """When mutation returns multiple errors, they are joined in ToolException."""
     gitlab_client_mock.graphql = AsyncMock(
         return_value={
             "ascpScanCreate": {
@@ -215,16 +200,15 @@ async def test_ascp_create_scan_mutation_multiple_errors(
 
     tool = CreateAscpScan(metadata=metadata)
 
-    response = await tool._arun(
-        project_path="namespace/project",
-        commit_sha="abc123",
-    )
+    with pytest.raises(ToolException) as exc_info:
+        await tool._arun(
+            project_path="namespace/project",
+            commit_sha="abc123",
+        )
 
-    response_json = json.loads(response)
-    assert "errors" in response_json
-    assert "response" in response_json
-    assert isinstance(response_json["errors"], list)
-    assert response_json["errors"] == ["Error one", "Error two"]
+    error_msg = str(exc_info.value)
+    assert "Error one" in error_msg
+    assert "Error two" in error_msg
 
 
 @pytest.mark.asyncio
@@ -238,19 +222,12 @@ async def test_ascp_create_scan_exception(
 
     tool = CreateAscpScan(metadata=metadata)
 
-    response = await tool._arun(
-        project_path="namespace/project",
-        commit_sha="abc123",
-    )
-
-    response_json = json.loads(response)
-    assert "errors" in response_json
-    assert "response" in response_json
-    assert isinstance(response_json["errors"], list)
-    assert len(response_json["errors"]) == 1
-    assert "ascp_create_scan" in response_json["errors"][0]
-    assert "ConnectionError" in response_json["errors"][0]
-    assert "Network failure" in response_json["errors"][0]
+    # Exceptions propagate directly
+    with pytest.raises(ConnectionError, match="Network failure"):
+        await tool._arun(
+            project_path="namespace/project",
+            commit_sha="abc123",
+        )
 
 
 @pytest.mark.asyncio
@@ -277,9 +254,8 @@ async def test_ascp_create_scan_default_scan_type(
     )
 
     response_json = json.loads(response)
-    assert response_json["errors"] == []
-    assert "response" in response_json
-    assert response_json["response"]["scan"] is not None
+    assert "scan" in response_json
+    assert response_json["scan"] is not None
     call_args = gitlab_client_mock.graphql.call_args[0]
     assert call_args[1]["input"]["scanType"] == "FULL"
 
@@ -289,23 +265,18 @@ async def test_ascp_create_scan_malformed_response(
     gitlab_client_mock,
     metadata,
 ):
-    """Non-dict response (e.g. None) must return JSON with error list."""
+    """Non-dict response (e.g. None) raises ToolException."""
     gitlab_client_mock.graphql = AsyncMock(return_value=None)
 
     tool = CreateAscpScan(metadata=metadata)
 
-    response = await tool._arun(
-        project_path="namespace/project",
-        commit_sha="abc123",
-    )
+    with pytest.raises(ToolException) as exc_info:
+        await tool._arun(
+            project_path="namespace/project",
+            commit_sha="abc123",
+        )
 
-    response_json = json.loads(response)
-    assert "errors" in response_json
-    assert "response" in response_json
-    assert isinstance(response_json["errors"], list)
-    assert any(
-        "no response or invalid format" in msg for msg in response_json["errors"]
-    )
+    assert "no response or invalid format" in str(exc_info.value)
 
 
 @pytest.mark.asyncio
@@ -313,7 +284,7 @@ async def test_ascp_create_scan_missing_scan_id(
     gitlab_client_mock,
     metadata,
 ):
-    """When mutation returns scan without id, tool returns error."""
+    """When mutation returns scan without id, tool raises ToolException."""
     gitlab_client_mock.graphql = AsyncMock(
         return_value={
             "ascpScanCreate": {
@@ -325,16 +296,13 @@ async def test_ascp_create_scan_missing_scan_id(
 
     tool = CreateAscpScan(metadata=metadata)
 
-    response = await tool._arun(
-        project_path="namespace/project",
-        commit_sha="abc123",
-    )
+    with pytest.raises(ToolException) as exc_info:
+        await tool._arun(
+            project_path="namespace/project",
+            commit_sha="abc123",
+        )
 
-    response_json = json.loads(response)
-    assert "errors" in response_json
-    assert "response" in response_json
-    assert isinstance(response_json["errors"], list)
-    assert "Failed to create ASCP scan" in response_json["errors"][0]
+    assert "Failed to create ASCP scan" in str(exc_info.value)
 
 
 def test_ascp_create_scan_format_display_message():

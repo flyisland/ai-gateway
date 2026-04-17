@@ -4,7 +4,7 @@ from enum import StrEnum
 from typing import Any, ClassVar, Optional, Type
 
 from langchain_core.tools import ToolException
-from packaging.version import InvalidVersion, Version
+from packaging.version import Version
 from pydantic import BaseModel, Field, field_validator
 
 from duo_workflow_service.security.tool_output_security import ToolTrustLevel
@@ -15,7 +15,6 @@ from duo_workflow_service.tools.duo_base_tool import (
 from duo_workflow_service.tools.vulnerabilities.queries.vulnerabilities import (
     LIST_VULNERABILITIES_QUERY,
 )
-from duo_workflow_service.tracking.errors import log_exception
 from lib.context import gitlab_version
 
 PROJECT_IDENTIFICATION_DESCRIPTION = """
@@ -634,17 +633,13 @@ class LinkVulnerabilityToMergeRequest(DuoBaseTool):
     args_schema: Type[BaseModel] = LinkVulnerabilityToMergeRequestInput
 
     async def _execute(self, **kwargs: Any) -> str:
-        version_18_2 = Version("18.2.0")
         version_18_5 = Version("18.5.0")
 
-        try:
-            gl_version = Version(gitlab_version.get())  # type: ignore[arg-type]
-        except (InvalidVersion, TypeError) as ex:
-            log_exception(ex)
-            gl_version = version_18_2
-
+        gl_version = Version(gitlab_version.get())  # type: ignore[arg-type]
         if gl_version < version_18_5:
-            raise ToolException("This tool is not available")
+            raise ToolException(
+                "This tool is not available, it requires GitLab 18.5 or later."
+            )
 
         vulnerability_id = str(kwargs.pop("vulnerability_id"))
         merge_request_id = str(kwargs.pop("merge_request_id"))

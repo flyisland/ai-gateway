@@ -233,24 +233,25 @@ class ReadFiles(DuoBaseTool):
                 log.error("Received empty grpc response")
                 return "Could not read files"
 
+            file_contents_result = (
+                file_contents_result_action_response.plainTextResponse.response
+            )
             try:
-                file_contents_result = (
-                    file_contents_result_action_response.plainTextResponse.response
-                )
                 result_dict = json.loads(file_contents_result)
             except json.JSONDecodeError as e:
-                log.error(f"Could not read files: {e}")
                 plain_text_response = (
                     file_contents_result_action_response.plainTextResponse
                 )
-                if plain_text_response:
-                    log.info(
-                        f"plainTextResponse.response_length={len(plain_text_response.response)}"
+                error_msg = f"Could not parse file contents as JSON: {e}"
+                if (
+                    plain_text_response
+                    and hasattr(plain_text_response, "error")
+                    and plain_text_response.error
+                ):
+                    error_msg = (
+                        f"{error_msg}. Executor error: {plain_text_response.error}"
                     )
-                    if plain_text_response.error:
-                        log.info(f"plainTextResponse.error={plain_text_response.error}")
-
-                return "Could not read files"
+                raise ToolException(error_msg)
 
         # Add excluded files with error messages
         for path in excluded_file_paths:

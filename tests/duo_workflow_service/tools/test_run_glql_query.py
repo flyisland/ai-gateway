@@ -119,17 +119,27 @@ async def test_connection_exception_propagates(
 
 @pytest.mark.asyncio
 @pytest.mark.parametrize(
-    "version,should_succeed",
+    "version,should_succeed,expected_exception",
     [
-        ("18.5.0", False),
-        ("18.6.0", True),
-        ("18.7.0", True),
-        ("19.0.0", True),
-        (None, False),
-        ("invalid", False),
+        ("18.5.0", False, ToolException),
+        ("18.6.0", True, None),
+        ("18.7.0", True, None),
+        ("19.0.0", True, None),
+        (
+            None,
+            False,
+            ToolException,
+        ),  # Invalid version caught and converted to ToolException
+        (
+            "invalid",
+            False,
+            ToolException,
+        ),  # Invalid version caught and converted to ToolException
     ],
 )
-async def test_version_check(version, should_succeed, glql_tool, mock_gitlab_client):
+async def test_version_check(
+    version, should_succeed, expected_exception, glql_tool, mock_gitlab_client
+):
     """Test that GLQL query only works with GitLab 18.6+."""
     mock_gitlab_client.apost.return_value = GitLabHttpResponse(
         status_code=200, body={"data": {"count": 0, "nodes": []}}
@@ -145,17 +155,11 @@ async def test_version_check(version, should_succeed, glql_tool, mock_gitlab_cli
                 {"glql_yaml": "```glql\nquery: type = Issue\n```"}
             )
             parsed = json.loads(response)
-            assert (
-                "error" not in parsed
-                or "GLQL API is only available" not in parsed.get("error", "")
-            )
+            assert "data" in parsed
             mock_gitlab_client.apost.assert_called_once()
         else:
-            with pytest.raises(ToolException) as exc_info:
+            with pytest.raises(expected_exception):
                 await glql_tool.arun({"glql_yaml": "```glql\nquery: type = Issue\n```"})
-            assert "GLQL API is only available in GitLab 18.6 and later" in str(
-                exc_info.value
-            )
             mock_gitlab_client.apost.assert_not_called()
 
 

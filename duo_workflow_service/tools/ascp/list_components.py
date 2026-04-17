@@ -1,5 +1,6 @@
 from typing import Any, Optional, Type
 
+from langchain_core.tools import ToolException
 from pydantic import BaseModel, ConfigDict, Field
 from pydantic.alias_generators import to_camel
 
@@ -11,21 +12,11 @@ DEFAULT_PAGE_SIZE = 50
 MAX_PAGE_SIZE = 100
 
 
-class ListAscpComponentsResponseBody(BaseModel):
-    """Nested response: components list, page_info, and raw API payload."""
-
-    components: Optional[list[dict[str, Any]]] = None
-    page_info: Optional[dict[str, Any]] = None
-    raw_response: Optional[dict[str, Any]] = None
-
-
 class ListAscpComponentsResponse(BaseModel):
-    """Unified response shape for success and error."""
+    """Response model for listing ASCP components."""
 
-    errors: list[str] = Field(default_factory=list)
-    response: ListAscpComponentsResponseBody = Field(
-        default_factory=ListAscpComponentsResponseBody
-    )
+    components: list[dict[str, Any]]
+    page_info: dict[str, Any]
 
 
 class ListAscpComponentsInput(BaseModel):
@@ -62,10 +53,8 @@ class ListAscpComponentsInput(BaseModel):
 class ListAscpComponents(DuoBaseTool):
     """Tool for listing ASCP (Application Security Collaboration Platform) components for a project.
 
-    Returned JSON uses a single shape for success and error: {"errors": list[str],
-    "response": {"components": ... | null, "page_info": ... | null, "raw_response": ... | null}}.
-    Success when errors is empty and response.components / response.page_info are set; on error,
-    errors is non-empty and response contains raw_response (raw GraphQL payload) when available.
+    On success, returns JSON with components list and pagination info. On error, raises ToolException with error
+    details.
     """
 
     name: str = "ascp_list_components"
@@ -92,47 +81,23 @@ class ListAscpComponents(DuoBaseTool):
         variables = parsed.model_dump(by_alias=True, exclude_none=True)
         project_path = parsed.project_path
 
-        try:
-            response = await self.gitlab_client.graphql(
-                LIST_ASCP_COMPONENTS_QUERY,
-                variables,
-            )
-        except Exception as e:
-            return ListAscpComponentsResponse(
-                errors=[
-                    f"ascp_list_components failed: {type(e).__name__}: {e!s}",
-                ],
-                response=ListAscpComponentsResponseBody(
-                    components=None, page_info=None, raw_response=None
-                ),
-            ).model_dump_json()
+        response = await self.gitlab_client.graphql(
+            LIST_ASCP_COMPONENTS_QUERY,
+            variables,
+        )
 
         if not isinstance(response, dict):
-            return ListAscpComponentsResponse(
-                errors=["GraphQL returned no response or invalid format"],
-                response=ListAscpComponentsResponseBody(
-                    components=None, page_info=None, raw_response=None
-                ),
-            ).model_dump_json()
+            raise ToolException("GraphQL returned no response or invalid format")
 
         graphql_errors = response.get("errors")
         if graphql_errors:
             messages = parse_graphql_errors(graphql_errors)
-            return ListAscpComponentsResponse(
-                errors=messages,
-                response=ListAscpComponentsResponseBody(
-                    components=None, page_info=None, raw_response=response
-                ),
-            ).model_dump_json()
+            exc_message = "; ".join(messages)
+            raise ToolException(exc_message)
 
         project_data = response.get("project")
         if project_data is None:
-            return ListAscpComponentsResponse(
-                errors=[f"Project '{project_path}' not found or not accessible"],
-                response=ListAscpComponentsResponseBody(
-                    components=None, page_info=None, raw_response=response
-                ),
-            ).model_dump_json()
+            raise ToolException(f"Project '{project_path}' not found or not accessible")
 
         ascp_components = project_data.get("ascpComponents") or {}
         nodes = ascp_components.get("nodes") or []
@@ -144,8 +109,5 @@ class ListAscpComponents(DuoBaseTool):
         }
 
         return ListAscpComponentsResponse(
-            errors=[],
-            response=ListAscpComponentsResponseBody(
-                components=nodes, page_info=page_info_dict, raw_response=None
-            ),
+            components=nodes, page_info=page_info_dict
         ).model_dump_json()
