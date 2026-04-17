@@ -2,13 +2,14 @@ import json
 from datetime import datetime, timezone
 from enum import StrEnum
 from typing import Any, Dict, Optional, override
+from uuid import uuid4
 
 import jsonschema
 from dependency_injector.wiring import Provide, inject
 from gitlab_cloud_connector import CloudConnectorUser
 from langgraph.checkpoint.base import BaseCheckpointSaver
 from langgraph.graph import StateGraph
-from langgraph.types import Command
+from langgraph.types import Command, Overwrite
 
 from ai_gateway.container import ContainerApplication
 from ai_gateway.prompts import BasePromptRegistry, InMemoryPromptRegistry
@@ -36,6 +37,7 @@ from duo_workflow_service.entities.state import (
     UiChatLog,
     WorkflowStatusEnum,
 )
+from duo_workflow_service.errors.typing import GENERIC_WORKFLOW_ERROR_MESSAGE
 from duo_workflow_service.interceptors.route import support_self_hosted_billing
 from duo_workflow_service.tracking.errors import log_exception
 from duo_workflow_service.workflows.abstract_workflow import (
@@ -45,7 +47,7 @@ from duo_workflow_service.workflows.type_definitions import AdditionalContext
 from lib.events import GLReportingEventContext
 from lib.internal_events.client import InternalEventsClient
 
-__all__ = ["Flow"]
+__all__ = ["Flow", "persist_error_to_ui_chat_log"]
 
 _EXECUTOR_CONTEXT = [
     "os_information",
@@ -58,6 +60,57 @@ _EXECUTOR_CONTEXT = [
 class UserDecision(StrEnum):
     APPROVE = "approval"
     REJECT = "rejection"
+
+
+async def persist_error_to_ui_chat_log(
+    compiled_graph: Any,
+    graph_config: Any,
+    existing_logs: list,
+    log: Any,
+    workflow_id: str,
+) -> None:
+    """Persist a generic error entry to the UI chat log via aupdate_state.
+
+    Appends a ``WORKFLOW_END`` / ``FAILURE`` log entry to *existing_logs* and
+    writes the combined list to the graph checkpoint using ``Overwrite`` so
+    that the reducer is bypassed entirely.  If ``aupdate_state`` raises, the
+    exception is caught and a warning is logged instead of propagating.
+
+    Args:
+        compiled_graph: The compiled LangGraph instance (must not be ``None``).
+        graph_config: The graph configuration dict passed to ``aupdate_state``.
+        existing_logs: The current ``ui_chat_log`` entries to preserve.
+        log: A structlog logger (or any object with a ``warning`` method).
+        workflow_id: The workflow identifier used in the warning log.
+    """
+    error_message = GENERIC_WORKFLOW_ERROR_MESSAGE
+
+    error_log = UiChatLog(
+        message_type=MessageTypeEnum.AGENT,
+        message_sub_type=None,
+        content=error_message,
+        timestamp=datetime.now(timezone.utc).isoformat(),
+        message_id=f"error-{str(uuid4())}",
+        status=ToolStatus.FAILURE,
+        correlation_id=None,
+        tool_info=None,
+        additional_context=None,
+    )
+
+    try:
+        # We pass the full ui_chat_log list (existing + error)
+        # because aupdate_state does not reliably apply the
+        # _ui_chat_log_reducer after a graph failure.
+        await compiled_graph.aupdate_state(
+            graph_config,
+            {"ui_chat_log": Overwrite(value=existing_logs + [error_log])},
+        )
+    except Exception as exc:
+        log.warning(
+            "Failed to persist error ui_chat_log to checkpoint",
+            workflow_id=workflow_id,
+            exc_info=exc,
+        )
 
 
 @support_self_hosted_billing(class_schema="flow/v1")
@@ -390,3 +443,17 @@ class Flow(AbstractWorkflow):
         log_exception(
             error, extra={"workflow_id": self._workflow_id, "source": __name__}
         )
+
+        if compiled_graph is not None:
+            existing_logs = (
+                list(self.checkpoint_notifier.ui_chat_log)
+                if self.checkpoint_notifier
+                else []
+            )
+            await persist_error_to_ui_chat_log(
+                compiled_graph=compiled_graph,
+                graph_config=graph_config,
+                existing_logs=existing_logs,
+                log=self.log,
+                workflow_id=self._workflow_id,
+            )

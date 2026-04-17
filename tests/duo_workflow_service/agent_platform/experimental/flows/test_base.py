@@ -1,3 +1,4 @@
+# pylint: disable=too-many-lines
 from contextlib import contextmanager
 from unittest.mock import AsyncMock, MagicMock, Mock, patch
 from uuid import uuid4
@@ -24,7 +25,11 @@ from duo_workflow_service.agent_platform.experimental.flows.flow_config import (
 from duo_workflow_service.agent_platform.experimental.routers.router import Router
 from duo_workflow_service.agent_platform.experimental.state.base import FlowEventType
 from duo_workflow_service.checkpointer.gitlab_workflow import WorkflowStatusEventEnum
-from duo_workflow_service.entities.state import MessageTypeEnum, WorkflowStatusEnum
+from duo_workflow_service.entities.state import (
+    MessageTypeEnum,
+    ToolStatus,
+    WorkflowStatusEnum,
+)
 from duo_workflow_service.workflows.type_definitions import AdditionalContext
 from lib.events import GLReportingEventContext
 
@@ -941,3 +946,90 @@ class TestFlow:  # pylint: disable=too-many-public-methods
             assert call_kwargs["flow_id"] == "test-workflow-123"
             assert call_kwargs["flow_type"] == flow_type
             assert "internal_event_client" in call_kwargs
+
+    @pytest.mark.asyncio
+    async def test_handle_workflow_failure_appends_error_log(self, flow_instance):
+        """Existing ui_chat_log entries are preserved."""
+        existing_log = {
+            "message_type": MessageTypeEnum.TOOL,
+            "content": "Previous log entry",
+        }
+        notifier = MagicMock()
+        notifier.ui_chat_log = [existing_log]
+        flow_instance.checkpoint_notifier = notifier
+
+        graph = AsyncMock()
+        config = {"configurable": {"thread_id": "test-workflow-123"}}
+
+        with patch(
+            "duo_workflow_service.agent_platform.experimental.flows.base.log_exception"
+        ):
+            await flow_instance._handle_workflow_failure(
+                RuntimeError("boom"), graph, config
+            )
+
+        state = graph.aupdate_state.call_args[0][1]
+        ui_chat_log = state["ui_chat_log"].value
+        assert len(ui_chat_log) == 2
+        assert ui_chat_log[0] == existing_log
+
+        error_entry = ui_chat_log[1]
+        assert error_entry["message_type"] == MessageTypeEnum.AGENT
+        assert error_entry["status"] == ToolStatus.FAILURE
+        assert error_entry["message_id"].startswith("error-")
+
+    @pytest.mark.asyncio
+    async def test_handle_workflow_failure_does_not_leak_details(self, flow_instance):
+        """Internal exception text must not appear in the UI log."""
+        notifier = MagicMock()
+        notifier.ui_chat_log = []
+        flow_instance.checkpoint_notifier = notifier
+
+        graph = AsyncMock()
+
+        with patch(
+            "duo_workflow_service.agent_platform.experimental.flows.base.log_exception"
+        ):
+            await flow_instance._handle_workflow_failure(
+                RuntimeError("secret internal detail"), graph, {}
+            )
+
+        state = graph.aupdate_state.call_args[0][1]
+        content = state["ui_chat_log"].value[0]["content"]
+        assert "secret internal detail" not in content
+        assert "error" in content.lower()
+
+    @pytest.mark.asyncio
+    async def test_handle_workflow_failure_no_compiled_graph(self, flow_instance):
+        """When compiled_graph is None, only log_exception runs."""
+        with patch(
+            "duo_workflow_service.agent_platform.experimental.flows.base.log_exception"
+        ):
+            await flow_instance._handle_workflow_failure(
+                RuntimeError("early failure"), None, {}
+            )
+
+    @pytest.mark.asyncio
+    async def test_handle_workflow_failure_aupdate_state_fails(self, flow_instance):
+        """If aupdate_state raises, the error is caught and a warning is logged."""
+        notifier = MagicMock()
+        notifier.ui_chat_log = []
+        flow_instance.checkpoint_notifier = notifier
+
+        graph = AsyncMock()
+        graph.aupdate_state.side_effect = Exception("closed")
+
+        flow_instance.log = MagicMock()
+
+        with patch(
+            "duo_workflow_service.agent_platform.experimental.flows.base.log_exception"
+        ):
+            await flow_instance._handle_workflow_failure(
+                RuntimeError("boom"), graph, {}
+            )
+
+        flow_instance.log.warning.assert_called_once_with(
+            "Failed to persist error ui_chat_log to checkpoint",
+            workflow_id="test-workflow-123",
+            exc_info=graph.aupdate_state.side_effect,
+        )

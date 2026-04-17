@@ -887,8 +887,8 @@ async def test_workflow_reject_slash_commands(
     await workflow.run("/nonexistent")
     assert workflow.is_done
 
-    mock_notifier.send_event.assert_called_once()
-    call_args = mock_notifier.send_event.call_args
+    assert mock_notifier.send_event.call_count == 2
+    call_args = mock_notifier.send_event.call_args_list[0]
     assert call_args.kwargs["type"] == "values"
     state = call_args.kwargs["state"]
     assert state["status"] == WorkflowStatusEnum.INPUT_REQUIRED
