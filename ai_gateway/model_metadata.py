@@ -261,3 +261,43 @@ def create_model_metadata(
         friendly_name=llm_definition.name,
         **data,
     )
+
+
+def build_default_code_completions_metadata(
+    fireworks_api_base_url: str,
+    model_keys: Dict[str, Any],
+    user: StarletteUser,
+    using_cache: bool = True,
+    mock_model_responses: bool = False,
+) -> TypeModelMetadata:
+    """Build the default model_metadata for ``code_completions``.
+
+    Args:
+        fireworks_api_base_url: The Fireworks API base URL from operator configuration.
+        model_keys: Provider key mapping (e.g. ``{"fireworks_provider_api_key": "..."}``) used to
+            extract the Fireworks API key.
+        user: The authenticated Starlette user; ``global_user_id`` is used as the Fireworks session ID.
+        using_cache: Whether prompt caching is enabled for this request. Defaults to ``True``.
+        mock_model_responses: When ``True``, allows an empty model identifier for local testing.
+
+    Returns:
+        A ``FireworksModelMetadata`` when the configured default model uses the ``fireworks_ai``
+        provider, otherwise a generic ``ModelMetadata`` for the ``gitlab`` provider.
+    """
+    llm_def = ModelSelectionConfig.instance().get_model_for_feature("code_completions")
+    if getattr(llm_def.params, "custom_llm_provider", None) == "fireworks_ai":
+        return create_model_metadata(
+            {
+                "provider": "fireworks_ai",
+                "name": llm_def.gitlab_identifier,
+                "fireworks_api_base_url": fireworks_api_base_url,
+                "provider_keys": model_keys,
+                "using_cache": using_cache,
+                "session_id": user.global_user_id,
+            },
+            mock_model_responses=mock_model_responses,
+        )
+    return create_model_metadata(
+        {"provider": "gitlab", "feature_setting": "code_completions"},
+        mock_model_responses=mock_model_responses,
+    )

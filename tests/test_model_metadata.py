@@ -11,6 +11,7 @@ from ai_gateway.model_metadata import (
     FireworksModelMetadata,
     ModelMetadata,
     ModelMetadataBySize,
+    build_default_code_completions_metadata,
     create_model_metadata,
     create_model_metadata_by_size,
 )
@@ -710,3 +711,111 @@ class TestCreateModelMetadataBySize:
     def test_invalid_data_raises(self):
         with pytest.raises(ValueError, match="provider must be present"):
             create_model_metadata_by_size(None)
+
+
+class TestBuildDefaultCodeCompletionsMetadata:
+    """Covers the unified helper used by v3/v4 to build default metadata for code_completions."""
+
+    @pytest.fixture
+    def fireworks_codestral(self):
+        return ChatLiteLLMDefinition(
+            gitlab_identifier="codestral_fw",
+            name="Codestral Fireworks",
+            max_context_tokens=32000,
+            family=["completion_fim"],
+            params={
+                "model": "codestral-x",
+                "custom_llm_provider": "fireworks_ai",
+                "identifier": "accounts/gitlab/routers/codestral-x",
+            },
+        )
+
+    @pytest.fixture
+    def vertex_model(self):
+        return ChatLiteLLMDefinition(
+            gitlab_identifier="vertex_codestral",
+            name="Vertex Codestral",
+            max_context_tokens=32000,
+            family=["completion_text"],
+            params={
+                "model": "codestral-vertex",
+                "custom_llm_provider": "vertex_ai",
+            },
+        )
+
+    @pytest.fixture
+    def mock_user(self):
+        user = mock.MagicMock()
+        user.global_user_id = "user-42"
+        return user
+
+    def _patch_feature_default(self, llm_def):
+        return patch.multiple(
+            ModelSelectionConfig,
+            get_model_for_feature=mock.Mock(return_value=llm_def),
+            get_model=mock.Mock(return_value=llm_def),
+        )
+
+    def test_emits_fireworks_metadata_when_default_is_fireworks(
+        self, fireworks_codestral, mock_user
+    ):
+        with self._patch_feature_default(fireworks_codestral):
+            metadata = build_default_code_completions_metadata(
+                fireworks_api_base_url="https://api.fireworks.ai/inference/v1",
+                model_keys={"fireworks_provider_api_key": "fw_secret"},
+                user=mock_user,
+            )
+
+        assert isinstance(metadata, FireworksModelMetadata)
+        params = metadata.to_params()
+        assert params["model"] == "accounts/gitlab/routers/codestral-x"
+        assert params["api_key"] == "fw_secret"
+        assert params["api_base"] == "https://api.fireworks.ai/inference/v1"
+        assert params["session_id"] == "user-42"
+        assert params["using_cache"] == "True"
+
+    def test_falls_back_to_generic_metadata_for_non_fireworks_default(
+        self, vertex_model, mock_user
+    ):
+        with self._patch_feature_default(vertex_model):
+            metadata = build_default_code_completions_metadata(
+                fireworks_api_base_url="unused",
+                model_keys={"fireworks_provider_api_key": "fw_secret"},
+                user=mock_user,
+            )
+
+        assert isinstance(metadata, ModelMetadata)
+        assert metadata.provider == "gitlab"
+        params = metadata.to_params()
+        assert "api_key" not in params or params.get("api_key") != "fw_secret"
+
+    def test_using_cache_false_propagates_to_params(
+        self, fireworks_codestral, mock_user
+    ):
+        with self._patch_feature_default(fireworks_codestral):
+            metadata = build_default_code_completions_metadata(
+                fireworks_api_base_url="https://api.fireworks.ai/inference/v1",
+                model_keys={"fireworks_provider_api_key": "fw_secret"},
+                user=mock_user,
+                using_cache=False,
+            )
+
+        assert isinstance(metadata, FireworksModelMetadata)
+        assert metadata.using_cache is False
+        assert metadata.to_params()["using_cache"] == "False"
+
+    def test_missing_api_key_still_returns_fireworks_metadata(
+        self, fireworks_codestral, mock_user
+    ):
+        """Operator misconfiguration (empty `model_keys`) shouldn't crash; the metadata is still emitted so callers can
+        surface a clearer error."""
+        with self._patch_feature_default(fireworks_codestral):
+            metadata = build_default_code_completions_metadata(
+                fireworks_api_base_url="https://api.fireworks.ai/inference/v1",
+                model_keys={},
+                user=mock_user,
+            )
+
+        assert isinstance(metadata, FireworksModelMetadata)
+        assert metadata.api_key is None
+        assert "api_key" not in metadata.to_params()
