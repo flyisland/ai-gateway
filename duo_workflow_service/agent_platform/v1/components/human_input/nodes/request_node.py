@@ -1,4 +1,4 @@
-from typing import Any, Literal
+from typing import Any, Literal, Sequence
 
 from ai_gateway.prompts import jinja2_formatter
 from duo_workflow_service.agent_platform.v1.components.human_input.ui_log import (
@@ -8,6 +8,7 @@ from duo_workflow_service.agent_platform.v1.components.human_input.ui_log import
 from duo_workflow_service.agent_platform.v1.state import (
     FlowState,
     IOKey,
+    RuntimeIOKey,
     get_vars_from_state,
 )
 from duo_workflow_service.agent_platform.v1.ui_log import UIHistory
@@ -42,7 +43,7 @@ class RequestNode:
         name: str,
         component_name: str,
         message_template: str,
-        inputs: list[IOKey],
+        inputs: Sequence[IOKey | RuntimeIOKey],
         ui_history: UIHistory[AgentLogWriter, UILogEventsHumanInput],
         request_type: Literal["approval", "input"] = "approval",
         status_key: IOKey,

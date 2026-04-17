@@ -1,4 +1,4 @@
-from typing import ClassVar, Optional, Type, cast
+from typing import ClassVar, Optional, Sequence, Type, cast
 
 import structlog
 from anthropic import APIStatusError
@@ -12,6 +12,7 @@ from duo_workflow_service.agent_platform.v1.state import (
     FlowState,
     FlowStateKeys,
     IOKey,
+    RuntimeIOKey,
     get_vars_from_state,
 )
 from duo_workflow_service.conversation.compaction import (
@@ -61,7 +62,7 @@ class AgentNode:
     name: str
     _prompt: Prompt
 
-    _inputs: list[IOKey]
+    _inputs: Sequence[IOKey | RuntimeIOKey]
 
     _component_name: str
 
@@ -78,7 +79,7 @@ class AgentNode:
         flow_type: GLReportingEventContext,
         name: str,
         prompt: Prompt,
-        inputs: list[IOKey],
+        inputs: Sequence[IOKey | RuntimeIOKey],
         component_name: str,
         internal_event_client: InternalEventsClient,
         response_schema: Optional[Type[BaseAgentOutput]] = None,
