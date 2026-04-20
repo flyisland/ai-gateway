@@ -17,6 +17,9 @@ class EventEnum(StrEnum):
     WORKFLOW_TOOL_SUCCESS = "duo_workflow_tool_success"
     WORKFLOW_ROUTE_DECISION = "duo_workflow_flow_route_decision"
     WORKFLOW_RESPONSE_SCHEMA_OUTPUT = "duo_workflow_response_schema_output"
+    ORBIT_DAP_TOOL_CALLED = "orbit_dap_tool_called"
+    ORBIT_DAP_TOOL_FAILED = "orbit_dap_tool_failed"
+    ORBIT_DAP_SESSION_SUMMARY = "orbit_dap_session_summary"
 
 
 class EventLabelEnum(StrEnum):

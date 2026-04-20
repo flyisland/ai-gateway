@@ -21,6 +21,11 @@ from lib.context.model import (
     current_model_metadata_with_size_context,
     get_model_metadata,
 )
+from lib.context.orbit import (
+    ORBIT_TOOL_PREFIX,
+    orbit_tool_call_count,
+    total_tool_call_count,
+)
 from lib.context.request_metadata import (
     METADATA_LABELS,
     LLMFinishReason,
@@ -75,4 +80,8 @@ __all__ = [
     "current_model_metadata_context",
     "get_model_metadata",
     "ModelSizeBucket",
+    # orbit
+    "ORBIT_TOOL_PREFIX",
+    "orbit_tool_call_count",
+    "total_tool_call_count",
 ]
