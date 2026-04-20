@@ -1,10 +1,12 @@
 from enum import StrEnum
+from typing import Any
 
 from gitlab_cloud_connector import CloudConnectorUser
 from pydantic import BaseModel
 
 from lib.billing_events.client import BillingEvent, BillingEventsClient
 from lib.context.llm_operations import get_llm_operations
+from lib.context.tool_executions import ToolExecutions
 from lib.events.base import GLReportingEventContext
 from lib.events.contextvar import self_hosted_dap_billing_enabled
 
@@ -91,6 +93,7 @@ class BillingEventService:
         unit_of_measure: str = "request",
         quantity: int = 1,
         llm_ops: list[LLMOperation] | None = None,
+        tool_execs: ToolExecutions | None = None,
     ) -> None:
         """Track billing for a workflow execution with LLM operation metadata.
 
@@ -111,6 +114,7 @@ class BillingEventService:
             llm_ops: Optional explicit LLM operations to track. Use this for legacy code paths
                 that don't work well with get_llm_operations(). Prefer migrating to get_llm_operations()
                 for new implementations.
+            tool_execs: Optional explicit tool names to track.
 
         Raises:
             ValueError: If no LLM operations are available from any source
@@ -134,12 +138,13 @@ class BillingEventService:
         else:
             raise ValueError("No LLM operations available for billing tracking")
 
-        metadata = {
+        metadata: dict[str, Any] = {
             "workflow_id": workflow_id,
             "feature_qualified_name": gl_context.feature_qualified_name,
             "feature_ai_catalog_item": gl_context.feature_ai_catalog_item,
             "execution_environment": execution_env.value,
             "llm_operations": llm_operations,
+            "tool_names": tool_execs or [],
         }
 
         self.client.track_billing_event(

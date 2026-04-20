@@ -33,6 +33,7 @@ from duo_workflow_service.status_updater.gitlab_status_updater import (
 )
 from lib.billing_events import BillingEvent, ExecutionEnvironment
 from lib.context import llm_operations
+from lib.context.tool_executions import init_tool_executions, tool_executions
 from lib.feature_flags.context import FeatureFlag
 from lib.internal_events import InternalEventAdditionalProperties
 from lib.internal_events.event_enum import EventEnum, EventLabelEnum, EventPropertyEnum
@@ -86,6 +87,31 @@ def mock_user_fixture():
     return CloudConnectorUser(
         authenticated=True, claims=UserClaims(gitlab_instance_uid="test-instance-123")
     )
+
+
+@pytest.fixture(name="mock_llm_operations")
+def mock_llm_operations_fixture():
+    """Set up LLM operations context for billing tests."""
+    operations = [
+        {
+            "token_count": 100,
+            "model_id": "claude-3-sonnet",
+            "model_engine": "anthropic",
+            "model_provider": "anthropic",
+            "prompt_tokens": 80,
+            "completion_tokens": 20,
+        },
+        {
+            "token_count": 150,
+            "model_id": "gpt-4",
+            "model_engine": "openai",
+            "model_provider": "openai",
+            "prompt_tokens": 120,
+            "completion_tokens": 30,
+        },
+    ]
+    llm_operations.set(operations)
+    return operations
 
 
 @pytest.fixture(autouse=True)
@@ -1302,31 +1328,12 @@ async def test_track_workflow_completion_with_billing_event(
     workflow_type,
     billing_event_service,
     mock_user,
+    mock_llm_operations,
     status,
 ):
     """Test that workflow completion triggers billing event for trackable statuses."""
     current_user.set(mock_user)
     gitlab_workflow._billing_event_service = billing_event_service
-
-    operations = [
-        {
-            "token_count": 100,
-            "model_id": "claude-3-sonnet",
-            "model_engine": "anthropic",
-            "model_provider": "anthropic",
-            "prompt_tokens": 80,
-            "completion_tokens": 20,
-        },
-        {
-            "token_count": 150,
-            "model_id": "gpt-4",
-            "model_engine": "openai",
-            "model_provider": "openai",
-            "prompt_tokens": 120,
-            "completion_tokens": 30,
-        },
-    ]
-    llm_operations.set(operations)
 
     await gitlab_workflow._track_workflow_completion(status)
 
@@ -1339,6 +1346,7 @@ async def test_track_workflow_completion_with_billing_event(
         category="GitLabWorkflow",
         unit_of_measure="request",
         quantity=1,
+        tool_execs=[],
     )
 
 
@@ -1784,3 +1792,48 @@ async def test_track_workflow_completion_omits_tracking_when_absent(
     additional_props = call_kwargs["additional_properties"]
 
     assert "fix_pipeline_decide_approach_output" not in additional_props.extra
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    "status",
+    [
+        WorkflowStatusEnum.FINISHED,
+        WorkflowStatusEnum.STOPPED,
+        WorkflowStatusEnum.INPUT_REQUIRED,
+        WorkflowStatusEnum.TOOL_CALL_APPROVAL_REQUIRED,
+        WorkflowStatusEnum.PLAN_APPROVAL_REQUIRED,
+    ],
+)
+async def test_track_workflow_completion_with_billing_event_includes_tool_names(
+    gitlab_workflow,
+    workflow_id,
+    workflow_type,
+    billing_event_service,
+    mock_user,
+    mock_llm_operations,
+    status,
+):
+    """Test that tool names accumulated during workflow are passed to billing event."""
+    current_user.set(mock_user)
+    gitlab_workflow._billing_event_service = billing_event_service
+
+    # Simulate tools that were executed during the workflow
+    init_tool_executions()
+    tool_executions.get().append("read_file")
+    tool_executions.get().append("write_file")
+    tool_executions.get().append("read_file")
+
+    await gitlab_workflow._track_workflow_completion(status)
+
+    billing_event_service.track_billing.assert_called_once_with(
+        workflow_id=workflow_id,
+        user=mock_user,
+        gl_context=workflow_type,
+        event=BillingEvent.DAP_FLOW_ON_COMPLETION,
+        execution_env=ExecutionEnvironment.DAP,
+        category="GitLabWorkflow",
+        unit_of_measure="request",
+        quantity=1,
+        tool_execs=["read_file", "write_file", "read_file"],
+    )

@@ -33,6 +33,12 @@ from lib.context.request_metadata import (
     is_gitlab_team_member,
     language_server_version,
 )
+from lib.context.tool_executions import (
+    ToolExecutions,
+    get_tool_executions,
+    init_tool_executions,
+    tool_executions,
+)
 
 __all__ = [
     # request_metadata
@@ -55,6 +61,11 @@ __all__ = [
     "get_token_usage",
     "init_llm_operations",
     "get_llm_operations",
+    # tool_executions
+    "tool_executions",
+    "init_tool_executions",
+    "get_tool_executions",
+    "ToolExecutions",
     # auth
     "cloud_connector_token_context_var",
     "StarletteUser",

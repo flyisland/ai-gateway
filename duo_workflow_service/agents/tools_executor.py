@@ -34,7 +34,7 @@ from duo_workflow_service.security.secret_redaction import redact_secrets_for_ui
 from duo_workflow_service.tools import RunCommand, Toolset, format_tool_display_message
 from duo_workflow_service.tools.planner import PlannerTool
 from duo_workflow_service.tracking.errors import log_exception
-from lib.context import client_capabilities, extract_finish_reason
+from lib.context import client_capabilities, extract_finish_reason, tool_executions
 from lib.events import GLReportingEventContext
 from lib.hidden_layer_log import set_hidden_layer_log_context
 from lib.internal_events import InternalEventAdditionalProperties, InternalEventsClient
@@ -577,6 +577,10 @@ class ToolsExecutor:
             event_name=event_name,
             additional_properties=additional_properties,
         )
+        if event_name == EventEnum.WORKFLOW_TOOL_SUCCESS:
+            current = tool_executions.get()
+            if current is not None:
+                current.append(tool_name)
         self._internal_event_client.track_event(
             event_name=event_name.value,
             additional_properties=additional_properties,

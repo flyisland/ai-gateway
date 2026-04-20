@@ -44,6 +44,7 @@ from duo_workflow_service.tools.planner import (
 )
 from duo_workflow_service.tools.toolset import ToolType
 from lib.context import client_capabilities
+from lib.context.tool_executions import init_tool_executions, tool_executions
 from lib.events import GLReportingEventContext
 from lib.internal_events import InternalEventAdditionalProperties
 from lib.internal_events.event_enum import CategoryEnum, EventEnum, EventLabelEnum
@@ -1865,3 +1866,118 @@ async def test_handle_tier_access_denied(all_tools, toolset, workflow_state, flo
     )
     assert tool_log["status"] == ToolStatus.FAILURE
     assert "Ultimate" in tool_log["content"]
+
+
+@pytest.mark.asyncio
+async def test_tool_executions_tracked_on_success(
+    workflow_state,
+    internal_event_client: Mock,
+    flow_type: GLReportingEventContext,
+):
+    """Test that successful tool calls append tool names to tool_executions context var."""
+    init_tool_executions()
+
+    mock_toolset = MagicMock(spec=Toolset)
+    mock_toolset.__contains__ = MagicMock(return_value=True)
+    mock_toolset.__getitem__ = MagicMock(return_value=mock_tool())
+
+    client_capabilities.set(set())
+
+    tools_executor = ToolsExecutor(
+        tools_agent_name="planner",
+        toolset=mock_toolset,
+        workflow_id="123",
+        workflow_type=flow_type,
+        internal_event_client=internal_event_client,
+    )
+
+    workflow_state["conversation_history"]["planner"] = [
+        AIMessage(
+            content=[{"type": "text", "text": "test"}],
+            tool_calls=[
+                {"id": "call-1", "name": "test_tool", "args": {"param": "value"}},
+            ],
+            id="ai-msg-tool-exec-tracking",
+        )
+    ]
+
+    await tools_executor.run(workflow_state)
+
+    assert tool_executions.get() == ["test_tool"]
+
+
+@pytest.mark.asyncio
+async def test_tool_executions_not_tracked_on_failure(
+    workflow_state,
+    internal_event_client: Mock,
+    flow_type: GLReportingEventContext,
+):
+    """Test that failed tool calls do not append to tool_executions context var."""
+    init_tool_executions()
+
+    tool = mock_tool(side_effect=TypeError("Wrong arguments"))
+    mock_toolset = MagicMock(spec=Toolset)
+    mock_toolset.__contains__ = MagicMock(return_value=True)
+    mock_toolset.__getitem__ = MagicMock(return_value=tool)
+
+    client_capabilities.set(set())
+
+    tools_executor = ToolsExecutor(
+        tools_agent_name="planner",
+        toolset=mock_toolset,
+        workflow_id="123",
+        workflow_type=flow_type,
+        internal_event_client=internal_event_client,
+    )
+
+    workflow_state["conversation_history"]["planner"] = [
+        AIMessage(
+            content=[{"type": "text", "text": "test"}],
+            tool_calls=[
+                {"id": "call-1", "name": "test_tool", "args": {}},
+            ],
+            id="ai-msg-tool-exec-failure",
+        )
+    ]
+
+    await tools_executor.run(workflow_state)
+
+    assert tool_executions.get() == []
+
+
+@pytest.mark.asyncio
+async def test_tool_executions_skipped_when_not_initialized(
+    workflow_state,
+    internal_event_client: Mock,
+    flow_type: GLReportingEventContext,
+):
+    """Test that tool tracking does not raise when tool_executions is not initialized."""
+
+    tool_executions.set(None)
+
+    mock_toolset = MagicMock(spec=Toolset)
+    mock_toolset.__contains__ = MagicMock(return_value=True)
+    mock_toolset.__getitem__ = MagicMock(return_value=mock_tool())
+
+    client_capabilities.set(set())
+
+    tools_executor = ToolsExecutor(
+        tools_agent_name="planner",
+        toolset=mock_toolset,
+        workflow_id="123",
+        workflow_type=flow_type,
+        internal_event_client=internal_event_client,
+    )
+
+    workflow_state["conversation_history"]["planner"] = [
+        AIMessage(
+            content=[{"type": "text", "text": "test"}],
+            tool_calls=[
+                {"id": "call-1", "name": "test_tool", "args": {"param": "value"}},
+            ],
+            id="ai-msg-tool-exec-not-init",
+        )
+    ]
+
+    await tools_executor.run(workflow_state)
+    assert tool_executions.get() is None

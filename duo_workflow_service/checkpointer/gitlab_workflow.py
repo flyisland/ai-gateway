@@ -72,6 +72,7 @@ from duo_workflow_service.workflows.type_definitions import (
 )
 from lib.billing_events import BillingEvent, BillingEventService, ExecutionEnvironment
 from lib.context import init_llm_operations
+from lib.context.tool_executions import get_tool_executions, init_tool_executions
 from lib.events import GLReportingEventContext
 from lib.feature_flags import FeatureFlag, is_feature_enabled
 from lib.internal_events import InternalEventAdditionalProperties, InternalEventsClient
@@ -306,7 +307,11 @@ class GitLabWorkflow(
                 return MemorySaver()
 
             init_llm_operations()
+
             response_schema_tracking_results.set({})
+
+            init_tool_executions()
+
             self._flow_start_time = time.time()
 
             config: RunnableConfig = {"configurable": {}}
@@ -516,6 +521,7 @@ class GitLabWorkflow(
         if status in BILLABLE_STATUSES:
             try:
                 user: CloudConnectorUser = current_user.get()
+                tool_executions = get_tool_executions() or []
                 self._billing_event_service.track_billing(
                     workflow_id=self._workflow_id,
                     user=user,
@@ -525,6 +531,7 @@ class GitLabWorkflow(
                     category=self.__class__.__name__,
                     unit_of_measure="request",
                     quantity=1,
+                    tool_execs=tool_executions,
                 )
                 self._logger.info(
                     "Successfully sent billing event for workflow %s", self._workflow_id
