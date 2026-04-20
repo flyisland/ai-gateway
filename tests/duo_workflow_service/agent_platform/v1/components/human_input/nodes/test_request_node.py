@@ -88,7 +88,7 @@ class TestRequestNode:
             # Verify the log entry content
             ui_log_entry = result[FlowStateKeys.UI_CHAT_LOG][0]
             assert ui_log_entry["content"] == "Formatted prompt content with test_value"
-            assert ui_log_entry["message_type"] == MessageTypeEnum.AGENT
+            assert ui_log_entry["message_type"] == MessageTypeEnum.REQUEST
 
     @pytest.mark.asyncio
     async def test_message_template_processed_when_present(self, sample_state):

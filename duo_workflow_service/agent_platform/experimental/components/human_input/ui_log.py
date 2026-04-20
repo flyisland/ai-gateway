@@ -32,9 +32,9 @@ class AgentLogWriter(BaseUILogWriter[UILogEventsHumanInput]):
         additional_context: Optional[list] = None,
         **kwargs,
     ) -> UiChatLog:
-        """Create a success UI log entry for agent messages."""
+        """Create a success UI log entry for human input request messages."""
         return UiChatLog(
-            message_type=MessageTypeEnum.AGENT,
+            message_type=MessageTypeEnum.REQUEST,
             message_sub_type=None,
             content=content,
             message_id=None,

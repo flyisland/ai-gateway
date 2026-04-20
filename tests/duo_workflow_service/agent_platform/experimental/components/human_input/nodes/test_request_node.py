@@ -73,7 +73,7 @@ class TestRequestNode:
             # Verify the log entry content
             ui_log_entry = result[FlowStateKeys.UI_CHAT_LOG][0]
             assert ui_log_entry["content"] == "Input value: test_value"
-            assert ui_log_entry["message_type"] == MessageTypeEnum.AGENT
+            assert ui_log_entry["message_type"] == MessageTypeEnum.REQUEST
 
     @pytest.mark.asyncio
     async def test_no_ui_log_when_both_message_template_and_ui_history_missing(
