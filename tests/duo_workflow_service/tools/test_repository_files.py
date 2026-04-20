@@ -4,6 +4,7 @@ from unittest.mock import AsyncMock
 
 import pytest
 from langchain_core.tools import ToolException
+from pydantic import ValidationError
 
 from duo_workflow_service.gitlab.http_client import GitLabHttpResponse
 from duo_workflow_service.gitlab.url_parser import GitLabUrlParser
@@ -266,6 +267,264 @@ async def test_get_file_binary_content_exception_propagates(tool, gitlab_client_
 def test_tree_format_display_message(tool, args, expected_message):
     msg = tool.format_display_message(args)
     assert msg == expected_message
+
+
+# Test cases for offset/limit pagination
+class TestGetRepositoryFilePagination:
+    """Test GetRepositoryFile tool with offset/limit pagination."""
+
+    @pytest.fixture
+    def multiline_content(self):
+        """A 10-line file for testing pagination."""
+        lines = [f"line {i}" for i in range(10)]
+        raw = "\n".join(lines)
+        encoded = base64.b64encode(raw.encode("utf-8")).decode("utf-8")
+        return GitLabHttpResponse(
+            status_code=200,
+            body={"content": encoded},
+            headers={"content-type": "application/json"},
+        )
+
+    @pytest.mark.asyncio
+    async def test_no_pagination_returns_full_content(
+        self, tool, gitlab_client_mock, multiline_content
+    ):
+        """Without offset/limit, returns the full file."""
+        gitlab_client_mock.aget.return_value = multiline_content
+        result = await tool._arun(
+            project_id="org/repo", ref="main", file_path="file.py"
+        )
+        content = json.loads(result)["content"]
+        assert content == "\n".join(f"line {i}" for i in range(10))
+
+    @pytest.mark.asyncio
+    async def test_offset_only(self, tool, gitlab_client_mock, multiline_content):
+        """Offset without limit reads from offset to end, with pagination hint."""
+        gitlab_client_mock.aget.return_value = multiline_content
+        result = await tool._arun(
+            project_id="org/repo", ref="main", file_path="file.py", offset=7
+        )
+        content = json.loads(result)["content"]
+        expected = "\n".join(f"line {i}" for i in range(7, 10))
+        expected += "\n\n[Showing lines 7-9 of 10 total.]"
+        assert content == expected
+
+    @pytest.mark.asyncio
+    async def test_limit_only(self, tool, gitlab_client_mock, multiline_content):
+        """Limit without offset reads first N lines, with continuation hint."""
+        gitlab_client_mock.aget.return_value = multiline_content
+        result = await tool._arun(
+            project_id="org/repo", ref="main", file_path="file.py", limit=3
+        )
+        content = json.loads(result)["content"]
+        expected = "\n".join(f"line {i}" for i in range(3))
+        expected += (
+            "\n\n[Showing lines 0-2 of 10 total. Use offset=3 to continue reading.]"
+        )
+        assert content == expected
+
+    @pytest.mark.asyncio
+    async def test_offset_and_limit(self, tool, gitlab_client_mock, multiline_content):
+        """Offset + limit reads a specific window, with continuation hint."""
+        gitlab_client_mock.aget.return_value = multiline_content
+        result = await tool._arun(
+            project_id="org/repo", ref="main", file_path="file.py", offset=3, limit=4
+        )
+        content = json.loads(result)["content"]
+        expected = "\n".join(f"line {i}" for i in range(3, 7))
+        expected += (
+            "\n\n[Showing lines 3-6 of 10 total. Use offset=7 to continue reading.]"
+        )
+        assert content == expected
+
+    @pytest.mark.asyncio
+    async def test_offset_beyond_file_length(
+        self, tool, gitlab_client_mock, multiline_content
+    ):
+        """Offset past end of file returns helpful message."""
+        gitlab_client_mock.aget.return_value = multiline_content
+        result = await tool._arun(
+            project_id="org/repo", ref="main", file_path="file.py", offset=100
+        )
+        content = json.loads(result)["content"]
+        assert "beyond end of file" in content
+        assert "10 lines" in content
+        assert "offset=0" in content
+
+    @pytest.mark.asyncio
+    async def test_limit_exceeds_remaining_lines(
+        self, tool, gitlab_client_mock, multiline_content
+    ):
+        """Limit larger than remaining lines returns what's available, with hint."""
+        gitlab_client_mock.aget.return_value = multiline_content
+        result = await tool._arun(
+            project_id="org/repo", ref="main", file_path="file.py", offset=8, limit=100
+        )
+        content = json.loads(result)["content"]
+        expected = "\n".join(f"line {i}" for i in range(8, 10))
+        expected += "\n\n[Showing lines 8-9 of 10 total.]"
+        assert content == expected
+
+    @pytest.mark.asyncio
+    async def test_offset_zero_with_limit(
+        self, tool, gitlab_client_mock, multiline_content
+    ):
+        """Offset 0 with limit is equivalent to limit only."""
+        gitlab_client_mock.aget.return_value = multiline_content
+        result = await tool._arun(
+            project_id="org/repo", ref="main", file_path="file.py", offset=0, limit=5
+        )
+        content = json.loads(result)["content"]
+        expected = "\n".join(f"line {i}" for i in range(5))
+        expected += (
+            "\n\n[Showing lines 0-4 of 10 total. Use offset=5 to continue reading.]"
+        )
+        assert content == expected
+
+    @pytest.mark.asyncio
+    async def test_explicit_full_range_returns_no_hint(
+        self, tool, gitlab_client_mock, multiline_content
+    ):
+        """Offset=0 + limit=total_lines returns full content with no pagination hint."""
+        gitlab_client_mock.aget.return_value = multiline_content
+        result = await tool._arun(
+            project_id="org/repo", ref="main", file_path="file.py", offset=0, limit=10
+        )
+        content = json.loads(result)["content"]
+        assert content == "\n".join(f"line {i}" for i in range(10))
+        assert "[Showing" not in content
+
+    @pytest.mark.asyncio
+    async def test_trailing_newline_does_not_create_phantom_line(
+        self, tool, gitlab_client_mock
+    ):
+        """File ending with newline should not produce an extra empty line."""
+        raw = "line 0\nline 1\nline 2\n"  # trailing newline
+        encoded = base64.b64encode(raw.encode("utf-8")).decode("utf-8")
+        mock_resp = GitLabHttpResponse(
+            status_code=200,
+            body={"content": encoded},
+            headers={"content-type": "application/json"},
+        )
+        gitlab_client_mock.aget.return_value = mock_resp
+        result = await tool._arun(
+            project_id="org/repo", ref="main", file_path="file.py", offset=0, limit=3
+        )
+        content = json.loads(result)["content"]
+        assert content == "line 0\nline 1\nline 2"
+
+    def test_negative_offset_rejected_by_validation(self):
+        """Negative offset is rejected by Pydantic validation."""
+        with pytest.raises(ValidationError):
+            RepositoryFileResourceInput(
+                project_id="org/repo", ref="main", file_path="file.py", offset=-1
+            )
+
+    def test_negative_limit_rejected_by_validation(self):
+        """Negative limit is rejected by Pydantic validation."""
+        with pytest.raises(ValidationError):
+            RepositoryFileResourceInput(
+                project_id="org/repo", ref="main", file_path="file.py", limit=-1
+            )
+
+    def test_zero_limit_rejected_by_validation(self):
+        """Zero limit is rejected by Pydantic validation (must be >= 1)."""
+        with pytest.raises(ValidationError):
+            RepositoryFileResourceInput(
+                project_id="org/repo", ref="main", file_path="file.py", limit=0
+            )
+
+    @pytest.mark.asyncio
+    async def test_empty_file_with_offset_returns_beyond_message(
+        self, tool, gitlab_client_mock
+    ):
+        """Empty file with offset > 0 returns helpful message, not empty string."""
+        encoded = base64.b64encode(b"").decode("utf-8")
+        mock_resp = GitLabHttpResponse(
+            status_code=200,
+            body={"content": encoded},
+            headers={"content-type": "application/json"},
+        )
+        gitlab_client_mock.aget.return_value = mock_resp
+        result = await tool._arun(
+            project_id="org/repo", ref="main", file_path="file.py", offset=5
+        )
+        content = json.loads(result)["content"]
+        assert "beyond end of file" in content
+        assert "0 lines" in content
+
+    @pytest.mark.asyncio
+    async def test_offset_zero_on_large_file_still_auto_paginates(
+        self, tool, gitlab_client_mock, large_file_content
+    ):
+        """Offset=0 without limit should still auto-paginate large files."""
+        gitlab_client_mock.aget.return_value = large_file_content
+        result = await tool._arun(
+            project_id="org/repo", ref="main", file_path="file.py", offset=0
+        )
+        content = json.loads(result)["content"]
+        assert (
+            "[Showing lines 0-1999 of 3000 total. Use offset=2000 to continue reading.]"
+            in content
+        )
+
+    @pytest.fixture
+    def large_file_content(self):
+        """A 3000-line file to test auto-pagination."""
+        lines = [f"line {i}" for i in range(3000)]
+        raw = "\n".join(lines)
+        encoded = base64.b64encode(raw.encode("utf-8")).decode("utf-8")
+        return GitLabHttpResponse(
+            status_code=200,
+            body={"content": encoded},
+            headers={"content-type": "application/json"},
+        )
+
+    @pytest.mark.asyncio
+    async def test_large_file_auto_paginates(
+        self, tool, gitlab_client_mock, large_file_content
+    ):
+        """Files exceeding 2000 lines are auto-paginated even without offset/limit."""
+        gitlab_client_mock.aget.return_value = large_file_content
+        result = await tool._arun(
+            project_id="org/repo", ref="main", file_path="file.py"
+        )
+        content = json.loads(result)["content"]
+        assert (
+            "[Showing lines 0-1999 of 3000 total. Use offset=2000 to continue reading.]"
+            in content
+        )
+        # Should contain exactly 2000 lines of content + hint
+        lines = content.split("\n")
+        # Last 2 lines are blank + hint
+        assert lines[0] == "line 0"
+        assert lines[1999] == "line 1999"
+
+    @pytest.mark.asyncio
+    async def test_small_file_no_auto_pagination(
+        self, tool, gitlab_client_mock, multiline_content
+    ):
+        """Files under 2000 lines return full content without auto-pagination."""
+        gitlab_client_mock.aget.return_value = multiline_content
+        result = await tool._arun(
+            project_id="org/repo", ref="main", file_path="file.py"
+        )
+        content = json.loads(result)["content"]
+        assert content == "\n".join(f"line {i}" for i in range(10))
+        assert "[Showing" not in content
+
+    @pytest.mark.asyncio
+    async def test_explicit_limit_overrides_auto_pagination(
+        self, tool, gitlab_client_mock, large_file_content
+    ):
+        """Explicit limit=3000 returns all lines, overriding auto-pagination."""
+        gitlab_client_mock.aget.return_value = large_file_content
+        result = await tool._arun(
+            project_id="org/repo", ref="main", file_path="file.py", limit=3000
+        )
+        content = json.loads(result)["content"]
+        assert content == "\n".join(f"line {i}" for i in range(3000))
+        assert "[Showing" not in content
 
 
 @pytest.mark.parametrize("host", ["gitlab.com", "gitlab.example.com"])
