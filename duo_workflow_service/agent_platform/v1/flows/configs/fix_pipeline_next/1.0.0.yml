@@ -83,8 +83,6 @@ components:
         as: "pipeline_url"
       - from: "context:inputs.merge_request.url"
         as: "merge_request_url"
-      - from: "context:fix_pipeline_next_execution.final_answer"
-        as: "execution_results"
       - from: "context:project_id"
         as: "project_id"
       - from: "context:inputs.user_rule"
