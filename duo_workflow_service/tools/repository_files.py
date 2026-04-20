@@ -15,6 +15,8 @@ from duo_workflow_service.tools.gitlab_resource_input import ProjectResourceInpu
 
 log = structlog.stdlib.get_logger(__name__)
 
+DEFAULT_GET_REPOSITORY_FILE_LIMIT = 2000
+
 
 class RepositoryFileResourceInput(ProjectResourceInput):
     ref: Optional[str] = Field(
@@ -24,6 +26,16 @@ class RepositoryFileResourceInput(ProjectResourceInput):
     file_path: Optional[str] = Field(
         default=None,
         description="Full path to file, such as lib/class.rb.",
+    )
+    offset: Optional[int] = Field(
+        default=None,
+        ge=0,
+        description="Starting line number (0-indexed). Use with limit for reading large files in chunks.",
+    )
+    limit: Optional[int] = Field(
+        default=None,
+        ge=1,
+        description="Number of lines to read from offset. Use for reading large files in chunks.",
     )
 
 
@@ -98,6 +110,12 @@ class GetRepositoryFile(RepositoryFileBaseTool):
     - A GitLab URL like:
       - https://gitlab.com/namespace/project/-/blob/master/README.md
       - https://gitlab.com/group/subgroup/project/-/blob/main/src/file.py
+
+    For large files, use offset and limit to read in chunks:
+    - offset: starting line number (0-indexed).
+    - limit: number of lines to read from that offset.
+    - If the output is truncated, a hint at the end shows the next offset to continue reading.
+    - Avoid reading the entire file when you only need a specific section.
     """
     # editorconfig-checker-enable
 
@@ -108,6 +126,8 @@ class GetRepositoryFile(RepositoryFileBaseTool):
         project_id = kwargs.get("project_id")
         ref = kwargs.get("ref")
         file_path = kwargs.get("file_path")
+        offset = kwargs.get("offset")
+        limit = kwargs.get("limit")
 
         project_id, ref, file_path, errors = self._validate_repository_file_url(
             url, project_id, ref, file_path
@@ -136,9 +156,54 @@ class GetRepositoryFile(RepositoryFileBaseTool):
 
         body = self._process_http_response("Get repository file", response, log)
 
+        # Note: The GitLab API does not support range queries on file content,
+        # so we always fetch the full file and slice client-side.
         content = base64.b64decode(body["content"]).decode("utf-8")
 
+        # Paginate when explicitly requested or when file is large
+        if (
+            offset is not None
+            or limit is not None
+            or content.count("\n") >= DEFAULT_GET_REPOSITORY_FILE_LIMIT
+        ):
+            content = self._paginate(content, offset, limit)
+
         return json.dumps({"content": content})
+
+    @staticmethod
+    def _paginate(
+        content: str,
+        offset: Optional[int],
+        limit: Optional[int],
+    ) -> str:
+        lines = content.rstrip("\n").splitlines()
+        total_lines = len(lines)
+
+        start = offset if offset is not None else 0
+        if limit is not None and limit > 0:
+            end = min(start + limit, total_lines)
+        elif limit is None and total_lines > DEFAULT_GET_REPOSITORY_FILE_LIMIT:
+            end = DEFAULT_GET_REPOSITORY_FILE_LIMIT
+        else:
+            end = total_lines
+
+        if start >= total_lines and (total_lines > 0 or start > 0):
+            return (
+                f"[Offset {start} is beyond end of file ({total_lines} lines). "
+                f"Use offset=0 to read from the start.]"
+            )
+
+        result = "\n".join(lines[start:end])
+
+        if end < total_lines:
+            result += (
+                f"\n\n[Showing lines {start}-{end - 1} of {total_lines} total. "
+                f"Use offset={end} to continue reading.]"
+            )
+        elif start > 0:
+            result += f"\n\n[Showing lines {start}-{end - 1} of {total_lines} total.]"
+
+        return result
 
     def format_display_message(
         self, args: RepositoryFileResourceInput, _tool_response: Any = None
