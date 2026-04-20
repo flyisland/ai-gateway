@@ -92,6 +92,7 @@ class TestBillingEventService:
                         "cache_write_tokens": 0,
                     }
                 ],
+                "tool_names": [],
             },
         )
 
@@ -321,3 +322,19 @@ class TestBillingEventService:
         metadata = get_call_metadata(billing_client)
         assert metadata["llm_operations"][0]["cache_read_tokens"] == 30
         assert metadata["llm_operations"][0]["cache_write_tokens"] == 20
+
+    def test_track_billing_includes_tool_names(
+        self, billing_service, billing_client, user, gl_context, llm_operation
+    ):
+        billing_service.track_billing(
+            workflow_id="workflow-tools",
+            user=user,
+            gl_context=gl_context,
+            event=BillingEvent.DAP_FLOW_ON_COMPLETION,
+            execution_env=ExecutionEnvironment.DAP,
+            category="test_category",
+            llm_ops=[llm_operation],
+            tool_execs=["read_file", "write_file", "read_file"],
+        )
+        metadata = get_call_metadata(billing_client)
+        assert metadata["tool_names"] == ["read_file", "write_file", "read_file"]

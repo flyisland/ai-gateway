@@ -2,7 +2,7 @@ from langchain_core.tools import BaseTool, ToolException
 from pydantic_core import ValidationError
 
 from duo_workflow_service.monitoring import duo_workflow_metrics
-from lib.context import client_capabilities
+from lib.context import client_capabilities, tool_executions
 from lib.events import GLReportingEventContext
 from lib.internal_events import InternalEventAdditionalProperties, InternalEventsClient
 from lib.internal_events.event_enum import EventEnum, EventLabelEnum
@@ -42,6 +42,10 @@ class ToolEventTracker:
             value=self._flow_id,
             **extra,
         )
+        if event_name == EventEnum.WORKFLOW_TOOL_SUCCESS:
+            current = tool_executions.get()
+            if current is not None:
+                current.append(tool_name)
         self._record_metric(
             event_name=event_name,
             additional_properties=additional_properties,
