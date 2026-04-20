@@ -1,0 +1,25 @@
+---
+description: Tracks failed Orbit tool calls from a DAP agent session
+internal_events: true
+action: orbit_dap_tool_failed
+identifiers:
+  - user
+additional_properties:
+  label:
+    description: Event category (workflow_tool_call)
+  property:
+    description: Orbit tool name (e.g., orbit_query_graph, orbit_get_graph_schema)
+  value:
+    description: Session ID that groups all tool calls within one agent conversation
+  client_capabilities:
+    description: List of client capabilities active in the session
+  error:
+    description: Error message from the failed tool execution
+  error_type:
+    description: Exception class name (e.g., TypeError, ValidationError)
+product_group: analytics_instrumentation
+milestone: '18.11'
+introduced_by_url: https://gitlab.com/gitlab-org/modelops/applied-ml/code-suggestions/ai-assist/-/merge_requests/5211
+tiers:
+  - premium
+  - ultimate
