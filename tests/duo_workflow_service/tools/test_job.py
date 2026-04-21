@@ -1,5 +1,5 @@
 import json
-from unittest.mock import AsyncMock, Mock
+from unittest.mock import AsyncMock, Mock, patch
 
 import pytest
 from langchain_core.tools import ToolException
@@ -280,3 +280,103 @@ async def test_get_job_logs_truncates_large_logs_from_end(gitlab_client_mock, me
     assert "<truncation_notice>" in response
     assert "END_OF_LOG" in response
     assert "START_OF_LOG" not in response
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    "byte_limit,byte_offset,expected_query",
+    [
+        # Only byte_limit
+        (1024, None, "?byte_limit=1024"),
+        # Only byte_offset
+        (None, 512, "?byte_offset=512"),
+        # Both byte_limit and byte_offset
+        (1024, 512, "?byte_limit=1024&byte_offset=512"),
+    ],
+)
+@patch("duo_workflow_service.tools.job.is_client_capable", return_value=True)
+async def test_get_job_logs_with_byte_params(
+    _mock_is_client_capable,
+    byte_limit,
+    byte_offset,
+    expected_query,
+    gitlab_client_mock,
+    metadata,
+):
+    mock_response = GitLabHttpResponse(
+        status_code=200,
+        body="partial trace",
+    )
+    gitlab_client_mock.aget = AsyncMock(return_value=mock_response)
+
+    tool = GetLogsFromJob(metadata=metadata)
+
+    kwargs = {"project_id": "1", "job_id": 1}
+    if byte_limit is not None:
+        kwargs["byte_limit"] = byte_limit
+    if byte_offset is not None:
+        kwargs["byte_offset"] = byte_offset
+
+    response = await tool._arun(**kwargs)
+
+    expected_response = json.dumps({"job_id": 1, "trace": "partial trace"})
+    assert response == expected_response
+
+    expected_path = f"/api/v4/projects/1/jobs/1/trace{expected_query}"
+    gitlab_client_mock.aget.assert_called_once_with(
+        path=expected_path, parse_json=False
+    )
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    "byte_limit,byte_offset",
+    [
+        (1024, None),
+        (None, 512),
+        (1024, 512),
+    ],
+)
+@patch("duo_workflow_service.tools.job.is_client_capable", return_value=False)
+async def test_get_job_logs_with_byte_params_not_capable(
+    _mock_is_client_capable,
+    byte_limit,
+    byte_offset,
+    gitlab_client_mock,
+    metadata,
+):
+    tool = GetLogsFromJob(metadata=metadata)
+
+    kwargs = {"project_id": "1", "job_id": 1}
+    if byte_limit is not None:
+        kwargs["byte_limit"] = byte_limit
+    if byte_offset is not None:
+        kwargs["byte_offset"] = byte_offset
+
+    with pytest.raises(ToolException, match="not supported by this client version"):
+        await tool._arun(**kwargs)
+
+    gitlab_client_mock.aget.assert_not_called()
+
+
+@pytest.mark.asyncio
+@patch("duo_workflow_service.tools.job.is_client_capable")
+async def test_get_job_logs_without_byte_params_skips_capability_check(
+    mock_is_client_capable,
+    gitlab_client_mock,
+    metadata,
+):
+    mock_response = GitLabHttpResponse(
+        status_code=200,
+        body="full trace",
+    )
+    gitlab_client_mock.aget = AsyncMock(return_value=mock_response)
+
+    tool = GetLogsFromJob(metadata=metadata)
+
+    await tool._arun(project_id="1", job_id=1)
+
+    mock_is_client_capable.assert_not_called()
+    gitlab_client_mock.aget.assert_called_once_with(
+        path="/api/v4/projects/1/jobs/1/trace", parse_json=False
+    )
