@@ -4,14 +4,18 @@ from unittest.mock import AsyncMock, Mock, call, patch
 
 import pytest
 from anthropic import APIStatusError
-from langchain_core.messages import AIMessage, ToolMessage
+from langchain_core.messages import AIMessage, HumanMessage, ToolMessage
 
 from ai_gateway.prompts import Prompt
 from duo_workflow_service.agent_platform.v1.components.agent.nodes.agent_node import (
     AgentFinalOutput,
     AgentNode,
 )
-from duo_workflow_service.agent_platform.v1.state import FlowStateKeys
+from duo_workflow_service.agent_platform.v1.state import (
+    FlowStateKeys,
+    IOKey,
+    RuntimeIOKey,
+)
 from duo_workflow_service.conversation.compaction import ConversationCompactor
 from duo_workflow_service.errors.error_handler import ModelError, ModelErrorType
 from lib.internal_events.event_enum import CategoryEnum
@@ -29,12 +33,22 @@ def mock_prompt_fixture(mock_ai_message):
     return mock_prompt
 
 
+@pytest.fixture(name="conversation_history_key")
+def conversation_history_key_fixture(component_name):
+    """Fixture for conversation history IOKey."""
+    return IOKey(
+        target="conversation_history",
+        subkeys=[component_name],
+        optional=True,
+    )
+
+
 @pytest.fixture(name="agent_node")
 def agent_node_fixture(
     flow_id,
     mock_prompt,
     inputs,
-    component_name,
+    conversation_history_key,
     mock_internal_event_client,
 ):
     """Fixture for AgentNode instance (default, no response schema)."""
@@ -44,7 +58,9 @@ def agent_node_fixture(
         name="test_agent_node",
         prompt=mock_prompt,
         inputs=inputs,
-        component_name=component_name,
+        conversation_history_key=RuntimeIOKey(
+            alias="conversation_history", factory=lambda _: conversation_history_key
+        ),
         internal_event_client=mock_internal_event_client,
     )
 
@@ -54,7 +70,7 @@ def agent_node_with_schema_fixture(
     flow_id,
     mock_prompt,
     inputs,
-    component_name,
+    conversation_history_key,
     mock_internal_event_client,
 ):
     """Fixture for AgentNode instance with AgentFinalOutput response schema."""
@@ -64,7 +80,9 @@ def agent_node_with_schema_fixture(
         name="test_agent_node",
         prompt=mock_prompt,
         inputs=inputs,
-        component_name=component_name,
+        conversation_history_key=RuntimeIOKey(
+            alias="conversation_history", factory=lambda _: conversation_history_key
+        ),
         internal_event_client=mock_internal_event_client,
         response_schema=AgentFinalOutput,
     )
@@ -214,6 +232,7 @@ class TestAgentNode:
         self,
         flow_id,
         inputs,
+        conversation_history_key,
         component_name,
         mock_internal_event_client,
         base_flow_state,
@@ -246,7 +265,10 @@ class TestAgentNode:
                 name="test_agent_node",
                 prompt=mock_prompt,
                 inputs=inputs,
-                component_name=component_name,
+                conversation_history_key=RuntimeIOKey(
+                    alias="conversation_history",
+                    factory=lambda _: conversation_history_key,
+                ),
                 internal_event_client=mock_internal_event_client,
             )
             result = await agent_node.run(base_flow_state)
@@ -429,7 +451,7 @@ class TestAgentNodeCompaction:
         flow_id,
         mock_prompt,
         inputs,
-        component_name,
+        conversation_history_key,
         mock_internal_event_client,
         mock_compactor,
     ):
@@ -440,7 +462,9 @@ class TestAgentNodeCompaction:
             name="test_agent_node",
             prompt=mock_prompt,
             inputs=inputs,
-            component_name=component_name,
+            conversation_history_key=RuntimeIOKey(
+                alias="conversation_history", factory=lambda _: conversation_history_key
+            ),
             internal_event_client=mock_internal_event_client,
             compactor=mock_compactor,
         )
@@ -466,7 +490,6 @@ class TestAgentNodeCompaction:
         agent_node_with_compactor,
         base_flow_state,
         mock_compactor,
-        component_name,
         mock_get_vars_from_state,
     ):
         """Test that run() passes the compactor to maybe_compact_history."""
@@ -481,7 +504,7 @@ class TestAgentNodeCompaction:
             mock_compact.assert_called_once_with(
                 compactor=mock_compactor,
                 history=[],
-                agent_name=component_name,
+                agent_name="test_agent_node",
             )
 
     @pytest.mark.asyncio
@@ -489,7 +512,6 @@ class TestAgentNodeCompaction:
         self,
         agent_node,
         base_flow_state,
-        component_name,
         mock_get_vars_from_state,
     ):
         """Test that run() passes None to maybe_compact_history when no compactor."""
@@ -504,5 +526,72 @@ class TestAgentNodeCompaction:
             mock_compact.assert_called_once_with(
                 compactor=None,
                 history=[],
-                agent_name=component_name,
+                agent_name="test_agent_node",
             )
+
+
+class TestAgentNodeTruncation:
+    """Test suite for AgentNode truncation recovery support."""
+
+    @pytest.mark.asyncio
+    @pytest.mark.parametrize(
+        "truncation_finish_reason,metadata_key",
+        [
+            ("length", "finish_reason"),
+            ("max_tokens", "stop_reason"),
+        ],
+    )
+    async def test_run_truncated_response_returns_with_recovery_message(
+        self,
+        truncation_finish_reason,
+        metadata_key,
+        mock_ai_message,
+        mock_prompt,
+        agent_node,
+        base_flow_state,
+        component_name,
+    ):
+        """Test that a truncated LLM response returns immediately with recovery context."""
+        truncated_message = copy.copy(mock_ai_message)
+        truncated_message.content = "I was writing a long response but got cut off..."
+        truncated_message.response_metadata = {metadata_key: truncation_finish_reason}
+        truncated_message.tool_calls = []
+
+        mock_prompt.ainvoke = AsyncMock(return_value=truncated_message)
+
+        result = await agent_node.run(base_flow_state)
+
+        # Only called once — no internal retry, returns to graph loop
+        assert mock_prompt.ainvoke.call_count == 1
+
+        # History includes truncated response + recovery message
+        result_history = result[FlowStateKeys.CONVERSATION_HISTORY][component_name]
+        assert len(result_history) == 2
+        assert result_history[0] == truncated_message
+        assert isinstance(result_history[1], HumanMessage)
+        assert "cut off" in result_history[1].content
+        assert "concise" in result_history[1].content
+
+    @pytest.mark.asyncio
+    async def test_run_non_truncation_abnormal_finish_reason_does_not_retry(
+        self,
+        mock_ai_message,
+        mock_prompt,
+        agent_node,
+        base_flow_state,
+        component_name,
+    ):
+        """Test that non-truncation abnormal finish reasons (e.g. content_filter) do not trigger recovery retry."""
+        content_filter_message = copy.copy(mock_ai_message)
+        content_filter_message.response_metadata = {"finish_reason": "content_filter"}
+        content_filter_message.tool_calls = []
+
+        mock_prompt.ainvoke = AsyncMock(return_value=content_filter_message)
+
+        result = await agent_node.run(base_flow_state)
+
+        # Should only be called once — no retry for content_filter
+        assert mock_prompt.ainvoke.call_count == 1
+
+        result_history = result[FlowStateKeys.CONVERSATION_HISTORY][component_name]
+        assert result_history == [content_filter_message]

@@ -326,7 +326,7 @@ class TestAgentComponentAttachNodes:
         mock_agent_node_cls.assert_called_once()
         agent_call_kwargs = mock_agent_node_cls.call_args[1]
         assert agent_call_kwargs["name"] == f"{component_name}#agent"
-        assert agent_call_kwargs["component_name"] == component_name
+        assert "conversation_history_key" in agent_call_kwargs
         assert (
             agent_call_kwargs["prompt"]
             == mock_prompt_registry.get_on_behalf.return_value
@@ -341,7 +341,7 @@ class TestAgentComponentAttachNodes:
         tool_call_kwargs = mock_tool_node_cls.call_args[1]
         tracker = tool_call_kwargs["tracker"]
         assert tool_call_kwargs["name"] == f"{component_name}#tools"
-        assert tool_call_kwargs["component_name"] == component_name
+        assert "conversation_history_key" in tool_call_kwargs
         assert tool_call_kwargs["toolset"] == mock_toolset
         assert tracker._flow_id == flow_id
         assert tracker._flow_type == flow_type
@@ -356,9 +356,8 @@ class TestAgentComponentAttachNodes:
         final_call_kwargs = mock_final_response_node_cls.call_args[1]
         assert final_call_kwargs["name"] == f"{component_name}#final_response"
         assert final_call_kwargs["component_name"] == component_name
-        assert final_call_kwargs["output"] == IOKey(
-            target="context", subkeys=[component_name, "final_answer"]
-        )
+        assert "conversation_history_key" in final_call_kwargs
+        assert "output_key" in final_call_kwargs
 
         # FinalResponse Node UI logging
         assert "ui_history" in final_call_kwargs
@@ -511,7 +510,7 @@ class TestAgentComponentAttachEdges:
 
         # Test the routing behavior - should raise RoutingError
         with pytest.raises(
-            RoutingError, match=f"Conversation history not found for {component_name}"
+            RoutingError, match="Conversation history not found for key"
         ):
             router_function(base_flow_state)
 

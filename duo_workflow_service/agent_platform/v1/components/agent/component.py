@@ -33,9 +33,9 @@ from duo_workflow_service.agent_platform.v1.components.registry import (
 )
 from duo_workflow_service.agent_platform.v1.state import (
     FlowState,
-    FlowStateKeys,
     IOKey,
     IOKeyTemplate,
+    RuntimeIOKey,
 )
 from duo_workflow_service.agent_platform.v1.ui_log import (
     UIHistory,
@@ -174,13 +174,33 @@ class AgentComponent(BaseComponent):
                 )
         return self
 
-    def _agent_node_router(self, state: FlowState) -> str:
-        history: list[BaseMessage] = state[FlowStateKeys.CONVERSATION_HISTORY].get(
-            self.name,
-            [],
+    @property
+    def _default_conversation_history_key(self) -> RuntimeIOKey:
+        """Return a ``RuntimeIOKey`` for this component's conversation history.
+
+        The key is static (component-scoped) and does not depend on runtime state,
+        but is wrapped in a ``RuntimeIOKey`` so it can be passed uniformly to nodes
+        that accept ``RuntimeIOKey`` for their conversation-history parameter.
+
+        Returns:
+            A ``RuntimeIOKey`` wrapping the static ``IOKey`` for this component's
+            conversation history slot.
+        """
+        static_key = IOKey(
+            target="conversation_history",
+            subkeys=[self.name],
+            optional=True,
         )
+        return RuntimeIOKey(alias="conversation_history", factory=lambda _: static_key)
+
+    def _agent_node_router(self, state: FlowState) -> str:
+        history_iokey = self._default_conversation_history_key.to_iokey(state)
+        history: list[BaseMessage] = history_iokey.value_from_state(state) or []
         if not history:
-            raise RoutingError(f"Conversation history not found for {self.name}")
+            raise RoutingError(
+                f"Conversation history not found for key "
+                f"{history_iokey.target}:{history_iokey.subkeys}"
+            )
 
         last_message = history[-1]
 
@@ -278,7 +298,7 @@ class AgentComponent(BaseComponent):
 
         node_agent = AgentNode(
             name=self.__entry_hook__(),
-            component_name=self.name,
+            conversation_history_key=self._default_conversation_history_key,
             prompt=prompt,
             inputs=self.inputs,
             flow_id=self.flow_id,
@@ -309,19 +329,25 @@ class AgentComponent(BaseComponent):
         )
         node_tools = ToolNode(
             name=f"{self.name}#tools",
-            component_name=self.name,
+            conversation_history_key=self._default_conversation_history_key,
             toolset=self.toolset,
             ui_history=UIHistory(
                 events=self.ui_log_events, writer_class=UILogWriterAgentTools
             ),
             tracker=tracker,
         )
+
+        static_output_key = self._final_answer_key.to_iokey(
+            {IOKeyTemplate.COMPONENT_NAME_TEMPLATE: self.name}
+        )
+        output_key = RuntimeIOKey(
+            alias="final_answer",
+            factory=lambda _: static_output_key,
+        )
         node_final_response = FinalResponseNode(
             name=f"{self.name}#final_response",
-            component_name=self.name,
-            output=self._final_answer_key.to_iokey(
-                {IOKeyTemplate.COMPONENT_NAME_TEMPLATE: self.name}
-            ),
+            conversation_history_key=self._default_conversation_history_key,
+            output_key=output_key,
             ui_history=UIHistory(
                 events=self.ui_log_events,
                 writer_class=default_ui_log_writer_class(
@@ -330,6 +356,7 @@ class AgentComponent(BaseComponent):
             ),
             response_schema=self._response_schema,
             response_schema_tracking=self.response_schema_tracking,
+            component_name=self.name,
             flow_id=self.flow_id,
             flow_type=self.flow_type,
             internal_event_client=self.internal_event_client,

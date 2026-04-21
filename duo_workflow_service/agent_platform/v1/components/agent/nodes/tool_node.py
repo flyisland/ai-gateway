@@ -12,7 +12,7 @@ from duo_workflow_service.agent_platform.v1.components.agent.ui_log import (
     UILogEventsAgent,
     UILogWriterAgentTools,
 )
-from duo_workflow_service.agent_platform.v1.state import FlowState, FlowStateKeys
+from duo_workflow_service.agent_platform.v1.state import FlowState, RuntimeIOKey
 from duo_workflow_service.agent_platform.v1.ui_log import UIHistory
 from duo_workflow_service.monitoring import duo_workflow_metrics
 from duo_workflow_service.security.prompt_security import SecurityException
@@ -25,27 +25,44 @@ __all__ = ["ToolNode"]
 
 
 class ToolNode:
+    """LangGraph node that executes tool calls from the last AIMessage in conversation history.
+
+    All state interactions are performed exclusively through ``IOKey`` instances,
+    following the Flow Registry guideline of avoiding direct state dictionary
+    access.
+
+    The conversation-history ``IOKey`` is resolved dynamically at runtime via
+    ``conversation_history_key``.  This supports both the common case (static key
+    wrapped in a ``RuntimeIOKey`` by the caller) and the supervisor case where
+    the key is only known at runtime.
+
+    Args:
+        name: LangGraph node name.
+        conversation_history_key: ``RuntimeIOKey`` that resolves the
+            conversation-history ``IOKey`` at runtime.
+        toolset: Collection of tools available for execution.
+        ui_history: UI log history writer for tool execution events.
+    """
+
     def __init__(
         self,
         *,
         name: str,
-        component_name: str,
         toolset: Toolset,
         ui_history: UIHistory[UILogWriterAgentTools, UILogEventsAgent],
+        conversation_history_key: RuntimeIOKey,
         tracker: ToolEventTracker,
     ):
-
         self.name = name
-        self._component_name = component_name
         self._toolset = toolset
         self._logger = structlog.stdlib.get_logger("agent_platform")
         self._ui_history = ui_history
+        self._conversation_history_key = conversation_history_key
         self._tracker = tracker
 
     async def run(self, state: FlowState) -> dict:
-        conversation_history = state[FlowStateKeys.CONVERSATION_HISTORY].get(
-            self._component_name, []
-        )
+        history_iokey = self._conversation_history_key.to_iokey(state)
+        conversation_history = history_iokey.value_from_state(state) or []
 
         # TODO: add ability to register all tool calls in a follow up
         # context = state["context"].get(self.component_name, {})
@@ -84,11 +101,12 @@ class ToolNode:
                 )
             )
 
+        # Append tool responses to existing history for replace-based reducer.
+        # The reducer will replace this component's conversation history with
+        # the complete list returned here.
         return {
             **self._ui_history.pop_state_updates(),
-            FlowStateKeys.CONVERSATION_HISTORY: {
-                self._component_name: conversation_history + tools_responses,
-            },
+            **history_iokey.to_nested_dict(conversation_history + tools_responses),
         }
 
     async def _execute_tool(

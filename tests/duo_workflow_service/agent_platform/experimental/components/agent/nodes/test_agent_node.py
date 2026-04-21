@@ -76,7 +76,7 @@ def agent_node_with_schema_fixture(
 @pytest.fixture(name="mock_get_vars_from_state")
 def mock_get_vars_from_state_fixture(prompt_variables):
     with patch(
-        "duo_workflow_service.agent_platform.experimental.components.agent.nodes.agent_node.get_vars_from_state"
+        "duo_workflow_service.agent_platform.v1.components.agent.nodes.agent_node.get_vars_from_state"
     ) as mock_get_vars_from_state:
         mock_get_vars_from_state.return_value = prompt_variables
         yield mock_get_vars_from_state
@@ -225,7 +225,7 @@ class TestAgentNode:
         mock_prompt.ainvoke = AsyncMock(side_effect=[api_error, mock_ai_message])
 
         with patch(
-            "duo_workflow_service.agent_platform.experimental.components.agent.nodes.agent_node.ModelErrorHandler",
+            "duo_workflow_service.agent_platform.v1.components.agent.nodes.agent_node.ModelErrorHandler",
         ) as mock_error_handler_cls:
             mock_error_handler = Mock()
             mock_error_handler_cls.return_value = mock_error_handler

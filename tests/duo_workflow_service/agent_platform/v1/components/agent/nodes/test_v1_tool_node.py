@@ -14,7 +14,11 @@ from duo_workflow_service.agent_platform.v1.components.agent.nodes.tool_node imp
 from duo_workflow_service.agent_platform.v1.components.agent.ui_log import (
     UILogEventsAgent,
 )
-from duo_workflow_service.agent_platform.v1.state import FlowStateKeys
+from duo_workflow_service.agent_platform.v1.state import (
+    FlowStateKeys,
+    IOKey,
+    RuntimeIOKey,
+)
 from duo_workflow_service.security.prompt_security import SecurityException
 from lib.internal_events.event_enum import CategoryEnum, EventEnum
 from tests.duo_workflow_service.agent_platform.v1.components.agent.conftest import (
@@ -80,9 +84,17 @@ def tool_node_fixture(
         flow_type=flow_type,
         internal_event_client=mock_internal_event_client,
     )
+    static_key = IOKey(
+        target="conversation_history",
+        subkeys=[component_name],
+        optional=True,
+    )
+    conversation_history_key = RuntimeIOKey(
+        alias="conversation_history", factory=lambda _: static_key
+    )
     return ToolNode(
         name="test_tool_node",
-        component_name=component_name,
+        conversation_history_key=conversation_history_key,
         toolset=mock_toolset,
         ui_history=ui_history,
         tracker=tracker,

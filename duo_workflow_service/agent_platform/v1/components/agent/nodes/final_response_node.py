@@ -10,9 +10,8 @@ from duo_workflow_service.agent_platform.v1.components.agent.ui_log import (
 )
 from duo_workflow_service.agent_platform.v1.state import (
     FlowState,
-    FlowStateKeys,
     IOKey,
-    create_nested_dict,
+    RuntimeIOKey,
 )
 from duo_workflow_service.agent_platform.v1.ui_log import DefaultUILogWriter, UIHistory
 from duo_workflow_service.monitoring import duo_workflow_metrics
@@ -30,38 +29,65 @@ log = structlog.stdlib.get_logger("final_response_node")
 
 
 class FinalResponseNode:
+    """LangGraph node that handles the final response and writes the result to state.
+
+    All state interactions are performed exclusively through ``IOKey`` instances,
+    following the Flow Registry guideline of avoiding direct state dictionary
+    access.
+
+    Both the conversation-history ``IOKey`` and the output ``IOKey`` are
+    ``RuntimeIOKey`` instances that resolve the concrete key at runtime.  This
+    supports both the common case (static key wrapped via ``RuntimeIOKey``) and
+    the supervisor case where the key depends on runtime state such as the active
+    subsession ID.
+
+    Args:
+        name: LangGraph node name.
+        ui_history: UI log history writer for final-answer events.
+        conversation_history_key: ``RuntimeIOKey`` that resolves the
+            conversation-history ``IOKey`` at runtime.
+        output_key: ``RuntimeIOKey`` that resolves the output ``IOKey`` at runtime.
+    """
+
     def __init__(
         self,
         *,
-        component_name: str,
         name: str,
-        output: Optional[IOKey],
         ui_history: UIHistory[DefaultUILogWriter, UILogEventsAgent],
         response_schema: Optional[Type[BaseAgentOutput]] = None,
+        conversation_history_key: RuntimeIOKey,
+        output_key: RuntimeIOKey,
         response_schema_tracking: bool = False,
+        component_name: Optional[str] = None,
         flow_id: Optional[str] = None,
         flow_type: Optional[GLReportingEventContext] = None,
         internal_event_client: Optional[InternalEventsClient] = None,
     ):
-        self._component_name = component_name
         self.name = name
-        self._output = output
         self._ui_history = ui_history
         self._response_schema = response_schema
+        self._conversation_history_key = conversation_history_key
+        self._output_key = output_key
         self._response_schema_tracking = response_schema_tracking
+        self._component_name = component_name
         self._flow_id = flow_id
         self._flow_type = flow_type
         self._internal_event_client = internal_event_client
 
     async def run(self, state: FlowState) -> dict:
-        last_message = self._get_last_ai_message(state)
+        history_iokey = self._conversation_history_key.to_iokey(state)
+        output_iokey = self._output_key.to_iokey(state)
+
+        last_message, history = self._get_last_ai_message(state, history_iokey)
 
         if self._response_schema is not None:
             final_response_text, updates = self._extract_structured_response(
-                last_message
+                last_message, history, history_iokey, output_iokey
             )
         else:
-            final_response_text, updates = self._extract_text_response(last_message)
+            final_response_text, updates = self._extract_text_response(
+                last_message, output_iokey
+            )
 
         self._ui_history.log.success(
             final_response_text,
@@ -70,33 +96,46 @@ class FinalResponseNode:
 
         return {**self._ui_history.pop_state_updates(), **updates}
 
-    def _get_last_ai_message(self, state: FlowState) -> AIMessage:
-        history = state[FlowStateKeys.CONVERSATION_HISTORY].get(
-            self._component_name, []
-        )
+    def _get_last_ai_message(
+        self, state: FlowState, history_iokey: IOKey
+    ) -> tuple[AIMessage, list]:
+        history = history_iokey.value_from_state(state) or []
 
         if not history:
-            raise ValueError(f"No messages found for {self._component_name}")
+            raise ValueError(
+                f"No messages found for conversation history key "
+                f"{history_iokey.target}:{history_iokey.subkeys}"
+            )
 
         last_message = history[-1]
 
         if not isinstance(last_message, AIMessage):
             raise ValueError(
-                f"The last message of {self._component_name} is not of type AIMessage"
+                f"The last message for conversation history key "
+                f"{history_iokey.target}:{history_iokey.subkeys} "
+                f"is not of type AIMessage"
             )
 
-        return last_message
+        return last_message, history
 
-    def _extract_structured_response(self, last_message: AIMessage) -> tuple[str, dict]:
+    def _extract_structured_response(
+        self,
+        last_message: AIMessage,
+        history: list,
+        history_iokey: IOKey,
+        output_iokey: IOKey,
+    ) -> tuple[str, dict]:
         if not last_message.tool_calls:
             raise ValueError(
                 f"Response schema requires a tool call but got a text-only response "
-                f"for {self._component_name}"
+                f"for conversation history key "
+                f"{history_iokey.target}:{history_iokey.subkeys}"
             )
 
         if len(last_message.tool_calls) > 1:
             raise ValueError(
-                f"Too many tool calls found in the last message of {self._component_name}"
+                f"Too many tool calls found in the last message for conversation "
+                f"history key {history_iokey.target}:{history_iokey.subkeys}"
             )
 
         final_response_call = last_message.tool_calls[0]
@@ -108,7 +147,7 @@ class FinalResponseNode:
         if final_response_call["name"] != self._response_schema.tool_title:
             raise ValueError(
                 f"Final response tool call not found in the conversation history "
-                f"of {self._component_name}"
+                f"for key {history_iokey.target}:{history_iokey.subkeys}"
             )
 
         parsed_response = self._response_schema(**final_response_call["args"])
@@ -116,47 +155,35 @@ class FinalResponseNode:
         if self._response_schema_tracking:
             self._track_response_schema_output(parsed_response)
 
+        # Append ToolMessage completion response to existing history for replace-based reducer.
+        # The reducer will replace this component's conversation history with the complete list.
         updates: dict = {
-            FlowStateKeys.CONVERSATION_HISTORY: {
-                self._component_name: [
-                    ToolMessage(content="", tool_call_id=final_response_call["id"])
-                ]
-            },
+            **history_iokey.to_nested_dict(
+                history
+                + [ToolMessage(content="", tool_call_id=final_response_call["id"])]
+            ),
         }
 
-        if self._output:
-            output_data = parsed_response.to_output()
-            if self._output.subkeys is not None:
-                updates[self._output.target] = create_nested_dict(
-                    self._output.subkeys, output_data
-                )
-            else:
-                updates[self._output.target] = output_data
+        output_data = parsed_response.to_output()
+        updates.update(output_iokey.to_nested_dict(output_data))
 
         return parsed_response.to_string_output(), updates
 
-    def _extract_text_response(self, last_message: AIMessage) -> tuple[str, dict]:
+    def _extract_text_response(
+        self, last_message: AIMessage, output_iokey: IOKey
+    ) -> tuple[str, dict]:
         final_response_text = last_message.text
 
-        updates: dict = {}
-
-        if self._output:
-            if self._output.subkeys is not None:
-                updates[self._output.target] = create_nested_dict(
-                    self._output.subkeys, final_response_text
-                )
-            else:
-                updates[self._output.target] = final_response_text
-
-        return final_response_text, updates
+        return final_response_text, output_iokey.to_nested_dict(final_response_text)
 
     def _track_response_schema_output(self, parsed_response: BaseAgentOutput) -> None:
         output_data = parsed_response.to_output()
         flow_type_value = self._flow_type.value if self._flow_type else "unknown"
+        component_name = self._component_name or self.name
 
         log.info(
             "Response schema output tracked",
-            component_name=self._component_name,
+            component_name=component_name,
             flow_id=self._flow_id,
             flow_type=flow_type_value,
             response_output=output_data,
@@ -164,7 +191,7 @@ class FinalResponseNode:
 
         duo_workflow_metrics.count_response_schema_output(
             flow_type=flow_type_value,
-            component_name=self._component_name,
+            component_name=component_name,
         )
 
         if self._internal_event_client and self._flow_type:
@@ -173,7 +200,7 @@ class FinalResponseNode:
                 extra = {field: str(value) for field, value in output_data.items()}
 
             additional_properties = InternalEventAdditionalProperties(
-                label=self._component_name,
+                label=component_name,
                 property=json.dumps(output_data, default=str),
                 value=self._flow_id,
                 **extra,
@@ -189,4 +216,4 @@ class FinalResponseNode:
         # (ContextVar.set() in a child task only affects that task's context copy).
         current_results = response_schema_tracking_results.get()
         if current_results is not None:
-            current_results[self._component_name] = output_data
+            current_results[component_name] = output_data
