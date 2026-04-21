@@ -357,11 +357,22 @@ class GetWorkItemNotesInput(WorkItemResourceInput):
         default=None,
         description="Return work item notes ordered by created_at or updated_at fields. Default is created_at",
     )
+    page_size: int = Field(
+        default=20,
+        description="Number of notes to return per page (1–100).",
+        le=100,
+        ge=1,
+    )
+    pagination_cursor: Optional[str] = Field(
+        default=None,
+        description="Cursor for pagination. Use `endCursor` from a previous response to fetch the next page.",
+    )
 
 
 class GetWorkItemNotes(WorkItemBaseTool):
     name: str = "get_work_item_notes"
-    description: str = f"""Get all comments (notes) for a specific work item.
+    description: str = f"""Get comments (notes) for a work item.
+    Supports pagination via 'page_size' and 'pagination_cursor'.
 
     {WORK_ITEM_IDENTIFICATION_DESCRIPTION}
 
@@ -382,6 +393,8 @@ class GetWorkItemNotes(WorkItemBaseTool):
         group_id = kwargs.pop("group_id", None)
         project_id = kwargs.pop("project_id", None)
         work_item_iid = kwargs.pop("work_item_iid", None)
+        page_size = kwargs.pop("page_size", 20)
+        pagination_cursor = kwargs.pop("pagination_cursor", None)
 
         resolved = await self._validate_work_item_url(
             url, group_id, project_id, work_item_iid
@@ -392,6 +405,8 @@ class GetWorkItemNotes(WorkItemBaseTool):
         query_variables = {
             "fullPath": resolved.parent.full_path,
             "workItemIid": str(resolved.work_item_iid),
+            "first": page_size,
+            "after": pagination_cursor,
             **get_query_variables_for_version(
                 "includeNoteResolvedAndResolvableFields", "includeDiscussionIdField"
             ),
@@ -406,10 +421,16 @@ class GetWorkItemNotes(WorkItemBaseTool):
         widgets = nodes[0].get("widgets", [])
         for widget in widgets:
             if "notes" in widget:
-                notes = widget.get("notes", {}).get("nodes", [])
-                return json.dumps({"notes": notes}, indent=2)
+                notes_data = widget.get("notes", {})
+                return json.dumps(
+                    {
+                        "notes": notes_data.get("nodes", []),
+                        "page_info": notes_data.get("pageInfo", {}),
+                    },
+                    indent=2,
+                )
 
-        return json.dumps({"notes": []})
+        return json.dumps({"notes": [], "page_info": {}}, indent=2)
 
     def format_display_message(
         self, args: GetWorkItemNotesInput, _tool_response: Any = None

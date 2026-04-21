@@ -2,14 +2,20 @@ query GetProjectWorkItemNotes(
     $fullPath: ID!,
     $workItemIid: String!,
     $includeNoteResolvedAndResolvableFields: Boolean!,
-    $includeDiscussionIdField: Boolean!
+    $includeDiscussionIdField: Boolean!,
+    $first: Int,
+    $after: String
 ) {
     project(fullPath: $fullPath) {
         workItems(iid: $workItemIid) {
             nodes {
                 widgets {
                     ... on WorkItemWidgetNotes {
-                        notes {
+                        notes(first: $first, after: $after) {
+                            pageInfo {
+                                hasNextPage
+                                endCursor
+                            }
                             nodes {
                                 id
                                 body
