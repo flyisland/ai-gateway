@@ -179,7 +179,7 @@ class TestMrReviewerTrigger:
     def test_mr_reviewer_branch_renders(self, user_prompt_template):
         goal = "https://gitlab.com/gitlab-org/gitlab/-/merge_requests/224998"
         result = render(user_prompt_template, goal=goal)
-        assert "reviewer" in result.lower()
+        assert "review the merge request" in result.lower()
         assert goal in result
 
     def test_mr_reviewer_does_not_render_mention_blocks(self, user_prompt_template):

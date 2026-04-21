@@ -283,6 +283,8 @@ prompts:
       user: |
         {% include 'common/merge_request_guidelines/1.0.0.jinja' %}
 
+        {% set trimmed = goal | trim %}
+        {% set is_bare_url = (trimmed | split('http', 1) | first) == '' and ' ' not in trimmed and '\n' not in trimmed %}
         {% if 'Input:' in goal and '\nContext: {' in goal %}
         You were mentioned in a note on a GitLab resource in your current project.
 
@@ -304,12 +306,18 @@ prompts:
         `{{ project_url[:-4] if project_url and project_url[-4:] == '.git' else project_url }}/-/{resource_type}/{IID}`
 
         If the task involves code changes, verify they work. Use your judgment on whether to push to an existing branch (e.g. if asked to fix something on the current MR) or create a new merge request — the task context should make this clear.
-        {% elif '/-/merge_requests/' in goal %}
-        You were assigned as a reviewer on a merge request: {{ goal }}
+        {% elif is_bare_url and '/-/merge_requests/' in trimmed %}
+        Review the merge request: {{ goal }}
 
-        Fetch the merge request details and its diffs. Review the code changes thoroughly — check for correctness, potential bugs, readability, and adherence to the project's coding conventions. Read relevant existing code for context where needed. Leave your review as comments on the merge request, highlighting any issues found and suggesting improvements. If the changes look good, approve the merge request.
-        {% else %}
+        Before reviewing the diff, read the MR description, linked issues, and commit messages to understand the intent. For each changed file, read enough surrounding code (imports, callers, tests) to understand the impact — not just the changed lines.
+
+        Focus your review on the **new code being introduced**. Look for correctness issues, edge cases, security concerns, and deviations from project conventions. Every comment should be specific and actionable — avoid restating what the code already shows or offering generic observations.
+
+        Post your review as a comment on the merge request, referencing specific files and line numbers. Do not approve the merge request.
+        {% elif is_bare_url and ('/-/issues/' in trimmed or '/-/work_items/' in trimmed) %}
         Solve the following GitLab issue: {{ goal }}
 
         Fetch the issue details and understand the problem thoroughly before writing any code. Consider what might be causing the issue and where in the codebase the relevant logic lives. If there are multiple possible approaches, reason about the tradeoffs and pick the simplest one that fully addresses the issue. Implement your solution, verify it works, then create a merge request with your changes.
+        {% else %}
+        {{ goal }}
         {% endif %}
