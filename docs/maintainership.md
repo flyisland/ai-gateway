@@ -28,12 +28,13 @@ While there is no strict guideline on how to become a maintainer, we generally r
 
 ### Steps to become an AI Gateway maintainer
 
-1. **Create a merge request** to update your [team member entry](https://gitlab.com/gitlab-com/www-gitlab-com/blob/master/doc/team_database.md) and indicate your role as the following:
+1. **Create a merge request** from [this MR template](https://gitlab.com/gitlab-com/www-gitlab-com/-/blob/master/.gitlab/merge_request_templates/AI%20Gateway%20maintainer.md) to update your [team member entry](https://gitlab.com/gitlab-com/www-gitlab-com/blob/master/doc/team_database.md) and indicate your role as the following:
    - `maintainer ai-gateway`
 1. **Assign the MR** to your manager and `@gitlab-org/maintainers/ai-gateway` for approval and merge.
 1. **Request group membership** after the MR is merged:
    - Ask an Owner of [`@gitlab-org/maintainers/ai-gateway`](https://gitlab.com/groups/gitlab-org/maintainers/ai-gateway/-/group_members?with_inherited_permissions=exclude) group to add you
    - This makes you one of the [Code Owners](https://gitlab.com/gitlab-org/modelops/applied-ml/code-suggestions/ai-assist/-/blob/main/.gitlab/CODEOWNERS?ref_type=heads) whose approval is required for an MR to be merged.
+   - Do **not** add members directly as `Owners` to the `https://gitlab.com/groups/gitlab-org/maintainers/ai-gateway/` project
 1. **Enable dependency review notifications**: Add your username to `additionalReviewers` in [`renovate.json`](https://gitlab.com/gitlab-org/modelops/applied-ml/code-suggestions/ai-assist/-/blob/main/renovate.json)
    - This includes you as a reviewer for dependency update merge requests.
 
