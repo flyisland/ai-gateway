@@ -121,8 +121,16 @@ class ToolNodeWithErrorCorrection:  # pylint: disable=too-many-instance-attribut
         Returns:
             State update dict with error feedback
         """
-        result: dict[str, Any] = {**self._ui_history.pop_state_updates()}
+        last_message = conversation_history[-1] if conversation_history else None
+        if last_message:
+            reasoning_content = last_message.text
+            if reasoning_content:
+                self._ui_history.log.warning(
+                    message=reasoning_content,
+                    event=UILogEventsOneOff.ON_AGENT_REASONING,
+                )
 
+        result: dict[str, Any] = {**self._ui_history.pop_state_updates()}
         feedback_message = (
             f"{NO_TOOL_CALLS_FEEDBACK_PREFIX}. If you were unable to "
             "generate tool calls because you encountered an unresolvable blocker (e.g., authentication "

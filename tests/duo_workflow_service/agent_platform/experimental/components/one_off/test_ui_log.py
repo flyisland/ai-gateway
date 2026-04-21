@@ -19,6 +19,7 @@ class TestUILogEventsOneOff:
         """Test that all expected events are defined in UILogEventsOneOff."""
         expected_events = [
             "ON_AGENT_FINAL_ANSWER",
+            "ON_AGENT_REASONING",
             "ON_TOOL_CALL_INPUT",
             "ON_TOOL_EXECUTION_SUCCESS",
             "ON_TOOL_EXECUTION_FAILED",

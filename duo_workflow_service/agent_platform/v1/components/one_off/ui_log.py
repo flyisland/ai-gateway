@@ -26,6 +26,7 @@ __all__ = [
 
 class UILogEventsOneOff(BaseUILogEvents):
     ON_AGENT_FINAL_ANSWER = auto()
+    ON_AGENT_REASONING = auto()
     ON_TOOL_CALL_INPUT = auto()
     ON_TOOL_EXECUTION_SUCCESS = auto()
     ON_TOOL_EXECUTION_FAILED = auto()
@@ -105,6 +106,24 @@ class UILogWriterOneOffTools(BaseUILogWriter):
             tool_info=ToolInfo(name=tool.name, args=tool_call_args),
             additional_context=kwargs.get("context_elements", []),
             message_sub_type=f"{tool.name}_input",
+            message_id=None,
+        )
+
+    def _log_warning(
+        self,
+        message: str,
+        **kwargs,
+    ) -> UiChatLog:
+        """Log agent reasoning when no tools are called."""
+        return UiChatLog(
+            message_type=MessageTypeEnum.AGENT,
+            content=message,
+            timestamp=datetime.now(timezone.utc).isoformat(),
+            status=None,
+            correlation_id=kwargs.get("correlation_id"),
+            tool_info=None,
+            additional_context=kwargs.get("context_elements", []),
+            message_sub_type="reasoning",
             message_id=None,
         )
 
