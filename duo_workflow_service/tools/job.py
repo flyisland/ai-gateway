@@ -1,11 +1,12 @@
 import json
 from typing import Any, List, NamedTuple, Optional, Type
-from urllib.parse import quote
+from urllib.parse import quote, urlencode
 
 import structlog
 from langchain_core.tools import ToolException
 from pydantic import BaseModel, Field
 
+from duo_workflow_service.client_capabilities import is_client_capable
 from duo_workflow_service.gitlab.url_parser import GitLabUrlParseError, GitLabUrlParser
 from duo_workflow_service.tools.duo_base_tool import DuoBaseTool
 from duo_workflow_service.tools.gitlab_resource_input import ProjectResourceInput
@@ -27,6 +28,14 @@ class GetLogsFromJobInput(ProjectResourceInput):
     job_id: Optional[int] = Field(
         default=None,
         description="The ID of the job. Required if URL is not provided.",
+    )
+    byte_offset: Optional[int] = Field(
+        default=None,
+        description="Byte position to start reading the job trace from. Use to resume reading a large trace.",
+    )
+    byte_limit: Optional[int] = Field(
+        default=None,
+        description="Max number of bytes to return from the job trace. Use to cap the response size for large jobs.",
     )
 
 
@@ -122,14 +131,29 @@ class GetLogsFromJob(DuoBaseTool):
         url = kwargs.get("url", None)
         project_id = kwargs.get("project_id", None)
         job_id = kwargs.get("job_id", None)
+        byte_limit = kwargs.get("byte_limit", None)
+        byte_offset = kwargs.get("byte_offset", None)
 
         validation_result = self._validate_job_url(url, project_id, job_id)
 
         if validation_result.errors:
             raise ToolException("; ".join(validation_result.errors))
 
+        path = f"/api/v4/projects/{validation_result.project_id}/jobs/{validation_result.job_id}/trace"
+        query_params = {}
+        if byte_limit is not None:
+            query_params["byte_limit"] = byte_limit
+        if byte_offset is not None:
+            query_params["byte_offset"] = byte_offset
+        if query_params:
+            if not is_client_capable("job_trace_pagination"):
+                raise ToolException(
+                    "byte_limit and byte_offset are not supported by this client version."
+                )
+            path = f"{path}?{urlencode(query_params)}"
+
         response = await self.gitlab_client.aget(
-            path=f"/api/v4/projects/{validation_result.project_id}/jobs/{validation_result.job_id}/trace",
+            path=path,
             parse_json=False,
         )
 
