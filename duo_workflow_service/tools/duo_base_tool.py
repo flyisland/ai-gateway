@@ -181,6 +181,13 @@ class DuoBaseTool(BaseTool):
         """Wrapper that applies truncation and security wrapping to all tool results.
 
         This method should NOT be overridden by subclasses.
+
+        The redaction-truncation order is intentionally: redact → truncate.
+
+        Rationale: truncation may split a secret/token mid-string, causing some
+        pattern-based detectors to no longer match the partial token.  By redacting
+        *before* truncation we ensure full secrets are caught before truncation
+        can split them.
         """
         saved_kwargs = dict(kwargs)
         kwargs = self._apply_tool_options(kwargs)
@@ -197,15 +204,15 @@ class DuoBaseTool(BaseTool):
             else:
                 await self._check_tier_access(feature, saved_kwargs)
 
-        # Apply truncation
+        # Redaction pass: catch full secrets before truncation splits them
+        tool_response = redact_secrets(response=tool_result, tool_name=self.name)
+
+        # Apply truncation (may convert structured types to strings)
         tool_response = truncate_tool_response(
-            tool_response=tool_result,
+            tool_response=tool_response,
             tool_name=self.name,
             truncation_config=self.truncation_config,
         )
-
-        # Redact any secret-like strings to prevent accidental leaking
-        tool_response = redact_secrets(response=tool_response, tool_name=self.name)
 
         return tool_response
 
