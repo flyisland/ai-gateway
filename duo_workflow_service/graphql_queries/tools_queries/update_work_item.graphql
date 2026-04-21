@@ -32,6 +32,14 @@ mutation updateWorkItem($input: WorkItemUpdateInput!) {
                     dueDate
                     isFixed
                 }
+                ... on WorkItemWidgetCurrentUserTodos {
+                    currentUserTodos {
+                        nodes {
+                            id
+                            state
+                        }
+                    }
+                }
             }
         }
         errors

@@ -76,6 +76,11 @@ class HealthStatus(str, Enum):
     AT_RISK = "atRisk"
 
 
+class TodoAction(str, Enum):
+    ADD = "add"
+    MARK_AS_DONE = "mark_as_done"
+
+
 class MilestoneWildcardId(str, Enum):
     ANY = "ANY"
     NONE = "NONE"
@@ -541,6 +546,16 @@ class UpdateWorkItemInput(WorkItemResourceInput):
         description="""Hierarchy widget configuration. Must contain 'parent_id' with
         work item global ID in the format: gid://gitlab/WorkItem/<id>""",
     )
+    todo_action: Optional[TodoAction] = Field(
+        default=None,
+        description="To-do action to perform on the work item. Use 'add' to create a to-do, "
+        "or 'mark_as_done' to resolve an existing to-do.",
+    )
+    todo_id: Optional[str] = Field(
+        default=None,
+        description="Global ID of the to-do item to mark as done (e.g., 'gid://gitlab/Todo/123'). "
+        "Optional when todo_action is 'mark_as_done'. If omitted, all to-dos for the work item are marked as done.",
+    )
 
 
 class UpdateWorkItem(WorkItemBaseTool):
@@ -551,11 +566,16 @@ class UpdateWorkItem(WorkItemBaseTool):
 
     {WORK_ITEM_IDENTIFICATION_DESCRIPTION}
 
+    Supports updating title, description, assignees, labels, state, health status,
+    dates, hierarchy, and to-do items.
+
     For example:
     - update_work_item(group_id='parent/child', work_item_iid=42, title="Updated title")
     - update_work_item(project_id='namespace/project', work_item_iid=42, title="Updated title")
     - update_work_item(url="https://gitlab.com/groups/namespace/group/-/work_items/42", title="Updated title")
     - update_work_item(url="https://gitlab.com/namespace/project/-/work_items/42", title="Updated title")
+    - update_work_item(url="https://gitlab.com/namespace/project/-/work_items/42", todo_action="add")
+    - update_work_item(url="https://gitlab.com/namespace/project/-/work_items/42", todo_action="mark_as_done", todo_id="gid://gitlab/Todo/123")
     """
     args_schema: Type[BaseModel] = UpdateWorkItemInput
 

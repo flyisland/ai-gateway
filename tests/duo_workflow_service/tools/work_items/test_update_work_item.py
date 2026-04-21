@@ -5,7 +5,11 @@ from unittest.mock import AsyncMock, Mock
 import pytest
 from langchain_core.tools import ToolException
 
-from duo_workflow_service.tools.work_item import UpdateWorkItem, UpdateWorkItemInput
+from duo_workflow_service.tools.work_item import (
+    TodoAction,
+    UpdateWorkItem,
+    UpdateWorkItemInput,
+)
 from duo_workflow_service.tools.work_items.base_tool import (
     ResolvedParent,
     ResolvedWorkItem,
@@ -118,6 +122,38 @@ def update_response_fixture_func():
                 }
             },
         ),
+        (
+            {"todo_action": "add"},
+            {"currentUserTodosWidget": {"action": "ADD"}},
+        ),
+        (
+            {
+                "todo_action": "mark_as_done",
+                "todo_id": "gid://gitlab/Todo/123",
+            },
+            {
+                "currentUserTodosWidget": {
+                    "action": "MARK_AS_DONE",
+                    "todoId": "gid://gitlab/Todo/123",
+                }
+            },
+        ),
+        (
+            {"todo_action": "mark_as_done"},
+            {"currentUserTodosWidget": {"action": "MARK_AS_DONE"}},
+        ),
+    ],
+    ids=[
+        "title",
+        "title_and_confidential",
+        "close_state",
+        "start_and_due_dates",
+        "health_status",
+        "assignees",
+        "labels",
+        "todo_add",
+        "todo_mark_as_done_with_id",
+        "todo_mark_as_done_without_id",
     ],
 )
 async def test_update_work_item_variants(
@@ -381,3 +417,145 @@ def test_update_work_item_input_without_hierarchy_widget():
 
     assert input_data.hierarchy_widget is None
     assert input_data.work_item_iid == 42
+
+
+def test_update_work_item_input_with_todo_action_add():
+    """Test UpdateWorkItemInput accepts todo_action='add'."""
+    input_data = UpdateWorkItemInput(
+        project_id="namespace/project",
+        work_item_iid=42,
+        todo_action="add",
+    )
+    assert input_data.todo_action == TodoAction.ADD
+    assert input_data.todo_id is None
+
+
+def test_update_work_item_input_with_todo_action_mark_as_done():
+    """Test UpdateWorkItemInput accepts todo_action='mark_as_done' with todo_id."""
+    input_data = UpdateWorkItemInput(
+        project_id="namespace/project",
+        work_item_iid=42,
+        todo_action="mark_as_done",
+        todo_id="gid://gitlab/Todo/123",
+    )
+    assert input_data.todo_action == TodoAction.MARK_AS_DONE
+    assert input_data.todo_id == "gid://gitlab/Todo/123"
+
+
+def test_update_work_item_input_without_todo_fields():
+    """Test UpdateWorkItemInput defaults todo fields to None."""
+    input_data = UpdateWorkItemInput(
+        project_id="namespace/project",
+        work_item_iid=42,
+    )
+    assert input_data.todo_action is None
+    assert input_data.todo_id is None
+
+
+@pytest.mark.asyncio
+async def test_update_work_item_with_invalid_todo_id(
+    gitlab_client_mock, metadata, resolved_work_item_fixture, update_response_fixture
+):
+    """Test that invalid todo_id format produces a warning but still succeeds."""
+    tool = UpdateWorkItem(description="update", metadata=metadata)
+    tool._resolve_work_item_data = AsyncMock(return_value=resolved_work_item_fixture)
+    gitlab_client_mock.graphql = AsyncMock(return_value=update_response_fixture)
+
+    result = await tool._arun(
+        project_id="namespace/project",
+        work_item_iid=42,
+        todo_action="mark_as_done",
+        todo_id="bad-format",
+    )
+
+    response_json = json.loads(result)
+    assert "updated_work_item" in response_json
+    assert "warnings" in response_json
+    assert any("Invalid todo_id format" in w for w in response_json["warnings"])
+
+    # Verify the widget was sent without todoId
+    call_args = gitlab_client_mock.graphql.call_args[0]
+    input_data = call_args[1]["input"]
+    assert "currentUserTodosWidget" in input_data
+    assert "todoId" not in input_data["currentUserTodosWidget"]
+
+
+@pytest.mark.asyncio
+async def test_update_work_item_with_invalid_todo_action(
+    gitlab_client_mock, metadata, resolved_work_item_fixture, update_response_fixture
+):
+    """Test that invalid todo_action produces a warning and skips the widget."""
+    tool = UpdateWorkItem(description="update", metadata=metadata)
+    tool._resolve_work_item_data = AsyncMock(return_value=resolved_work_item_fixture)
+    gitlab_client_mock.graphql = AsyncMock(return_value=update_response_fixture)
+
+    result = await tool._arun(
+        project_id="namespace/project",
+        work_item_iid=42,
+        todo_action="invalid_action",
+    )
+
+    response_json = json.loads(result)
+    assert "updated_work_item" in response_json
+    assert "warnings" in response_json
+    assert any("Invalid todo_action" in w for w in response_json["warnings"])
+
+    # Verify the widget was NOT included
+    call_args = gitlab_client_mock.graphql.call_args[0]
+    input_data = call_args[1]["input"]
+    assert "currentUserTodosWidget" not in input_data
+
+
+@pytest.mark.asyncio
+async def test_update_work_item_without_todo_action(
+    gitlab_client_mock, metadata, resolved_work_item_fixture, update_response_fixture
+):
+    """Test that omitting todo_action does not include the currentUserTodosWidget."""
+    tool = UpdateWorkItem(description="update", metadata=metadata)
+    tool._resolve_work_item_data = AsyncMock(return_value=resolved_work_item_fixture)
+    gitlab_client_mock.graphql = AsyncMock(return_value=update_response_fixture)
+
+    result = await tool._arun(
+        project_id="namespace/project",
+        work_item_iid=42,
+        title="Updated Title",
+    )
+
+    response_json = json.loads(result)
+    assert "updated_work_item" in response_json
+
+    # Verify the widget was NOT included when todo_action is not provided
+    call_args = gitlab_client_mock.graphql.call_args[0]
+    input_data = call_args[1]["input"]
+    assert "currentUserTodosWidget" not in input_data
+
+
+@pytest.mark.asyncio
+async def test_update_work_item_add_action_drops_todo_id(
+    gitlab_client_mock, metadata, resolved_work_item_fixture, update_response_fixture
+):
+    """Test that todo_id is dropped with a warning when todo_action is 'add'."""
+    tool = UpdateWorkItem(description="update", metadata=metadata)
+    tool._resolve_work_item_data = AsyncMock(return_value=resolved_work_item_fixture)
+    gitlab_client_mock.graphql = AsyncMock(return_value=update_response_fixture)
+
+    result = await tool._arun(
+        project_id="namespace/project",
+        work_item_iid=42,
+        todo_action="add",
+        todo_id="gid://gitlab/Todo/456",
+    )
+
+    response_json = json.loads(result)
+    assert "updated_work_item" in response_json
+    assert "warnings" in response_json
+    assert any(
+        "todo_id is only applicable when todo_action is 'mark_as_done'." in w
+        for w in response_json["warnings"]
+    )
+
+    # Verify the widget was sent as ADD without todoId
+    call_args = gitlab_client_mock.graphql.call_args[0]
+    input_data = call_args[1]["input"]
+    assert input_data["currentUserTodosWidget"] == {"action": "ADD"}
+    assert "todoId" not in input_data["currentUserTodosWidget"]

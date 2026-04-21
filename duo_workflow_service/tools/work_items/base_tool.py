@@ -46,6 +46,11 @@ STATE_EVENT_MAPPING = {
     "opened": "REOPEN",
 }
 
+TODO_ACTION_MAPPING = {
+    "add": "ADD",
+    "mark_as_done": "MARK_AS_DONE",
+}
+
 
 class ResolvedParent(NamedTuple):
     type: Literal["group", "project"]
@@ -253,6 +258,11 @@ class WorkItemBaseTool(DuoBaseTool):
         if hierarchy_widget:
             input_data["hierarchyWidget"] = hierarchy_widget
 
+        todo_widget = WorkItemBaseTool._build_todo_widget(kwargs, warnings)
+
+        if todo_widget:
+            input_data["currentUserTodosWidget"] = todo_widget
+
         return input_data, warnings
 
     @staticmethod
@@ -363,6 +373,50 @@ class WorkItemBaseTool(DuoBaseTool):
             return None
 
         return {"parentId": parent_id}  # Note: GraphQL expects camelCase
+
+    @staticmethod
+    def _build_todo_widget(
+        kwargs: Dict[str, Any], warnings: List[str]
+    ) -> Optional[Dict[str, Any]]:
+        """Build currentUserTodosWidget input for work item to-do management.
+
+        Args:
+            kwargs: Input parameters that may contain todo_action and todo_id.
+            warnings: List to collect validation warnings.
+
+        Returns:
+            Dictionary with to-do widget configuration or None if not provided.
+        """
+        todo_action = kwargs.get("todo_action")
+        if todo_action is None:
+            return None
+
+        action_key = (
+            todo_action.value if isinstance(todo_action, Enum) else str(todo_action)
+        )
+        action_value = TODO_ACTION_MAPPING.get(action_key)
+        if not action_value:
+            warnings.append(
+                f"Invalid todo_action '{todo_action}'. Must be 'add' or 'mark_as_done'."
+            )
+            return None
+
+        widget: Dict[str, Any] = {"action": action_value}
+
+        todo_id = kwargs.get("todo_id")
+        if todo_id:
+            if action_value != TODO_ACTION_MAPPING["mark_as_done"]:
+                warnings.append(
+                    "todo_id is only applicable when todo_action is 'mark_as_done'."
+                )
+            elif not re.match(r"^gid://gitlab/Todo/\d+$", str(todo_id)):
+                warnings.append(
+                    f"Invalid todo_id format: '{todo_id}'. Expected 'gid://gitlab/Todo/<id>'."
+                )
+            else:
+                widget["todoId"] = todo_id
+
+        return widget
 
     @staticmethod
     def _normalize_gids(ids: list[Any], gid_type: str) -> tuple[list[str], list[Any]]:
