@@ -5,7 +5,7 @@
 from unittest.mock import AsyncMock, Mock, patch
 
 import pytest
-from langchain_core.messages import HumanMessage, ToolMessage
+from langchain_core.messages import AIMessage, HumanMessage, ToolMessage
 from pydantic_core import ValidationError
 
 from duo_workflow_service.agent_platform.utils.tool_event_tracker import (
@@ -20,6 +20,7 @@ from duo_workflow_service.agent_platform.v1.components.one_off.nodes.tool_node_w
     ToolNodeWithErrorCorrection,
 )
 from duo_workflow_service.agent_platform.v1.components.one_off.ui_log import (
+    UILogEventsOneOff,
     UILogWriterOneOffTools,
 )
 from duo_workflow_service.agent_platform.v1.state import FlowStateKeys, IOKey
@@ -76,6 +77,7 @@ def ui_history_one_off_fixture():
     ui_history.log.success = Mock()
     ui_history.log.error = Mock()
     ui_history.log._log_tool_call_input = Mock()
+    ui_history.log.warning = Mock()
     ui_history.pop_state_updates = Mock(return_value={})
     return ui_history
 
@@ -484,6 +486,57 @@ class TestToolNodeWithErrorCorrectionRun:
         assert NO_TOOL_CALLS_FEEDBACK_PREFIX in conversation_messages[1].content
         # Verify the message contains the routing sentinel so _tools_router can handle it
         assert ATTEMPTS_REMAINING_SENTINEL in conversation_messages[1].content
+
+    @pytest.mark.asyncio
+    async def test_run_no_tool_calls_reasoning_log_included_in_result(
+        self,
+        component_name,
+        mock_toolset,
+        flow_id,
+        flow_type,
+        mock_internal_event_client,
+        tool_calls_key,
+        tool_responses_key,
+        execution_result_key,
+        conversation_history_key,
+        base_flow_state,
+        mock_tool_monitoring,
+        mock_prompt_security,
+        mock_logger,
+    ):
+        """Test that ON_AGENT_REASONING log is included in the result when no tool calls."""
+        ui_history = UIHistory(
+            events=[UILogEventsOneOff.ON_AGENT_REASONING],
+            writer_class=UILogWriterOneOffTools,
+        )
+        tracker = ToolEventTracker(
+            flow_id=flow_id,
+            flow_type=flow_type,
+            internal_event_client=mock_internal_event_client,
+        )
+        node = ToolNodeWithErrorCorrection(
+            name="test_tool_node",
+            component_name=component_name,
+            toolset=mock_toolset,
+            ui_history=ui_history,
+            max_correction_attempts=3,
+            tool_calls_key=tool_calls_key,
+            tool_responses_key=tool_responses_key,
+            execution_result_key=execution_result_key,
+            conversation_history_key=conversation_history_key,
+            tracker=tracker,
+        )
+
+        ai_message = AIMessage(content="I cannot determine the exact file path.")
+        state = base_flow_state.copy()
+        state[FlowStateKeys.CONVERSATION_HISTORY] = {component_name: [ai_message]}
+
+        result = await node.run(state)
+
+        logs = result.get(FlowStateKeys.UI_CHAT_LOG, [])
+        assert len(logs) == 1
+        assert logs[0]["content"] == "I cannot determine the exact file path."
+        assert logs[0]["message_sub_type"] == "reasoning"
 
     @pytest.mark.asyncio
     async def test_run_empty_conversation_history(
