@@ -268,10 +268,9 @@ routers:
     condition:
       input: "context:fix_pipeline_next_decide_fix.final_answer.decision"
       routes:
-        "add_comment": "fix_pipeline_add_comment"
         "create_fix_on_existing_mr": "fix_pipeline_next_code_suggestions"
         "create_fix_on_new_mr": "create_repository_branch"
-        "default_route": "fix_pipeline_add_comment"
+        "default_route": "create_repository_branch"
   - from: "fix_pipeline_next_code_suggestions"
     to: "end"
   - from: "create_repository_branch"

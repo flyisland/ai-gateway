@@ -1,5 +1,5 @@
-Examine the information below and set the decision field to either `add_comment`, `create_fix_on_existing_mr`
-or `create_fix_on_new_mr`.
+Examine the information below and set the decision field to either `create_fix_on_existing_mr` or
+`create_fix_on_new_mr`.
 
 {% if merge_request_url %}
 A merge request is associated with this pipeline:
@@ -25,4 +25,4 @@ of files that were changed — is below:
 Decision rules:
 - If no merge request URL is provided → set the decision field to `create_fix_on_new_mr`
 - If a merge request URL is provided AND every file modified by the execution step appears in the merge request diff → set the decision field to `create_fix_on_existing_mr`
-- If a merge request URL is provided BUT any file modified by the execution step is NOT in the merge request diff → set the decision field to `add_comment`
+- If a merge request URL is provided BUT any file modified by the execution step is NOT in the merge request diff → set the decision field to `create_fix_on_new_mr`
