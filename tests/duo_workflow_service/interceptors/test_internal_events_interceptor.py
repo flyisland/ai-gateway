@@ -58,6 +58,7 @@ def create_handler_call_details(metadata_dict):
                 "x-gitlab-namespace-id": "2",
                 "x-gitlab-root-namespace-id": "3",
                 "x-gitlab-is-a-gitlab-member": "true",
+                "x-gitlab-organization-id": "1337",
             },
             {
                 "realm": "test-realm",
@@ -74,6 +75,7 @@ def create_handler_call_details(metadata_dict):
                 "client_name": None,
                 "client_type": None,
                 "client_version": None,
+                "organization_id": 1337,
             },
             id="standard_metadata",
         ),
@@ -102,6 +104,7 @@ def create_handler_call_details(metadata_dict):
                 "namespace_id": 2,
                 "ultimate_parent_namespace_id": 3,
                 "is_gitlab_team_member": True,
+                "organization_id": None,
                 "client_name": None,
                 "client_type": None,
                 "client_version": None,
@@ -133,6 +136,7 @@ def create_handler_call_details(metadata_dict):
                 "namespace_id": 2,
                 "ultimate_parent_namespace_id": None,
                 "is_gitlab_team_member": True,
+                "organization_id": None,
                 "client_name": None,
                 "client_type": None,
                 "client_version": None,
@@ -164,6 +168,7 @@ def create_handler_call_details(metadata_dict):
                 "namespace_id": 2,
                 "ultimate_parent_namespace_id": None,
                 "is_gitlab_team_member": True,
+                "organization_id": None,
                 "client_name": None,
                 "client_type": None,
                 "client_version": None,
@@ -195,6 +200,7 @@ def create_handler_call_details(metadata_dict):
                 "namespace_id": 2,
                 "ultimate_parent_namespace_id": 3,
                 "is_gitlab_team_member": True,
+                "organization_id": None,
                 "client_name": None,
                 "client_type": None,
                 "client_version": None,
@@ -226,6 +232,7 @@ def create_handler_call_details(metadata_dict):
                 "namespace_id": 2,
                 "ultimate_parent_namespace_id": 3,
                 "is_gitlab_team_member": True,
+                "organization_id": None,
                 "client_name": None,
                 "client_type": None,
                 "client_version": None,
@@ -255,6 +262,7 @@ def create_handler_call_details(metadata_dict):
                 "namespace_id": None,
                 "ultimate_parent_namespace_id": 3,
                 "is_gitlab_team_member": False,
+                "organization_id": None,
                 "client_name": None,
                 "client_type": None,
                 "client_version": None,
@@ -289,6 +297,7 @@ def create_handler_call_details(metadata_dict):
                 "namespace_id": 2,
                 "ultimate_parent_namespace_id": 3,
                 "is_gitlab_team_member": True,
+                "organization_id": None,
                 "client_name": "gitlab-duo-workflow",
                 "client_type": "node-websocket",
                 "client_version": "1.0.0",
@@ -320,6 +329,7 @@ def create_handler_call_details(metadata_dict):
                 "namespace_id": 2,
                 "ultimate_parent_namespace_id": 3,
                 "is_gitlab_team_member": True,
+                "organization_id": None,
                 "client_name": None,
                 "client_type": None,
                 "client_version": None,
@@ -354,6 +364,7 @@ def create_handler_call_details(metadata_dict):
                 "namespace_id": 2,
                 "ultimate_parent_namespace_id": 3,
                 "is_gitlab_team_member": True,
+                "organization_id": None,
                 "client_name": None,
                 "client_type": None,
                 "client_version": None,
@@ -393,6 +404,7 @@ async def test_interceptor_metadata_handling(
     assert event_context.client_name == expected["client_name"]
     assert event_context.client_type == expected["client_type"]
     assert event_context.client_version == expected["client_version"]
+    assert event_context.organization_id == expected.get("organization_id")
     # By default, no lsp_version should be in extra
     assert event_context.extra == {}
     # By default, instance_version should be None

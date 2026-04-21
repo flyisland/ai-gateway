@@ -19,6 +19,7 @@ from duo_workflow_service.interceptors import (
     X_GITLAB_IS_A_GITLAB_MEMBER,
     X_GITLAB_IS_GITLAB_MEMBER,
     X_GITLAB_NAMESPACE_ID,
+    X_GITLAB_ORGANIZATION_ID,
     X_GITLAB_PROJECT_ID,
     X_GITLAB_REALM_HEADER,
     X_GITLAB_ROOT_NAMESPACE_ID,
@@ -75,6 +76,9 @@ class InternalEventsInterceptor(grpc.aio.ServerInterceptor):
         namespace_id = metadata.get(X_GITLAB_NAMESPACE_ID)
         namespace_id = int(namespace_id) if namespace_id else None
 
+        organization_id = metadata.get(X_GITLAB_ORGANIZATION_ID)
+        organization_id = int(organization_id) if organization_id else None
+
         # Get language server version from context
         lsp_version = language_server_version.get()
         extra = {}
@@ -118,6 +122,7 @@ class InternalEventsInterceptor(grpc.aio.ServerInterceptor):
             client_name=metadata.get(X_GITLAB_CLIENT_NAME_HEADER, None) or None,
             client_type=metadata.get(X_GITLAB_CLIENT_TYPE_HEADER, None) or None,
             client_version=metadata.get(X_GITLAB_CLIENT_VERSION_HEADER, None) or None,
+            organization_id=organization_id,
         )
 
         validate_event_context(context, grpc_method=handler_call_details.method)

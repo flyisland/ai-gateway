@@ -20,7 +20,7 @@ __all__ = ["InternalEventsClient"]
 class InternalEventsClient:
     """Client to handle internal events using SnowplowClient."""
 
-    STANDARD_CONTEXT_SCHEMA = "iglu:com.gitlab/gitlab_standard/jsonschema/1-1-7"
+    STANDARD_CONTEXT_SCHEMA = "iglu:com.gitlab/gitlab_standard/jsonschema/1-1-8"
     AI_CONTEXT_SCHEMA = "iglu:com.gitlab/ai_context/jsonschema/1-0-1"
     REQUEST_TIMEOUT = (5.0, 10.0)
 

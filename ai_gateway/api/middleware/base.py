@@ -23,6 +23,7 @@ from .headers import (
     X_GITLAB_INSTANCE_ID_HEADER,
     X_GITLAB_LANGUAGE_SERVER_VERSION,
     X_GITLAB_MODEL_GATEWAY_REQUEST_SENT_AT,
+    X_GITLAB_ORGANIZATION_ID,
     X_GITLAB_REALM_HEADER,
     X_GITLAB_ROOT_NAMESPACE_ID,
     X_GITLAB_SAAS_DUO_PRO_NAMESPACE_IDS_HEADER,
@@ -171,6 +172,7 @@ class AccessLogMiddleware:
                 "is_gitlab_team_member": request.headers.get(
                     X_GITLAB_TEAM_MEMBER_HEADER
                 ),
+                "gitlab_organization_id": request.headers.get(X_GITLAB_ORGANIZATION_ID),
             }
 
             fields.update(starlette_context.data)
