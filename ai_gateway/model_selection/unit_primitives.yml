@@ -339,7 +339,7 @@ configurable_unit_primitives:
     unit_primitives:
       - "review_merge_request"
     default_models:
-      - "claude_sonnet_4_6_vertex"
+      - "claude_sonnet_4_20250514_vertex"
     selectable_models:
       - "claude_sonnet_4_20250514"
       - "claude_sonnet_4_20250514_bedrock"
