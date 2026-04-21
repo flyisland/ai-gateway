@@ -2,7 +2,7 @@ from typing import ClassVar, Optional, Sequence, Type, cast
 
 import structlog
 from anthropic import APIStatusError
-from langchain_core.messages import AIMessage, ToolMessage
+from langchain_core.messages import AIMessage, HumanMessage, ToolMessage
 from pydantic import ConfigDict, Field
 from pydantic_core import ValidationError
 
@@ -10,7 +10,6 @@ from ai_gateway.prompts import Prompt
 from ai_gateway.response_schemas.base import BaseAgentOutput
 from duo_workflow_service.agent_platform.v1.state import (
     FlowState,
-    FlowStateKeys,
     IOKey,
     RuntimeIOKey,
     get_vars_from_state,
@@ -19,6 +18,7 @@ from duo_workflow_service.conversation.compaction import (
     ConversationCompactor,
     maybe_compact_history,
 )
+from duo_workflow_service.conversation.trimmer import restore_message_consistency
 from duo_workflow_service.errors.error_handler import ModelError, ModelErrorHandler
 from lib.context import LLMFinishReason, extract_finish_reason
 from lib.events import GLReportingEventContext
@@ -59,12 +59,35 @@ class AgentFinalOutput(BaseAgentOutput):
 
 
 class AgentNode:
+    """LangGraph node that invokes an LLM and appends the completion to conversation history.
+
+    All state interactions are performed exclusively through ``IOKey`` instances,
+    following the Flow Registry guideline of avoiding direct state dictionary
+    access.
+
+    The conversation-history ``IOKey`` is resolved dynamically at runtime via
+    ``conversation_history_key``.  This supports both the common case (static key
+    wrapped in a ``RuntimeIOKey`` by the caller) and the supervisor case where
+    the key is only known at runtime.
+
+    Args:
+        flow_id: Identifier of the current flow execution.
+        flow_type: Reporting context used for internal events and metrics.
+        name: LangGraph node name (used when registering with ``StateGraph``).
+        prompt: Bound ``Prompt`` instance used to invoke the LLM.
+        inputs: ``IOKey`` list describing which state values to pass as prompt
+            variables.
+        conversation_history_key: ``RuntimeIOKey`` that resolves the
+            conversation-history ``IOKey`` at runtime.
+        internal_event_client: Client for tracking internal telemetry events.
+    """
+
     name: str
     _prompt: Prompt
 
     _inputs: Sequence[IOKey | RuntimeIOKey]
 
-    _component_name: str
+    _conversation_history_key: RuntimeIOKey
 
     _internal_event_client: InternalEventsClient
 
@@ -80,32 +103,34 @@ class AgentNode:
         name: str,
         prompt: Prompt,
         inputs: Sequence[IOKey | RuntimeIOKey],
-        component_name: str,
         internal_event_client: InternalEventsClient,
-        response_schema: Optional[Type[BaseAgentOutput]] = None,
+        conversation_history_key: RuntimeIOKey,
         compactor: ConversationCompactor | None = None,
+        response_schema: Optional[Type[BaseAgentOutput]] = None,
     ):
         self._flow_id = flow_id
         self._flow_type = flow_type
         self.name = name
         self._prompt = prompt
         self._inputs = inputs
-        self._component_name = component_name
         self._internal_event_client = internal_event_client
         self._error_handler = ModelErrorHandler()
-        self._response_schema = response_schema
         self._compactor = compactor
+        self._conversation_history_key = conversation_history_key
+        self._response_schema = response_schema
+
+    _TRUNCATION_RECOVERY_MESSAGE = (
+        "Your response was too long and got cut off. "
+        "Be more concise and use smaller, incremental steps."
+    )
 
     async def run(self, state: FlowState) -> dict:
-        history = state[FlowStateKeys.CONVERSATION_HISTORY].get(
-            self._component_name, []
-        )
+        history_iokey = self._conversation_history_key.to_iokey(state)
+        history = history_iokey.value_from_state(state) or []
         variables = get_vars_from_state(self._inputs, state)
 
         history = await maybe_compact_history(
-            compactor=self._compactor,
-            history=history,
-            agent_name=self._component_name,
+            compactor=self._compactor, history=history, agent_name=self.name
         )
 
         while True:
@@ -115,6 +140,21 @@ class AgentNode:
                     await self._prompt.ainvoke(input={**variables, "history": history}),
                 )
                 finish_reason = extract_finish_reason(completion.response_metadata)
+                if finish_reason in LLMFinishReason.truncation_values():
+                    log.warning(
+                        "LLM response was truncated due to token limit; "
+                        "injecting recovery message and returning to graph loop",
+                        finish_reason=finish_reason,
+                    )
+                    history = restore_message_consistency(
+                        [
+                            *history,
+                            completion,
+                            HumanMessage(content=self._TRUNCATION_RECOVERY_MESSAGE),
+                        ]
+                    )
+                    return history_iokey.to_nested_dict(history)
+
                 if finish_reason in LLMFinishReason.abnormal_values():
                     log.warning(f"LLM stopped abnormally with reason: {finish_reason}")
 
@@ -122,11 +162,10 @@ class AgentNode:
                     history = [*history, *updates]
                     continue
 
-                return {
-                    FlowStateKeys.CONVERSATION_HISTORY: {
-                        self._component_name: history + [completion]
-                    },
-                }
+                # Append new completion to existing history for replace-based reducer.
+                # The reducer will replace this component's conversation history with
+                # the complete list returned here.
+                return history_iokey.to_nested_dict(history + [completion])
             except APIStatusError as e:
                 error_message = str(e)
                 status_code = e.response.status_code

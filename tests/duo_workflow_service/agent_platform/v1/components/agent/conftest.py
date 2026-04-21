@@ -148,6 +148,7 @@ def mock_ai_message_fixture():
         "finish_reason": "stop"
     }  # OpenAI format used by LiteLLM
     mock_message.tool_calls = []
+    mock_message.invalid_tool_calls = []
     mock_message.additional_kwargs = {}
     return mock_message
 

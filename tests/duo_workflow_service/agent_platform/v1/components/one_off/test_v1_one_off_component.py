@@ -224,7 +224,7 @@ class TestOneOffComponentAttachNodes:
         mock_agent_node_cls.assert_called_once()
         agent_call_kwargs = mock_agent_node_cls.call_args[1]
         assert agent_call_kwargs["name"] == f"{component_name}#llm"
-        assert agent_call_kwargs["component_name"] == component_name
+        assert "conversation_history_key" in agent_call_kwargs
         assert (
             agent_call_kwargs["prompt"]
             == mock_prompt_registry.get_on_behalf.return_value

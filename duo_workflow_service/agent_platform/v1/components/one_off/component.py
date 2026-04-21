@@ -39,6 +39,7 @@ from duo_workflow_service.agent_platform.v1.state import (
     FlowState,
     FlowStateKeys,
     IOKeyTemplate,
+    RuntimeIOKey,
 )
 from duo_workflow_service.agent_platform.v1.ui_log import UIHistory
 from duo_workflow_service.conversation.compaction import (
@@ -70,6 +71,7 @@ class OneOffComponent(BaseComponent):
     _conversation_history_key: ClassVar[IOKeyTemplate] = IOKeyTemplate(
         target="conversation_history",
         subkeys=[IOKeyTemplate.COMPONENT_NAME_TEMPLATE],
+        optional=True,
     )
 
     _outputs: ClassVar[tuple[IOKeyTemplate, ...]] = (
@@ -165,10 +167,19 @@ class OneOffComponent(BaseComponent):
             },
         )
 
+        # Build a static RuntimeIOKey for this component's conversation history
+        static_history_key = self._conversation_history_key.to_iokey(
+            {IOKeyTemplate.COMPONENT_NAME_TEMPLATE: self.name}
+        )
+        conversation_history_key_runtime = RuntimeIOKey(
+            alias="conversation_history",
+            factory=lambda _: static_history_key,
+        )
+
         # reuse existing agent_node
         agent_node = AgentNode(
             name=self.__entry_hook__(),
-            component_name=self.name,
+            conversation_history_key=conversation_history_key_runtime,
             prompt=prompt,
             inputs=self.inputs,
             flow_id=self.flow_id,
