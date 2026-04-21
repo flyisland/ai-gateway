@@ -18,6 +18,7 @@ from ai_gateway.api.middleware.headers import (
     X_GITLAB_INSTANCE_ID_HEADER,
     X_GITLAB_INTERFACE,
     X_GITLAB_NAMESPACE_ID,
+    X_GITLAB_ORGANIZATION_ID,
     X_GITLAB_PROJECT_ID,
     X_GITLAB_REALM_HEADER,
     X_GITLAB_ROOT_NAMESPACE_ID,
@@ -83,6 +84,13 @@ class InternalEventMiddleware:
             else None
         )
 
+        organization_id_str = request.headers.get(X_GITLAB_ORGANIZATION_ID)
+        organization_id = (
+            int(organization_id_str)
+            if organization_id_str and organization_id_str != "null"
+            else None
+        )
+
         # EventContext uses Pydantic which coerces int and string to boolean type
         # Reference: https://docs.pydantic.dev/latest/api/standard_library_types/#booleans
         context = EventContext(
@@ -110,6 +118,7 @@ class InternalEventMiddleware:
             namespace_id=namespace_id,
             ultimate_parent_namespace_id=root_namespace_id,
             deployment_type=request.headers.get(X_GITLAB_DEPLOYMENT_TYPE),
+            organization_id=organization_id,
         )
         validate_event_context(context, endpoint=request.url.path)
 

@@ -42,6 +42,7 @@ BASE_CONTEXT_SCHEMA = {
     "source": "ai-gateway-python",
     "total_tokens": None,
     "deployment_type": None,
+    "organization_id": None,
 }
 
 

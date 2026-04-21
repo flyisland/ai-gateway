@@ -52,6 +52,7 @@ class EventContext(BaseModel):
     model_name: Optional[str] = None
     model_provider: Optional[str] = None
     deployment_type: Optional[str] = None
+    organization_id: Optional[int] = None
 
 
 @dataclass

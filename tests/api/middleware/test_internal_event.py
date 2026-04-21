@@ -16,6 +16,7 @@ from ai_gateway.api.middleware.headers import (
     X_GITLAB_INSTANCE_ID_HEADER,
     X_GITLAB_INTERFACE,
     X_GITLAB_NAMESPACE_ID,
+    X_GITLAB_ORGANIZATION_ID,
     X_GITLAB_PROJECT_ID,
     X_GITLAB_REALM_HEADER,
     X_GITLAB_ROOT_NAMESPACE_ID,
@@ -121,6 +122,7 @@ async def test_middleware_set_context(internal_event_middleware, user):
                 (X_GITLAB_NAMESPACE_ID.lower().encode(), b""),
                 (X_GITLAB_PROJECT_ID.lower().encode(), b"456"),
                 (X_GITLAB_ROOT_NAMESPACE_ID.lower().encode(), b""),
+                (X_GITLAB_ORGANIZATION_ID.lower().encode(), b"1337"),
             ],
             "user": user,
         }
@@ -155,6 +157,7 @@ async def test_middleware_set_context(internal_event_middleware, user):
             client_version="1.97.0",
             client_type="ide",
             interface="duo_chat",
+            organization_id=1337,
             project_id=456,
             feature_enabled_by_namespace_ids=[],
             context_generated_at=mock_event_context.set.call_args[0][
