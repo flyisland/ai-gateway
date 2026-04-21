@@ -50,12 +50,40 @@ def work_item_notes_fixture():
     ]
 
 
+@pytest.fixture(name="page_info")
+def page_info_fixture():
+    """Fixture for a default pageInfo with no next page."""
+    return {"hasNextPage": False, "endCursor": None}
+
+
 @pytest.fixture(name="version_variables")
 def version_variables_default_fixture():
     """Fixture for note-specific version variables."""
     return {
         "includeNoteResolvedAndResolvableFields": True,
         "includeDiscussionIdField": True,
+    }
+
+
+def make_graphql_response(root_key, notes, page_info):
+    """Helper to build a GraphQL response with notes and pageInfo."""
+    return {
+        root_key: {
+            "workItems": {
+                "nodes": [
+                    {
+                        "widgets": [
+                            {
+                                "notes": {
+                                    "nodes": notes,
+                                    "pageInfo": page_info,
+                                }
+                            }
+                        ]
+                    }
+                ]
+            }
+        }
     }
 
 
@@ -66,23 +94,20 @@ async def test_get_work_item_notes_with_group_id(
     gitlab_client_mock,
     metadata,
     work_item_notes,
+    page_info,
     version_variables,
 ):
     mock_get_query_variables.return_value = version_variables
-    graphql_response = {
-        "namespace": {
-            "workItems": {
-                "nodes": [{"widgets": [{"notes": {"nodes": work_item_notes}}]}]
-            }
-        }
-    }
+    graphql_response = make_graphql_response("namespace", work_item_notes, page_info)
     gitlab_client_mock.graphql = AsyncMock(return_value=graphql_response)
 
     tool = GetWorkItemNotes(description="get work item notes", metadata=metadata)
 
     response = await tool._arun(group_id="namespace/group", work_item_iid=42)
 
-    expected_response = json.dumps({"notes": work_item_notes}, indent=2)
+    expected_response = json.dumps(
+        {"notes": work_item_notes, "page_info": page_info}, indent=2
+    )
     assert response == expected_response
 
     mock_get_query_variables.assert_called_once_with(
@@ -90,11 +115,12 @@ async def test_get_work_item_notes_with_group_id(
     )
     gitlab_client_mock.graphql.assert_called_once()
 
-    # Verify version-specific variables are passed to GraphQL query
     call_args = gitlab_client_mock.graphql.call_args
     query_variables = call_args[0][1]
     assert query_variables["fullPath"] == "namespace/group"
     assert query_variables["workItemIid"] == "42"
+    assert query_variables["first"] == 20
+    assert query_variables["after"] is None
     assert query_variables["includeNoteResolvedAndResolvableFields"] is True
     assert query_variables["includeDiscussionIdField"] is True
 
@@ -137,23 +163,20 @@ async def test_get_work_item_notes_with_project_id(
     gitlab_client_mock,
     metadata,
     work_item_notes,
+    page_info,
     version_variables,
 ):
     mock_get_query_variables.return_value = version_variables
-    graphql_response = {
-        "project": {
-            "workItems": {
-                "nodes": [{"widgets": [{"notes": {"nodes": work_item_notes}}]}]
-            }
-        }
-    }
+    graphql_response = make_graphql_response("project", work_item_notes, page_info)
     gitlab_client_mock.graphql = AsyncMock(return_value=graphql_response)
 
     tool = GetWorkItemNotes(description="get work item notes", metadata=metadata)
 
     response = await tool._arun(project_id="namespace/project", work_item_iid=42)
 
-    expected_response = json.dumps({"notes": work_item_notes}, indent=2)
+    expected_response = json.dumps(
+        {"notes": work_item_notes, "page_info": page_info}, indent=2
+    )
     assert response == expected_response
 
     mock_get_query_variables.assert_called_once_with(
@@ -161,11 +184,12 @@ async def test_get_work_item_notes_with_project_id(
     )
     gitlab_client_mock.graphql.assert_called_once()
 
-    # Verify version-specific variables are passed to GraphQL query
     call_args = gitlab_client_mock.graphql.call_args
     query_variables = call_args[0][1]
     assert query_variables["fullPath"] == "namespace/project"
     assert query_variables["workItemIid"] == "42"
+    assert query_variables["first"] == 20
+    assert query_variables["after"] is None
     assert query_variables["includeNoteResolvedAndResolvableFields"] is True
     assert query_variables["includeDiscussionIdField"] is True
 
@@ -177,21 +201,15 @@ async def test_get_work_item_notes_with_group_url(
     gitlab_client_mock,
     metadata,
     work_item_notes,
+    page_info,
     version_variables,
 ):
     mock_get_query_variables.return_value = version_variables
-    # Mock the _validate_work_item_url method
     resolved_work_item = ResolvedWorkItem(
         parent=ResolvedParent(type="group", full_path="namespace/group"),
         work_item_iid=42,
     )
-    graphql_response = {
-        "namespace": {
-            "workItems": {
-                "nodes": [{"widgets": [{"notes": {"nodes": work_item_notes}}]}]
-            }
-        }
-    }
+    graphql_response = make_graphql_response("namespace", work_item_notes, page_info)
     gitlab_client_mock.graphql = AsyncMock(return_value=graphql_response)
 
     tool = GetWorkItemNotes(description="get work item notes", metadata=metadata)
@@ -201,7 +219,9 @@ async def test_get_work_item_notes_with_group_url(
         url="https://gitlab.com/groups/namespace/group/-/work_items/42"
     )
 
-    expected_response = json.dumps({"notes": work_item_notes}, indent=2)
+    expected_response = json.dumps(
+        {"notes": work_item_notes, "page_info": page_info}, indent=2
+    )
     assert response == expected_response
 
     mock_get_query_variables.assert_called_once_with(
@@ -217,16 +237,11 @@ async def test_get_work_item_notes_with_project_url(
     gitlab_client_mock,
     metadata,
     work_item_notes,
+    page_info,
     version_variables,
 ):
     mock_get_query_variables.return_value = version_variables
-    graphql_response = {
-        "project": {
-            "workItems": {
-                "nodes": [{"widgets": [{"notes": {"nodes": work_item_notes}}]}]
-            }
-        }
-    }
+    graphql_response = make_graphql_response("project", work_item_notes, page_info)
     gitlab_client_mock.graphql = AsyncMock(return_value=graphql_response)
 
     tool = GetWorkItemNotes(description="get work item notes", metadata=metadata)
@@ -235,7 +250,9 @@ async def test_get_work_item_notes_with_project_url(
         url="https://gitlab.com/namespace/project/-/work_items/42"
     )
 
-    expected_response = json.dumps({"notes": work_item_notes}, indent=2)
+    expected_response = json.dumps(
+        {"notes": work_item_notes, "page_info": page_info}, indent=2
+    )
     assert response == expected_response
 
     mock_get_query_variables.assert_called_once_with(
@@ -257,7 +274,7 @@ async def test_get_work_item_notes_with_no_widgets(
 
     response = await tool._arun(project_id="namespace/project", work_item_iid=42)
 
-    expected_response = json.dumps({"notes": []})
+    expected_response = json.dumps({"notes": [], "page_info": {}}, indent=2)
     assert response == expected_response
 
     mock_get_query_variables.assert_called_once_with(
@@ -272,8 +289,15 @@ async def test_get_work_item_notes_with_empty_notes(
     mock_get_query_variables, gitlab_client_mock, metadata, version_variables
 ):
     mock_get_query_variables.return_value = version_variables
+    page_info = {"hasNextPage": False, "endCursor": None}
     graphql_response = {
-        "project": {"workItems": {"nodes": [{"widgets": [{"notes": {"nodes": []}}]}]}}
+        "project": {
+            "workItems": {
+                "nodes": [
+                    {"widgets": [{"notes": {"nodes": [], "pageInfo": page_info}}]}
+                ]
+            }
+        }
     }
     gitlab_client_mock.graphql = AsyncMock(return_value=graphql_response)
 
@@ -281,7 +305,7 @@ async def test_get_work_item_notes_with_empty_notes(
 
     response = await tool._arun(project_id="namespace/project", work_item_iid=42)
 
-    expected_response = json.dumps({"notes": []}, indent=2)
+    expected_response = json.dumps({"notes": [], "page_info": page_info}, indent=2)
     assert response == expected_response
 
     mock_get_query_variables.assert_called_once_with(
@@ -341,6 +365,72 @@ async def test_get_work_item_notes_with_invalid_url(gitlab_client_mock, metadata
         in str(exc_info.value)
     )
     gitlab_client_mock.graphql.assert_not_called()
+
+
+@pytest.mark.asyncio
+@patch("duo_workflow_service.tools.work_item.get_query_variables_for_version")
+async def test_get_work_item_notes_pagination_first_page(
+    mock_get_query_variables,
+    gitlab_client_mock,
+    metadata,
+    work_item_notes,
+    version_variables,
+):
+    """Test that first page returns notes with hasNextPage=True and a cursor."""
+    mock_get_query_variables.return_value = version_variables
+    page_info = {"hasNextPage": True, "endCursor": "cursor_abc123"}
+    graphql_response = make_graphql_response("project", work_item_notes, page_info)
+    gitlab_client_mock.graphql = AsyncMock(return_value=graphql_response)
+
+    tool = GetWorkItemNotes(description="get work item notes", metadata=metadata)
+
+    response = await tool._arun(
+        project_id="namespace/project", work_item_iid=42, page_size=2
+    )
+
+    response_json = json.loads(response)
+    assert response_json["notes"] == work_item_notes
+    assert response_json["page_info"]["hasNextPage"] is True
+    assert response_json["page_info"]["endCursor"] == "cursor_abc123"
+
+    call_args = gitlab_client_mock.graphql.call_args
+    query_variables = call_args[0][1]
+    assert query_variables["first"] == 2
+    assert query_variables["after"] is None
+
+
+@pytest.mark.asyncio
+@patch("duo_workflow_service.tools.work_item.get_query_variables_for_version")
+async def test_get_work_item_notes_pagination_subsequent_page(
+    mock_get_query_variables,
+    gitlab_client_mock,
+    metadata,
+    work_item_notes,
+    version_variables,
+):
+    """Test that subsequent page passes the cursor and returns the next batch."""
+    mock_get_query_variables.return_value = version_variables
+    page_info = {"hasNextPage": False, "endCursor": None}
+    graphql_response = make_graphql_response("project", work_item_notes, page_info)
+    gitlab_client_mock.graphql = AsyncMock(return_value=graphql_response)
+
+    tool = GetWorkItemNotes(description="get work item notes", metadata=metadata)
+
+    response = await tool._arun(
+        project_id="namespace/project",
+        work_item_iid=42,
+        page_size=2,
+        pagination_cursor="cursor_abc123",
+    )
+
+    response_json = json.loads(response)
+    assert response_json["notes"] == work_item_notes
+    assert response_json["page_info"]["hasNextPage"] is False
+
+    call_args = gitlab_client_mock.graphql.call_args
+    query_variables = call_args[0][1]
+    assert query_variables["first"] == 2
+    assert query_variables["after"] == "cursor_abc123"
 
 
 @pytest.mark.parametrize(
