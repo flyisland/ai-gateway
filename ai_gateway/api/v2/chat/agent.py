@@ -73,6 +73,9 @@ def authorize_duo_core(
         # We also can't rely on messages[-1] alone: the Rails ReAct loop appends an assistant
         # scratchpad message (content=None) after each tool execution and calls again, so the
         # last message is often the assistant entry, not the user message.
+        #
+        # NOTE: @GitLab-Duo-Code-Reviewer is the staging equivalent of @GitLabDuo. This is
+        # a temporary addition to unblock staging validation — remove once testing is complete.
         try:
             content = next(
                 (
@@ -85,7 +88,7 @@ def authorize_duo_core(
         except (IndexError, AttributeError, TypeError):
             content = ""
 
-        if "@GitLabDuo" not in content:
+        if "@GitLabDuo" not in content and "@GitLab-Duo-Code-Reviewer" not in content:
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
                 detail="Duo Core no longer authorized to access Duo Classic Chat",

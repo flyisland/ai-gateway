@@ -898,6 +898,38 @@ class TestReActAgentStream:
                 },
                 "duo_core",
             ),
+            # Staging uses @GitLab-Duo-Code-Reviewer instead of @GitLabDuo. Temporary
+            # addition to unblock staging validation — must be allowed.
+            (
+                CloudConnectorUser(
+                    authenticated=True,
+                    claims=UserClaims(scopes=["duo_classic_chat"]),
+                ),
+                AgentRequest(
+                    messages=[
+                        Message(
+                            role=Role.USER,
+                            content="@GitLab-Duo-Code-Reviewer explain this diff",
+                        )
+                    ]
+                ),
+                200,
+                "",
+                [
+                    call(
+                        "request_duo_classic_chat",
+                        category="ai_gateway.api.v2.chat.agent",
+                    )
+                ],
+                None,
+                {
+                    "custom_models": {"enabled": True},
+                    "process_level_feature_flags": {
+                        "duo_classic_chat_duo_core_cutoff": True
+                    },
+                },
+                "duo_core",
+            ),
             # Preamble user message (injected MR context) precedes the @GitLabDuo trigger.
             # The first user message has no ping; the last one does. Must be allowed.
             (
