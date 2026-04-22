@@ -90,24 +90,10 @@ class TestFilterCacheControlInjectionPoints:
 
 
 class TestDefaultCacheControlInjectionPoints:
-    def test_single_turn_prompt(self):
-        prompt_template = {
-            "system": "You are a helpful assistant.",
-            "user": "Hello",
-        }
-
-        result = default_cache_control_injection_points(prompt_template)
-
-        assert result == [{"location": "message", "index": 0}]
-
-    def test_multi_turn_prompt(self):
-        prompt_template = {
-            "system": "You are a helpful assistant.",
-            "user": "Hello",
-            "placeholder": "history",
-        }
-
-        result = default_cache_control_injection_points(prompt_template)
+    def test_always_includes_history_cache_breakpoint(self):
+        """History is always auto-injected at runtime by prompt_template_to_messages(), so the history cache breakpoint
+        is always added unconditionally."""
+        result = default_cache_control_injection_points()
 
         assert result == [
             {"location": "message", "index": 0},
@@ -124,8 +110,11 @@ class TestDefaultCacheControlAppliedToPrompts:
     caching defaults — the core cost-saving behaviour this feature provides."""
 
     def test_litellm_single_turn_prompt_gets_system_message_cached(self):
-        """LiteLLM single-turn prompt: system message is always cached
-        (passed through to LiteLLM which handles it natively)."""
+        """LiteLLM single-turn prompt: system message is always cached and the
+        history cache breakpoint is always added because history is auto-injected
+        at runtime by ``prompt_template_to_messages()``."""
+        set_prompt_caching_enabled_to_current_request("true")
+
         model_kwargs = Prompt._build_model_kwargs(
             params=PromptParams(timeout=60),
             model_metadata=None,
@@ -135,6 +124,7 @@ class TestDefaultCacheControlAppliedToPrompts:
 
         assert model_kwargs[CACHE_CONTROL_INJECTION_POINTS_KEY] == [
             {"location": "message", "index": 0},
+            {"location": "message", "index": -1},
         ]
 
     def test_litellm_multi_turn_prompt_caches_history_when_header_enabled(self):
@@ -227,7 +217,12 @@ class TestDefaultCacheControlAppliedToPrompts:
         ],
     )
     def test_supported_provider_with_prompt_template_gets_defaults(self, provider):
-        """Supported providers should get caching defaults when prompt_template is provided."""
+        """Supported providers should get caching defaults when prompt_template is provided.
+
+        History is always auto-injected at runtime, so both cache breakpoints are always added.
+        """
+        set_prompt_caching_enabled_to_current_request("true")
+
         model_kwargs = Prompt._build_model_kwargs(
             params=PromptParams(timeout=60),
             model_metadata=None,
@@ -237,6 +232,7 @@ class TestDefaultCacheControlAppliedToPrompts:
 
         assert model_kwargs[CACHE_CONTROL_INJECTION_POINTS_KEY] == [
             {"location": "message", "index": 0},
+            {"location": "message", "index": -1},
         ]
 
     def test_explicit_yaml_config_is_not_overridden(self):
