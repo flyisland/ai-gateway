@@ -65,8 +65,8 @@ components:
     inputs:
       - from: "context:fix_pipeline_context.final_answer"
         as: "fix_pipeline_context_results"
-      - from: "context:fix_pipeline_create_plan.final_answer"
-        as: "fix_pipeline_plan"
+      - from: "context:fix_pipeline_next_execution.final_answer"
+        as: "execution_results"
       - from: "context:inputs.merge_request.url"
         as: "merge_request_url"
         optional: True
@@ -83,8 +83,6 @@ components:
         as: "pipeline_url"
       - from: "context:inputs.merge_request.url"
         as: "merge_request_url"
-      - from: "context:fix_pipeline_create_plan.final_answer"
-        as: "fix_pipeline_plan"
       - from: "context:project_id"
         as: "project_id"
       - from: "context:inputs.user_rule"
@@ -93,6 +91,7 @@ components:
     toolset:
       - "build_review_merge_request_context"
       - "create_merge_request_diff_note"
+      - "run_git_command"
     ui_log_events:
       - "on_agent_final_answer"
       - "on_tool_execution_success"
@@ -152,34 +151,15 @@ components:
       - "on_tool_execution_success"
       - "on_tool_execution_failed"
 
-  - name: "fix_pipeline_create_plan"
+  - name: "fix_pipeline_next_execution"
     type: AgentComponent
-    prompt_id: "fix_pipeline_create_plan"
+    prompt_id: "fix_pipeline_next_execution"
     prompt_version: "^1.0.0"
     inputs:
       - from: "context:fix_pipeline_context.final_answer"
         as: "fix_pipeline_context_results"
       - from: "context:inputs.pipeline.source_branch"
         as: "source_branch"
-      - from: "context:inputs.user_rule"
-        as: "agents_dot_md"
-        optional: True
-      - from: "context:inputs.workspace_agent_skills"
-        as: "workspace_agent_skills"
-        optional: True
-    toolset: []
-    ui_log_events:
-      - "on_agent_final_answer"
-
-  - name: "fix_pipeline_execution"
-    type: AgentComponent
-    prompt_id: "fix_pipeline_execution"
-    prompt_version: "^1.0.0"
-    inputs:
-      - from: "context:fix_pipeline_context.final_answer"
-        as: "fix_pipeline_context_results"
-      - from: "context:fix_pipeline_create_plan.final_answer"
-        as: "fix_pipeline_plan"
       - from: "context:inputs.user_rule"
         as: "agents_dot_md"
         optional: True
@@ -251,7 +231,7 @@ components:
         as: "default_branch"
       - from: "context:fix_pipeline_git_push.final_answer"
         as: "git_push_response"
-      - from: "context:fix_pipeline_execution.final_answer"
+      - from: "context:fix_pipeline_next_execution.final_answer"
         as: "execution_results"
       - from: "context:workflow_id"
         as: "workflow_id"
@@ -278,25 +258,22 @@ routers:
       input: "context:fix_pipeline_next_decide_approach.final_answer.decision"
       routes:
         "add_comment": "fix_pipeline_add_comment"
-        "create_plan": "fix_pipeline_create_plan"
+        "create_plan": "fix_pipeline_next_execution"
         "default_route": "fix_pipeline_add_comment"
   - from: "fix_pipeline_add_comment"
     to: "end"
-  - from: "fix_pipeline_create_plan"
+  - from: "fix_pipeline_next_execution"
     to: "fix_pipeline_next_decide_fix"
   - from: "fix_pipeline_next_decide_fix"
     condition:
       input: "context:fix_pipeline_next_decide_fix.final_answer.decision"
       routes:
-        "add_comment": "fix_pipeline_add_comment"
         "create_fix_on_existing_mr": "fix_pipeline_next_code_suggestions"
         "create_fix_on_new_mr": "create_repository_branch"
-        "default_route": "fix_pipeline_add_comment"
+        "default_route": "create_repository_branch"
   - from: "fix_pipeline_next_code_suggestions"
     to: "end"
   - from: "create_repository_branch"
-    to: "fix_pipeline_execution"
-  - from: "fix_pipeline_execution"
     to: "fix_pipeline_git_commit"
   - from: "fix_pipeline_git_commit"
     to: "fix_pipeline_git_push"
