@@ -415,7 +415,7 @@ class Prompt(RunnableBinding[Any, BaseMessage]):
             and model_class_provider in CACHE_CONTROL_SUPPORTED_PROVIDERS
         ):
             model_kwargs[CACHE_CONTROL_INJECTION_POINTS_KEY] = (
-                default_cache_control_injection_points(prompt_template)
+                default_cache_control_injection_points()
             )
 
         filter_cache_control_injection_points(model_kwargs)

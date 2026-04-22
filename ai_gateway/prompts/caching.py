@@ -20,29 +20,29 @@ CACHE_CONTROL_SUPPORTED_PROVIDERS = frozenset(
 )
 
 
-def default_cache_control_injection_points(
-    prompt_template: dict[str, str],
-) -> list[dict]:
-    """Generate default cache control injection points based on prompt structure.
+def default_cache_control_injection_points() -> list[dict]:
+    """Generate default cache control injection points.
 
     Matches the production pattern used by chat agent flows:
 
     - The system message (index 0) is always cached unconditionally.
-    - For multi-turn prompts (with a ``placeholder`` key), the full
-    conversation history (index -1) is additionally cached, gated on
+    - The full conversation history (index -1) is additionally cached, gated on
     the ``X-Gitlab-Model-Prompt-Cache-Enabled`` request header.
+
+    Note: History is always auto-injected at runtime by
+    ``prompt_template_to_messages()`` (even when the ``placeholder`` key is
+    absent from the raw YAML dict), so the history cache breakpoint is added
+    unconditionally rather than gating on the presence of ``placeholder`` in
+    the raw template dict.
     """
     points: list[dict] = [
         {"location": "message", "index": 0},
+        {
+            "location": "message",
+            "index": -1,
+            REQUIRE_PROMPT_CACHING_ENABLED_IN_REQUEST: "true",
+        },
     ]
-    if "placeholder" in prompt_template:
-        points.append(
-            {
-                "location": "message",
-                "index": -1,
-                REQUIRE_PROMPT_CACHING_ENABLED_IN_REQUEST: "true",
-            }
-        )
     return points
 
 
