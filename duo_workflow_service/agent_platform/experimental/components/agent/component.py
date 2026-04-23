@@ -47,6 +47,11 @@ from duo_workflow_service.agent_platform.experimental.ui_log import (
 from duo_workflow_service.agent_platform.utils.tool_event_tracker import (
     ToolEventTracker,
 )
+
+# Re-export RoutingError from v1 to prevent code duplication.
+from duo_workflow_service.agent_platform.v1.components.agent.component import (  # noqa: F401
+    RoutingError,
+)
 from duo_workflow_service.conversation.compaction import (
     CompactionConfig,
     create_conversation_compactor,
@@ -55,10 +60,6 @@ from duo_workflow_service.tools.toolset import Toolset
 from lib.internal_events import InternalEventsClient
 
 __all__ = ["AgentComponent", "AgentComponentBase", "RoutingError"]
-
-
-class RoutingError(Exception):
-    """Exception raised when edge routers encounter unexpected conditions."""
 
 
 class AgentComponentBase(BaseComponent):

@@ -1,4 +1,14 @@
-from typing import Annotated, ClassVar, Literal, Optional, Self, Type, Union, override
+from typing import (
+    Annotated,
+    Any,
+    ClassVar,
+    Literal,
+    Optional,
+    Self,
+    Type,
+    Union,
+    override,
+)
 
 from dependency_injector.wiring import Provide, inject
 from langchain_core.messages import AIMessage, BaseMessage
@@ -49,15 +59,23 @@ from duo_workflow_service.tools.toolset import Toolset
 from lib.context import get_model_metadata
 from lib.internal_events import InternalEventsClient
 
-__all__ = ["AgentComponent", "RoutingError"]
+__all__ = ["AgentComponent", "AgentComponentBase", "RoutingError"]
 
 
 class RoutingError(Exception):
     """Exception raised when edge routers encounter unexpected conditions."""
 
 
-@register_component(decorators=[inject])
-class AgentComponent(BaseComponent):
+class AgentComponentBase(BaseComponent):
+    """Shared base for agent-style components (AgentComponent, SupervisorAgentComponent).
+
+    Holds the common field declarations and class-level metadata shared by all
+    agent variants.  Subclasses must override ``_agent_node_router`` and
+    ``attach`` with their own graph-topology logic.
+
+    Do NOT use this class directly in flow configs — use AgentComponent instead.
+    """
+
     _final_answer_key: ClassVar[IOKeyTemplate] = IOKeyTemplate(
         target="context",
         subkeys=[IOKeyTemplate.COMPONENT_NAME_TEMPLATE, "final_answer"],
@@ -96,20 +114,17 @@ class AgentComponent(BaseComponent):
         ContainerApplication.internal_event.client
     ]
 
-    ui_log_events: list[UILogEventsAgent] = Field(default_factory=list)
-    ui_role_as: Literal["agent", "tool"] = "agent"
-
     _allowed_input_targets = tuple(FlowState.__annotations__.keys())
+
     _response_schema: Optional[Type[BaseAgentOutput]] = PrivateAttr()
 
     @model_validator(mode="after")
-    def validate_and_resolve_response_schema(self):
+    def validate_and_resolve_response_schema(self) -> Self:
         """Validate response schema params and resolve the schema.
 
-        This validator:
-        1. Validates that response_schema_id and response_schema_version are either both set or both None
-        2. Resolves the response schema from the registry (or uses None for default text-only mode)
-        3. Validates that the schema tool name doesn't collide with existing tools
+        1. Validates that response_schema_id and response_schema_version are either both set or both None.
+        2. Resolves the response schema from the registry, or uses None for default text-only mode.
+        3. Validates that the schema tool name doesn't collide with existing tools.
         """
         if bool(self.response_schema_id) != bool(self.response_schema_version):
             raise ValueError(
@@ -122,13 +137,11 @@ class AgentComponent(BaseComponent):
                 "response_schema_tracking requires response_schema_id to be set."
             )
 
-        # Resolve the response schema
         if self.response_schema_id and self.response_schema_version:
             response_schema = self.schema_registry.get(
                 schema_id=self.response_schema_id,
                 schema_version=self.response_schema_version,
             )
-            # Check to see if name of schema tool collides with existing tools
             if response_schema.tool_title in self.toolset:
                 raise ValueError(
                     f"Response schema tool title '{response_schema.tool_title}' "
@@ -193,8 +206,132 @@ class AgentComponent(BaseComponent):
         )
         return RuntimeIOKey(alias="conversation_history", factory=lambda _: static_key)
 
+    def _build_prompt(self, tools: list, tool_choice: str) -> Any:
+        """Build the agent prompt with the given tool list and tool choice."""
+        model_metadata = get_model_metadata(self.model_size_preference)
+        return self.prompt_registry.get_on_behalf(
+            self.user,
+            self.prompt_id,
+            self.prompt_version,
+            model_metadata=model_metadata,
+            tools=tools,
+            tool_choice=tool_choice,
+            is_graph_node=True,
+            internal_event_extra={
+                "agent_name": self.name,
+                "workflow_id": self.flow_id,
+                "workflow_type": self.flow_type.value,
+            },
+        )
+
+    def __entry_hook__(self) -> Annotated[str, "Entry node name"]:
+        return f"{self.name}#agent"
+
     def _agent_node_router(self, state: FlowState) -> str:
-        history_iokey = self._default_conversation_history_key.to_iokey(state)
+        raise NotImplementedError
+
+    def attach(self, graph: StateGraph, router: RouterProtocol) -> None:
+        raise NotImplementedError
+
+
+@register_component(decorators=[inject])
+class AgentComponent(AgentComponentBase):
+    """AgentComponent for use in flow configs.
+
+    Provides the standard single-agent ReAct loop (agent ↔ tools, final_response) with dependency injection applied.
+
+    Can be used standalone or bound to a SupervisorAgentComponent via bind_to_supervisor.
+    When bound to a supervisor:
+    - The description field becomes required (used by supervisor's delegate_task tool)
+    - The component uses supervisor-provided key factories for conversation history and output
+    - Output keys are resolved at runtime based on the active subsession
+
+    When used standalone:
+    - The description field is optional
+    - Uses default key factories that resolve to component-scoped keys
+    - Output keys are static and component-scoped
+    """
+
+    description: Optional[str] = None
+    ui_log_events: list[UILogEventsAgent] = Field(default_factory=list)
+    ui_role_as: Literal["agent", "tool"] = "agent"
+
+    _allowed_input_targets = tuple(FlowState.__annotations__.keys())
+
+    # Private attributes for RuntimeIOKey instances with default values.
+    # Overridden by bind_to_supervisor when used as a subagent.
+    _conversation_history_key: RuntimeIOKey = PrivateAttr()
+    _output_key: RuntimeIOKey = PrivateAttr()
+    _is_bound_to_supervisor: bool = PrivateAttr(default=False)
+
+    @model_validator(mode="after")
+    def initialize_key_factories(self) -> Self:
+        """Initialize RuntimeIOKey instances with default values for standalone use.
+
+        These defaults are overridden by bind_to_supervisor when the component is used as a subagent.
+        """
+        # Default conversation history key uses component-scoped static key
+        self._conversation_history_key = self._default_conversation_history_key
+
+        # Default output key resolves to a static component-scoped final_answer key
+        static_output_key = self._final_answer_key.to_iokey(
+            {IOKeyTemplate.COMPONENT_NAME_TEMPLATE: self.name}
+        )
+        self._output_key = RuntimeIOKey(
+            alias="final_answer",
+            factory=lambda _: static_output_key,
+        )
+
+        return self
+
+    def bind_to_supervisor(
+        self,
+        *,
+        conversation_history_key: RuntimeIOKey,
+        output_key: RuntimeIOKey,
+        goal_key: RuntimeIOKey,
+    ) -> None:
+        """Bind this agent to a supervisor.
+
+        Must be called before ``attach`` when using this component as a subagent.
+        The supervisor passes subsession-scoped ``RuntimeIOKey`` instances so the
+        agent never needs to scan state to discover which supervisor owns it or
+        what the active subsession ID is.
+
+        When bound to a supervisor, the description field must be set.
+
+        Args:
+            conversation_history_key: ``RuntimeIOKey`` that resolves the
+                subsession-scoped conversation-history key at runtime.
+            output_key: ``RuntimeIOKey`` that resolves the subsession-scoped
+                final_answer key at runtime.
+            goal_key: ``RuntimeIOKey`` that resolves the subsession-scoped goal
+                key at runtime.  The resolved IOKey replaces the static
+                ``context:goal`` input so the subagent reads the delegation
+                prompt written by ``DelegationNode`` rather than the shared
+                flow goal.
+
+        Raises:
+            ValueError: If description is not set when binding to supervisor.
+        """
+        if not self.description:
+            raise ValueError(
+                f"AgentComponent '{self.name}' must have a description when bound to a supervisor."
+            )
+        self._conversation_history_key = conversation_history_key
+        self._output_key = output_key
+        self._is_bound_to_supervisor = True
+
+        # Ensure subagent does not read shared `context:goal` directly
+        self.inputs = [
+            inp
+            for inp in self.inputs
+            if inp.template_variable_name != goal_key.template_variable_name
+        ]
+        self.inputs.append(goal_key)
+
+    def _agent_node_router(self, state: FlowState) -> str:
+        history_iokey = self._conversation_history_key.to_iokey(state)
         history: list[BaseMessage] = history_iokey.value_from_state(state) or []
         if not history:
             raise RoutingError(
@@ -233,9 +370,13 @@ class AgentComponent(BaseComponent):
     def outputs(self) -> tuple[IOKey, ...]:
         """Return the outputs for this component.
 
-        For custom response schemas, this includes both the base final_answer output
-        and individual field paths for each schema field, enabling easier discovery
-        and access to nested data.
+        When bound to a supervisor, returns an empty tuple since the output keys
+        require runtime substitutions (supervisor name, subagent name, subsession ID)
+        that are only known at graph execution time.
+
+        For standalone components with custom response schemas, this includes both
+        the base final_answer output and individual field paths for each schema field,
+        enabling easier discovery and access to nested data.
 
         Returns:
             Tuple of IOKey objects describing all output paths from this component.
@@ -250,6 +391,9 @@ class AgentComponent(BaseComponent):
                 - context:<name>.final_answer.issues_found
                 - context:<name>.final_answer.recommendations
         """
+        # If bound to supervisor, return empty tuple (keys resolved at runtime)
+        if self._is_bound_to_supervisor:
+            return ()
 
         replacements = {IOKeyTemplate.COMPONENT_NAME_TEMPLATE: self.name}
         base_outputs = tuple(output.to_iokey(replacements) for output in self._outputs)
@@ -279,32 +423,16 @@ class AgentComponent(BaseComponent):
             tools = self.toolset.bindable
             tool_choice = "auto"
 
-        model_metadata = get_model_metadata(self.model_size_preference)
-
-        prompt = self.prompt_registry.get_on_behalf(
-            self.user,
-            self.prompt_id,
-            self.prompt_version,
-            model_metadata=model_metadata,
-            tools=tools,  # type: ignore[arg-type]
-            tool_choice=tool_choice,
-            is_graph_node=True,
-            internal_event_extra={
-                "agent_name": self.name,
-                "workflow_id": self.flow_id,
-                "workflow_type": self.flow_type.value,
-            },
-        )
+        prompt = self._build_prompt(tools=tools, tool_choice=tool_choice)
 
         node_agent = AgentNode(
             name=self.__entry_hook__(),
-            conversation_history_key=self._default_conversation_history_key,
+            conversation_history_key=self._conversation_history_key,
             prompt=prompt,
             inputs=self.inputs,
             flow_id=self.flow_id,
             flow_type=self.flow_type,
             internal_event_client=self.internal_event_client,
-            response_schema=self._response_schema,
             compactor=(
                 create_conversation_compactor(
                     config=(
@@ -321,6 +449,7 @@ class AgentComponent(BaseComponent):
                 if self.compaction
                 else None
             ),
+            response_schema=self._response_schema,
         )
         tracker = ToolEventTracker(
             flow_id=self.flow_id,
@@ -329,25 +458,17 @@ class AgentComponent(BaseComponent):
         )
         node_tools = ToolNode(
             name=f"{self.name}#tools",
-            conversation_history_key=self._default_conversation_history_key,
+            conversation_history_key=self._conversation_history_key,
             toolset=self.toolset,
             ui_history=UIHistory(
                 events=self.ui_log_events, writer_class=UILogWriterAgentTools
             ),
             tracker=tracker,
         )
-
-        static_output_key = self._final_answer_key.to_iokey(
-            {IOKeyTemplate.COMPONENT_NAME_TEMPLATE: self.name}
-        )
-        output_key = RuntimeIOKey(
-            alias="final_answer",
-            factory=lambda _: static_output_key,
-        )
         node_final_response = FinalResponseNode(
             name=f"{self.name}#final_response",
-            conversation_history_key=self._default_conversation_history_key,
-            output_key=output_key,
+            conversation_history_key=self._conversation_history_key,
+            output_key=self._output_key,
             ui_history=UIHistory(
                 events=self.ui_log_events,
                 writer_class=default_ui_log_writer_class(
