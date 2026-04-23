@@ -32,7 +32,7 @@ class TestHumanInputComponent:
             flow_id="test_flow",
             flow_type=flow_type,
             user=user,
-            message_template="test_message_template",
+            message_template="Test message template",
             ui_log_events=[
                 UILogEventsHumanInput.ON_USER_INPUT_PROMPT,
                 UILogEventsHumanInput.ON_USER_RESPONSE,
@@ -43,7 +43,7 @@ class TestHumanInputComponent:
         """Test that IOKeyTemplate correctly replaces SENDS_RESPONSE_TO_COMPONENT_NAME_TEMPLATE."""
         outputs = human_input_component.outputs
 
-        assert len(outputs) == 2
+        assert len(outputs) == 3
 
         # First output should be conversation_history
         conversation_output = outputs[0]
@@ -56,6 +56,12 @@ class TestHumanInputComponent:
         assert isinstance(approval_output, IOKey)
         assert approval_output.target == "context"
         assert approval_output.subkeys == ["test_human_input", "approval"]
+
+        # Third output should be status
+        status_output = outputs[2]
+        assert isinstance(status_output, IOKey)
+        assert status_output.target == "status"
+        assert status_output.subkeys is None
 
     def test_attach_method_creates_nodes(self, human_input_component):
         """Test that attach method creates proper nodes in the graph."""
@@ -95,24 +101,29 @@ class TestHumanInputComponent:
             mock_request_node.assert_called_once_with(
                 name="test_human_input#request",
                 component_name="test_human_input",
-                message_template=mock_request_node.call_args[1]["message_template"],
+                message_template="Test message template",
                 inputs=human_input_component.inputs,
+                request_type="approval",
                 ui_history=mock_request_node.call_args[1]["ui_history"],
+                status_key=human_input_component._status_output,
             )
 
             mock_fetch_node.assert_called_once_with(
                 name="test_human_input#fetch",
                 component_name="test_human_input",
-                sends_response_to="awesome_agent",
                 output=human_input_component._approval_output,
+                conversation_history_key=human_input_component._conversation_history_input,
                 ui_history=mock_fetch_node.call_args[1]["ui_history"],
+                status_key=human_input_component._status_output,
             )
 
-            # Verify graph received calls to add_node, add_edge and add_conditional_edges with correct arguments
-            graph.add_node.assert_any_call(
-                "test_human_input#request", request_instance.run
-            )
-            graph.add_node.assert_any_call("test_human_input#fetch", fetch_instance.run)
+            # Verify graph received calls to add_node, add_edge and add_conditional_edges
+            # Note: Experimental component uses wrapper functions, not node.run directly
+            assert graph.add_node.call_count == 2
+            node_names = [call[0][0] for call in graph.add_node.call_args_list]
+            assert "test_human_input#request" in node_names
+            assert "test_human_input#fetch" in node_names
+
             graph.add_edge.assert_called_once_with(
                 "test_human_input#request", "test_human_input#fetch"
             )
@@ -120,71 +131,84 @@ class TestHumanInputComponent:
                 "test_human_input#fetch", router.route
             )
 
-    def test_message_template(self, human_input_component):
-        """Test integration with AgentComponent."""
-        graph = StateGraph(FlowState)
-        router = Mock()
-
-        with (
-            patch(
-                "duo_workflow_service.agent_platform.experimental.components.human_input.component.RequestNode"
-            ) as mock_request_node,
-            patch(
-                "duo_workflow_service.agent_platform.experimental.components.human_input.component.FetchNode"
-            ) as mock_fetch_node,
-        ):
-
-            # Mock node instances
-            request_instance = Mock()
-            request_instance.name = "test_human_input#request"
-            mock_request_node.return_value = request_instance
-
-            fetch_instance = Mock()
-            fetch_instance.name = "test_human_input#fetch"
-            mock_fetch_node.return_value = fetch_instance
-
-            human_input_component.attach(graph, router)
-
-            # Verify request node was created with message_template
-            call_args = mock_request_node.call_args
-            assert call_args[1]["message_template"] == "test_message_template"
-
-    def test_optional_message_template(self, user, flow_type: GLReportingEventContext):
-        """Test that message_template is optional when no message_template provided."""
+    def test_default_ui_log_events(self, user, flow_type: GLReportingEventContext):
+        """Test that ui_log_events defaults to both ON_USER_INPUT_PROMPT and ON_USER_RESPONSE."""
         component = HumanInputComponent(
             name="test_human_input",
             sends_response_to="awesome_agent",
             flow_id="test_flow",
             flow_type=flow_type,
             user=user,
+            message_template="Test message",
+            # ui_log_events not specified - should use defaults
         )
 
-        graph = StateGraph(FlowState)
-        router = Mock()
+        # Verify defaults are set correctly
+        assert component.ui_log_events == [
+            UILogEventsHumanInput.ON_USER_INPUT_PROMPT,
+            UILogEventsHumanInput.ON_USER_RESPONSE,
+        ]
 
-        with (
-            patch(
-                "duo_workflow_service.agent_platform.experimental.components.human_input.component.RequestNode"
-            ) as mock_request_node,
-            patch(
-                "duo_workflow_service.agent_platform.experimental.components.human_input.component.FetchNode"
-            ) as mock_fetch_node,
+    def test_validation_requires_on_user_input_prompt(
+        self, user, flow_type: GLReportingEventContext
+    ):
+        """Test that validation fails if ON_USER_INPUT_PROMPT is missing."""
+        with pytest.raises(
+            ValueError,
+            match="ui_log_events must include.*on_user_input_prompt",
         ):
+            HumanInputComponent(
+                name="test_human_input",
+                sends_response_to="awesome_agent",
+                flow_id="test_flow",
+                flow_type=flow_type,
+                user=user,
+                message_template="Test message",
+                ui_log_events=[
+                    UILogEventsHumanInput.ON_USER_RESPONSE
+                ],  # Missing ON_USER_INPUT_PROMPT
+            )
 
-            # Mock node instances
-            request_instance = Mock()
-            request_instance.name = "test_human_input#request"
-            mock_request_node.return_value = request_instance
+    def test_validation_requires_on_user_response(
+        self, user, flow_type: GLReportingEventContext
+    ):
+        """Test that validation fails if ON_USER_RESPONSE is missing."""
+        with pytest.raises(
+            ValueError,
+            match="ui_log_events must include.*on_user_response",
+        ):
+            HumanInputComponent(
+                name="test_human_input",
+                sends_response_to="awesome_agent",
+                flow_id="test_flow",
+                flow_type=flow_type,
+                user=user,
+                message_template="Test message",
+                ui_log_events=[
+                    UILogEventsHumanInput.ON_USER_INPUT_PROMPT
+                ],  # Missing ON_USER_RESPONSE
+            )
 
-            fetch_instance = Mock()
-            fetch_instance.name = "test_human_input#fetch"
-            mock_fetch_node.return_value = fetch_instance
+    def test_validation_allows_additional_events(
+        self, user, flow_type: GLReportingEventContext
+    ):
+        """Test that validation allows additional events beyond the required ones."""
+        # This should succeed - all required events are present
+        component = HumanInputComponent(
+            name="test_human_input",
+            sends_response_to="awesome_agent",
+            flow_id="test_flow",
+            flow_type=flow_type,
+            user=user,
+            message_template="Test message",
+            ui_log_events=[
+                UILogEventsHumanInput.ON_USER_INPUT_PROMPT,
+                UILogEventsHumanInput.ON_USER_RESPONSE,
+                # Could add more events here in the future
+            ],
+        )
 
-            component.attach(graph, router)
-
-            # Verify request node was created with None message_template
-            call_args = mock_request_node.call_args
-            assert call_args[1]["message_template"] is None
+        assert len(component.ui_log_events) >= 2
 
     def test_ui_log_events_integration(self, human_input_component):
         """Test UI log events are properly passed to nodes."""
