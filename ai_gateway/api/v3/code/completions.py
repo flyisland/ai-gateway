@@ -38,7 +38,11 @@ from ai_gateway.code_suggestions import (
 from ai_gateway.code_suggestions.base import SAAS_PROMPT_MODEL_MAP
 from ai_gateway.config import Config
 from ai_gateway.container import ContainerApplication
-from ai_gateway.model_metadata import TypeModelMetadata, create_model_metadata
+from ai_gateway.model_metadata import (
+    TypeModelMetadata,
+    build_default_code_completions_metadata,
+    create_model_metadata,
+)
 from ai_gateway.models import KindModelProvider
 from ai_gateway.prompts import BasePromptRegistry
 from ai_gateway.structured_logging import get_request_logger
@@ -46,6 +50,7 @@ from ai_gateway.tracking import SnowplowEventContext
 from lib.context import StarletteUser, current_model_metadata_context, get_current_user
 from lib.events import FeatureQualifiedNameStatic
 from lib.feature_flags.context import current_feature_flag_context
+from lib.prompts.caching import X_GITLAB_MODEL_PROMPT_CACHE_ENABLED
 from lib.usage_quota import UsageQuotaEvent
 
 __all__ = [
@@ -122,6 +127,10 @@ async def code_suggestions(
     language_server_version = LanguageServerVersion.from_string(
         request.headers.get(X_GITLAB_LANGUAGE_SERVER_VERSION, None)
     )
+    using_cache = (
+        request.headers.get(X_GITLAB_MODEL_PROMPT_CACHE_ENABLED, "true").lower()
+        == "true"
+    )
     component = payload.prompt_components[0]
     code_context = [
         component.payload.content
@@ -157,6 +166,8 @@ async def code_suggestions(
             stream_handler=stream_handler,
             snowplow_event_context=snowplow_code_suggestion_context,
             model_metadata=current_model_metadata_context.get(),
+            config=config,
+            using_cache=using_cache,
         )
     if component.type == CodeEditorComponents.GENERATION:
         return await code_generation(
@@ -186,6 +197,8 @@ async def code_completion(
     ],
     code_context: Optional[list[CodeContextPayload]] = None,
     model_metadata: TypeModelMetadata = None,
+    config: Optional[Config] = None,
+    using_cache: bool = True,
 ):
     kwargs = {}
 
@@ -206,6 +219,19 @@ async def code_completion(
             model__role_arn=payload.role_arn or model_metadata.role_arn,
         )
     else:
+        if model_metadata is None:
+            if config is None:
+                raise ValueError(
+                    "config must be provided when model_metadata is not set"
+                )
+            model_metadata = build_default_code_completions_metadata(
+                fireworks_api_base_url=config.fireworks_api_base_url(),
+                model_keys=config.model_keys(),
+                user=current_user,
+                using_cache=using_cache,
+                mock_model_responses=config.mock_model_responses,
+            )
+
         try:
             prompt = prompt_registry.get_on_behalf(
                 current_user,
