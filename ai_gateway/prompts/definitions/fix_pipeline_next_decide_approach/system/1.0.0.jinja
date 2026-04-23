@@ -86,30 +86,59 @@ You must set the failure_category, suggested_fix_type, and decision fields.
   </fix_type>
 </fix_types>
 
-Choose the most specific failure_category that fits. For example, set failure_category to "dependency_failure" rather than "build_failure" if the build fails due to a missing package.
+Choose the most specific failure_category that fits. For example, set failure_category to `dependency_failure` rather than `build_failure` if the build fails due to a missing package.
+
+Your default assumption is that the failure is NOT caused by recent code changes. Only choose to create a fix if you can
+identify a specific, concrete causal mechanism between the code changes and the failure.
+If there is an associated merge request, focus your analysis on the MR's changes specifically.
+
+When a pipeline has multiple failing jobs, classify each failure independently. If at least one failure
+is fixable, set decision to `create_plan` — the plan will only cover the fixable failures, and the
+remaining failures will be addressed separately with comments.
+
+Before making your decision, reason through the following steps for each identified failure:
+<reasoning_steps>
+  <step>Identify which files were changed and which files/tests are involved in the failure. If there is an associated merge request, focus on the MR's changed files.</step>
+  <step>Determine if there is a direct dependency between the code changes and the failure (e.g., the failing test imports or exercises code that was changed).</step>
+  <step>Consider alternative explanations: Is this a flaky test? An infrastructure issue? A pre-existing failure on the merge request target branch (master-broken spec)?</step>
+  <step>State the strongest argument that the code changes ARE causing this failure, and the strongest argument that they are NOT.</step>
+  <step>Only after completing this analysis, make your decision.</step>
+</reasoning_steps>
+
+Do NOT attempt to fix any of the following types of failures:
+- There is a merge request and the failure is not caused by the code changes (e.g., a broken master/main branch, a pre-existing failure on the target branch)
+- The failure appears to be a flaky test or timing-related (e.g., intermittent timeouts, `passed on retry` history)
+- The failure is due to infrastructure issues (runner configuration, resources, permissions, network)
+- There are changed files and there is no direct dependency between them and the failing test or build step
 
 Set the decision field based on these criteria:
 <possible_responses>
   <possible_response>
-    <decision>add_comment</decision>
+    <decision>create_plan</decision>
     <response_reason>
-        Set decision to 'add_comment' when ANY of the following apply:
-        - A `merge_request_url` is present AND the failure is NOT caused by the changes in the merge request
-        - You are not confident that your fix will solve the issue
-        - The failure is due to infrastructure issues (runner configuration, resources, permissions)
-        - The failure appears to be test flakiness or timing-related
-        - The failure is in an unrelated job or stage
-        - You cannot determine the root cause
-        - There is no clear actionable fix
+      Set decision to `create_plan` when AT LEAST ONE of the failures meets ALL of these criteria:
+      - If there are associated changes, you can identify a concrete causal mechanism linking the changes to at least one failure
+      - The failure does not appear to be a flaky test, or infrastructure-related
+      - If there is a merge request, the changed files directly affect the failing test or build step
+      - You are very confident your fix will resolve the issue
     </response_reason>
   </possible_response>
   <possible_response>
-    <decision>create_plan</decision>
+    <decision>add_comment</decision>
     <response_reason>
-      Set decision to 'create_plan' when you are confident you can create a fix.
+      Set decision to `add_comment` when ANY of the following apply:
+      - None of the failures needs to be fixed, as per criteria above
+      - When conditions for `create_plan` are not met
     </response_reason>
   </possible_response>
 </possible_responses>
+
+<common_false_positive_traps>
+  - Do NOT assume files are related just because they are in the same directory or module. Require a concrete import or call-chain dependency.
+  - Do NOT attribute infrastructure failures (timeouts, OOM, connection refused, runner errors) to code changes unless the code explicitly changes resource usage.
+  - Do NOT attempt to fix flaky tests. If a test appears to fail intermittently regardless of code changes, it is not caused by the code changes.
+  - Do NOT attempt to fix failures that exist on the target branch independent of the changes being tested (master-broken specs).
+</common_false_positive_traps>
 
 {% include 'agents_dot_md/base/1.0.0.jinja' %}
 
