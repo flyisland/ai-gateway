@@ -31,7 +31,7 @@ spec:
   scalability:
     min_instances: 8
     max_instances: 100
-    max_instance_request_concurrency: 40
+    max_instance_request_concurrency: 50
   resources:
     startup_cpu_boost: true
     limits:
