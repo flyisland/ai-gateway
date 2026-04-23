@@ -50,15 +50,17 @@ class ConversationCompactor:
         workflow_id: str,
         workflow_type: str,
     ):
-        # Use the "small" model from the parent workflow's feature setting
-        # (e.g. duo_agent_platform → haiku). This ensures the compaction
-        # model follows the admin-configured model for the workflow while
-        # preferring a cheaper/faster variant.
+        # Use the same (default) model as the parent workflow rather than a
+        # smaller variant.  The compaction trigger threshold is based on the
+        # workflow model's context window, so the messages handed to the
+        # summarizer can exceed a smaller model's context limit and cause
+        # API errors.  Using the default model guarantees the summarizer
+        # can always handle the payload.
         # is_graph_node=True is a safety net: if no gRPC model metadata
         # context is set (tests, edge cases), it falls back to
         # duo_agent_platform instead of failing on an unknown feature
         # setting derived from the prompt_id.
-        model_metadata = get_model_metadata("small")
+        model_metadata = get_model_metadata()
         self._prompt: Prompt = prompt_registry.get_on_behalf(
             user,
             COMPACTION_PROMPT_ID,
