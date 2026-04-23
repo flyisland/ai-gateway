@@ -8,9 +8,9 @@ version: "v1"
 environment: ambient
 
 components:
-  - name: "fix_pipeline_context"
+  - name: "fix_pipeline_next_context"
     type: AgentComponent
-    prompt_id: "fix_pipeline_context"
+    prompt_id: "fix_pipeline_next_context"
     prompt_version: "^1.0.0"
     inputs:
       - from: "context:goal"
@@ -44,7 +44,7 @@ components:
     response_schema_version: "^1.0.0"
     response_schema_tracking: true
     inputs:
-      - from: "context:fix_pipeline_context.final_answer"
+      - from: "context:fix_pipeline_next_context.final_answer"
         as: "fix_pipeline_context_results"
       - from: "context:inputs.merge_request.url"
         as: "merge_request_url"
@@ -63,7 +63,7 @@ components:
     response_schema_id: "fix_pipeline_next_decide_fix"
     response_schema_version: "^1.0.0"
     inputs:
-      - from: "context:fix_pipeline_context.final_answer"
+      - from: "context:fix_pipeline_next_context.final_answer"
         as: "fix_pipeline_context_results"
       - from: "context:fix_pipeline_next_execution.final_answer"
         as: "execution_results"
@@ -106,7 +106,7 @@ components:
         as: "pipeline_url"
       - from: "context:inputs.merge_request.url"
         as: "merge_request_url"
-      - from: "context:fix_pipeline_context.final_answer"
+      - from: "context:fix_pipeline_next_context.final_answer"
         as: "fix_pipeline_context_results"
       - from: "context:inputs.user_rule"
         as: "agents_dot_md"
@@ -137,7 +137,7 @@ components:
         as: "ref"
       - from: "context:project_http_url_to_repo"
         as: "repository_url"
-      - from: "context:fix_pipeline_context.final_answer"
+      - from: "context:fix_pipeline_next_context.final_answer"
         as: "naming_context"
       - from: "context:workflow_id"
         as: "workflow_id"
@@ -156,7 +156,7 @@ components:
     prompt_id: "fix_pipeline_next_execution"
     prompt_version: "^1.0.0"
     inputs:
-      - from: "context:fix_pipeline_context.final_answer"
+      - from: "context:fix_pipeline_next_context.final_answer"
         as: "fix_pipeline_context_results"
       - from: "context:inputs.pipeline.source_branch"
         as: "source_branch"
@@ -251,7 +251,7 @@ components:
       - "on_tool_execution_failed"
 
 routers:
-  - from: "fix_pipeline_context"
+  - from: "fix_pipeline_next_context"
     to: "fix_pipeline_next_decide_approach"
   - from: "fix_pipeline_next_decide_approach"
     condition:
@@ -283,7 +283,7 @@ routers:
     to: "end"
 
 flow:
-  entry_point: "fix_pipeline_context"
+  entry_point: "fix_pipeline_next_context"
   inputs:
     - category: merge_request
       input_schema:
