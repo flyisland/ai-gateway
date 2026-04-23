@@ -1,7 +1,5 @@
-# pylint: disable=too-many-arguments,too-many-positional-arguments,unused-argument,file-naming-for-tests
+# pylint: disable=too-many-lines,file-naming-for-tests
 """Test suite for AgentComponent class."""
-
-# pylint: disable=file-naming-for-tests
 from typing import ClassVar, Literal
 from unittest.mock import Mock, patch
 
@@ -12,12 +10,13 @@ from pydantic import BaseModel, ConfigDict, Field, ValidationError
 from ai_gateway.response_schemas import BaseResponseSchemaRegistry
 from duo_workflow_service.agent_platform.v1.components.agent.component import (
     AgentComponent,
+    AgentComponentBase,
     RoutingError,
 )
 from duo_workflow_service.agent_platform.v1.components.agent.ui_log import (
     UILogEventsAgent,
 )
-from duo_workflow_service.agent_platform.v1.state import FlowStateKeys
+from duo_workflow_service.agent_platform.v1.state import FlowStateKeys, RuntimeIOKey
 from duo_workflow_service.agent_platform.v1.state.base import IOKey
 from duo_workflow_service.agent_platform.v1.ui_log import UIHistory
 from duo_workflow_service.conversation.compaction import CompactionConfig
@@ -134,7 +133,7 @@ def agent_component_no_output_fixture(
         name=component_name,
         flow_id=flow_id,
         flow_type=flow_type,
-        user=user,  # noqa: F821  # pylint: disable=undefined-variable
+        user=user,
         inputs=["context:user_input", "context:task_description"],
         prompt_id=prompt_id,
         prompt_version=prompt_version,
@@ -205,6 +204,215 @@ def mock_schema_registry_fixture():
 
     mock_registry.get.return_value = CustomResponseTool
     return mock_registry
+
+
+class TestAgentComponentBase:
+    """Test suite for AgentComponentBase abstract stubs."""
+
+    def test_agent_node_router_raises_not_implemented(
+        self,
+        component_name,
+        flow_id,
+        flow_type,
+        user,
+        mock_toolset,
+        mock_prompt_registry,
+        mock_internal_event_client,
+    ):
+        """Base _agent_node_router must raise NotImplementedError."""
+
+        class ConcreteBase(AgentComponentBase):
+            pass
+
+        component = ConcreteBase(
+            name=component_name,
+            flow_id=flow_id,
+            flow_type=flow_type,
+            user=user,
+            inputs=[],
+            prompt_id="test",
+            toolset=mock_toolset,
+            prompt_registry=mock_prompt_registry,
+            internal_event_client=mock_internal_event_client,
+        )
+        with pytest.raises(NotImplementedError):
+            component._agent_node_router({})
+
+    def test_attach_raises_not_implemented(
+        self,
+        component_name,
+        flow_id,
+        flow_type,
+        user,
+        mock_toolset,
+        mock_prompt_registry,
+        mock_internal_event_client,
+        mock_state_graph,
+        mock_router,
+    ):
+        """Base attach must raise NotImplementedError."""
+
+        class ConcreteBase(AgentComponentBase):
+            pass
+
+        component = ConcreteBase(
+            name=component_name,
+            flow_id=flow_id,
+            flow_type=flow_type,
+            user=user,
+            inputs=[],
+            prompt_id="test",
+            toolset=mock_toolset,
+            prompt_registry=mock_prompt_registry,
+            internal_event_client=mock_internal_event_client,
+        )
+        with pytest.raises(NotImplementedError):
+            component.attach(mock_state_graph, mock_router)
+
+    def test_default_conversation_history_key_returns_correct_runtime_io_key(
+        self,
+        component_name,
+        flow_id,
+        flow_type,
+        user,
+        mock_toolset,
+        mock_prompt_registry,
+        mock_internal_event_client,
+    ):
+        """_default_conversation_history_key returns a RuntimeIOKey wrapping the correct static IOKey."""
+
+        class ConcreteBase(AgentComponentBase):
+            pass
+
+        component = ConcreteBase(
+            name=component_name,
+            flow_id=flow_id,
+            flow_type=flow_type,
+            user=user,
+            inputs=[],
+            prompt_id="test",
+            toolset=mock_toolset,
+            prompt_registry=mock_prompt_registry,
+            internal_event_client=mock_internal_event_client,
+        )
+        runtime_key = component._default_conversation_history_key
+        assert isinstance(runtime_key, RuntimeIOKey)
+
+        iokey = runtime_key.to_iokey({})
+        assert iokey.target == "conversation_history"
+        assert iokey.subkeys == [component_name]
+        assert iokey.optional is True
+
+    @pytest.mark.parametrize(
+        ("schema_id", "schema_version", "should_raise"),
+        [
+            ("test/schema", "^1.0.0", False),  # Both provided - valid
+            (None, None, False),  # Neither provided - valid
+            ("test/schema", None, True),  # Only ID - invalid
+            (None, "^1.0.0", True),  # Only version - invalid
+        ],
+    )
+    def test_id_and_version_are_provided(
+        self,
+        component_name,
+        flow_id,
+        flow_type,
+        user,
+        prompt_id,
+        prompt_version,
+        mock_toolset,
+        mock_prompt_registry,
+        mock_schema_registry,
+        mock_internal_event_client,
+        schema_id,
+        schema_version,
+        should_raise,
+    ):
+        """Both response_schema_id and response_schema_version must be set together or both omitted."""
+
+        class ConcreteBase(AgentComponentBase):
+            pass
+
+        if should_raise:
+            with pytest.raises(ValueError, match="must be provided together"):
+                ConcreteBase(
+                    name=component_name,
+                    flow_id=flow_id,
+                    flow_type=flow_type,
+                    user=user,
+                    inputs=["context:user_input"],
+                    prompt_id=prompt_id,
+                    prompt_version=prompt_version,
+                    toolset=mock_toolset,
+                    response_schema_id=schema_id,
+                    response_schema_version=schema_version,
+                    prompt_registry=mock_prompt_registry,
+                    internal_event_client=mock_internal_event_client,
+                )
+        else:
+            if schema_id and schema_version:
+                mock_schema = mock_schema_registry.get.return_value
+                mock_toolset.__contains__ = (
+                    lambda self, name: name != mock_schema.tool_title
+                )
+
+            component = ConcreteBase(
+                name=component_name,
+                flow_id=flow_id,
+                flow_type=flow_type,
+                user=user,
+                inputs=["context:user_input"],
+                prompt_id=prompt_id,
+                prompt_version=prompt_version,
+                toolset=mock_toolset,
+                response_schema_id=schema_id,
+                response_schema_version=schema_version,
+                schema_registry=mock_schema_registry,
+                prompt_registry=mock_prompt_registry,
+                internal_event_client=mock_internal_event_client,
+            )
+            assert component.response_schema_id == schema_id
+            assert component.response_schema_version == schema_version
+
+    def test_tool_name_collision_with_response_schema(
+        self,
+        component_name,
+        flow_id,
+        flow_type,
+        user,
+        prompt_id,
+        prompt_version,
+        mock_toolset,
+        mock_prompt_registry,
+        mock_schema_registry,
+        mock_internal_event_client,
+    ):
+        """Response schema tool title colliding with an existing tool raises ValueError."""
+
+        class ConcreteBase(AgentComponentBase):
+            pass
+
+        mock_schema = Mock()
+        mock_schema.tool_title = "colliding_response_tool"
+        mock_schema_registry.get.return_value = mock_schema
+        mock_toolset.__contains__ = lambda self, name: name == "colliding_response_tool"
+
+        with pytest.raises(ValueError, match="collides with existing tool"):
+            ConcreteBase(
+                name=component_name,
+                flow_id=flow_id,
+                flow_type=flow_type,
+                user=user,
+                inputs=["context:user_input"],
+                prompt_id=prompt_id,
+                prompt_version=prompt_version,
+                toolset=mock_toolset,
+                response_schema_id="test/schema",
+                response_schema_version="1.0.0",
+                schema_registry=mock_schema_registry,
+                prompt_registry=mock_prompt_registry,
+                internal_event_client=mock_internal_event_client,
+            )
 
 
 class TestAgentComponentInitialization:
@@ -1083,3 +1291,170 @@ class TestAgentComponentCompaction:
                 mock_create_compactor.assert_not_called()
                 agent_call_kwargs = mock_agent_node_cls.call_args[1]
                 assert agent_call_kwargs["compactor"] is None
+
+
+class TestAgentComponentBindToSupervisor:
+    """Test suite for AgentComponent.bind_to_supervisor functionality."""
+
+    def test_bind_to_supervisor_sets_factories(
+        self,
+        component_name,
+        flow_id,
+        flow_type,
+        user,
+        prompt_id,
+        mock_toolset,
+        mock_prompt_registry,
+        mock_internal_event_client,
+    ):
+        """Test that bind_to_supervisor sets the key factories."""
+        component = AgentComponent(
+            name=component_name,
+            flow_id=flow_id,
+            flow_type=flow_type,
+            user=user,
+            prompt_id=prompt_id,
+            toolset=mock_toolset,
+            prompt_registry=mock_prompt_registry,
+            internal_event_client=mock_internal_event_client,
+            description="Test agent for supervisor",
+        )
+
+        # Initially keys should have default values
+        assert isinstance(component._conversation_history_key, RuntimeIOKey)
+        assert isinstance(component._output_key, RuntimeIOKey)
+        assert not component._is_bound_to_supervisor
+
+        # Create mock RuntimeIOKey instances
+        mock_history_key = RuntimeIOKey(alias="conversation_history", factory=Mock())
+        mock_output_key = RuntimeIOKey(alias="final_answer", factory=Mock())
+        mock_goal_key = RuntimeIOKey(alias="goal", factory=Mock())
+
+        # Bind to supervisor
+        component.bind_to_supervisor(
+            conversation_history_key=mock_history_key,
+            output_key=mock_output_key,
+            goal_key=mock_goal_key,
+        )
+
+        # Keys should now be set to the provided values
+        assert component._conversation_history_key is mock_history_key
+        assert component._output_key is mock_output_key
+        assert component._is_bound_to_supervisor
+        # goal_key should be appended to inputs so AgentNode receives it transparently
+        assert mock_goal_key in component.inputs
+
+    def test_bind_to_supervisor_removes_existing_goal_input_and_appends_new_one(
+        self,
+        component_name,
+        flow_id,
+        flow_type,
+        user,
+        prompt_id,
+        mock_toolset,
+        mock_prompt_registry,
+        mock_internal_event_client,
+    ):
+        """Test that bind_to_supervisor removes any pre-existing goal input before appending the new one."""
+        existing_goal_key = IOKey(target="context", subkeys=["goal"])
+        component = AgentComponent(
+            name=component_name,
+            flow_id=flow_id,
+            flow_type=flow_type,
+            user=user,
+            prompt_id=prompt_id,
+            toolset=mock_toolset,
+            prompt_registry=mock_prompt_registry,
+            internal_event_client=mock_internal_event_client,
+            description="Test agent for supervisor",
+        )
+        component.inputs = [existing_goal_key]
+
+        mock_history_key = RuntimeIOKey(alias="conversation_history", factory=Mock())
+        mock_output_key = RuntimeIOKey(alias="final_answer", factory=Mock())
+        new_goal_key = RuntimeIOKey(alias="goal", factory=Mock())
+
+        component.bind_to_supervisor(
+            conversation_history_key=mock_history_key,
+            output_key=mock_output_key,
+            goal_key=new_goal_key,
+        )
+
+        # The old goal key should have been removed and replaced by the new one
+        assert existing_goal_key not in component.inputs
+        assert new_goal_key in component.inputs
+
+    def test_bind_to_supervisor_requires_description(
+        self,
+        component_name,
+        flow_id,
+        flow_type,
+        user,
+        prompt_id,
+        mock_toolset,
+        mock_prompt_registry,
+        mock_internal_event_client,
+    ):
+        """Test that bind_to_supervisor raises ValueError if description is not set."""
+        component = AgentComponent(
+            name=component_name,
+            flow_id=flow_id,
+            flow_type=flow_type,
+            user=user,
+            prompt_id=prompt_id,
+            toolset=mock_toolset,
+            prompt_registry=mock_prompt_registry,
+            internal_event_client=mock_internal_event_client,
+            # No description
+        )
+
+        mock_history_key = RuntimeIOKey(alias="conversation_history", factory=Mock())
+        mock_output_key = RuntimeIOKey(alias="final_answer", factory=Mock())
+        mock_goal_key = RuntimeIOKey(alias="goal", factory=Mock())
+
+        with pytest.raises(ValueError, match="must have a description"):
+            component.bind_to_supervisor(
+                conversation_history_key=mock_history_key,
+                output_key=mock_output_key,
+                goal_key=mock_goal_key,
+            )
+
+    def test_outputs_returns_empty_when_bound(
+        self,
+        component_name,
+        flow_id,
+        flow_type,
+        user,
+        prompt_id,
+        mock_toolset,
+        mock_prompt_registry,
+        mock_internal_event_client,
+    ):
+        """Test that outputs returns empty tuple when bound to supervisor."""
+        component = AgentComponent(
+            name=component_name,
+            flow_id=flow_id,
+            flow_type=flow_type,
+            user=user,
+            prompt_id=prompt_id,
+            toolset=mock_toolset,
+            prompt_registry=mock_prompt_registry,
+            internal_event_client=mock_internal_event_client,
+            description="Test agent for supervisor",
+        )
+
+        # Before binding, outputs should be populated
+        assert len(component.outputs) > 0
+
+        # Bind to supervisor
+        mock_history_key = RuntimeIOKey(alias="conversation_history", factory=Mock())
+        mock_output_key = RuntimeIOKey(alias="final_answer", factory=Mock())
+        mock_goal_key = RuntimeIOKey(alias="goal", factory=Mock())
+        component.bind_to_supervisor(
+            conversation_history_key=mock_history_key,
+            output_key=mock_output_key,
+            goal_key=mock_goal_key,
+        )
+
+        # After binding, outputs should be empty
+        assert component.outputs == ()

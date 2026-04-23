@@ -10,6 +10,7 @@ from duo_workflow_service.agent_platform.v1.state import (
     FlowStateKeys,
     IOKey,
     IOKeyTemplate,
+    RuntimeIOKey,
 )
 from duo_workflow_service.entities.state import WorkflowStatusEnum
 from lib.context import ModelSizeBucket
@@ -51,7 +52,7 @@ class BaseComponent(BaseModel, ABC):
 
     supported_environments: ClassVar[tuple[str, ...]] = ()
 
-    inputs: list[IOKey] = Field(default_factory=list)
+    inputs: list[IOKey | RuntimeIOKey] = Field(default_factory=list)
     name: str
     flow_id: str
     flow_type: GLReportingEventContext
@@ -70,6 +71,9 @@ class BaseComponent(BaseModel, ABC):
     @model_validator(mode="after")
     def validate_base_fields(self) -> Self:
         for inp in self.inputs:
+            if isinstance(inp, RuntimeIOKey):
+                continue
+
             if inp.literal:
                 continue
 
