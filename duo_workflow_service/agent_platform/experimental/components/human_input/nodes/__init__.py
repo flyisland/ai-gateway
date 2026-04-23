@@ -1,4 +1,6 @@
-from .fetch_node import FetchNode
-from .request_node import RequestNode
+from duo_workflow_service.agent_platform.v1.components.human_input.nodes import (
+    FetchNode,
+    RequestNode,
+)
 
 __all__ = ["FetchNode", "RequestNode"]
