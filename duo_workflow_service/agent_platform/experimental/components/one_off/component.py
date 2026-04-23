@@ -37,6 +37,8 @@ from duo_workflow_service.agent_platform.utils.tool_event_tracker import (
     ToolEventTracker,
 )
 from duo_workflow_service.agent_platform.v1.state import IOKey
+from duo_workflow_service.audit_events.context import get_audit_collector
+from duo_workflow_service.audit_events.event_types import ToolExecutionRetriedEvent
 from duo_workflow_service.conversation.compaction import (
     CompactionConfig,
     create_conversation_compactor,
@@ -218,6 +220,19 @@ class OneOffComponent(AgentComponentBase):
                 return outgoing_router.route(
                     state
                 )  # Max attempts reached - exit component
+
+            collector = get_audit_collector()
+            if collector:
+                context = state.get("context", {}).get(self.name, {})
+                collector.capture(
+                    ToolExecutionRetriedEvent(
+                        workflow_id=self.flow_id,
+                        tool_name=self.name,
+                        attempt_number=context.get("correction_attempts", 0),
+                        max_attempts=self.max_correction_attempts,
+                        previous_error=str(last_message.content),
+                    )
+                )
             return self.__entry_hook__()  # Error with attempts remaining - retry
 
         # If we can't parse then raise error

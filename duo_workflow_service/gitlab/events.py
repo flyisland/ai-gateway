@@ -3,6 +3,8 @@ from typing import List, Union
 
 import structlog
 
+from duo_workflow_service.audit_events.context import get_audit_collector
+from duo_workflow_service.audit_events.event_types import UserInputReceivedEvent
 from duo_workflow_service.entities.event import WorkflowEvent
 from duo_workflow_service.gitlab.http_client import GitlabHttpClient
 
@@ -30,6 +32,18 @@ async def get_event(
     if isinstance(events, list) and len(events) > 0:
         if ack:
             await ack_event(gitlab_client, workflow_id, events[0])
+
+        collector = get_audit_collector()
+        if collector:
+            message = events[0].get("message", "")
+            collector.capture(
+                UserInputReceivedEvent(
+                    workflow_id=workflow_id,
+                    input_type=events[0].get("event_type", "text"),
+                    content=message,
+                    content_length=len(message),
+                )
+            )
 
         return events[0]
 

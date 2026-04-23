@@ -14,6 +14,8 @@ from duo_workflow_service.agent_platform.v1.state import (
     RuntimeIOKey,
 )
 from duo_workflow_service.agent_platform.v1.ui_log import DefaultUILogWriter, UIHistory
+from duo_workflow_service.audit_events.context import get_audit_collector
+from duo_workflow_service.audit_events.event_types import ToolInvokedEvent
 from duo_workflow_service.monitoring import duo_workflow_metrics
 from duo_workflow_service.tracking.response_schema_tracking_context import (
     response_schema_tracking_results,
@@ -151,6 +153,16 @@ class FinalResponseNode:
             )
 
         parsed_response = self._response_schema(**final_response_call["args"])
+
+        collector = get_audit_collector()
+        if collector:
+            collector.capture(
+                ToolInvokedEvent(
+                    workflow_id=self._flow_id or "",
+                    tool_name=self._response_schema.tool_title,
+                    tool_args=final_response_call.get("args", {}),
+                )
+            )
 
         if self._response_schema_tracking:
             self._track_response_schema_output(parsed_response)
