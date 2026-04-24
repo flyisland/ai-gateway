@@ -1,47 +1,10 @@
-from unittest.mock import AsyncMock, patch
+from unittest.mock import ANY, AsyncMock, patch
 
 import pytest
 from gitlab_cloud_connector import CloudConnectorUser, GitLabUnitPrimitive, UserClaims
 
-from ai_gateway.api.v1 import api_router
-from ai_gateway.api.v1.proxy.request import (
-    EXTENDED_FEATURE_CATEGORIES_FOR_PROXY_ENDPOINTS,
-)
 from ai_gateway.proxy.clients import ProxyModel
-
-
-@pytest.fixture(name="fast_api_router", scope="class")
-def fast_api_router_fixture():
-    return api_router
-
-
-@pytest.fixture(name="auth_user")
-def auth_user_fixture():
-    return CloudConnectorUser(
-        authenticated=True,
-        claims=UserClaims(
-            scopes=EXTENDED_FEATURE_CATEGORIES_FOR_PROXY_ENDPOINTS.keys(),
-            gitlab_instance_id="1",
-            extra={
-                "gitlab_project_id": "1",
-                "gitlab_namespace_id": "1",
-                "gitlab_root_namespace_id": "1",
-            },
-        ),
-    )
-
-
-@pytest.fixture(name="proxy_headers")
-def proxy_headers_fixture():
-    """Common headers for proxy requests."""
-    return {
-        "Authorization": "Bearer 12345",
-        "X-Gitlab-Authentication-Type": "oidc",
-        "X-Gitlab-Instance-Id": "1",
-        "X-Gitlab-Project-Id": "1",
-        "X-Gitlab-Namespace-Id": "1",
-        "x-gitlab-root-namespace-id": "1",
-    }
+from lib.billing_events.client import BillingEvent
 
 
 @pytest.fixture(name="mock_proxy_model")
@@ -60,10 +23,28 @@ def mock_proxy_model_fixture():
     )
 
 
+@pytest.fixture(name="proxy_upstream_response")
+def proxy_upstream_response_fixture() -> dict:
+    return {
+        "choices": [
+            {
+                "index": 0,
+                "message": {
+                    "role": "assistant",
+                    "content": "Hi there! How can I help you today?",
+                },
+                "finish_reason": "stop",
+            }
+        ],
+        "usage": {
+            "prompt_tokens": 1,
+            "completion_tokens": 2,
+            "total_tokens": 3,
+        },
+    }
+
+
 class TestProxyOpenAI:
-    @pytest.mark.parametrize(
-        "unit_primitive", EXTENDED_FEATURE_CATEGORIES_FOR_PROXY_ENDPOINTS.keys()
-    )
     def test_successful_chat_completions_request(
         self,
         mock_client,
@@ -103,9 +84,6 @@ class TestProxyOpenAI:
             category="ai_gateway.api.v1.proxy.openai",
         )
 
-    @pytest.mark.parametrize(
-        "unit_primitive", EXTENDED_FEATURE_CATEGORIES_FOR_PROXY_ENDPOINTS.keys()
-    )
     def test_successful_completions_request(
         self,
         mock_client,
@@ -145,9 +123,6 @@ class TestProxyOpenAI:
             category="ai_gateway.api.v1.proxy.openai",
         )
 
-    @pytest.mark.parametrize(
-        "unit_primitive", EXTENDED_FEATURE_CATEGORIES_FOR_PROXY_ENDPOINTS.keys()
-    )
     def test_successful_embeddings_request(
         self,
         mock_client,
@@ -190,10 +165,9 @@ class TestProxyOpenAI:
         mock_client,
         mock_track_internal_event,
         proxy_headers,
+        unit_primitive,
         mock_proxy_model,
     ):
-        unit_primitive = list(EXTENDED_FEATURE_CATEGORIES_FOR_PROXY_ENDPOINTS.keys())[0]
-
         with (
             patch(
                 "ai_gateway.proxy.clients.ProxyClient.proxy",
@@ -222,9 +196,6 @@ class TestProxyOpenAI:
             category="ai_gateway.api.v1.proxy.openai",
         )
 
-    @pytest.mark.parametrize(
-        "unit_primitive", EXTENDED_FEATURE_CATEGORIES_FOR_PROXY_ENDPOINTS.keys()
-    )
     def test_successful_responses_request(
         self,
         mock_client,
@@ -267,10 +238,9 @@ class TestProxyOpenAI:
         mock_client,
         mock_track_internal_event,
         proxy_headers,
+        unit_primitive,
         mock_proxy_model,
     ):
-        unit_primitive = list(EXTENDED_FEATURE_CATEGORIES_FOR_PROXY_ENDPOINTS.keys())[0]
-
         with (
             patch(
                 "ai_gateway.proxy.clients.ProxyClient.proxy",
@@ -299,6 +269,61 @@ class TestProxyOpenAI:
         mock_track_internal_event.assert_called_once_with(
             f"request_{unit_primitive}",
             category="ai_gateway.api.v1.proxy.openai",
+        )
+
+    @pytest.mark.usefixtures("mock_proxy_async_client")
+    def test_billing_event(
+        self,
+        mock_client,
+        mock_track_billing_event,
+        unit_primitive,
+        proxy_headers,
+        mock_proxy_model,
+    ):
+        with (
+            patch(
+                "ai_gateway.proxy.clients.OpenAIProxyModelFactory.factory",
+                new_callable=AsyncMock,
+                return_value=mock_proxy_model,
+            ),
+        ):
+            headers = {**proxy_headers, "X-Gitlab-Unit-Primitive": unit_primitive}
+            response = mock_client.post(
+                "/proxy/openai/v1/chat/completions",
+                headers=headers,
+                json={
+                    "model": "gpt-5",
+                    "max_tokens": 1024,
+                    "messages": [{"role": "user", "content": "Hi, how are you?"}],
+                    "stream": False,
+                },
+            )
+
+        assert response.status_code == 200
+
+        mock_track_billing_event.assert_called_once_with(
+            ANY,
+            event=BillingEvent.AIGW_PROXY_USE,
+            category="ai_gateway.proxy.clients.base",
+            unit_of_measure="request",
+            quantity=1,
+            metadata={
+                "llm_operations": [
+                    {
+                        "token_count": 3,
+                        "model_id": "gpt-5",
+                        "model_engine": "openai",
+                        "model_provider": "openai",
+                        "prompt_tokens": 1,
+                        "completion_tokens": 2,
+                        "agent_name": None,
+                        "cache_read_tokens": 0,
+                        "cache_write_tokens": 0,
+                    }
+                ],
+                "feature_qualified_name": "ai_gateway_proxy_use",
+                "feature_ai_catalog_item": False,
+            },
         )
 
 
@@ -419,10 +444,8 @@ class TestDataMismatch:
 
 
 class TestInvalidRoutes:
-    def test_invalid_openai_path(self, mock_client, proxy_headers):
+    def test_invalid_openai_path(self, mock_client, proxy_headers, unit_primitive):
         """Test request to invalid OpenAI path."""
-        unit_primitive = list(EXTENDED_FEATURE_CATEGORIES_FOR_PROXY_ENDPOINTS.keys())[0]
-
         headers = {**proxy_headers, "X-Gitlab-Unit-Primitive": unit_primitive}
         response = mock_client.post(
             "/proxy/openai/v1/invalid-path",
@@ -454,11 +477,10 @@ class TestUsageQuotaWithModelName:
         mock_client,
         mock_track_internal_event,
         proxy_headers,
+        unit_primitive,
         model_name,
     ):
         """Test that model_name from ProxyModel is passed to usage quota service."""
-        unit_primitive = list(EXTENDED_FEATURE_CATEGORIES_FOR_PROXY_ENDPOINTS.keys())[0]
-
         mock_proxy_model = ProxyModel(
             base_url="https://api.openai.com",
             model_name=model_name,

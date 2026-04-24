@@ -26,6 +26,7 @@ def proxy_client_fixture(limits, internal_event_client, billing_event_client):
 
 
 @pytest.mark.asyncio
+@pytest.mark.usefixtures("mock_proxy_async_client")
 async def test_valid_proxy_request_text_embedding(
     vertex_factory, proxy_client, request_factory
 ):
@@ -112,7 +113,7 @@ async def test_valid_proxy_request_text_embedding(
     ],
 )
 async def test_request_url(
-    async_client,
+    mock_proxy_async_client,
     vertex_factory,
     proxy_client,
     request_factory,
@@ -137,7 +138,7 @@ async def test_request_url(
 
         assert response.status_code == 200
 
-        async_client.request.assert_called_once_with(
+        mock_proxy_async_client.request.assert_called_once_with(
             method="POST",
             url=URL(expected_upstream_path),
             headers=ANY,

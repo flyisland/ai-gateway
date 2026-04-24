@@ -64,6 +64,7 @@ def request_headers_fixture():
         ("http://0.0.0.0:5052/v1/proxy/openai/v1/responses", 200),
     ],
 )
+@pytest.mark.usefixtures("mock_proxy_async_client")
 async def test_valid_proxy_requests(
     openai_factory,
     proxy_client,
@@ -88,6 +89,7 @@ async def test_valid_proxy_requests(
 
 
 @pytest.mark.asyncio
+@pytest.mark.usefixtures("mock_proxy_async_client")
 async def test_valid_completions_request(
     openai_factory,
     proxy_client,
@@ -226,6 +228,7 @@ async def test_missing_api_key(
 
 
 @pytest.mark.asyncio
+@pytest.mark.usefixtures("mock_proxy_async_client")
 async def test_stream_flag_extraction(
     openai_factory,
     proxy_client,

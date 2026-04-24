@@ -100,6 +100,9 @@ def mock_llm_operations_fixture():
             "model_provider": "anthropic",
             "prompt_tokens": 80,
             "completion_tokens": 20,
+            "agent_name": "foo",
+            "cache_read_tokens": 50,
+            "cache_write_tokens": 10,
         },
         {
             "token_count": 150,
@@ -108,6 +111,9 @@ def mock_llm_operations_fixture():
             "model_provider": "openai",
             "prompt_tokens": 120,
             "completion_tokens": 30,
+            "agent_name": "bar",
+            "cache_read_tokens": 10,
+            "cache_write_tokens": 5,
         },
     ]
     llm_operations.set(operations)
@@ -1327,6 +1333,7 @@ async def test_track_workflow_completion_with_billing_event(
     workflow_id,
     workflow_type,
     billing_event_service,
+    billing_event_client,
     mock_user,
     mock_llm_operations,
     status,
@@ -1337,16 +1344,20 @@ async def test_track_workflow_completion_with_billing_event(
 
     await gitlab_workflow._track_workflow_completion(status)
 
-    billing_event_service.track_billing.assert_called_once_with(
-        workflow_id=workflow_id,
-        user=mock_user,
-        gl_context=workflow_type,
-        event=BillingEvent.DAP_FLOW_ON_COMPLETION,
-        execution_env=ExecutionEnvironment.DAP,
-        category="GitLabWorkflow",
+    billing_event_client.track_billing_event.assert_called_once_with(
+        mock_user,
+        BillingEvent.DAP_FLOW_ON_COMPLETION,
+        "GitLabWorkflow",
         unit_of_measure="request",
         quantity=1,
-        tool_execs=[],
+        metadata={
+            "workflow_id": workflow_id,
+            "feature_qualified_name": workflow_type.feature_qualified_name,
+            "feature_ai_catalog_item": workflow_type.feature_ai_catalog_item,
+            "execution_environment": ExecutionEnvironment.DAP.value,
+            "llm_operations": mock_llm_operations,
+            "tool_names": [],
+        },
     )
 
 
@@ -1354,13 +1365,14 @@ async def test_track_workflow_completion_with_billing_event(
 async def test_track_workflow_completion_with_non_billable_status(
     gitlab_workflow,
     billing_event_service,
+    billing_event_client,
 ):
     """Test that workflow completion doesn't trigger billing event for non-trackable statuses."""
     gitlab_workflow._billing_event_service = billing_event_service
 
     await gitlab_workflow._track_workflow_completion("some_other_status")
 
-    billing_event_service.track_billing.assert_not_called()
+    billing_event_client.track_billing_event.assert_not_called()
 
 
 @pytest.fixture(autouse=True)
@@ -1810,6 +1822,7 @@ async def test_track_workflow_completion_with_billing_event_includes_tool_names(
     workflow_id,
     workflow_type,
     billing_event_service,
+    billing_event_client,
     mock_user,
     mock_llm_operations,
     status,
@@ -1826,14 +1839,18 @@ async def test_track_workflow_completion_with_billing_event_includes_tool_names(
 
     await gitlab_workflow._track_workflow_completion(status)
 
-    billing_event_service.track_billing.assert_called_once_with(
-        workflow_id=workflow_id,
-        user=mock_user,
-        gl_context=workflow_type,
-        event=BillingEvent.DAP_FLOW_ON_COMPLETION,
-        execution_env=ExecutionEnvironment.DAP,
-        category="GitLabWorkflow",
+    billing_event_client.track_billing_event.assert_called_once_with(
+        mock_user,
+        BillingEvent.DAP_FLOW_ON_COMPLETION,
+        "GitLabWorkflow",
         unit_of_measure="request",
         quantity=1,
-        tool_execs=["read_file", "write_file", "read_file"],
+        metadata={
+            "workflow_id": workflow_id,
+            "feature_qualified_name": workflow_type.feature_qualified_name,
+            "feature_ai_catalog_item": workflow_type.feature_ai_catalog_item,
+            "execution_environment": ExecutionEnvironment.DAP.value,
+            "llm_operations": mock_llm_operations,
+            "tool_names": ["read_file", "write_file", "read_file"],
+        },
     )

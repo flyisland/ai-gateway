@@ -1,8 +1,6 @@
 import json
-from unittest.mock import Mock, patch
 
 import fastapi
-import httpx
 import pytest
 from fastapi import status
 
@@ -55,6 +53,7 @@ def request_headers_fixture():
         ),
     ],
 )
+@pytest.mark.usefixtures("mock_proxy_async_client")
 async def test_valid_proxy_requests(
     anthropic_factory,
     proxy_client,
@@ -113,6 +112,7 @@ async def test_invalid_proxy_requests(
 
 
 @pytest.mark.asyncio
+@pytest.mark.usefixtures("mock_proxy_async_client")
 async def test_count_tokens_endpoint(
     anthropic_factory,
     proxy_client,
@@ -139,7 +139,7 @@ async def test_count_tokens_endpoint(
 
 @pytest.mark.asyncio
 @pytest.mark.parametrize(
-    "request_headers,upstream_response_headers,expected_upstream_headers,expected_downstream_headers",
+    "request_headers,proxy_proxy_upstream_response_headers,expected_upstream_headers,expected_downstream_headers",
     [
         pytest.param(
             {
@@ -199,6 +199,7 @@ async def test_count_tokens_endpoint(
     ],
 )
 async def test_anthropic_beta_header_handling(
+    mock_proxy_async_client,
     internal_event_client,
     billing_event_client,
     limits,
@@ -206,52 +207,29 @@ async def test_anthropic_beta_header_handling(
     request_factory,
     request_params,
     request_headers,
-    upstream_response_headers,
+    proxy_proxy_upstream_response_headers,
     expected_upstream_headers,
     expected_downstream_headers,
 ):
     """Test anthropic-beta header handling in both directions (upstream and downstream)."""
     monkeypatch.setenv("ANTHROPIC_API_KEY", "test")
 
-    # Create mock response
-    response_body = {
-        "id": "msg_123",
-        "type": "message",
-        "role": "assistant",
-        "content": [{"type": "text", "text": "Hello!"}],
-        "usage": {"input_tokens": 10, "output_tokens": 20},
-    }
-
-    mock_client = Mock(spec=httpx.AsyncClient)
-    mock_response = httpx.Response(
-        status_code=200,
-        headers=upstream_response_headers,
-        json=response_body,
-        request=Mock(),
-    )
-    mock_client.send.return_value = mock_response
-    mock_client.build_request = httpx.AsyncClient().build_request
-
     anthropic_factory = AnthropicProxyModelFactory()
     proxy_client = ProxyClient(limits, internal_event_client, billing_event_client)
 
-    with patch(
-        "litellm.proxy.pass_through_endpoints.pass_through_endpoints.get_async_httpx_client",
-        return_value=Mock(client=mock_client),
-    ):
-        # Make request
-        request = request_factory(
-            request_url="http://0.0.0.0:5052/v1/proxy/anthropic/v1/messages",
-            request_body=json.dumps(request_params).encode("utf-8"),
-            request_headers=request_headers,
-        )
+    # Make request
+    request = request_factory(
+        request_url="http://0.0.0.0:5052/v1/proxy/anthropic/v1/messages",
+        request_body=json.dumps(request_params).encode("utf-8"),
+        request_headers=request_headers,
+    )
 
-        model = await anthropic_factory.factory(request)
-        response = await proxy_client.proxy(request, model)
+    model = await anthropic_factory.factory(request)
+    response = await proxy_client.proxy(request, model)
 
     # Verify upstream request headers
-    mock_client.send.assert_called_once()
-    upstream_request = mock_client.send.call_args[0][0]
+    mock_proxy_async_client.send.assert_called_once()
+    upstream_request = mock_proxy_async_client.send.call_args[0][0]
 
     for header, value in expected_upstream_headers.items():
         assert (
@@ -271,7 +249,7 @@ async def test_anthropic_beta_header_handling(
         assert response.headers[header] == value
 
     # Verify disallowed headers are NOT in downstream response
-    if "x-custom-header" in upstream_response_headers:
+    if "x-custom-header" in proxy_proxy_upstream_response_headers:
         assert "x-custom-header" not in response.headers
 
     # Verify that headers NOT in expected sets are absent

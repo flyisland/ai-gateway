@@ -49,7 +49,6 @@ from duo_workflow_service.workflows.type_definitions import (
     AdditionalContext,
 )
 from lib.billing_events import BillingEvent, ExecutionEnvironment
-from lib.billing_events.service import SelfHostedLLMOperations
 from lib.context import client_capabilities
 from lib.events import GLReportingEventContext
 from lib.internal_events.context import InternalEventAdditionalProperties
@@ -83,13 +82,6 @@ def create_mock_internal_event_client():
     mock_client = MagicMock()
     mock_client.track_event = MagicMock()
     return mock_client
-
-
-def create_mock_billing_service():
-    """Helper function to create a mock billing service for tests."""
-    mock_billing_service = MagicMock()
-    mock_billing_service.track_billing = MagicMock()
-    return mock_billing_service
 
 
 @pytest.fixture(autouse=True)
@@ -1625,7 +1617,9 @@ async def test_next_client_event_client_streaming_closed():
         ),
     ],
 )
-async def test_self_hosted_execute_workflow(request_ids, expected_action_ids):
+async def test_self_hosted_execute_workflow(
+    billing_event_service, request_ids, expected_action_ids
+):
     """Test that TrackSelfHostedExecuteWorkflow echoes back client events with matching requestID."""
     user = CloudConnectorUser(
         authenticated=True,
@@ -1654,7 +1648,7 @@ async def test_self_hosted_execute_workflow(request_ids, expected_action_ids):
     result = servicer.TrackSelfHostedExecuteWorkflow(
         mock_request_iterator(),
         mock_context,
-        billing_service=create_mock_billing_service(),
+        billing_service=billing_event_service,
     )
 
     assert isinstance(result, AsyncIterable)
@@ -1669,7 +1663,7 @@ async def test_self_hosted_execute_workflow(request_ids, expected_action_ids):
 
 @pytest.mark.asyncio
 @patch.dict(os.environ, {"CLOUD_CONNECTOR_SERVICE_NAME": "gitlab-duo-workflow-service"})
-async def test_track_self_hosted_execute_workflow_unauthorized():
+async def test_track_self_hosted_execute_workflow_unauthorized(billing_event_service):
     user = CloudConnectorUser(
         authenticated=True,
         is_debug=False,
@@ -1698,7 +1692,7 @@ async def test_track_self_hosted_execute_workflow_unauthorized():
     result_generator = servicer.TrackSelfHostedExecuteWorkflow(
         mock_request_iterator(),
         mock_context,
-        billing_service=create_mock_billing_service(),
+        billing_service=billing_event_service,
     )
 
     with pytest.raises(grpc.RpcError):
@@ -1717,7 +1711,9 @@ async def test_track_self_hosted_execute_workflow_unauthorized():
 
 @pytest.mark.asyncio
 @patch("duo_workflow_service.server.ContainerApplication")
-async def test_track_self_hosted_execute_workflow_billing_event(_mock_container):
+async def test_track_self_hosted_execute_workflow_billing_event(
+    _mock_container, billing_event_service, billing_event_client
+):
     user = CloudConnectorUser(
         authenticated=True,
         claims=UserClaims(
@@ -1729,9 +1725,6 @@ async def test_track_self_hosted_execute_workflow_billing_event(_mock_container)
     current_user.set(user)
 
     mock_context = MagicMock(spec=grpc.ServicerContext)
-
-    # Create mock billing service using helper
-    mock_billing_service = create_mock_billing_service()
 
     async def mock_request_iterator() -> (
         AsyncIterable[contract_pb2.TrackSelfHostedClientEvent]
@@ -1747,34 +1740,39 @@ async def test_track_self_hosted_execute_workflow_billing_event(_mock_container)
     result = servicer.TrackSelfHostedExecuteWorkflow(
         mock_request_iterator(),
         mock_context,
-        billing_service=mock_billing_service,
+        billing_service=billing_event_service,
     )
 
     actions = [action async for action in result]
     assert len(actions) == 1
     assert actions[0].requestID == "test-req-id"
 
-    # Verify billing service was called once with correct parameters
-    # We need to capture the GLReportingEventContext to verify it separately
-    # since it's a complex object that needs instance checking
-    call_args = mock_billing_service.track_billing.call_args
-    gl_context = call_args[0][2]
-
-    assert isinstance(gl_context, GLReportingEventContext)
-    assert gl_context.feature_qualified_name == "test_feature"
-    assert gl_context.feature_ai_catalog_item is True
-
-    # Now verify the complete call with assert_called_once_with
-    mock_billing_service.track_billing.assert_called_once_with(
-        "test-workflow-id",
+    billing_event_client.track_billing_event.assert_called_once_with(
         user,
-        gl_context,
-        event=BillingEvent.DAP_FLOW_ON_COMPLETION,
-        execution_env=ExecutionEnvironment.DAP,
-        category="DuoWorkflowService",
+        BillingEvent.DAP_FLOW_ON_COMPLETION,
+        "DuoWorkflowService",
         unit_of_measure="request",
         quantity=1,
-        llm_ops=SelfHostedLLMOperations.get_operations(),
+        metadata={
+            "workflow_id": "test-workflow-id",
+            "feature_qualified_name": "test_feature",
+            "feature_ai_catalog_item": True,
+            "execution_environment": ExecutionEnvironment.DAP.value,
+            "llm_operations": [
+                {
+                    "token_count": 1,
+                    "model_id": "self-hosted-model",
+                    "model_engine": "litellm",
+                    "model_provider": "litellm",
+                    "prompt_tokens": 1,
+                    "completion_tokens": 1,
+                    "agent_name": None,
+                    "cache_read_tokens": 0,
+                    "cache_write_tokens": 0,
+                }
+            ],
+            "tool_names": [],
+        },
     )
 
 
