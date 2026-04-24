@@ -1,14 +1,18 @@
 from collections.abc import Callable, Sequence
-from typing import Any, Literal, Optional, Union, override
+from typing import Any, Dict, List, Literal, Optional, Tuple, Union, override
 
 from langchain_core.language_models import LanguageModelInput
-from langchain_core.messages import AIMessage
+from langchain_core.messages import AIMessage, BaseMessage
 from langchain_core.runnables import Runnable
 from langchain_core.tools import BaseTool
 from litellm import add_known_models, register_model
 from pydantic import BaseModel
 
 from ai_gateway.models.base import validate_custom_endpoint
+from ai_gateway.models.v2._model_compat import (
+    remove_trailing_assistant_message,
+    supports_assistant_prefill,
+)
 from ai_gateway.vendor.langchain_litellm.litellm import ChatLiteLLM as _LChatLiteLLM
 
 __all__ = ["ChatLiteLLM"]
@@ -181,3 +185,14 @@ class ChatLiteLLM(_LChatLiteLLM):
         kwargs.pop("web_search_options", None)  # Not yet supported for LiteLLM
 
         return super().bind_tools(tools, tool_choice=tool_choice, **kwargs)
+
+    @override
+    def _create_message_dicts(
+        self, messages: List[BaseMessage], stop: Optional[List[str]]
+    ) -> Tuple[List[Dict[str, Any]], Dict[str, Any]]:
+        message_dicts, params = super()._create_message_dicts(messages, stop)
+        model_name = self.model_name or self.model
+        if not supports_assistant_prefill(model_name):
+            payload = remove_trailing_assistant_message({"messages": message_dicts})
+            message_dicts = payload["messages"]
+        return message_dicts, params

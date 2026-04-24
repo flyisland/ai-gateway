@@ -12,6 +12,10 @@ from langchain_core.tools import BaseTool
 from pydantic import model_validator
 
 from ai_gateway.models.base import validate_custom_endpoint
+from ai_gateway.models.v2._model_compat import (
+    remove_trailing_assistant_message,
+    supports_assistant_prefill,
+)
 
 __all__ = ["ChatAnthropic"]
 
@@ -122,3 +126,18 @@ class ChatAnthropic(_LChatAnthropic):
             tools_list,
             **kwargs,
         )
+
+    @override
+    def _get_request_payload(
+        self,
+        input_: LanguageModelInput,
+        *,
+        stop: Optional[list[str]] = None,
+        **kwargs: Any,
+    ) -> dict:
+        payload = super()._get_request_payload(input_, stop=stop, **kwargs)
+
+        if supports_assistant_prefill(self.model):
+            return payload
+
+        return remove_trailing_assistant_message(payload)
