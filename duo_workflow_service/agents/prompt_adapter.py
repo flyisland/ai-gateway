@@ -22,7 +22,7 @@ from duo_workflow_service.slash_commands.goal_parser import (
 from duo_workflow_service.slash_commands.goal_parser import parse as slash_command_parse
 from lib.context import get_model_metadata
 from lib.prompts.caching import prompt_caching_enabled_in_current_request
-from lib.prompts.utilities import TOOL_OUTPUT_SECURITY_INCLUDE
+from lib.prompts.utilities import render_security_block
 
 VALID_SLASH_COMMANDS = ["explain", "refactor", "tests", "fix"]
 
@@ -56,7 +56,7 @@ class ChatAgentPromptTemplate(Runnable[ChatWorkflowState, PromptValue]):
         # Create separate system messages for static and dynamic parts
         if "system_static" in self.prompt_template:
             static_content_text = jinja2_formatter(
-                TOOL_OUTPUT_SECURITY_INCLUDE + self.prompt_template["system_static"],
+                render_security_block() + self.prompt_template["system_static"],
                 system_template_override=_kwargs.get("system_template_override"),
                 gitlab_instance_type=(
                     gitlab_instance_info.instance_type
