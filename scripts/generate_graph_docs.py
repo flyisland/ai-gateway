@@ -25,8 +25,7 @@ this file, instead update it by running `make duo-workflow-docs`.
 [[_TOC_]]
 """
 
-GRAPH_CONFIG = """
----
+GRAPH_CONFIG = """---
 config:
     flowchart:
         curve: linear
@@ -133,7 +132,7 @@ def main():
                             diagram += f"    {edge_from} -.->|{condition_output}| {clean_name(edge_to)};\n"
 
                 diagram += "    classDef default fill:#f2f0ff,line-height:1.2;\n"
-                diagram += "    classDef first fill-opacity: 0;\n"
+                diagram += "    classDef first fill-opacity:0;\n"
                 diagram += "    classDef last fill:#bfb6fc;\n"
 
                 output_file.write("```mermaid\n" + diagram + "```\n")
