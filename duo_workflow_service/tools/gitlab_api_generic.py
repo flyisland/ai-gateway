@@ -5,6 +5,7 @@ and maintenance overhead compared to specialized tools.
 """
 
 import json
+import re
 from typing import Any, Dict, Optional, Type
 from urllib.parse import unquote, urlencode, urlsplit
 
@@ -123,7 +124,7 @@ class GitLabApiGet(DuoBaseTool):
         "\n\nCommon API patterns:\n"
         "- Projects: /api/v4/projects/{id}\n"
         "- Merge Requests: /api/v4/projects/{id}/merge_requests/{iid}\n"
-        "- Issues: /api/v4/projects/{id}/issues/{iid}\n"
+        "- Issues and Work Items: /api/v4/projects/{id}/issues/{iid}\n"
         "- Pipelines: /api/v4/projects/{id}/pipelines/{id}\n"
         "- Commits: /api/v4/projects/{id}/repository/commits/{sha}\n"
         "- Repository Tree: /api/v4/projects/{id}/repository/tree with params={'path': 'sub/dir', 'ref': 'HEAD'}\n"
@@ -167,6 +168,16 @@ class GitLabApiGet(DuoBaseTool):
                 "The 'endpoint' parameter must be provided. "
                 "Please provide an API endpoint path."
             )
+
+        # The GitLab REST API has no /work_items/ endpoint yet
+        # redirect to the equivalent /issues/ endpoint.
+        # TODO: remove this block when `work_items` endpoint is introduced in
+        # https://gitlab.com/groups/gitlab-org/-/work_items/9673
+        endpoint = re.sub(
+            r"^(/api/v4/projects/[^/]+)/work_items(/|$)",
+            r"\1/issues\2",
+            endpoint,
+        )
 
         endpoint = validate_api_endpoint(endpoint)
 
