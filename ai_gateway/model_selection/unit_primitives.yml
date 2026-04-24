@@ -126,21 +126,23 @@ configurable_unit_primitives:
     unit_primitives:
       - "resolve_vulnerability"
     default_models:
-      - "claude_sonnet_4_5_20250929"
+      - "claude_sonnet_4_6_vertex"
     selectable_models:
       - "claude_sonnet_4_20250514"
       - "claude_sonnet_4_5_20250929"
+      - "claude_sonnet_4_6_vertex"
   - feature_setting: "duo_chat_explain_vulnerability"
     unit_primitives:
       - "explain_vulnerability"
     default_models:
-      - "claude_sonnet_4_5_20250929_vertex"
+      - "claude_sonnet_4_6_vertex"
     selectable_models:
       - "claude_sonnet_4_20250514_vertex"
       - "claude_sonnet_4_20250514_bedrock"
       - "claude_sonnet_4_5_20250929"
       - "claude_sonnet_4_5_20250929_vertex"
       - "claude_sonnet_4_5_20250929_bedrock"
+      - "claude_sonnet_4_6_vertex"
   - feature_setting: "code_suggestions"
     unit_primitives:
       - "generate_code"
