@@ -45,6 +45,7 @@ def test_proxy_model_fixture():
 
 
 @pytest.mark.asyncio
+@pytest.mark.usefixtures("mock_proxy_async_client")
 async def test_valid_proxy_request(
     proxy_client,
     request_factory,
@@ -166,7 +167,7 @@ def test_current_proxy_client_context_var_set_on_init(
 
 @pytest.mark.asyncio
 async def test_proxy_exception_code(
-    async_client,
+    mock_proxy_async_client,
     limits,
     request_factory,
     internal_event_client,
@@ -186,7 +187,7 @@ async def test_proxy_exception_code(
         status_code=400, detail=json.dumps(error_content)
     )
 
-    async_client.request.side_effect = http_exception
+    mock_proxy_async_client.request.side_effect = http_exception
 
     proxy_client = ProxyClient(limits, internal_event_client, billing_event_client)
     response = await proxy_client.proxy(request_factory(), test_proxy_model)
@@ -198,7 +199,7 @@ async def test_proxy_exception_code(
 
 @pytest.mark.asyncio
 async def test_proxy_exception_code_with_malformed_json_message(
-    async_client,
+    mock_proxy_async_client,
     limits,
     request_factory,
     internal_event_client,
@@ -210,7 +211,7 @@ async def test_proxy_exception_code_with_malformed_json_message(
 
     http_exception = fastapi.HTTPException(status_code=400, detail=error_content)
 
-    async_client.request.side_effect = http_exception
+    mock_proxy_async_client.request.side_effect = http_exception
 
     proxy_client = ProxyClient(limits, internal_event_client, billing_event_client)
     response = await proxy_client.proxy(request_factory(), test_proxy_model)

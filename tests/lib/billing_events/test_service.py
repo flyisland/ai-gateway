@@ -1,26 +1,13 @@
-from unittest.mock import Mock, patch
+from unittest.mock import patch
 
 import pytest
 
-from lib.billing_events import BillingEvent, BillingEventsClient
+from lib.billing_events import BillingEvent
 from lib.billing_events.service import (
-    BillingEventService,
     ExecutionEnvironment,
     LLMOperation,
 )
 from lib.events import GLReportingEventContext
-
-
-@pytest.fixture(name="billing_client")
-def mock_billing_client():
-    """Fixture for a mocked BillingEventsClient."""
-    return Mock(spec=BillingEventsClient)
-
-
-@pytest.fixture(name="billing_service")
-def mock_billing_service(billing_client):
-    """Fixture for BillingEventService with mocked client."""
-    return BillingEventService(client=billing_client)
 
 
 @pytest.fixture(name="gl_context")
@@ -53,10 +40,15 @@ class TestBillingEventService:
     """Test suite for BillingEventService class."""
 
     def test_track_billing_with_explicit_operations(
-        self, billing_service, billing_client, user, gl_context, llm_operation
+        self,
+        billing_event_service,
+        billing_event_client,
+        user,
+        gl_context,
+        llm_operation,
     ):
         """Test billing event with explicit LLM operations and custom parameters."""
-        billing_service.track_billing(
+        billing_event_service.track_billing(
             workflow_id="workflow-123",
             user=user,
             gl_context=gl_context,
@@ -68,7 +60,7 @@ class TestBillingEventService:
             llm_ops=[llm_operation],
         )
 
-        billing_client.track_billing_event.assert_called_once_with(
+        billing_event_client.track_billing_event.assert_called_once_with(
             user,
             BillingEvent.DAP_FLOW_ON_COMPLETION,
             "test_category",
@@ -97,7 +89,12 @@ class TestBillingEventService:
         )
 
     def test_track_billing_with_multiple_operations(
-        self, billing_service, billing_client, user, gl_context, llm_operation
+        self,
+        billing_event_service,
+        billing_event_client,
+        user,
+        gl_context,
+        llm_operation,
     ):
         """Test billing event with multiple LLM operations."""
         second_op = LLMOperation(
@@ -109,7 +106,7 @@ class TestBillingEventService:
             completion_tokens=80,
         )
 
-        billing_service.track_billing(
+        billing_event_service.track_billing(
             workflow_id="workflow-456",
             user=user,
             gl_context=gl_context,
@@ -119,20 +116,20 @@ class TestBillingEventService:
             llm_ops=[llm_operation, second_op],
         )
 
-        metadata = get_call_metadata(billing_client)
+        metadata = get_call_metadata(billing_event_client)
         assert len(metadata["llm_operations"]) == 2
         assert metadata["llm_operations"][0]["token_count"] == 150
         assert metadata["llm_operations"][1]["token_count"] == 200
 
     def test_track_billing_defaults_and_gl_context_variations(
-        self, billing_service, billing_client, user, llm_operation
+        self, billing_event_service, billing_event_client, user, llm_operation
     ):
         """Test default parameters and different GL context configurations."""
         gl_context = GLReportingEventContext.from_workflow_definition(
             "chat", is_ai_catalog_item=False
         )
 
-        billing_service.track_billing(
+        billing_event_service.track_billing(
             workflow_id="workflow-test",
             user=user,
             gl_context=gl_context,
@@ -142,7 +139,7 @@ class TestBillingEventService:
             llm_ops=[llm_operation],
         )
 
-        call_args = billing_client.track_billing_event.call_args
+        call_args = billing_event_client.track_billing_event.call_args
         assert call_args[1]["unit_of_measure"] == "request"
         assert call_args[1]["quantity"] == 1
 
@@ -151,13 +148,20 @@ class TestBillingEventService:
         assert metadata["feature_ai_catalog_item"] is False
 
     def test_track_billing_exception_handling(
-        self, billing_service, billing_client, user, gl_context, llm_operation
+        self,
+        billing_event_service,
+        billing_event_client,
+        user,
+        gl_context,
+        llm_operation,
     ):
         """Test that exceptions during billing propagate."""
-        billing_client.track_billing_event.side_effect = Exception("Billing error")
+        billing_event_client.track_billing_event.side_effect = Exception(
+            "Billing error"
+        )
 
         with pytest.raises(Exception, match="Billing error"):
-            billing_service.track_billing(
+            billing_event_service.track_billing(
                 workflow_id="workflow-error",
                 user=user,
                 gl_context=gl_context,
@@ -167,14 +171,14 @@ class TestBillingEventService:
                 llm_ops=[llm_operation],
             )
 
-        billing_client.track_billing_event.assert_called_once()
+        billing_event_client.track_billing_event.assert_called_once()
 
     @patch("lib.billing_events.service.get_llm_operations")
     def test_track_billing_with_context_operations(
         self,
         mock_get_llm_operations,
-        billing_service,
-        billing_client,
+        billing_event_service,
+        billing_event_client,
         user,
         gl_context,
     ):
@@ -191,7 +195,7 @@ class TestBillingEventService:
         ]
         mock_get_llm_operations.return_value = context_ops
 
-        billing_service.track_billing(
+        billing_event_service.track_billing(
             workflow_id="workflow-context",
             user=user,
             gl_context=gl_context,
@@ -201,14 +205,14 @@ class TestBillingEventService:
         )
 
         mock_get_llm_operations.assert_called_once()
-        metadata = get_call_metadata(billing_client)
+        metadata = get_call_metadata(billing_event_client)
         assert len(metadata["llm_operations"]) == 1
         assert metadata["llm_operations"][0]["model_id"] == "gpt-4"
         assert metadata["llm_operations"][0]["token_count"] == 300
 
     @patch("lib.billing_events.service.get_llm_operations")
     def test_track_billing_raises_error_when_no_operations_available(
-        self, mock_get_llm_operations, billing_service, user, gl_context
+        self, mock_get_llm_operations, billing_event_service, user, gl_context
     ):
         """Test that ValueError is raised when no LLM operations are available."""
         mock_get_llm_operations.return_value = None
@@ -216,7 +220,7 @@ class TestBillingEventService:
         with pytest.raises(
             ValueError, match="No LLM operations available for billing tracking"
         ):
-            billing_service.track_billing(
+            billing_event_service.track_billing(
                 workflow_id="workflow-no-ops",
                 user=user,
                 gl_context=gl_context,
@@ -236,8 +240,8 @@ class TestBillingEventService:
     def test_track_billing_operation_priority(
         self,
         mock_get_llm_operations,
-        billing_service,
-        billing_client,
+        billing_event_service,
+        billing_event_client,
         user,
         gl_context,
         llm_operation,
@@ -256,7 +260,7 @@ class TestBillingEventService:
             }
         ]
 
-        billing_service.track_billing(
+        billing_event_service.track_billing(
             workflow_id="workflow-priority",
             user=user,
             gl_context=gl_context,
@@ -266,21 +270,21 @@ class TestBillingEventService:
             llm_ops=[llm_operation] if explicit_ops_provided else None,
         )
 
-        metadata = get_call_metadata(billing_client)
+        metadata = get_call_metadata(billing_event_client)
         assert metadata["llm_operations"][0]["model_id"] == expected_model
 
     @patch("lib.billing_events.service.get_llm_operations")
     def test_track_billing_explicit_operations_skip_context(
         self,
         mock_get_llm_operations,
-        billing_service,
-        billing_client,
+        billing_event_service,
+        billing_event_client,
         user,
         gl_context,
         llm_operation,
     ):
         """Test that explicit operations skip context retrieval."""
-        billing_service.track_billing(
+        billing_event_service.track_billing(
             workflow_id="workflow-explicit",
             user=user,
             gl_context=gl_context,
@@ -291,11 +295,11 @@ class TestBillingEventService:
         )
 
         mock_get_llm_operations.assert_not_called()
-        metadata = get_call_metadata(billing_client)
+        metadata = get_call_metadata(billing_event_client)
         assert metadata["llm_operations"][0]["model_id"] == "claude-3-5-sonnet"
 
     def test_track_billing_with_cache_tokens(
-        self, billing_service, billing_client, user, gl_context
+        self, billing_event_service, billing_event_client, user, gl_context
     ):
         """Test cache token fields are included in billing metadata."""
         op = LLMOperation(
@@ -309,7 +313,7 @@ class TestBillingEventService:
             cache_write_tokens=20,
         )
 
-        billing_service.track_billing(
+        billing_event_service.track_billing(
             workflow_id="workflow-cache",
             user=user,
             gl_context=gl_context,
@@ -319,14 +323,19 @@ class TestBillingEventService:
             llm_ops=[op],
         )
 
-        metadata = get_call_metadata(billing_client)
+        metadata = get_call_metadata(billing_event_client)
         assert metadata["llm_operations"][0]["cache_read_tokens"] == 30
         assert metadata["llm_operations"][0]["cache_write_tokens"] == 20
 
     def test_track_billing_includes_tool_names(
-        self, billing_service, billing_client, user, gl_context, llm_operation
+        self,
+        billing_event_service,
+        billing_event_client,
+        user,
+        gl_context,
+        llm_operation,
     ):
-        billing_service.track_billing(
+        billing_event_service.track_billing(
             workflow_id="workflow-tools",
             user=user,
             gl_context=gl_context,
@@ -336,5 +345,5 @@ class TestBillingEventService:
             llm_ops=[llm_operation],
             tool_execs=["read_file", "write_file", "read_file"],
         )
-        metadata = get_call_metadata(billing_client)
+        metadata = get_call_metadata(billing_event_client)
         assert metadata["tool_names"] == ["read_file", "write_file", "read_file"]

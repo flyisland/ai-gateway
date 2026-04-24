@@ -4,6 +4,7 @@ from pathlib import Path
 from typing import Any, AsyncIterator, Literal, Optional, Union
 from unittest.mock import AsyncMock, Mock, PropertyMock, patch
 
+import httpx
 import litellm
 import pytest
 import structlog
@@ -15,6 +16,7 @@ from langchain_community.chat_models.fake import FakeListChatModel
 from langchain_core.messages import BaseMessage
 from langchain_core.messages.ai import AIMessage, UsageMetadata
 from langchain_core.outputs import ChatGeneration, ChatGenerationChunk, ChatResult
+from litellm.llms.custom_httpx.http_handler import AsyncHTTPHandler
 from starlette.middleware import Middleware
 from starlette_context.middleware import RawContextMiddleware
 
@@ -140,6 +142,14 @@ def model_metadata_context_fixture():
 @pytest.fixture(name="mock_track_internal_event")
 def mock_track_internal_event_fixture():
     with patch("lib.internal_events.InternalEventsClient.track_event") as mock:
+        yield mock
+
+
+@pytest.fixture(name="mock_track_billing_event")
+def mock_track_billing_event_fixture():
+    with patch(
+        "lib.billing_events.client.BillingEventsClient.track_billing_event"
+    ) as mock:
         yield mock
 
 
@@ -908,10 +918,50 @@ def mock_request_fixture(user: StarletteUser | None):
 
 
 @pytest.fixture(name="billing_event_client")
-def billing_event_client_fixture():
+def billing_event_client_fixture() -> BillingEventsClient:
     return Mock(spec=BillingEventsClient)
 
 
 @pytest.fixture(name="billing_event_service")
-def billing_event_service_fixture():
-    return Mock(spec=BillingEventService)
+def billing_event_service_fixture(
+    billing_event_client: BillingEventsClient,
+) -> BillingEventService:
+    return BillingEventService(client=billing_event_client)
+
+
+@pytest.fixture(name="proxy_proxy_upstream_response_headers")
+def proxy_proxy_upstream_response_headers_fixture() -> dict:
+    return {
+        "Content-Type": "application/json",
+        "date": "2024",
+        "transfer-encoding": "chunked",
+    }
+
+
+@pytest.fixture(name="proxy_upstream_response")
+def proxy_upstream_response_fixture() -> dict:
+    return {"response": "mocked"}
+
+
+@pytest.fixture(name="mock_proxy_async_client")
+def mock_proxy_async_client_fixture(
+    proxy_proxy_upstream_response_headers: dict, proxy_upstream_response: dict
+):
+    client = Mock(spec=httpx.AsyncClient)
+    response = httpx.Response(
+        status_code=200,
+        headers=proxy_proxy_upstream_response_headers,
+        json=proxy_upstream_response,
+        request=Mock(),
+    )
+    client.send.return_value = response
+    client.request.return_value = response
+    client.build_request = httpx.AsyncClient().build_request
+
+    http_handler = Mock(spec=AsyncHTTPHandler, client=client)
+
+    with patch(
+        "litellm.proxy.pass_through_endpoints.pass_through_endpoints.get_async_httpx_client",
+        return_value=http_handler,
+    ):
+        yield client
