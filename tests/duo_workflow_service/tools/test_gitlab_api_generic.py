@@ -270,6 +270,29 @@ class TestGitLabApiGet:
             "total_pages": "3",
         }
 
+    @pytest.mark.asyncio
+    async def test_work_items_endpoint_redirected_to_issues(
+        self, gitlab_api_get_tool, gitlab_client_mock
+    ):
+        """Test that work_items endpoints are redirected to issues endpoints."""
+        response_data = {"id": 1, "title": "Test Issue"}
+        mock_response = Mock(spec=GitLabHttpResponse)
+        mock_response.is_success.return_value = True
+        mock_response.body = json.dumps(response_data)
+        mock_response.headers = {}
+        gitlab_client_mock.aget = AsyncMock(return_value=mock_response)
+
+        result = await gitlab_api_get_tool._execute(
+            endpoint="/api/v4/projects/13/work_items/42"
+        )
+
+        gitlab_client_mock.aget.assert_called_once_with(
+            path="/api/v4/projects/13/issues/42",
+        )
+        result_json = json.loads(result)
+        assert result_json["status"] == "success"
+        assert result_json["data"] == response_data
+
     def test_format_display_message_with_endpoint(self, gitlab_api_get_tool):
         """Test display message formatting with endpoint."""
         args = GitLabApiGetInput(endpoint="/api/v4/projects/13/merge_requests/42")
