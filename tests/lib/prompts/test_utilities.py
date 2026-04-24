@@ -1,16 +1,24 @@
 """Tests for lib/prompts/utilities module."""
 
+from unittest.mock import patch
+
+import pytest
 from langchain_core.messages import AIMessage, ToolMessage
 from langchain_core.prompts import ChatPromptTemplate, MessagesPlaceholder
 
 from lib.prompts.utilities import (
-    TOOL_OUTPUT_SECURITY_INCLUDE,
     prompt_template_to_messages,
+    render_security_block,
 )
 
 
 class TestPromptTemplateToMessages:
     """Tests for prompt_template_to_messages function."""
+
+    @pytest.fixture(autouse=True)
+    def mock_security_suffix(self):
+        with patch("lib.prompts.utilities._security_suffix", return_value="test"):
+            yield
 
     def test_basic_message_conversion(self):
         """Test conversion of basic role -> content mapping."""
@@ -24,7 +32,7 @@ class TestPromptTemplateToMessages:
         assert len(result) == 3
         assert result[0] == (
             "system",
-            TOOL_OUTPUT_SECURITY_INCLUDE + "You are a helpful assistant",
+            render_security_block() + "You are a helpful assistant",
         )
         assert result[1] == ("user", "Hello!")
         assert isinstance(result[2], MessagesPlaceholder)
@@ -44,7 +52,7 @@ class TestPromptTemplateToMessages:
         assert len(result) == 3
         assert result[0] == (
             "system",
-            TOOL_OUTPUT_SECURITY_INCLUDE + "You are a helpful assistant",
+            render_security_block() + "You are a helpful assistant",
         )
         assert isinstance(result[1], MessagesPlaceholder)
         assert result[1].variable_name == "history"
@@ -72,7 +80,7 @@ class TestPromptTemplateToMessages:
 
         assert result[0] == (
             "system",
-            TOOL_OUTPUT_SECURITY_INCLUDE + "You are {{ role }}",
+            render_security_block() + "You are {{ role }}",
         )
         assert result[1] == (
             "user",
@@ -93,7 +101,7 @@ class TestPromptTemplateToMessages:
         assert len(result) == 5
         assert result[0] == (
             "system",
-            TOOL_OUTPUT_SECURITY_INCLUDE + "System message",
+            render_security_block() + "System message",
         )
         assert result[1] == ("assistant", "Assistant message")
         assert result[2] == ("human", "Human message")
@@ -115,7 +123,7 @@ class TestPromptTemplateToMessages:
         assert len(result) == 4
         assert result[0] == (
             "system_static",
-            TOOL_OUTPUT_SECURITY_INCLUDE + "Static system content",
+            render_security_block() + "Static system content",
         )
         assert result[1] == ("system_dynamic", "Dynamic system content")
         assert result[2] == ("user", "Hello!")
