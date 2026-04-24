@@ -190,7 +190,6 @@ graph TD;
 ## Graph: `developer/experimental` (Flow Registry)
 
 ```mermaid
-
 ---
 config:
     flowchart:
@@ -207,14 +206,13 @@ graph TD;
     git_unshallow --> developer_agent;
     developer_agent --> __end__;
     classDef default fill:#f2f0ff,line-height:1.2;
-    classDef first fill-opacity: 0;
+    classDef first fill-opacity:0;
     classDef last fill:#bfb6fc;
 ```
 
 ## Graph: `developer_unstable/experimental` (Flow Registry)
 
 ```mermaid
-
 ---
 config:
     flowchart:
@@ -229,14 +227,13 @@ graph TD;
     git_unshallow --> developer_agent;
     developer_agent --> __end__;
     classDef default fill:#f2f0ff,line-height:1.2;
-    classDef first fill-opacity: 0;
+    classDef first fill-opacity:0;
     classDef last fill:#bfb6fc;
 ```
 
 ## Graph: `analytics_agent/v1` (Flow Registry)
 
 ```mermaid
-
 ---
 config:
     flowchart:
@@ -248,14 +245,13 @@ graph TD;
     __start__ --> analytics_agent;
     analytics_agent(analytics_agent<br>#91;AgentComponent#93;);
     classDef default fill:#f2f0ff,line-height:1.2;
-    classDef first fill-opacity: 0;
+    classDef first fill-opacity:0;
     classDef last fill:#bfb6fc;
 ```
 
 ## Graph: `code_review/v1` (Flow Registry)
 
 ```mermaid
-
 ---
 config:
     flowchart:
@@ -280,14 +276,13 @@ graph TD;
     analyze_prescan_results --> perform_code_review_and_publish;
     perform_code_review_and_publish --> __end__;
     classDef default fill:#f2f0ff,line-height:1.2;
-    classDef first fill-opacity: 0;
+    classDef first fill-opacity:0;
     classDef last fill:#bfb6fc;
 ```
 
 ## Graph: `convert_to_gl_ci/v1` (Flow Registry)
 
 ```mermaid
-
 ---
 config:
     flowchart:
@@ -308,14 +303,13 @@ graph TD;
     git_commit --> git_push;
     git_push --> __end__;
     classDef default fill:#f2f0ff,line-height:1.2;
-    classDef first fill-opacity: 0;
+    classDef first fill-opacity:0;
     classDef last fill:#bfb6fc;
 ```
 
 ## Graph: `developer/v1` (Flow Registry)
 
 ```mermaid
-
 ---
 config:
     flowchart:
@@ -332,14 +326,13 @@ graph TD;
     git_unshallow --> developer_agent;
     developer_agent --> __end__;
     classDef default fill:#f2f0ff,line-height:1.2;
-    classDef first fill-opacity: 0;
+    classDef first fill-opacity:0;
     classDef last fill:#bfb6fc;
 ```
 
 ## Graph: `duo_permissions_assistant/v1` (Flow Registry)
 
 ```mermaid
-
 ---
 config:
     flowchart:
@@ -351,14 +344,13 @@ graph TD;
     __start__ --> duo_permissions_assistant;
     duo_permissions_assistant(duo_permissions_assistant<br>#91;AgentComponent#93;);
     classDef default fill:#f2f0ff,line-height:1.2;
-    classDef first fill-opacity: 0;
+    classDef first fill-opacity:0;
     classDef last fill:#bfb6fc;
 ```
 
 ## Graph: `fix_pipeline/v1` (Flow Registry)
 
 ```mermaid
-
 ---
 config:
     flowchart:
@@ -395,14 +387,13 @@ graph TD;
     fix_pipeline_decide_comment -.->|default_route| __end__;
     fix_pipeline_comment_link --> __end__;
     classDef default fill:#f2f0ff,line-height:1.2;
-    classDef first fill-opacity: 0;
+    classDef first fill-opacity:0;
     classDef last fill:#bfb6fc;
 ```
 
 ## Graph: `fix_pipeline_next/v1` (Flow Registry)
 
 ```mermaid
-
 ---
 config:
     flowchart:
@@ -440,14 +431,13 @@ graph TD;
     fix_pipeline_git_push --> fix_pipeline_next_create_new_mr;
     fix_pipeline_next_create_new_mr --> __end__;
     classDef default fill:#f2f0ff,line-height:1.2;
-    classDef first fill-opacity: 0;
+    classDef first fill-opacity:0;
     classDef last fill:#bfb6fc;
 ```
 
 ## Graph: `project_activity/v1` (Flow Registry)
 
 ```mermaid
-
 ---
 config:
     flowchart:
@@ -474,14 +464,13 @@ graph TD;
     summarize_activity --> create_summary_issue;
     create_summary_issue --> __end__;
     classDef default fill:#f2f0ff,line-height:1.2;
-    classDef first fill-opacity: 0;
+    classDef first fill-opacity:0;
     classDef last fill:#bfb6fc;
 ```
 
 ## Graph: `resolve_sast_vulnerability/v1` (Flow Registry)
 
 ```mermaid
-
 ---
 config:
     flowchart:
@@ -514,14 +503,13 @@ graph TD;
     evaluate_merge_request --> link_vulnerability;
     link_vulnerability --> __end__;
     classDef default fill:#f2f0ff,line-height:1.2;
-    classDef first fill-opacity: 0;
+    classDef first fill-opacity:0;
     classDef last fill:#bfb6fc;
 ```
 
 ## Graph: `sast_fp_detection/v1` (Flow Registry)
 
 ```mermaid
-
 ---
 config:
     flowchart:
@@ -547,14 +535,13 @@ graph TD;
     sast_fp_detection_agent --> sast_post_results_to_gitlab_component;
     sast_post_results_to_gitlab_component --> __end__;
     classDef default fill:#f2f0ff,line-height:1.2;
-    classDef first fill-opacity: 0;
+    classDef first fill-opacity:0;
     classDef last fill:#bfb6fc;
 ```
 
 ## Graph: `secrets_fp_detection/v1` (Flow Registry)
 
 ```mermaid
-
 ---
 config:
     flowchart:
@@ -577,14 +564,13 @@ graph TD;
     secret_fp_detection_agent --> secret_post_results_to_gitlab_component;
     secret_post_results_to_gitlab_component --> __end__;
     classDef default fill:#f2f0ff,line-height:1.2;
-    classDef first fill-opacity: 0;
+    classDef first fill-opacity:0;
     classDef last fill:#bfb6fc;
 ```
 
 ## Graph: `slack_assistant/v1` (Flow Registry)
 
 ```mermaid
-
 ---
 config:
     flowchart:
@@ -597,6 +583,6 @@ graph TD;
     slack_assistant(slack_assistant<br>#91;AgentComponent#93;);
     slack_assistant --> __end__;
     classDef default fill:#f2f0ff,line-height:1.2;
-    classDef first fill-opacity: 0;
+    classDef first fill-opacity:0;
     classDef last fill:#bfb6fc;
 ```
