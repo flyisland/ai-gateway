@@ -106,6 +106,7 @@ models:
     description: "Earlier generation model for coding, reasoning, and agentic workflows."
     max_context_tokens: 200000 # https://docs.claude.com/en/docs/about-claude/models/overview#legacy-models
     model_class_provider: anthropic
+    supports_assistant_prefill: true
     params:
       model: "claude-opus-4-20250514"
       temperature: 0.0
@@ -120,6 +121,7 @@ models:
     description: "Superseded by Sonnet 4.5 for coding, reasoning, and agentic workflows."
     max_context_tokens: 200000 # https://docs.claude.com/en/docs/about-claude/models/overview#latest-models-comparison
     model_class_provider: anthropic
+    supports_assistant_prefill: true
     params:
       model: "claude-opus-4-1-20250805"
       temperature: 0.0
@@ -133,6 +135,7 @@ models:
     max_context_tokens: 200000 # https://platform.claude.com/docs/en/about-claude/models/overview#latest-models-comparison
     proxy_provider: anthropic
     model_class_provider: anthropic
+    supports_assistant_prefill: true
     family:
       - claude
     params:
@@ -147,6 +150,7 @@ models:
     cost_indicator: "$$$$"
     max_context_tokens: 200000 # https://platform.claude.com/docs/en/about-claude/models/overview#latest-models-comparison
     model_class_provider: litellm
+    supports_assistant_prefill: true
     family:
       - claude
     params:
@@ -307,6 +311,7 @@ models:
     # Note: Claude Sonnet 4.5 supports a 1M token context window **only** when using the context-1m-2025-08-07 beta header
     proxy_provider: anthropic
     model_class_provider: anthropic
+    supports_assistant_prefill: true
     family:
       - claude
     description: "Anthropic's flagship model for real-world coding, reasoning, and agentic workflows."
@@ -326,6 +331,7 @@ models:
     family:
       - claude
     model_class_provider: litellm
+    supports_assistant_prefill: true
     params:
       model: "claude-sonnet-4-5@20250929"
       custom_llm_provider: "vertex_ai"
@@ -346,6 +352,7 @@ models:
     family:
       - claude
     model_class_provider: litellm
+    supports_assistant_prefill: true
     params:
       model: bedrock/global.anthropic.claude-sonnet-4-5-20250929-v1:0
       custom_llm_provider: bedrock
@@ -359,6 +366,7 @@ models:
     max_context_tokens: 200000 # https://docs.claude.com/en/docs/about-claude/models/overview#latest-models-comparison
     proxy_provider: anthropic
     model_class_provider: anthropic
+    supports_assistant_prefill: true
     family:
       - claude
     description: "Fast, cost-effective responses."
@@ -377,6 +385,7 @@ models:
     family:
       - claude
     model_class_provider: litellm
+    supports_assistant_prefill: true
     params:
       model: "claude-haiku-4-5@20251001"
       custom_llm_provider: "vertex_ai"
@@ -395,6 +404,7 @@ models:
     family:
       - claude
     model_class_provider: litellm
+    supports_assistant_prefill: true
     params:
       model: bedrock/global.anthropic.claude-haiku-4-5-20251001-v1:0
       custom_llm_provider: bedrock
@@ -411,6 +421,7 @@ models:
     # Note: Claude Sonnet 4 supports a 1M token context window when using the context-1m-2025-08-07 beta header
     proxy_provider: anthropic
     model_class_provider: anthropic
+    supports_assistant_prefill: true
     params:
       model: "claude-sonnet-4-20250514"
       temperature: 0.0
@@ -426,6 +437,7 @@ models:
     cost_indicator: "$$$"
     max_context_tokens: 200000 # https://console.cloud.google.com/vertex-ai/publishers/anthropic/model-garden/claude-sonnet-4
     model_class_provider: litellm
+    supports_assistant_prefill: true
     params:
       model: "claude-sonnet-4@20250514"
       custom_llm_provider: "vertex_ai"
@@ -447,6 +459,7 @@ models:
     cost_indicator: "$$$"
     max_context_tokens: 200000 # https://console.aws.amazon.com/bedrock/home#/model-catalog/serverless/anthropic.claude-sonnet-4-20250514-v1:0
     model_class_provider: litellm
+    supports_assistant_prefill: true
     params:
       model: bedrock/global.anthropic.claude-sonnet-4-20250514-v1:0
       custom_llm_provider: bedrock

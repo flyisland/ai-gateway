@@ -52,6 +52,9 @@ class BaseLLMDefinition(BaseModel):
     family: list[str] = []
     deprecation: Optional[DeprecationInfo] = None
     proxy_provider: Optional[str] = None
+    # Claude 4.6+ rejects requests ending with an assistant turn (prefill).
+    # Opt in by setting to true for models that still accept prefill.
+    supports_assistant_prefill: bool = False
 
 
 class ChatLiteLLMDefinition(BaseLLMDefinition):

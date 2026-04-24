@@ -13,6 +13,7 @@ from langchain_core.messages.ai import InputTokenDetails, UsageMetadata
 from langchain_core.outputs import ChatGenerationChunk
 from langchain_core.runnables import Runnable
 
+from ai_gateway.models.v2._model_compat import PREVIOUS_ASSISTANT_CONTEXT_PREFIX
 from ai_gateway.models.v2.chat_litellm import ChatLiteLLM
 from ai_gateway.vendor.langchain_litellm.litellm import _create_usage_metadata
 
@@ -532,3 +533,64 @@ class TestMistralAIPrefixFormat:
         chat = ChatLiteLLM(model="test-model", custom_llm_provider="mistral")
         message_dicts, _ = chat._create_message_dicts([], stop=None)
         assert message_dicts == []
+
+
+class TestClaude46PrefillCompat:
+    @pytest.mark.parametrize(
+        ("model", "expect_rewrite"),
+        [
+            # Claude 4.6+: prefill rejected, rewritten as user context
+            pytest.param("claude-sonnet-4-6", True, id="4.6-sonnet-direct"),
+            pytest.param("claude-opus-4-7", True, id="4.7-opus-direct"),
+            pytest.param(
+                "anthropic/claude-sonnet-4-6", True, id="4.6-sonnet-litellm-anthropic"
+            ),
+            pytest.param(
+                "vertex_ai/claude-sonnet-4-6", True, id="4.6-sonnet-litellm-vertex"
+            ),
+            pytest.param(
+                "bedrock/global.anthropic.claude-sonnet-4-6",
+                True,
+                id="4.6-sonnet-bedrock",
+            ),
+            pytest.param(
+                "bedrock/global.anthropic.claude-opus-4-6-v1",
+                True,
+                id="4.6-opus-bedrock",
+            ),
+            pytest.param(
+                "bedrock/global.anthropic.claude-opus-4-7",
+                True,
+                id="4.7-opus-bedrock",
+            ),
+            # Claude <= 4.5: prefill supported, payload untouched
+            pytest.param("claude-sonnet-4@20250514", False, id="4.0-sonnet-vertex"),
+            pytest.param("claude-sonnet-4-5@20250929", False, id="4.5-sonnet-vertex"),
+            pytest.param("claude-haiku-4-5@20251001", False, id="4.5-haiku-vertex"),
+            pytest.param("claude-opus-4-5@20251101", False, id="4.5-opus-vertex"),
+            pytest.param(
+                "bedrock/global.anthropic.claude-sonnet-4-5-20250929-v1:0",
+                False,
+                id="4.5-sonnet-bedrock",
+            ),
+        ],
+    )
+    def test_claude_46_prefill_workaround(self, model, expect_rewrite):
+        chat = ChatLiteLLM(model=model)
+        messages = [HumanMessage(content="hello"), AIMessage(content="Thought: ")]
+
+        dicts, _ = chat._create_message_dicts(messages, stop=None)
+
+        if expect_rewrite:
+            expected = {
+                "role": "user",
+                "content": [
+                    {
+                        "type": "text",
+                        "text": f"{PREVIOUS_ASSISTANT_CONTEXT_PREFIX}Thought: ",
+                    }
+                ],
+            }
+        else:
+            expected = {"role": "assistant", "content": "Thought: "}
+        assert dicts[-1] == expected

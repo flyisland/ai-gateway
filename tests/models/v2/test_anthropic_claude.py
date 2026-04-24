@@ -1,8 +1,10 @@
 import pytest
 from anthropic import AsyncAnthropic
+from langchain_core.messages import AIMessage, HumanMessage
 from langchain_core.runnables import Runnable
 
 from ai_gateway.models.v2 import ChatAnthropic
+from ai_gateway.models.v2._model_compat import PREVIOUS_ASSISTANT_CONTEXT_PREFIX
 
 
 class TestChatAnthropic:
@@ -147,3 +149,39 @@ class TestChatAnthropic:
 
         assert isinstance(result, Runnable)
         assert result.kwargs["tools"] == expected_tools
+
+    @pytest.mark.parametrize(
+        ("model", "expect_rewrite"),
+        [
+            # Claude 4.6+: prefill rejected, rewritten as user context
+            pytest.param("claude-sonnet-4-6", True, id="4.6-sonnet"),
+            pytest.param("claude-opus-4-6", True, id="4.6-opus"),
+            pytest.param("claude-opus-4-7", True, id="4.7-opus"),
+            # Claude <= 4.5: prefill supported, payload untouched
+            pytest.param("claude-sonnet-4-20250514", False, id="4.0-sonnet"),
+            pytest.param("claude-opus-4-1-20250805", False, id="4.1-opus"),
+            pytest.param("claude-sonnet-4-5-20250929", False, id="4.5-sonnet"),
+            pytest.param("claude-opus-4-5-20251101", False, id="4.5-opus"),
+            pytest.param("claude-haiku-4-5-20251001", False, id="4.5-haiku"),
+        ],
+    )
+    def test_claude_46_prefill_workaround(self, model, expect_rewrite):
+        chat = ChatAnthropic(async_client=AsyncAnthropic(api_key="test"), model=model)
+        messages = [HumanMessage(content="hello"), AIMessage(content="Thought: ")]
+
+        sent = chat._get_request_payload(messages)["messages"]
+
+        expected_last = (
+            {
+                "role": "user",
+                "content": [
+                    {
+                        "type": "text",
+                        "text": f"{PREVIOUS_ASSISTANT_CONTEXT_PREFIX}Thought: ",
+                    }
+                ],
+            }
+            if expect_rewrite
+            else {"role": "assistant", "content": "Thought: "}
+        )
+        assert sent[-1] == expected_last
