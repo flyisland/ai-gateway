@@ -337,14 +337,19 @@ async def test_get_job_logs_with_byte_params(
         (1024, 512),
     ],
 )
+@patch("duo_workflow_service.tools.job.log")
 @patch("duo_workflow_service.tools.job.is_client_capable", return_value=False)
 async def test_get_job_logs_with_byte_params_not_capable(
     _mock_is_client_capable,
+    mock_log,
     byte_limit,
     byte_offset,
     gitlab_client_mock,
     metadata,
 ):
+    mock_response = GitLabHttpResponse(status_code=200, body="full trace")
+    gitlab_client_mock.aget = AsyncMock(return_value=mock_response)
+
     tool = GetLogsFromJob(metadata=metadata)
 
     kwargs = {"project_id": "1", "job_id": 1}
@@ -353,10 +358,15 @@ async def test_get_job_logs_with_byte_params_not_capable(
     if byte_offset is not None:
         kwargs["byte_offset"] = byte_offset
 
-    with pytest.raises(ToolException, match="not supported by this client version"):
-        await tool._arun(**kwargs)
+    response = await tool._arun(**kwargs)
 
-    gitlab_client_mock.aget.assert_not_called()
+    assert response == json.dumps({"job_id": 1, "trace": "full trace"})
+    gitlab_client_mock.aget.assert_called_once_with(
+        path="/api/v4/projects/1/jobs/1/trace", parse_json=False
+    )
+    mock_log.warning.assert_called_once_with(
+        "Ignoring byte_limit/byte_offset because they are not supported by this client version."
+    )
 
 
 @pytest.mark.asyncio

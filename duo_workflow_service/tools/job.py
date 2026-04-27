@@ -146,11 +146,12 @@ class GetLogsFromJob(DuoBaseTool):
         if byte_offset is not None:
             query_params["byte_offset"] = byte_offset
         if query_params:
-            if not is_client_capable("job_trace_pagination"):
-                raise ToolException(
-                    "byte_limit and byte_offset are not supported by this client version."
+            if is_client_capable("job_trace_pagination"):
+                path = f"{path}?{urlencode(query_params)}"
+            else:
+                log.warning(
+                    "Ignoring byte_limit/byte_offset because they are not supported by this client version."
                 )
-            path = f"{path}?{urlencode(query_params)}"
 
         response = await self.gitlab_client.aget(
             path=path,
