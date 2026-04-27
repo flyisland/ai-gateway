@@ -62,6 +62,11 @@ _COMMAND_OUTPUT_TOOLS = {
     "run_command": RunCommand,
 }
 
+# Substrings returned by the LSP executor when a command times out or is cancelled.
+# These are matched case-insensitively against the tool response content.
+_COMMAND_TIMED_OUT_SUBSTRING = "command timed out"
+_COMMAND_CANCELLED_SUBSTRING = "command was interrupted by the user"
+
 
 class IncompleteToolCallDueToMaxTokens(ToolException):
     """Raised when a tool call is incomplete, e.g., due to streaming ending due to max_tokens."""
@@ -499,9 +504,10 @@ class ToolsExecutor:
         if response:
             error_message = f"{error_message} {textwrap.shorten(str(response), 100)}"
 
+        status = self._detect_failure_status(str(error))
         self._add_tool_ui_chat_log(
             tool_call=tool_call,
-            status=ToolStatus.FAILURE,
+            status=status,
             ui_chat_logs=chat_logs,
             error_message=error_message,
             project_name=project_name,
@@ -712,3 +718,18 @@ class ToolsExecutor:
             return tool_response
 
         return tool_response
+
+    def _detect_failure_status(self, error_message: str) -> ToolStatus:
+        """Resolve the appropriate failure ToolStatus from an LSP error message string.
+
+        Returns TIMED_OUT or CANCELLED if the error message matches a known pattern, otherwise returns FAILURE.
+        """
+        error_lower = error_message.lower()
+
+        if _COMMAND_TIMED_OUT_SUBSTRING in error_lower:
+            return ToolStatus.TIMED_OUT
+
+        if _COMMAND_CANCELLED_SUBSTRING in error_lower:
+            return ToolStatus.CANCELLED
+
+        return ToolStatus.FAILURE
