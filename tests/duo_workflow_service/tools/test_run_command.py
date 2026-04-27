@@ -10,11 +10,8 @@ from duo_workflow_service.tools.command import (
     _DEFAULT_COMMAND_TIMEOUT_SECONDS,
     RunCommand,
     RunCommandInput,
-    RunCommandWithTimeout,
-    RunCommandWithTimeoutInput,
     ShellCommand,
-    ShellCommandWithTimeout,
-    ShellCommandWithTimeoutInput,
+    ShellCommandInput,
 )
 
 
@@ -165,18 +162,15 @@ def test_run_command_format_display_message():
     [
         ("npm", "install", 300, 300),
         ("docker", "build .", 600, 600),
-        (
-            "ls",
-            "-la",
-            _DEFAULT_COMMAND_TIMEOUT_SECONDS,
-            _DEFAULT_COMMAND_TIMEOUT_SECONDS,
-        ),
+        ("ls", "-la", None, _DEFAULT_COMMAND_TIMEOUT_SECONDS),
     ],
 )
-async def test_run_command_with_timeout(
+@mock.patch("duo_workflow_service.tools.command.is_client_capable", return_value=True)
+async def test_run_command_with_timeout_capable(
+    _mock_is_client_capable,
     program: str,
     args: str,
-    timeout: int,
+    timeout,
     expected_timeout: int,
     mock_success_client_event,
 ):
@@ -185,10 +179,8 @@ async def test_run_command_with_timeout(
         return_value=mock_success_client_event
     )
 
-    metadata = {"outbox": mock_outbox}
-
-    tool = RunCommandWithTimeout(name="run_command", description="Run a shell command")
-    tool.metadata = metadata
+    tool = RunCommand(name="run_command", description="Run a shell command")
+    tool.metadata = {"outbox": mock_outbox}
 
     response = await tool._arun(program=program, args=args, timeout=timeout)
 
@@ -200,16 +192,33 @@ async def test_run_command_with_timeout(
     assert action.runCommand.timeout == expected_timeout
 
 
-def test_run_command_with_timeout_supersedes_run_command():
-    assert RunCommandWithTimeout.supersedes is RunCommand
-    assert RunCommandWithTimeout.required_capability == frozenset({"command_timeout"})
+@pytest.mark.asyncio
+@mock.patch("duo_workflow_service.tools.command.is_client_capable", return_value=False)
+async def test_run_command_with_timeout_not_capable(_mock_is_client_capable):
+    """Providing timeout when client lacks command_timeout capability raises ToolException."""
+    tool = RunCommand(name="run_command", description="Run a shell command")
+
+    with pytest.raises(ToolException, match="not supported by this client version"):
+        await tool._arun(program="npm", args="install", timeout=300)
 
 
-def test_run_command_with_timeout_format_display_message():
-    tool = RunCommandWithTimeout(description="Run a shell command")
-    input_data = RunCommandWithTimeoutInput(program="npm", args="install", timeout=300)
-    message = tool.format_display_message(input_data)
-    assert message == "Run command: npm install"
+@pytest.mark.asyncio
+@mock.patch("duo_workflow_service.tools.command.is_client_capable", return_value=False)
+@mock.patch("duo_workflow_service.tools.command._execute_action")
+async def test_run_command_without_timeout_not_capable_skips_timeout(
+    execute_action_mock, _mock_is_client_capable
+):
+    """When client is not capable and no timeout provided, command runs without timeout."""
+    execute_action_mock.return_value = "done"
+
+    tool = RunCommand(name="run_command", description="Run a shell command")
+    tool.metadata = {"outbox": None}
+
+    await tool._arun(program="ls", args="-la")
+
+    execute_action_mock.assert_called_once()
+    action = execute_action_mock.call_args[0][1]
+    assert not action.runCommand.HasField("timeout")
 
 
 @pytest.mark.asyncio
@@ -218,12 +227,14 @@ def test_run_command_with_timeout_format_display_message():
     [
         ("npm install", 300, 300),
         ("docker build .", 600, 600),
-        ("ls -la", _DEFAULT_COMMAND_TIMEOUT_SECONDS, _DEFAULT_COMMAND_TIMEOUT_SECONDS),
+        ("ls -la", None, _DEFAULT_COMMAND_TIMEOUT_SECONDS),
     ],
 )
-async def test_shell_command_with_timeout(
+@mock.patch("duo_workflow_service.tools.command.is_client_capable", return_value=True)
+async def test_shell_command_with_timeout_capable(
+    _mock_is_client_capable,
     command: str,
-    timeout: int,
+    timeout,
     expected_timeout: int,
     mock_success_client_event,
 ):
@@ -232,9 +243,7 @@ async def test_shell_command_with_timeout(
         return_value=mock_success_client_event
     )
 
-    tool = ShellCommandWithTimeout(
-        name="run_command", description="Run a shell command"
-    )
+    tool = ShellCommand(name="run_command", description="Run a shell command")
     tool.metadata = {"outbox": mock_outbox}
 
     response = await tool._arun(command=command, timeout=timeout)
@@ -247,57 +256,30 @@ async def test_shell_command_with_timeout(
     assert action.runShellCommand.timeout == expected_timeout
 
 
-def test_shell_command_with_timeout_supersedes_shell_command():
-    assert ShellCommandWithTimeout.supersedes is ShellCommand
-    assert ShellCommandWithTimeout.required_capability == frozenset(
-        {"shell_command", "command_timeout"}
-    )
+@pytest.mark.asyncio
+@mock.patch("duo_workflow_service.tools.command.is_client_capable", return_value=False)
+async def test_shell_command_with_timeout_not_capable(_mock_is_client_capable):
+    """Providing timeout when client lacks command_timeout capability raises ToolException."""
+    tool = ShellCommand(name="run_command", description="Run a shell command")
 
-
-def test_shell_command_with_timeout_format_display_message():
-    tool = ShellCommandWithTimeout(description="Run a shell command")
-    input_data = ShellCommandWithTimeoutInput(command="npm install", timeout=300)
-    message = tool.format_display_message(input_data)
-    assert message == "Run shell command: npm install"
+    with pytest.raises(ToolException, match="not supported by this client version"):
+        await tool._arun(command="npm install", timeout=300)
 
 
 @pytest.mark.asyncio
+@mock.patch("duo_workflow_service.tools.command.is_client_capable", return_value=False)
 @mock.patch("duo_workflow_service.tools.command._execute_action")
-async def test_run_command_with_timeout_uses_default_when_not_provided(
-    execute_action_mock,
+async def test_shell_command_without_timeout_not_capable_skips_timeout(
+    execute_action_mock, _mock_is_client_capable
 ):
-    """Test that RunCommandWithTimeout uses default timeout when LLM doesn't provide one."""
+    """When client is not capable and no timeout provided, command runs without timeout."""
     execute_action_mock.return_value = "done"
 
-    tool = RunCommandWithTimeout(name="run_command", description="Run a shell command")
+    tool = ShellCommand(name="run_command", description="Run a shell command")
     tool.metadata = {"outbox": None}
 
-    # Call without timeout parameter (simulating LLM not providing it)
-    await tool._arun(program="ls", args="-la")
-
-    execute_action_mock.assert_called_once()
-    action = execute_action_mock.call_args[0][1]
-    assert action.runCommand.HasField("timeout")
-    assert action.runCommand.timeout == _DEFAULT_COMMAND_TIMEOUT_SECONDS
-
-
-@pytest.mark.asyncio
-@mock.patch("duo_workflow_service.tools.command._execute_action")
-async def test_shell_command_with_timeout_uses_default_when_not_provided(
-    execute_action_mock,
-):
-    """Test that ShellCommandWithTimeout uses default timeout when LLM doesn't provide one."""
-    execute_action_mock.return_value = "done"
-
-    tool = ShellCommandWithTimeout(
-        name="run_command", description="Run a shell command"
-    )
-    tool.metadata = {"outbox": None}
-
-    # Call without timeout parameter (simulating LLM not providing it)
     await tool._arun(command="ls -la")
 
     execute_action_mock.assert_called_once()
     action = execute_action_mock.call_args[0][1]
-    assert action.runShellCommand.HasField("timeout")
-    assert action.runShellCommand.timeout == _DEFAULT_COMMAND_TIMEOUT_SECONDS
+    assert not action.runShellCommand.HasField("timeout")

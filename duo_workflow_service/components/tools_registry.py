@@ -75,9 +75,7 @@ NO_OP_TOOLS: list[Type[BaseModel]] = [
 # These tools require specific client capabilities to function properly.
 # They are only enabled when all capabilities in their required_capability frozenset are present.
 _CAPABILITY_DEPENDENT_TOOLS: list[Type[BaseTool]] = [
-    tools.RunCommandWithTimeout,
     tools.ShellCommand,
-    tools.ShellCommandWithTimeout,
     tools.AdvanceBlobSearch,
     tools.ReadFileChunked,
 ]

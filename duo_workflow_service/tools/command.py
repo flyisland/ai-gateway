@@ -6,6 +6,7 @@ from langchain_core.tools import ToolException
 from pydantic import BaseModel, Field
 
 from contract import contract_pb2
+from duo_workflow_service.client_capabilities import is_client_capable
 from duo_workflow_service.executor.action import _execute_action
 from duo_workflow_service.tools.duo_base_tool import DuoBaseTool
 
@@ -21,13 +22,10 @@ class RunCommandInput(BaseModel):
         "eg: '-v -p source.txt destination.txt'",
         default=None,
     )
-
-
-class RunCommandWithTimeoutInput(RunCommandInput):
-    timeout: int = Field(
+    timeout: Optional[int] = Field(
         description="Timeout in seconds. "
         "Use a higher value for long-running commands like 'npm install' or 'docker build'.",
-        default=_DEFAULT_COMMAND_TIMEOUT_SECONDS,
+        default=None,
     )
 
 
@@ -72,7 +70,16 @@ Instead of '{disallowed_operator}' please use {self.name} multiple times consecu
             "arguments": arguments,
             "flags": [],
         }
+
+        if timeout is None:
+            if is_client_capable("command_timeout"):
+                timeout = _DEFAULT_COMMAND_TIMEOUT_SECONDS
+
         if timeout is not None:
+            if not is_client_capable("command_timeout"):
+                raise ToolException(
+                    "timeout parameter is not supported by this client version."
+                )
             run_command_kwargs["timeout"] = timeout
 
         return await _execute_action(
@@ -95,39 +102,14 @@ Instead of '{disallowed_operator}' please use {self.name} multiple times consecu
         return message
 
 
-class RunCommandWithTimeout(RunCommand):
-    """Enhanced run_command tool with optional timeout support.
-
-    Supersedes RunCommand when the client declares the 'command_timeout' capability, ensuring the LLM only receives the
-    timeout parameter when the executor can honour it.
-    """
-
-    args_schema: Type[BaseModel] = RunCommandWithTimeoutInput
-    supersedes: ClassVar[Optional[Type[DuoBaseTool]]] = RunCommand
-    required_capability: ClassVar[frozenset[str]] = frozenset({"command_timeout"})
-
-    async def _execute(
-        self,
-        program: str,
-        args: Optional[str] = None,
-        timeout: Optional[int] = _DEFAULT_COMMAND_TIMEOUT_SECONDS,
-    ) -> str:
-        if timeout is None:
-            timeout = _DEFAULT_COMMAND_TIMEOUT_SECONDS
-        return await super()._execute(program=program, args=args, timeout=timeout)
-
-
 class ShellCommandInput(BaseModel):
     command: str = Field(
         description="The shell script to execute in the user's default shell"
     )
-
-
-class ShellCommandWithTimeoutInput(ShellCommandInput):
-    timeout: int = Field(
+    timeout: Optional[int] = Field(
         description="Timeout in seconds. "
         "Use a higher value for long-running commands like 'npm install' or 'docker build'.",
-        default=_DEFAULT_COMMAND_TIMEOUT_SECONDS,
+        default=None,
     )
 
 
@@ -147,7 +129,16 @@ class ShellCommand(DuoBaseTool):
         timeout: Optional[int] = None,
     ) -> str:
         run_shell_kwargs: dict = {"command": command}
+
+        if timeout is None:
+            if is_client_capable("command_timeout"):
+                timeout = _DEFAULT_COMMAND_TIMEOUT_SECONDS
+
         if timeout is not None:
+            if not is_client_capable("command_timeout"):
+                raise ToolException(
+                    "timeout parameter is not supported by this client version."
+                )
             run_shell_kwargs["timeout"] = timeout
 
         return await _execute_action(
@@ -167,26 +158,3 @@ class ShellCommand(DuoBaseTool):
         if _tool_response is not None:
             return f"{message} {textwrap.shorten(_tool_response, max_len)}"
         return message
-
-
-class ShellCommandWithTimeout(ShellCommand):
-    """Enhanced shell command tool with timeout support.
-
-    Supersedes ShellCommand when the client declares both 'shell_command' and 'command_timeout' capabilities, ensuring
-    the LLM only receives the timeout parameter when the executor can honour it.
-    """
-
-    args_schema: Type[BaseModel] = ShellCommandWithTimeoutInput
-    supersedes: ClassVar[Optional[Type[DuoBaseTool]]] = ShellCommand
-    required_capability: ClassVar[frozenset[str]] = frozenset(
-        {"shell_command", "command_timeout"}
-    )
-
-    async def _execute(
-        self,
-        command: str,
-        timeout: Optional[int] = _DEFAULT_COMMAND_TIMEOUT_SECONDS,
-    ) -> str:
-        if timeout is None:
-            timeout = _DEFAULT_COMMAND_TIMEOUT_SECONDS
-        return await super()._execute(command=command, timeout=timeout)
