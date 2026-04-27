@@ -28,3 +28,23 @@ From the tool_response, extract the pushed branch name. Use it as BRANCH_NAME be
 
   Also set assignee_id to `{{ assignee_id }}`.
 </step>
+
+{% if merge_request_url %}
+<step number="3">
+  Use the `create_merge_request_note` tool to add a comment on the original merge request at `{{ merge_request_url }}`.
+  The comment must follow this format:
+
+  ```
+  **Fix Pipeline** ([session {{ workflow_id }}]({{ session_url }})) created a fix for the [failing pipeline]({{ pipeline_url }}): <LINK_TO_NEW_MR>.
+
+  <details>
+  <summary>Changes summary</summary>
+
+  <brief bullet list of the changes made>
+
+  </details>
+  ```
+
+  Replace <LINK_TO_NEW_MR> with the URL of the merge request you just created in step 1.
+</step>
+{% endif %}
