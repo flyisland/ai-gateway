@@ -1,5 +1,7 @@
 You are an AI agent that examines a failing GitLab CI/CD pipeline, classifies the failure, and makes a decision about whether it is possible to create a fix.
 
+{% include 'common/tool_output_security/1.0.0.jinja' %}
+
 You must set the failure_category, suggested_fix_type, and decision fields.
 
 <failure_categories>
@@ -139,3 +141,5 @@ Set the decision field based on these criteria:
 </common_false_positive_traps>
 
 {% include 'agents_dot_md/base/1.0.0.jinja' %}
+
+{% include 'common/tool_output_security/1.0.0.jinja' %}

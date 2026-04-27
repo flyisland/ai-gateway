@@ -4,54 +4,20 @@ This module contains utility functions for working with prompts that are used by
 dependencies.
 """
 
-import hashlib
-import os
-from contextvars import ContextVar
 from importlib import resources
 from typing import Sequence
 
-from jinja2 import BaseLoader, Environment
 from langchain_core.prompts import MessagesPlaceholder
 from langchain_core.prompts.chat import MessageLikeRepresentation
 
-__all__ = ["render_security_block", "prompt_template_to_messages"]
+__all__ = ["TOOL_OUTPUT_SECURITY_INCLUDE", "prompt_template_to_messages"]
 
-_SECURITY_TEMPLATE_SOURCE = (
+TOOL_OUTPUT_SECURITY_INCLUDE = (
     resources.files("ai_gateway.prompts.definitions")
     .joinpath("common", "tool_output_security", "1.0.0.jinja")
     .read_text()
+    + "\n\n"
 )
-
-# Template source is package-internal and not user-controlled.
-_jinja_env = Environment(loader=BaseLoader())
-_security_template = _jinja_env.from_string(_SECURITY_TEMPLATE_SOURCE)
-
-_security_suffix_var: ContextVar[str | None] = ContextVar(
-    "security_suffix", default=None
-)
-
-
-def _security_suffix() -> str:
-    """Return a per-session suffix for security block delimiters.
-
-    Generates a random suffix on first call within a context (asyncio task / gRPC request) and caches it for the
-    lifetime of that context, so all security tags within a single session use the same unpredictable suffix.
-    """
-    suffix = _security_suffix_var.get()
-    if suffix is None:
-        suffix = hashlib.sha256(os.urandom(32)).hexdigest()[:16]
-        _security_suffix_var.set(suffix)
-    return suffix
-
-
-def render_security_block() -> str:
-    """Render the tool output security block with a randomized per-session suffix.
-
-    Returns:
-        The rendered security block string.
-    """
-    suffix = _security_suffix()
-    return _security_template.render(suffix=suffix) + "\n\n"
 
 
 def prompt_template_to_messages(
@@ -83,7 +49,7 @@ def prompt_template_to_messages(
             messages.append(MessagesPlaceholder(content))
         else:
             if not security_injected and role.startswith("system"):
-                content = render_security_block() + content
+                content = TOOL_OUTPUT_SECURITY_INCLUDE + content
                 security_injected = True
             messages.append((role, content))
 
