@@ -85,6 +85,7 @@ class TestBillingEventService:
                     }
                 ],
                 "tool_names": [],
+                "orbit_called": False,
             },
         )
 
@@ -347,3 +348,26 @@ class TestBillingEventService:
         )
         metadata = get_call_metadata(billing_event_client)
         assert metadata["tool_names"] == ["read_file", "write_file", "read_file"]
+
+    def test_track_billing_with_orbit_called(
+        self,
+        billing_event_service,
+        billing_event_client,
+        user,
+        gl_context,
+        llm_operation,
+    ):
+        """Test that orbit_called flag is included in billing metadata."""
+        billing_event_service.track_billing(
+            workflow_id="workflow-123",
+            user=user,
+            gl_context=gl_context,
+            event=BillingEvent.DAP_FLOW_ON_COMPLETION,
+            execution_env=ExecutionEnvironment.DAP,
+            category="test_category",
+            llm_ops=[llm_operation],
+            orbit_called=True,
+        )
+
+        metadata = get_call_metadata(billing_event_client)
+        assert metadata["orbit_called"] is True

@@ -148,6 +148,19 @@ def _attribute_dirty(
     return False, None
 
 
+ORBIT_TOOL_IDENTIFIER = "orbit"
+
+
+def _get_orbit_tool_calls(checkpoint: Checkpoint) -> bool:
+    """Check if any Orbit tools were called in the checkpoint state."""
+    channel_values = checkpoint.get("channel_values", {})
+    ui_chat_log = channel_values.get("ui_chat_log", [])
+    return any(
+        ORBIT_TOOL_IDENTIFIER in (entry.get("tool_info") or {}).get("name", "")
+        for entry in ui_chat_log
+    )
+
+
 class GitLabWorkflow(
     BaseCheckpointSaver[Any], AbstractAsyncContextManager[Any]
 ):  # pylint: disable=too-many-instance-attributes
@@ -183,6 +196,7 @@ class GitLabWorkflow(
         self._workflow_config = workflow_config
         self._internal_event_client = internal_event_client
         self._billing_event_service = billing_event_service
+        self._orbit_called = False
         self.serde = CheckpointSerializer()
 
     @override
@@ -567,6 +581,7 @@ class GitLabWorkflow(
                     unit_of_measure="request",
                     quantity=1,
                     tool_execs=tool_executions,
+                    orbit_called=self._orbit_called,
                 )
                 self._logger.info(
                     "Successfully sent billing event for workflow %s", self._workflow_id
@@ -800,6 +815,9 @@ class GitLabWorkflow(
         new_versions: ChannelVersions,
     ) -> RunnableConfig:
         configurable = config.get("configurable", {})
+
+        if not self._orbit_called:
+            self._orbit_called = _get_orbit_tool_calls(checkpoint)
 
         compression_enabled = is_feature_enabled(FeatureFlag.COMPRESS_CHECKPOINT)
 

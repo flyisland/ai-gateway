@@ -94,6 +94,7 @@ class BillingEventService:
         quantity: int = 1,
         llm_ops: list[LLMOperation] | None = None,
         tool_execs: ToolExecutions | None = None,
+        orbit_called: bool = False,
     ) -> None:
         """Track billing for a workflow execution with LLM operation metadata.
 
@@ -114,6 +115,7 @@ class BillingEventService:
                 that don't work well with get_llm_operations(). Prefer migrating to get_llm_operations()
                 for new implementations.
             tool_execs: Optional explicit tool names to track.
+            orbit_called: Whether any Orbit tools were called during the workflow session.
 
         Raises:
             ValueError: If no LLM operations are available from any source
@@ -139,6 +141,7 @@ class BillingEventService:
             "execution_environment": execution_env.value,
             "llm_operations": llm_operations,
             "tool_names": tool_execs or [],
+            "orbit_called": orbit_called,
         }
 
         self.client.track_billing_event(

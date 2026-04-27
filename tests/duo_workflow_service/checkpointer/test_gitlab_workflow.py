@@ -17,6 +17,7 @@ from langgraph.checkpoint.memory import MemorySaver
 from duo_workflow_service.checkpointer.gitlab_workflow import (
     GitLabWorkflow,
     WorkflowStatusEventEnum,
+    _get_orbit_tool_calls,
 )
 from duo_workflow_service.checkpointer.gitlab_workflow_utils import compress_checkpoint
 from duo_workflow_service.entities.state import WorkflowStatusEnum
@@ -32,6 +33,7 @@ from duo_workflow_service.status_updater.gitlab_status_updater import (
     UnsupportedStatusEvent,
 )
 from lib.billing_events import BillingEvent, ExecutionEnvironment
+from lib.billing_events.service import LLMOperation
 from lib.context import llm_operations
 from lib.context.tool_executions import init_tool_executions, tool_executions
 from lib.feature_flags.context import FeatureFlag
@@ -1357,6 +1359,7 @@ async def test_track_workflow_completion_with_billing_event(
             "execution_environment": ExecutionEnvironment.DAP.value,
             "llm_operations": mock_llm_operations,
             "tool_names": [],
+            "orbit_called": False,
         },
     )
 
@@ -1373,6 +1376,140 @@ async def test_track_workflow_completion_with_non_billable_status(
     await gitlab_workflow._track_workflow_completion("some_other_status")
 
     billing_event_client.track_billing_event.assert_not_called()
+
+
+@pytest.mark.asyncio
+async def test_track_workflow_completion_with_orbit_called(
+    gitlab_workflow,
+    workflow_id,
+    workflow_type,
+    billing_event_service,
+    billing_event_client,
+    mock_user,
+):
+    """Test that orbit_called=True is passed to billing when orbit tools were used."""
+    current_user.set(mock_user)
+    gitlab_workflow._billing_event_service = billing_event_service
+    gitlab_workflow._orbit_called = True
+
+    operations = [
+        {
+            "token_count": 100,
+            "model_id": "claude-3-sonnet",
+            "model_engine": "anthropic",
+            "model_provider": "anthropic",
+            "prompt_tokens": 80,
+            "completion_tokens": 20,
+        },
+    ]
+    llm_operations.set(operations)
+
+    await gitlab_workflow._track_workflow_completion(WorkflowStatusEnum.FINISHED)
+
+    mock_llm_operations = [
+        LLMOperation.model_validate(op).model_dump() for op in operations
+    ]
+    billing_event_client.track_billing_event.assert_called_once_with(
+        mock_user,
+        BillingEvent.DAP_FLOW_ON_COMPLETION,
+        "GitLabWorkflow",
+        unit_of_measure="request",
+        quantity=1,
+        metadata={
+            "workflow_id": workflow_id,
+            "feature_qualified_name": workflow_type.feature_qualified_name,
+            "feature_ai_catalog_item": workflow_type.feature_ai_catalog_item,
+            "execution_environment": ExecutionEnvironment.DAP.value,
+            "llm_operations": mock_llm_operations,
+            "tool_names": [],
+            "orbit_called": True,
+        },
+    )
+
+
+class TestGetOrbitToolCalls:
+    def test_no_tool_calls(self):
+        checkpoint = {"channel_values": {"ui_chat_log": []}}
+        assert _get_orbit_tool_calls(checkpoint) is False
+
+    def test_no_orbit_tools(self):
+        checkpoint = {
+            "channel_values": {
+                "ui_chat_log": [
+                    {"tool_info": {"name": "read_file", "args": {}}},
+                    {"tool_info": {"name": "run_command", "args": {}}},
+                ]
+            }
+        }
+        assert _get_orbit_tool_calls(checkpoint) is False
+
+    def test_with_orbit_tool(self):
+        checkpoint = {
+            "channel_values": {
+                "ui_chat_log": [
+                    {"tool_info": {"name": "read_file", "args": {}}},
+                    {"tool_info": {"name": "orbit_search", "args": {}}},
+                ]
+            }
+        }
+        assert _get_orbit_tool_calls(checkpoint) is True
+
+    def test_missing_channel_values(self):
+        checkpoint = {}
+        assert _get_orbit_tool_calls(checkpoint) is False
+
+    def test_entries_without_tool_info(self):
+        checkpoint = {
+            "channel_values": {
+                "ui_chat_log": [
+                    {"tool_info": None},
+                    {"message_type": "agent"},
+                ]
+            }
+        }
+        assert _get_orbit_tool_calls(checkpoint) is False
+
+
+@pytest.mark.asyncio
+async def test_aput_sets_orbit_called_when_orbit_tool_present(
+    gitlab_workflow, http_client, checkpoint_metadata, workflow_id
+):
+    """Test that aput sets _orbit_called when checkpoint contains orbit tool calls."""
+    config = {"configurable": {"checkpoint_id": "parent-checkpoint"}}
+    checkpoint = {
+        "id": "new-id",
+        "channel_values": {
+            "ui_chat_log": [{"tool_info": {"name": "orbit_search", "args": {}}}]
+        },
+    }
+    http_client.apost.return_value = GitLabHttpResponse(status_code=200, body={})
+
+    assert gitlab_workflow._orbit_called is False
+    await gitlab_workflow.aput(
+        config, checkpoint, checkpoint_metadata, ChannelVersions()
+    )
+    assert gitlab_workflow._orbit_called is True
+
+
+@pytest.mark.asyncio
+async def test_aput_does_not_reset_orbit_called_once_set(
+    gitlab_workflow, http_client, checkpoint_metadata, workflow_id
+):
+    """Test that _orbit_called stays True once set, even if subsequent checkpoints have no orbit tools."""
+    config = {"configurable": {"checkpoint_id": "parent-checkpoint"}}
+    http_client.apost.return_value = GitLabHttpResponse(status_code=200, body={})
+
+    gitlab_workflow._orbit_called = True
+    checkpoint = {
+        "id": "new-id",
+        "channel_values": {
+            "ui_chat_log": [{"tool_info": {"name": "read_file", "args": {}}}]
+        },
+    }
+    await gitlab_workflow.aput(
+        config, checkpoint, checkpoint_metadata, ChannelVersions()
+    )
+    assert gitlab_workflow._orbit_called is True
 
 
 @pytest.fixture(autouse=True)
@@ -1852,5 +1989,6 @@ async def test_track_workflow_completion_with_billing_event_includes_tool_names(
             "execution_environment": ExecutionEnvironment.DAP.value,
             "llm_operations": mock_llm_operations,
             "tool_names": ["read_file", "write_file", "read_file"],
+            "orbit_called": False,
         },
     )
