@@ -1,12 +1,13 @@
 import os
-from typing import Annotated, Optional, Set, TypedDict
+from typing import Annotated, Literal, Optional, Set, TypedDict
 
 import litellm
 from dotenv import find_dotenv
-from pydantic import BaseModel, Field, RootModel
+from pydantic import BaseModel, Field, Json, RootModel
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 __all__ = [
+    "ConfigBedrockGuardrail",
     "Config",
     "ConfigLogging",
     "ConfigFastApi",
@@ -194,6 +195,36 @@ class ConfigBindToolsCache(BaseModel):
     max_size: int = 128
 
 
+class ConfigBedrockGuardrail(BaseModel):
+    """Bedrock guardrail configuration.
+
+    See https://docs.aws.amazon.com/bedrock/latest/APIReference/API_runtime_GuardrailConfiguration.html
+    """
+
+    guardrailIdentifier: Annotated[
+        str,
+        Field(
+            min_length=1,
+            max_length=2048,
+            pattern=r"^([a-z0-9]+|arn:aws(-[^:]+)?:bedrock:[a-z0-9-]{1,20}:[0-9]{12}:guardrail/[a-z0-9]+)$",
+            description="The guardrail identifier (short ID or full ARN).",
+        ),
+    ]
+    guardrailVersion: Optional[
+        Annotated[
+            str,
+            Field(
+                pattern=r"^(|([1-9][0-9]{0,7})|(DRAFT))$",
+                description="The guardrail version ('DRAFT' or a numeric string).",
+            ),
+        ]
+    ] = None
+    trace: Literal["enabled", "disabled"] = Field(
+        default="disabled",
+        description="Whether to enable guardrail trace in Bedrock responses.",
+    )
+
+
 class ConfigFeatureFlags(BaseModel):
     disallowed_flags: dict[str, Set[str]] = {}
     excl_post_process: list[str] = []
@@ -264,6 +295,14 @@ class Config(BaseSettings):
     cloud_connector_service_name: str = "gitlab-ai-gateway"
     mock_model_responses: bool = False
     use_agentic_mock: bool = False
+    bedrock_guardrail_config: Optional[Json[ConfigBedrockGuardrail]] = Field(
+        default=None,
+        description=(
+            "Bedrock guardrail configuration as a JSON string. "
+            "Set via AIGW_BEDROCK_GUARDRAIL_CONFIG_JSON. "
+            'Example: \'{"guardrailIdentifier": "abc123", "guardrailVersion": "1", "trace": "disabled"}\''
+        ),
+    )
 
     logging: Annotated[ConfigLogging, Field(default_factory=ConfigLogging)] = (
         ConfigLogging()

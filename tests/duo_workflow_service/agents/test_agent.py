@@ -21,6 +21,7 @@ from duo_workflow_service.entities.state import (
     WorkflowStatusEnum,
 )
 from duo_workflow_service.gitlab.http_client import GitlabHttpClient
+from lib.guardrails import GUARDRAIL_INTERVENED_WARNING
 from lib.internal_events.event_enum import CategoryEnum
 from lib.prompts.utilities import TOOL_OUTPUT_SECURITY_INCLUDE
 from tests.conftest import FakeModel
@@ -343,6 +344,30 @@ Human message"""
                 == "There was an error processing your request in the Duo Agent Platform, please try again or "
                 "contact support if the issue persists."
             )
+
+    @pytest.mark.asyncio
+    async def test_run_with_guardrail_intervened_finish_reason(
+        self,
+        agent: Agent,
+        workflow_state: DuoWorkflowStateType,
+        prompt_name: str,
+    ):
+        with patch.object(
+            agent.__class__.__bases__[0], "ainvoke", new_callable=AsyncMock
+        ) as mock_ainvoke:
+            mock_ainvoke.return_value = AIMessage(
+                content="",
+                response_metadata={"finish_reason": "guardrail_intervened"},
+            )
+
+            result = await agent.run(workflow_state)
+
+            assert result["status"] == WorkflowStatusEnum.ERROR
+            assert isinstance(result["conversation_history"][prompt_name][0], AIMessage)
+            assert result["conversation_history"][prompt_name][0].content == (
+                GUARDRAIL_INTERVENED_WARNING
+            )
+            assert result["ui_chat_log"][0]["content"] == GUARDRAIL_INTERVENED_WARNING
 
     @pytest.mark.asyncio
     async def test_run_with_5xx_api_error(

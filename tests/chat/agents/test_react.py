@@ -3,7 +3,8 @@ from unittest.mock import patch
 
 import fastapi
 import pytest
-from langchain_core.messages import SystemMessage
+from langchain_core.messages import AIMessage, SystemMessage
+from langchain_core.outputs import Generation
 from starlette_context import context, request_cycle_context
 from structlog.testing import capture_logs
 
@@ -29,6 +30,7 @@ from ai_gateway.model_selection.models import ModelClassProvider
 from ai_gateway.models.base_chat import Role
 from ai_gateway.prompts import Prompt
 from lib.feature_flags.context import current_feature_flag_context
+from lib.guardrails import GUARDRAIL_INTERVENED_WARNING
 
 
 @pytest.fixture(name="inputs")
@@ -140,6 +142,23 @@ class TestReActPlainTextParser:
         actual_reason = parser.parse_finish_reason(meta_data)
 
         assert actual_reason == expected_reason
+
+    def test_guardrail_intervened_returns_unknown_action(self):
+        parser = ReActPlainTextParser()
+        response = [
+            Generation(
+                text="blocked",
+                message=AIMessage(
+                    content="blocked",
+                    response_metadata={"finish_reason": "guardrail_intervened"},
+                ),
+            )
+        ]
+
+        event = parser.parse_result(response)
+
+        assert isinstance(event, AgentUnknownAction)
+        assert event.text == "blocked"
 
     @pytest.mark.parametrize(
         ("message", "finish_reason", "expected"),
@@ -624,6 +643,26 @@ class TestReActAgent:
                     AgentError(message="api_error", retryable=False),
                 ],
             ),
+            (
+                ReActAgentInputs(
+                    messages=[
+                        Message(
+                            role=Role.USER,
+                            content="What's the title of this epic?",
+                        ),
+                    ],
+                ),
+                ValueError(
+                    "litellm.BadRequestError: BedrockException - Your request was blocked by a guardrail policy. Please revise your input and try again."
+                ),
+                "litellm.BadRequestError: BedrockException - Your request was blocked by a guardrail policy. Please revise your input and try again.",
+                [
+                    AgentError(
+                        message="litellm.BadRequestError: BedrockException - Your request was blocked by a guardrail policy. Please revise your input and try again.",
+                        retryable=False,
+                    ),
+                ],
+            ),
         ],
     )
     async def test_stream_error(
@@ -700,13 +739,12 @@ class TestReActAgent:
         assert len(messages) == 3  # System, User and one added AI message
 
 
-class TestAppendWarningIfResponseExceededMaxTokens:
-    """Test the _append_warning_if_response_exceeded_max_tokens method."""
+class TestAppendFinalMessageWarnings:
+    """Test the _append_final_message_warnings method."""
 
     @pytest.mark.parametrize(
         ("event", "expected_text"),
         [
-            # Final answer with length finish reason - should add warning
             (
                 AgentFinalAnswer(text="Response text", finish_reason="length"),
                 (
@@ -715,29 +753,28 @@ class TestAppendWarningIfResponseExceededMaxTokens:
                     "Please try again with less context."
                 ),
             ),
-            # Final answer with stop finish reason - no warning
+            (
+                AgentFinalAnswer(
+                    text="Response text", finish_reason="guardrail_intervened"
+                ),
+                ("Response text\n\n" + GUARDRAIL_INTERVENED_WARNING),
+            ),
             (
                 AgentFinalAnswer(text="Response text", finish_reason="stop"),
                 "Response text",
             ),
-            # Final answer with no finish reason - no warning
             (
                 AgentFinalAnswer(text="Response text", finish_reason=None),
                 "Response text",
             ),
         ],
     )
-    def test_append_warning_if_response_exceeded_max_tokens(
-        self, event, expected_text, agent
-    ):
-
-        result = agent._append_warning_if_response_exceeded_max_tokens(event)
+    def test_append_final_message_warnings(self, event, expected_text, agent):
+        result = agent._append_final_message_warnings(event)
 
         if expected_text is None:
-            # For tool actions, verify the event is unchanged
             assert result == event
         else:
-            # For final answers, verify the text is as expected
             assert isinstance(result, AgentFinalAnswer)
             assert result.text == expected_text
 

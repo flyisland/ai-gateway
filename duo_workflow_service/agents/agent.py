@@ -37,6 +37,7 @@ from duo_workflow_service.tools.handover import HandoverTool
 from duo_workflow_service.tracking.errors import log_exception
 from lib.context import LLMFinishReason, StarletteUser, extract_finish_reason
 from lib.events import GLReportingEventContext
+from lib.guardrails import GUARDRAIL_INTERVENED_WARNING
 from lib.prompts.utilities import prompt_template_to_messages
 
 log = structlog.stdlib.get_logger("agent_v2")
@@ -166,6 +167,27 @@ class Agent(BaseAgent):
     def _respond_to_human(self, state, model_completion) -> dict[str, Any]:
         if not isinstance(model_completion, AIMessage):
             return {}
+
+        finish_reason = extract_finish_reason(model_completion.response_metadata)
+        if finish_reason == LLMFinishReason.GUARDRAIL_INTERVENED.value:
+            guardrail_message = AIMessage(content=GUARDRAIL_INTERVENED_WARNING)
+            return {
+                "conversation_history": {self.name: [guardrail_message]},
+                "status": WorkflowStatusEnum.ERROR,
+                "ui_chat_log": [
+                    UiChatLog(
+                        message_type=MessageTypeEnum.AGENT,
+                        message_sub_type=None,
+                        content=GUARDRAIL_INTERVENED_WARNING,
+                        timestamp=datetime.now(timezone.utc).isoformat(),
+                        status=ToolStatus.FAILURE,
+                        correlation_id=None,
+                        tool_info=None,
+                        additional_context=None,
+                        message_id=f"error-{uuid4()}",
+                    )
+                ],
+            }
 
         last_human_input = state.get("last_human_input")
         if (

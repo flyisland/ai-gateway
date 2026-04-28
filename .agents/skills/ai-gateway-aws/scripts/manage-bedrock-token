@@ -1,0 +1,102 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+REPO_ROOT="$(git rev-parse --show-toplevel)"
+ENV_FILE="${REPO_ROOT}/.env"
+
+IAM_USER_NAME="${IAM_USER_NAME:-aigw-local-dev}"
+AWS_PROFILE="${AWS_PROFILE:-default}"
+AWS_REGION="${AWS_REGION:-us-east-1}"
+CREDENTIAL_AGE_DAYS="${CREDENTIAL_AGE_DAYS:-1}"
+POLICY_ARN="arn:aws:iam::aws:policy/AmazonBedrockLimitedAccess"
+
+teardown() {
+  echo "Deleting service-specific credentials for ${IAM_USER_NAME}..."
+  CREDENTIAL_IDS=$(aws iam list-service-specific-credentials \
+    --user-name "${IAM_USER_NAME}" \
+    --service-name bedrock.amazonaws.com \
+    --profile "${AWS_PROFILE}" \
+    --region "${AWS_REGION}" \
+    --output text \
+    --query 'ServiceSpecificCredentials[].ServiceSpecificCredentialId')
+
+  for cred_id in ${CREDENTIAL_IDS}; do
+    aws iam delete-service-specific-credential \
+      --user-name "${IAM_USER_NAME}" \
+      --service-specific-credential-id "${cred_id}" \
+      --profile "${AWS_PROFILE}" \
+      --region "${AWS_REGION}"
+    echo "Deleted credential ${cred_id}"
+  done
+
+  echo "Detaching ${POLICY_ARN}..."
+  aws iam detach-user-policy \
+    --user-name "${IAM_USER_NAME}" \
+    --policy-arn "${POLICY_ARN}" \
+    --profile "${AWS_PROFILE}" \
+    --region "${AWS_REGION}" 2>/dev/null || true
+
+  echo "Deleting IAM user ${IAM_USER_NAME}..."
+  aws iam delete-user \
+    --user-name "${IAM_USER_NAME}" \
+    --profile "${AWS_PROFILE}" \
+    --region "${AWS_REGION}"
+
+  if [ -f "${ENV_FILE}" ] && grep -q '^AWS_BEARER_TOKEN_BEDROCK=' "${ENV_FILE}"; then
+    sed -i.bak '/^AWS_BEARER_TOKEN_BEDROCK=/d' "${ENV_FILE}" && rm -f "${ENV_FILE}.bak"
+    echo "Removed AWS_BEARER_TOKEN_BEDROCK from ${ENV_FILE}"
+  fi
+
+  echo "Teardown complete."
+}
+
+create() {
+  if ! aws iam get-user --user-name "${IAM_USER_NAME}" --profile "${AWS_PROFILE}" --region "${AWS_REGION}" >/dev/null 2>&1; then
+    echo "Creating IAM user ${IAM_USER_NAME}..."
+    aws iam create-user \
+      --user-name "${IAM_USER_NAME}" \
+      --profile "${AWS_PROFILE}" \
+      --region "${AWS_REGION}" >/dev/null
+
+    aws iam attach-user-policy \
+      --user-name "${IAM_USER_NAME}" \
+      --policy-arn "${POLICY_ARN}" \
+      --profile "${AWS_PROFILE}" \
+      --region "${AWS_REGION}"
+  else
+    echo "IAM user ${IAM_USER_NAME} already exists, skipping creation."
+  fi
+
+  echo "Generating Bedrock API key (valid for ${CREDENTIAL_AGE_DAYS} day(s))..."
+  TOKEN=$(aws iam create-service-specific-credential \
+    --user-name "${IAM_USER_NAME}" \
+    --service-name bedrock.amazonaws.com \
+    --credential-age-days "${CREDENTIAL_AGE_DAYS}" \
+    --profile "${AWS_PROFILE}" \
+    --region "${AWS_REGION}" \
+    --output json \
+    --query 'ServiceSpecificCredential.ServiceCredentialSecret')
+
+  if [ -f "${ENV_FILE}" ] && grep -q '^AWS_BEARER_TOKEN_BEDROCK=' "${ENV_FILE}"; then
+    sed -i.bak "s|^AWS_BEARER_TOKEN_BEDROCK=.*|AWS_BEARER_TOKEN_BEDROCK=${TOKEN}|" "${ENV_FILE}" && rm -f "${ENV_FILE}.bak"
+    echo "Updated AWS_BEARER_TOKEN_BEDROCK in ${ENV_FILE}"
+  else
+    echo "" >> "${ENV_FILE}"
+    echo "AWS_BEARER_TOKEN_BEDROCK=${TOKEN}" >> "${ENV_FILE}"
+    echo "Appended AWS_BEARER_TOKEN_BEDROCK to ${ENV_FILE}"
+  fi
+}
+
+if [ $# -eq 0 ]; then
+  echo "Usage: $(basename "$0") <create|delete>" >&2
+  exit 1
+fi
+
+case "$1" in
+  create) create ;;
+  delete) teardown ;;
+  *)
+    echo "Usage: $(basename "$0") <create|delete>" >&2
+    exit 1
+    ;;
+esac

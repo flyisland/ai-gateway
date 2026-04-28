@@ -29,12 +29,14 @@ from langchain_core.messages import AIMessage, AIMessageChunk, BaseMessage
 from langchain_core.outputs import ChatGeneration, ChatGenerationChunk, ChatResult
 from langchain_core.runnables import Runnable
 
+from ai_gateway.config import ConfigBedrockGuardrail
 from ai_gateway.model_selection.models import CompletionType
 from ai_gateway.models.base import validate_custom_endpoint
 from ai_gateway.models.fireworks_retry import (
     DEFAULT_FIREWORKS_ERRORS,
     create_fireworks_retry_decorator,
 )
+from ai_gateway.models.guardrails import bedrock_guardrail_params
 from ai_gateway.vendor.langchain_litellm.litellm import _create_usage_metadata
 
 __all__ = ["CompletionLiteLLM"]
@@ -98,6 +100,7 @@ class CompletionLiteLLM(BaseChatModel):
     disable_streaming: bool = False
     custom_models_enabled: bool = False
     allowed_api_bases: frozenset[str] = frozenset()
+    bedrock_guardrail_config: Optional[ConfigBedrockGuardrail] = None
 
     class Config:
         arbitrary_types_allowed = True
@@ -204,6 +207,12 @@ class CompletionLiteLLM(BaseChatModel):
             completion_args["vertex_ai_location"] = kwargs.get(
                 "vertex_ai_location", "us-central1"
             )
+
+        guardrail_params = bedrock_guardrail_params(
+            self.custom_llm_provider, self.bedrock_guardrail_config
+        )
+        if guardrail_params:
+            completion_args["guardrailConfig"] = guardrail_params["guardrailConfig"]
 
         return completion_args
 
