@@ -33,9 +33,7 @@ from duo_workflow_service.entities.state import (
 )
 from duo_workflow_service.interceptors.route import support_self_hosted_billing
 from duo_workflow_service.tracking.errors import log_exception
-from duo_workflow_service.workflows.abstract_workflow import (
-    AbstractWorkflow,
-)
+from duo_workflow_service.workflows.abstract_workflow import AbstractWorkflow
 from duo_workflow_service.workflows.type_definitions import AdditionalContext
 from lib.events import GLReportingEventContext
 from lib.feature_flags.context import FeatureFlag, is_feature_enabled
@@ -319,6 +317,7 @@ class Workflow(AbstractWorkflow):
             system_template_override=self.system_template_override,
             agent_name_override=self._agent_name_override,
             compaction=CompactionConfig(trim_threshold=0.7),
+            internal_events_client=self._internal_event_client,
         )
 
         tools_runner = ToolsExecutor(

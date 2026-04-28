@@ -1,0 +1,35 @@
+---
+description: Tracks each legacy token-based trim execution with before/after token data
+internal_events: true
+action: duo_workflow_legacy_trim_executed
+product_group: agent_foundations
+additional_properties:
+  label:
+    description: Agent name that triggered the trim
+  property:
+    description: Hardcoded string workflow_id
+  value:
+    description: Workflow Id for session correlation
+  tokens_before:
+    description: Estimated token count before trimming
+  tokens_after:
+    description: Token count after trimming
+  tokens_removed:
+    description: Tokens removed by trimming (tokens_before - tokens_after)
+  messages_before:
+    description: Number of messages before trimming
+  messages_after:
+    description: Number of messages after trimming
+  token_budget:
+    description: "The trim target in tokens (0.7 * max_context_tokens)"
+  max_context_tokens:
+    description: "The model's max context window size"
+  workflow_type:
+    description: "Type of workflow that triggered the trim (e.g. developer, chat)"
+  duration_ms:
+    description: Time spent on the trim operation in milliseconds
+milestone: '19.0'
+introduced_by_url: https://gitlab.com/gitlab-org/modelops/applied-ml/code-suggestions/ai-assist/-/merge_requests/5320
+tiers:
+  - premium
+  - ultimate

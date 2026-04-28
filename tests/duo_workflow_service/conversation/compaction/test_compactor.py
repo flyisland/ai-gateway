@@ -12,6 +12,8 @@ from duo_workflow_service.conversation.compaction import (
 )
 from duo_workflow_service.conversation.compaction.compactor import (
     COMPACTION_CONTINUE_MESSAGE,
+    CompactionStatus,
+    ConversationCompactor,
 )
 
 DEFAULT_MAX_RECENT_MESSAGES = 10
@@ -574,3 +576,246 @@ class TestInvokeSummarizerToolMetadataStripping:
         )
         assert "[Called tool 'read_file'" in all_content
         assert "[Tool result for 'read_file']" in all_content
+
+
+class TestIsCompactionCallFlag:
+    """Test that is_compaction_call is set in internal_event_extra."""
+
+    @patch(
+        "duo_workflow_service.conversation.compaction.compactor.get_model_metadata",
+        return_value=None,
+    )
+    def test_is_compaction_call_in_internal_event_extra(
+        self, _mock_get_model_metadata, mock_prompt_registry, user
+    ):
+        """The is_compaction_call flag should be in internal_event_extra."""
+        create_conversation_compactor(
+            config=CompactionConfig(),
+            prompt_registry=mock_prompt_registry,
+            user=user,
+            agent_name="test_agent",
+            workflow_id="test_workflow",
+            workflow_type="test_type",
+        )
+
+        call_kwargs = mock_prompt_registry.get_on_behalf.call_args
+        extra = call_kwargs.kwargs.get(
+            "internal_event_extra", call_kwargs[1].get("internal_event_extra")
+        )
+        assert extra["is_compaction_call"] is True
+        assert extra["agent_name"] == "test_agent"
+        assert extra["workflow_id"] == "test_workflow"
+        assert extra["workflow_type"] == "test_type"
+
+
+@patch(
+    "duo_workflow_service.conversation.compaction.compactor.get_model_max_context_token_limit"
+)
+@patch("duo_workflow_service.conversation.compaction.compactor.duo_workflow_metrics")
+class TestCompactorPrometheusMetrics:
+    """Test Prometheus metric recording during compaction."""
+
+    @pytest.mark.asyncio
+    @patch.object(CompactionTokenEstimator, "estimate_complete_history")
+    async def test_success_increments_counter_and_records_duration(
+        self,
+        mock_estimate,
+        mock_metrics,
+        mock_get_max_context,
+        compactor,
+        mock_prompt,
+    ):
+        """Successful compaction should increment counter and observe duration."""
+        mock_get_max_context.return_value = 400_000
+        mock_estimate.return_value = int(0.8 * 400_000)
+
+        summary_message = AIMessage(
+            content="Summary",
+            usage_metadata={
+                "input_tokens": 1000,
+                "output_tokens": 200,
+                "total_tokens": 1200,
+            },
+        )
+        mock_prompt.ainvoke.return_value = summary_message
+
+        messages = [HumanMessage(content="Initial query"), AIMessage(content="R1")]
+        for i in range(15):
+            messages.append(HumanMessage(content=f"M{i}"))
+            messages.append(AIMessage(content=f"R{i}"))
+
+        await compactor.compact(messages)
+
+        mock_metrics.count_compaction_execution.assert_called_once_with(
+            flow_type="test_type",
+            agent_name="test_agent",
+            status=CompactionStatus.SUCCESS,
+        )
+        mock_metrics.time_compaction_llm.assert_called_once_with(
+            flow_type="test_type",
+            agent_name="test_agent",
+        )
+
+    @pytest.mark.asyncio
+    @patch.object(CompactionTokenEstimator, "estimate_complete_history")
+    async def test_error_increments_counter(
+        self,
+        mock_estimate,
+        mock_metrics,
+        mock_get_max_context,
+        compactor,
+        mock_prompt,
+    ):
+        """Failed compaction should increment counter with error status."""
+        mock_get_max_context.return_value = 400_000
+        mock_estimate.return_value = int(0.8 * 400_000)
+
+        mock_prompt.ainvoke.side_effect = Exception("LLM error")
+
+        messages = [HumanMessage(content="Initial query"), AIMessage(content="R1")]
+        for i in range(15):
+            messages.append(HumanMessage(content=f"M{i}"))
+            messages.append(AIMessage(content=f"R{i}"))
+
+        await compactor.compact(messages)
+
+        mock_metrics.count_compaction_execution.assert_called_once_with(
+            flow_type="test_type",
+            agent_name="test_agent",
+            status=CompactionStatus.ERROR,
+        )
+
+
+@patch(
+    "duo_workflow_service.conversation.compaction.compactor.get_model_max_context_token_limit"
+)
+class TestCompactorSnowplowEvents:
+    """Test Snowplow event firing during compaction."""
+
+    @pytest.mark.asyncio
+    @patch.object(CompactionTokenEstimator, "estimate_complete_history")
+    @patch(
+        "duo_workflow_service.conversation.compaction.compactor.duo_workflow_metrics"
+    )
+    async def test_fires_compaction_event_on_success(
+        self,
+        _mock_metrics,
+        mock_estimate,
+        mock_get_max_context,
+        compactor_with_events,
+        mock_prompt,
+        mock_internal_events_client,
+    ):
+        """Should fire compaction_executed event with correct fields on success."""
+        mock_get_max_context.return_value = 400_000
+        mock_estimate.return_value = int(0.8 * 400_000)
+
+        summary_message = AIMessage(
+            content="Summary",
+            usage_metadata={
+                "input_tokens": 1000,
+                "output_tokens": 200,
+                "total_tokens": 1200,
+            },
+        )
+        mock_prompt.ainvoke.return_value = summary_message
+
+        messages = [HumanMessage(content="Initial query"), AIMessage(content="R1")]
+        for i in range(15):
+            messages.append(HumanMessage(content=f"M{i}"))
+            messages.append(AIMessage(content=f"R{i}"))
+
+        await compactor_with_events.compact(messages)
+
+        mock_internal_events_client.track_event.assert_called_once()
+        call_kwargs = mock_internal_events_client.track_event.call_args.kwargs
+        assert call_kwargs["event_name"] == "duo_workflow_compaction_executed"
+        assert call_kwargs["category"] == ConversationCompactor.__name__
+        additional_props = call_kwargs["additional_properties"]
+        assert additional_props.label == "test_agent"
+        assert additional_props.property == "workflow_id"
+        assert additional_props.value == "test_workflow"
+        assert additional_props.extra["status"] == "success"
+        assert additional_props.extra["model_name"] == "unknown"
+        assert additional_props.extra["compaction_input_tokens"] == 1000
+        assert additional_props.extra["compaction_output_tokens"] == 200
+        assert additional_props.extra["tokens_before"] > 0
+        assert "messages_summarized" in additional_props.extra
+        assert "token_budget" in additional_props.extra
+        assert "max_context_tokens" in additional_props.extra
+        assert "duration_seconds" in additional_props.extra
+
+    @pytest.mark.asyncio
+    @patch.object(CompactionTokenEstimator, "estimate_complete_history")
+    @patch(
+        "duo_workflow_service.conversation.compaction.compactor.duo_workflow_metrics"
+    )
+    async def test_fires_compaction_event_on_error(
+        self,
+        _mock_metrics,
+        mock_estimate,
+        mock_get_max_context,
+        compactor_with_events,
+        mock_prompt,
+        mock_internal_events_client,
+    ):
+        """Should fire compaction_executed event with error_type on failure."""
+        mock_get_max_context.return_value = 400_000
+        mock_estimate.return_value = int(0.8 * 400_000)
+
+        mock_prompt.ainvoke.side_effect = RuntimeError("LLM error")
+
+        messages = [HumanMessage(content="Initial query"), AIMessage(content="R1")]
+        for i in range(15):
+            messages.append(HumanMessage(content=f"M{i}"))
+            messages.append(AIMessage(content=f"R{i}"))
+
+        await compactor_with_events.compact(messages)
+
+        mock_internal_events_client.track_event.assert_called_once()
+        call_kwargs = mock_internal_events_client.track_event.call_args.kwargs
+        assert call_kwargs["event_name"] == "duo_workflow_compaction_executed"
+        assert call_kwargs["category"] == ConversationCompactor.__name__
+        additional_props = call_kwargs["additional_properties"]
+        assert additional_props.extra["status"] == "error"
+        assert additional_props.extra["model_name"] == "unknown"
+        assert additional_props.extra["error_type"] == "RuntimeError"
+        assert "duration_seconds" in additional_props.extra
+
+    @pytest.mark.asyncio
+    @patch.object(CompactionTokenEstimator, "estimate_complete_history")
+    @patch(
+        "duo_workflow_service.conversation.compaction.compactor.duo_workflow_metrics"
+    )
+    async def test_fire_compaction_event_noop_without_client(
+        self,
+        _mock_metrics,
+        mock_estimate,
+        mock_get_max_context,
+        compactor,
+        mock_prompt,
+    ):
+        """_fire_compaction_event should be a no-op when internal_events_client is None."""
+        mock_get_max_context.return_value = 400_000
+        mock_estimate.return_value = int(0.8 * 400_000)
+
+        summary_message = AIMessage(
+            content="Summary",
+            usage_metadata={
+                "input_tokens": 1000,
+                "output_tokens": 200,
+                "total_tokens": 1200,
+            },
+        )
+        mock_prompt.ainvoke.return_value = summary_message
+
+        messages = [HumanMessage(content="Initial query"), AIMessage(content="R1")]
+        for i in range(15):
+            messages.append(HumanMessage(content=f"M{i}"))
+            messages.append(AIMessage(content=f"R{i}"))
+
+        # compactor fixture has no internal_events_client (None)
+        result = await compactor.compact(messages)
+
+        # Should succeed without error -- no event is fired
+        assert result.was_compacted is True

@@ -34,6 +34,8 @@ class TestDuoWorkflowMetrics(unittest.TestCase):
             "agent_platform_receive_start_counter",
             "agent_platform_response_schema_output_counter",
             "agent_platform_flow_route_decision_counter",
+            "compaction_execution_counter",
+            "compaction_llm_duration",
         ]:
             mock_histogram = MagicMock()
             setattr(self.metrics, metric_name, mock_histogram)
@@ -427,6 +429,54 @@ class TestDuoWorkflowMetrics(unittest.TestCase):
             flow_type="fix_pipeline",
             component_name="fix_pipeline_decide_approach",
         )
+
+    def test_count_compaction_execution(self):
+        self._assert_counter_called(
+            "compaction_execution_counter",
+            "count_compaction_execution",
+            {
+                "flow_type": "developer",
+                "agent_name": "planner",
+                "status": "success",
+                "lsp_version": "unknown",
+                "gitlab_version": "unknown",
+                "client_type": "unknown",
+                "gitlab_realm": "unknown",
+                "is_gitlab_team_member": "unknown",
+            },
+            flow_type="developer",
+            agent_name="planner",
+            status="success",
+        )
+
+    def test_time_compaction_llm(self):
+        observe_mock = MagicMock()
+        labels_result_mock = MagicMock()
+        labels_result_mock.observe = observe_mock
+
+        cast(MagicMock, self.metrics.compaction_llm_duration.labels).return_value = (
+            labels_result_mock
+        )
+
+        with self.metrics.time_compaction_llm(
+            flow_type="developer", agent_name="planner"
+        ):
+            pass
+
+        cast(
+            MagicMock, self.metrics.compaction_llm_duration.labels
+        ).assert_called_once_with(
+            flow_type="developer",
+            agent_name="planner",
+            lsp_version="unknown",
+            gitlab_version="unknown",
+            client_type="unknown",
+            gitlab_realm="unknown",
+            is_gitlab_team_member="unknown",
+        )
+        observe_mock.assert_called_once()
+        args, _ = observe_mock.call_args
+        self.assertGreaterEqual(args[0], 0)
 
 
 if __name__ == "__main__":

@@ -5,6 +5,8 @@ from duo_workflow_service.conversation.compaction.compactor import ConversationC
 from duo_workflow_service.conversation.trimmer import apply_token_based_trim
 from duo_workflow_service.entities.state import get_model_max_context_token_limit
 from lib.feature_flags.context import FeatureFlag, is_feature_enabled
+from lib.internal_events.context import InternalEventAdditionalProperties
+from lib.internal_events.event_enum import EventEnum
 
 log = get_logger("compaction.integration")
 
@@ -14,6 +16,10 @@ async def maybe_compact_history(
     history: list[BaseMessage],
     agent_name: str,
 ) -> list[BaseMessage]:
+    """Compact or trim conversation history.
+
+    Uses compaction (LLM summarization) when enabled, otherwise falls back to legacy token-based trimming.
+    """
     # Compact history if enabled and ff is true otherwise fallback
     is_ff_on = is_feature_enabled(FeatureFlag.AI_CONTEXT_COMPACTION)
 
@@ -33,8 +39,36 @@ async def maybe_compact_history(
         ff_enable=is_ff_on,
         agent_name=agent_name,
     )
-    return apply_token_based_trim(
+    trim_result = apply_token_based_trim(
         messages=history,
         component_name=agent_name,
         max_context_tokens=get_model_max_context_token_limit(),
     )
+
+    # Reuse internal event client from compactor instance for now, will refactor it in
+    # https://gitlab.com/gitlab-org/modelops/applied-ml/code-suggestions/ai-assist/-/merge_requests/4862
+    if (
+        trim_result.was_trimmed
+        and compactor is not None
+        and compactor._internal_events_client is not None
+    ):
+        compactor._internal_events_client.track_event(
+            event_name=EventEnum.LEGACY_TRIM_EXECUTED.value,
+            additional_properties=InternalEventAdditionalProperties(
+                label=agent_name,
+                property="workflow_id",
+                value=compactor._workflow_id,
+                workflow_type=compactor._workflow_type,
+                tokens_before=trim_result.tokens_before,
+                tokens_after=trim_result.tokens_after,
+                tokens_removed=trim_result.tokens_before - trim_result.tokens_after,
+                messages_before=trim_result.messages_before,
+                messages_after=trim_result.messages_after,
+                token_budget=trim_result.token_budget,
+                max_context_tokens=trim_result.max_context_tokens,
+                duration_ms=trim_result.duration_ms,
+            ),
+            category="legacy_trimmer",
+        )
+
+    return trim_result.messages

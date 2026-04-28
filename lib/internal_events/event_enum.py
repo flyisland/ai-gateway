@@ -20,6 +20,8 @@ class EventEnum(StrEnum):
     ORBIT_DAP_TOOL_CALLED = "orbit_dap_tool_called"
     ORBIT_DAP_TOOL_FAILED = "orbit_dap_tool_failed"
     ORBIT_DAP_SESSION_SUMMARY = "orbit_dap_session_summary"
+    COMPACTION_EXECUTED = "duo_workflow_compaction_executed"
+    LEGACY_TRIM_EXECUTED = "duo_workflow_legacy_trim_executed"
 
 
 class EventLabelEnum(StrEnum):

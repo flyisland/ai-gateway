@@ -34,6 +34,12 @@ def mock_prompt_registry_fixture(mock_prompt):
     return mock_registry
 
 
+@pytest.fixture(name="mock_internal_events_client")
+def mock_internal_events_client_fixture():
+    """Mock InternalEventsClient for testing Snowplow event firing."""
+    return MagicMock()
+
+
 @pytest.fixture(name="compactor")
 def compactor_fixture(compaction_config, mock_prompt_registry, user):
     """Create a ConversationCompactor via the factory, using mock registry.
@@ -51,4 +57,24 @@ def compactor_fixture(compaction_config, mock_prompt_registry, user):
             agent_name="test_agent",
             workflow_id="test_workflow",
             workflow_type="test_type",
+        )
+
+
+@pytest.fixture(name="compactor_with_events")
+def compactor_with_events_fixture(
+    compaction_config, mock_prompt_registry, user, mock_internal_events_client
+):
+    """Create a ConversationCompactor with an InternalEventsClient for event testing."""
+    with patch(
+        "duo_workflow_service.conversation.compaction.compactor.get_model_metadata",
+        return_value=None,
+    ):
+        return create_conversation_compactor(
+            config=compaction_config,
+            prompt_registry=mock_prompt_registry,
+            user=user,
+            agent_name="test_agent",
+            workflow_id="test_workflow",
+            workflow_type="test_type",
+            internal_events_client=mock_internal_events_client,
         )

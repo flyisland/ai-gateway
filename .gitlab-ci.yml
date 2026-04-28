@@ -160,6 +160,7 @@ include:
       - if: $CI_SERVER_HOST == "gitlab.com"
     inputs:
       stage: "validate"
+      version: "1.0.2"
 
 # Overwrite internal_events_validation to start as soon as possible
 Internal event definitions validation:

@@ -1,0 +1,45 @@
+---
+description: Tracks each compaction LLM call execution with token and cost data
+internal_events: true
+action: duo_workflow_compaction_executed
+product_group: agent_foundations
+additional_properties:
+  label:
+    description: Agent name that triggered compaction
+  property:
+    description: Hardcoded string workflow_id
+  value:
+    description: Workflow Id for session correlation
+  status:
+    description: "success or error"
+  model_name:
+    description: Model used for compaction summarization
+  compaction_input_tokens:
+    description: Input tokens consumed by the compaction LLM call
+  compaction_output_tokens:
+    description: Output tokens produced by the compaction LLM call
+  tokens_before:
+    description: Total conversation tokens before compaction
+  tokens_after:
+    description: Total conversation tokens after compaction
+  tokens_saved:
+    description: Tokens saved by compaction (tokens_before - tokens_after)
+  compaction_ratio:
+    description: "Ratio of tokens removed (1 - tokens_after / tokens_before)"
+  messages_summarized:
+    description: Number of messages that were summarized
+  token_budget:
+    description: "The trim threshold in tokens (trim_threshold * max_context_tokens)"
+  max_context_tokens:
+    description: "The model's max context window size"
+  duration_seconds:
+    description: Wall-clock duration of the compaction LLM call
+  workflow_type:
+    description: "Type of workflow that triggered compaction (e.g. developer, chat)"
+  error_type:
+    description: Error class name if status is error, null otherwise
+milestone: '19.0'
+introduced_by_url: https://gitlab.com/gitlab-org/modelops/applied-ml/code-suggestions/ai-assist/-/merge_requests/5320
+tiers:
+  - premium
+  - ultimate

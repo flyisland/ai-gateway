@@ -11,6 +11,7 @@ from duo_workflow_service.conversation.compaction import (
 )
 from lib.events import GLReportingEventContext
 from lib.feature_flags.context import FeatureFlag, is_feature_enabled
+from lib.internal_events.client import InternalEventsClient
 
 
 def create_agent(
@@ -24,6 +25,7 @@ def create_agent(
     system_template_override: str | None,
     agent_name_override: str | None = None,
     compaction: CompactionConfig | None = None,
+    internal_events_client: InternalEventsClient | None = None,
 ) -> ChatAgent:
     # Use agent_name_override for chat-partial flows, default to "chat"
     agent_name = agent_name_override if agent_name_override else "chat"
@@ -57,6 +59,7 @@ def create_agent(
             agent_name=agent_name,
             workflow_id=workflow_id,
             workflow_type=workflow_type.value,
+            internal_events_client=internal_events_client,
         )
         if compaction
         else None

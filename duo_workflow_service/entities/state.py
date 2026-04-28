@@ -155,7 +155,7 @@ def _conversation_history_reducer(
             messages=combined_messages,
             component_name=agent_name,
             max_context_tokens=get_model_max_context_token_limit(),
-        )
+        ).messages
 
     return reduced
 

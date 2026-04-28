@@ -1,6 +1,6 @@
 """Tests for integration.py maybe_compact_history function."""
 
-from unittest.mock import AsyncMock, patch
+from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 from langchain_core.messages import HumanMessage
@@ -9,6 +9,7 @@ from duo_workflow_service.conversation.compaction import CompactionResult
 from duo_workflow_service.conversation.compaction.integration import (
     maybe_compact_history,
 )
+from duo_workflow_service.conversation.trimmer import TrimResult
 
 
 class TestMaybeCompactHistory:
@@ -30,7 +31,7 @@ class TestMaybeCompactHistory:
         """When compactor is None, should fall back to token-based trimming."""
         messages = [HumanMessage(content="test")]
         mock_get_max_context.return_value = 400_000
-        mock_trim.return_value = messages
+        mock_trim.return_value = TrimResult(messages=messages, was_trimmed=False)
 
         result = await maybe_compact_history(
             compactor=None,
@@ -63,7 +64,7 @@ class TestMaybeCompactHistory:
         messages = [HumanMessage(content="test")]
         mock_is_feature_enabled.return_value = False
         mock_get_max_context.return_value = 400_000
-        mock_trim.return_value = messages
+        mock_trim.return_value = TrimResult(messages=messages, was_trimmed=False)
 
         mock_compactor = AsyncMock()
 
@@ -154,7 +155,7 @@ class TestMaybeCompactHistory:
         """Empty history with no compactor should still call trimming."""
         messages = []
         mock_get_max_context.return_value = 400_000
-        mock_trim.return_value = messages
+        mock_trim.return_value = TrimResult(messages=messages, was_trimmed=False)
 
         result = await maybe_compact_history(
             compactor=None,
@@ -164,3 +165,174 @@ class TestMaybeCompactHistory:
 
         assert result == []
         mock_trim.assert_called_once()
+
+    @pytest.mark.asyncio
+    @patch(
+        "duo_workflow_service.conversation.compaction.integration.apply_token_based_trim"
+    )
+    @patch(
+        "duo_workflow_service.conversation.compaction.integration.get_model_max_context_token_limit"
+    )
+    @patch(
+        "duo_workflow_service.conversation.compaction.integration.is_feature_enabled"
+    )
+    async def test_legacy_trim_event_fires_when_trimmed(
+        self, mock_is_feature_enabled, mock_get_max_context, mock_trim
+    ):
+        """Should fire legacy_trim_executed event when trim actually trims.
+
+        The event fires via compactor._internal_events_client when the compactor exists but the feature flag is off
+        (fallback to trim).
+        """
+        messages = [HumanMessage(content="test")]
+        trimmed = [HumanMessage(content="trimmed")]
+        mock_get_max_context.return_value = 400_000
+        mock_trim.return_value = TrimResult(
+            messages=trimmed,
+            was_trimmed=True,
+            tokens_before=300_000,
+            tokens_after=200_000,
+            messages_before=50,
+            messages_after=30,
+            token_budget=280_000,
+            max_context_tokens=400_000,
+            duration_ms=12.5,
+        )
+
+        # The event fires via compactor._internal_events_client, so we
+        # need a compactor with the right private attributes set.
+        mock_events_client = MagicMock()
+        mock_compactor = MagicMock()
+        mock_compactor._internal_events_client = mock_events_client
+        mock_compactor._workflow_id = "wf-123"
+        mock_compactor._workflow_type = "developer"
+
+        # Feature flag is off → falls through to legacy trim
+        mock_is_feature_enabled.return_value = False
+
+        result = await maybe_compact_history(
+            compactor=mock_compactor,
+            history=messages,
+            agent_name="test_agent",
+        )
+
+        assert result == trimmed
+        mock_events_client.track_event.assert_called_once()
+        call_kwargs = mock_events_client.track_event.call_args.kwargs
+        assert call_kwargs["event_name"] == "duo_workflow_legacy_trim_executed"
+        assert call_kwargs["category"] == "legacy_trimmer"
+        additional_props = call_kwargs["additional_properties"]
+        assert additional_props.label == "test_agent"
+        assert additional_props.property == "workflow_id"
+        assert additional_props.value == "wf-123"
+        assert additional_props.extra["tokens_before"] == 300_000
+        assert additional_props.extra["tokens_after"] == 200_000
+        assert additional_props.extra["tokens_removed"] == 100_000
+
+    @pytest.mark.asyncio
+    @patch(
+        "duo_workflow_service.conversation.compaction.integration.apply_token_based_trim"
+    )
+    @patch(
+        "duo_workflow_service.conversation.compaction.integration.get_model_max_context_token_limit"
+    )
+    @patch(
+        "duo_workflow_service.conversation.compaction.integration.is_feature_enabled"
+    )
+    async def test_legacy_trim_event_does_not_fire_when_not_trimmed(
+        self, mock_is_feature_enabled, mock_get_max_context, mock_trim
+    ):
+        """Should NOT fire event when trim short-circuits (below threshold)."""
+        messages = [HumanMessage(content="test")]
+        mock_get_max_context.return_value = 400_000
+        mock_trim.return_value = TrimResult(messages=messages, was_trimmed=False)
+
+        mock_events_client = MagicMock()
+        mock_compactor = MagicMock()
+        mock_compactor._internal_events_client = mock_events_client
+        mock_compactor._workflow_id = "wf-123"
+        mock_compactor._workflow_type = "developer"
+
+        # Feature flag is off → falls through to legacy trim
+        mock_is_feature_enabled.return_value = False
+
+        result = await maybe_compact_history(
+            compactor=mock_compactor,
+            history=messages,
+            agent_name="test_agent",
+        )
+
+        assert result == messages
+        mock_events_client.track_event.assert_not_called()
+
+    @pytest.mark.asyncio
+    @patch(
+        "duo_workflow_service.conversation.compaction.integration.apply_token_based_trim"
+    )
+    @patch(
+        "duo_workflow_service.conversation.compaction.integration.get_model_max_context_token_limit"
+    )
+    @patch(
+        "duo_workflow_service.conversation.compaction.integration.is_feature_enabled"
+    )
+    async def test_legacy_trim_event_does_not_fire_without_client(
+        self, mock_is_feature_enabled, mock_get_max_context, mock_trim
+    ):
+        """Should NOT fire event when compactor._internal_events_client is None."""
+        messages = [HumanMessage(content="test")]
+        trimmed = [HumanMessage(content="trimmed")]
+        mock_get_max_context.return_value = 400_000
+        mock_trim.return_value = TrimResult(
+            messages=trimmed,
+            was_trimmed=True,
+            tokens_before=300_000,
+            tokens_after=200_000,
+        )
+
+        # Compactor exists but has no internal events client
+        mock_compactor = MagicMock()
+        mock_compactor._internal_events_client = None
+
+        # Feature flag is off → falls through to legacy trim
+        mock_is_feature_enabled.return_value = False
+
+        result = await maybe_compact_history(
+            compactor=mock_compactor,
+            history=messages,
+            agent_name="test_agent",
+        )
+
+        assert result == trimmed
+
+    @pytest.mark.asyncio
+    @patch(
+        "duo_workflow_service.conversation.compaction.integration.apply_token_based_trim"
+    )
+    @patch(
+        "duo_workflow_service.conversation.compaction.integration.get_model_max_context_token_limit"
+    )
+    @patch(
+        "duo_workflow_service.conversation.compaction.integration.is_feature_enabled"
+    )
+    async def test_no_event_when_compactor_is_none(
+        self, mock_is_feature_enabled, mock_get_max_context, mock_trim
+    ):
+        """No event fires when compactor is None (no client to fire with)."""
+        messages = [HumanMessage(content="test")]
+        trimmed = [HumanMessage(content="trimmed")]
+        mock_get_max_context.return_value = 400_000
+        mock_trim.return_value = TrimResult(
+            messages=trimmed,
+            was_trimmed=True,
+            tokens_before=300_000,
+            tokens_after=200_000,
+        )
+
+        result = await maybe_compact_history(
+            compactor=None,
+            history=messages,
+            agent_name="test_agent",
+        )
+
+        # compactor is None → event block is skipped entirely
+        assert result == trimmed

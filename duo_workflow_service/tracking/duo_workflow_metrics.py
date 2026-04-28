@@ -169,6 +169,21 @@ class DuoWorkflowMetrics:  # pylint: disable=too-many-instance-attributes
             registry=registry,
         )
 
+        self.compaction_execution_counter = Counter(
+            "compaction_execution_total",
+            "Count of compaction LLM call executions",
+            ["flow_type", "agent_name", "status"] + METADATA_LABELS,
+            registry=registry,
+        )
+
+        self.compaction_llm_duration = Histogram(
+            "compaction_llm_duration_seconds",
+            "Duration of compaction summarization LLM calls",
+            ["flow_type", "agent_name"] + METADATA_LABELS,
+            registry=registry,
+            buckets=LLM_TIME_SCALE_BUCKETS,
+        )
+
         self.time_to_first_response = Histogram(
             "duo_workflow_time_to_first_response_seconds",
             "Time from ExecuteWorkflow call to first outgoing action",
@@ -304,6 +319,30 @@ class DuoWorkflowMetrics:  # pylint: disable=too-many-instance-attributes
             is_default_route=str(is_default_route).lower(),
             **build_metadata_labels(),
         ).inc()
+
+    def count_compaction_execution(
+        self,
+        flow_type: str = "unknown",
+        agent_name: str = "unknown",
+        status: str = "unknown",
+    ) -> None:
+        self.compaction_execution_counter.labels(
+            flow_type=flow_type,
+            agent_name=agent_name,
+            status=status,
+            **build_metadata_labels(),
+        ).inc()
+
+    def time_compaction_llm(
+        self, flow_type: str = "unknown", agent_name: str = "unknown"
+    ):
+        return self._timer(
+            lambda duration: self.compaction_llm_duration.labels(
+                flow_type=flow_type,
+                agent_name=agent_name,
+                **build_metadata_labels(),
+            ).observe(duration)
+        )
 
     def time_tool_call(self, tool_name="unknown", flow_type="unknown"):
         return self._timer(

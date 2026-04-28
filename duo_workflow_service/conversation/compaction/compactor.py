@@ -1,3 +1,5 @@
+import time
+from enum import StrEnum
 from typing import cast
 
 from gitlab_cloud_connector import CloudConnectorUser
@@ -20,8 +22,12 @@ from duo_workflow_service.conversation.compaction.utils import (
     strip_tool_metadata,
 )
 from duo_workflow_service.entities.state import get_model_max_context_token_limit
+from duo_workflow_service.monitoring import duo_workflow_metrics
 from lib.context import StarletteUser
 from lib.context.model import get_model_metadata
+from lib.internal_events.client import InternalEventsClient
+from lib.internal_events.context import InternalEventAdditionalProperties
+from lib.internal_events.event_enum import EventEnum
 
 log = get_logger("compactor")
 
@@ -31,6 +37,11 @@ COMPACTION_PROMPT_VERSION = "^1.0.0"
 COMPACTION_CONTINUE_MESSAGE = (
     "Continue working on the task based on the conversation above."
 )
+
+
+class CompactionStatus(StrEnum):
+    SUCCESS = "success"
+    ERROR = "error"
 
 
 class ConversationCompactor:
@@ -49,6 +60,7 @@ class ConversationCompactor:
         agent_name: str,
         workflow_id: str,
         workflow_type: str,
+        internal_events_client: InternalEventsClient | None = None,
     ):
         # Use the same (default) model as the parent workflow rather than a
         # smaller variant.  The compaction trigger threshold is based on the
@@ -71,8 +83,14 @@ class ConversationCompactor:
                 "agent_name": agent_name,
                 "workflow_id": workflow_id,
                 "workflow_type": workflow_type,
+                "is_compaction_call": True,
             },
         )
+        self._agent_name = agent_name
+        self._workflow_id = workflow_id
+        self._workflow_type = workflow_type
+        self._model_name = getattr(model_metadata, "name", "unknown")
+        self._internal_events_client = internal_events_client
         self._config = config
         self._token_estimator = token_estimator
         prompt_tpl = cast(ChatPromptTemplate, self._prompt.prompt_tpl)
@@ -136,10 +154,40 @@ class ConversationCompactor:
             return CompactionResult(messages=messages, was_compacted=False)
 
         original_tokens = self._token_estimator.estimate_complete_history(messages)
+        start_time = time.time()
 
         try:
-            summary = await self._invoke_summarizer(slices.to_summarize)
+            with duo_workflow_metrics.time_compaction_llm(
+                flow_type=self._workflow_type,
+                agent_name=self._agent_name,
+            ):
+                summary = await self._invoke_summarizer(slices.to_summarize)
+            duration = time.time() - start_time
+
+            # Prometheus counter
+            duo_workflow_metrics.count_compaction_execution(
+                flow_type=self._workflow_type,
+                agent_name=self._agent_name,
+                status=CompactionStatus.SUCCESS,
+            )
         except Exception as e:
+            duration = time.time() - start_time
+
+            # Prometheus counter for failure
+            duo_workflow_metrics.count_compaction_execution(
+                flow_type=self._workflow_type,
+                agent_name=self._agent_name,
+                status=CompactionStatus.ERROR,
+            )
+
+            self._fire_compaction_event(
+                status=CompactionStatus.ERROR,
+                model_name=self._model_name,
+                tokens_before=original_tokens,
+                duration_seconds=duration,
+                error_type=type(e).__name__,
+            )
+
             log.error(
                 "Failed to summarize messages, keeping original",
                 error=str(e),
@@ -168,6 +216,31 @@ class ConversationCompactor:
             compacted_messages.append(HumanMessage(content=COMPACTION_CONTINUE_MESSAGE))
 
         compacted_tokens = self._calculate_compacted_tokens(original_tokens, summary)
+
+        # Extract token usage from the summary for the Snowplow event
+        usage = summary.usage_metadata
+        compaction_input_tokens = usage.get("input_tokens", 0) if usage else 0
+        compaction_output_tokens = usage.get("output_tokens", 0) if usage else 0
+
+        max_context_tokens = get_model_max_context_token_limit()
+        self._fire_compaction_event(
+            status=CompactionStatus.SUCCESS,
+            model_name=self._model_name,
+            compaction_input_tokens=compaction_input_tokens,
+            compaction_output_tokens=compaction_output_tokens,
+            tokens_before=original_tokens,
+            tokens_after=compacted_tokens,
+            tokens_saved=original_tokens - compacted_tokens,
+            compaction_ratio=(
+                round(1 - compacted_tokens / original_tokens, 4)
+                if original_tokens > 0
+                else 0
+            ),
+            messages_summarized=len(slices.to_summarize),
+            token_budget=int(self._config.trim_threshold * max_context_tokens),
+            max_context_tokens=max_context_tokens,
+            duration_seconds=round(duration, 3),
+        )
 
         log.info(
             "Finish context compaction",
@@ -221,6 +294,22 @@ class ConversationCompactor:
             + output_tokens
         )
 
+    def _fire_compaction_event(self, **kwargs) -> None:
+        """Fire a compaction_executed Snowplow event."""
+        if self._internal_events_client is None:
+            return
+        self._internal_events_client.track_event(
+            event_name=EventEnum.COMPACTION_EXECUTED.value,
+            additional_properties=InternalEventAdditionalProperties(
+                label=self._agent_name,
+                property="workflow_id",
+                value=self._workflow_id,
+                workflow_type=self._workflow_type,
+                **kwargs,
+            ),
+            category=self.__class__.__name__,
+        )
+
 
 def create_conversation_compactor(
     config: CompactionConfig,
@@ -229,6 +318,7 @@ def create_conversation_compactor(
     agent_name: str,
     workflow_id: str,
     workflow_type: str,
+    internal_events_client: InternalEventsClient | None = None,
 ) -> ConversationCompactor:
     return ConversationCompactor(
         prompt_registry=prompt_registry,
@@ -238,4 +328,5 @@ def create_conversation_compactor(
         agent_name=agent_name,
         workflow_id=workflow_id,
         workflow_type=workflow_type,
+        internal_events_client=internal_events_client,
     )
