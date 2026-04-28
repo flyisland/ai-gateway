@@ -103,6 +103,17 @@ query GetGroupWorkItem(
                             name
                         }
                     }
+                    ... on WorkItemWidgetCurrentUserTodos {
+                        currentUserTodos(state: pending) {
+                            nodes {
+                                id
+                                createdAt
+                                body
+                                targetUrl
+                                action
+                            }
+                        }
+                    }
                     ... on WorkItemWidgetHierarchy {
                         parent {
                             id
