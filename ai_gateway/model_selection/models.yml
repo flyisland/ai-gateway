@@ -573,6 +573,9 @@ models:
       model: gpt-5-codex
       verbosity: "medium"
       max_tokens: 128_000
+    deprecation:
+      deprecation_date: "2026-04-23"
+      removal_version: "19.2"
 
   # proxy endpoint only
   - name: "GPT-5 - OpenAI (alias)"
@@ -609,6 +612,9 @@ models:
     params:
       model: gpt-5.1-codex
       max_tokens: 128_000
+    deprecation:
+      deprecation_date: "2026-04-23"
+      removal_version: "19.2"
 
   - name: "GPT-5.2-Codex - OpenAI"
     provider: "OpenAI"
@@ -622,6 +628,9 @@ models:
       model: gpt-5.2-codex
       verbosity: "medium"
       max_tokens: 128_000
+    deprecation:
+      deprecation_date: "2026-04-23"
+      removal_version: "19.2"
 
   - name: "GPT-5.3-Codex - OpenAI"
     provider: "OpenAI"
