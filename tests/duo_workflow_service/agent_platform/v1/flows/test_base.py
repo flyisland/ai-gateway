@@ -56,17 +56,10 @@ class TestFlow:  # pylint: disable=too-many-public-methods
     def flow_type_fixture(self) -> GLReportingEventContext:
         return GLReportingEventContext.from_workflow_definition("chat")
 
-    @pytest.fixture(name="mock_project")
-    def mock_project_fixture(self):
-        """Fixture providing mock project data."""
-        return {
-            "id": 123,
-            "name": "test-project",
-            "web_url": "https://gitlab.com/test/project",
-        }
-
     @pytest.fixture(name="mock_state_graph")
-    def mock_state_graph_fixture(self, mock_project):
+    def mock_state_graph_fixture(
+        self, mock_fetch_workflow_and_container_data
+    ):  # pylint: disable=unused-argument
         # Create mock StateGraph and compiled graph
         mock_state_graph = Mock(spec=StateGraph)
         mock_compiled_graph = Mock()
@@ -96,9 +89,6 @@ class TestFlow:  # pylint: disable=too-many-public-methods
                 },
             ),
             patch(
-                "duo_workflow_service.workflows.abstract_workflow.fetch_workflow_and_container_data"
-            ) as mock_fetch,
-            patch(
                 "duo_workflow_service.workflows.abstract_workflow.UserInterface",
                 return_value=ui_notifier,
             ),
@@ -110,19 +100,6 @@ class TestFlow:  # pylint: disable=too-many-public-methods
                 return_value=mock_state_graph,
             ),
         ):
-            mock_fetch.return_value = (
-                mock_project,
-                None,
-                {
-                    "agent_privileges_names": [],
-                    "pre_approved_agent_privileges_names": [],
-                    "allow_agent_to_request_user": False,
-                    "mcp_enabled": False,
-                    "first_checkpoint": None,
-                    "workflow_status": "",
-                    "gitlab_host": "gitlab.com",
-                },
-            )
             mock_parser.extract_host_from_url.return_value = "gitlab.com"
 
             yield mock_state_graph
@@ -247,12 +224,17 @@ class TestFlow:  # pylint: disable=too-many-public-methods
 
     @pytest.mark.asyncio
     @pytest.mark.parametrize(
-        "status_event,goal,expected_type,checkpoint_tuple_present",
+        "status_event,goal,expected_type,first_checkpoint",
         [
-            (WorkflowStatusEventEnum.START, "test goal", dict, False),
-            ("unknown_event", "test goal", type(None), False),
-            (WorkflowStatusEventEnum.RETRY, "test goal", type(None), True),
-            (WorkflowStatusEventEnum.RETRY, "test goal", dict, False),
+            (WorkflowStatusEventEnum.START, "test goal", dict, None),
+            ("unknown_event", "test goal", type(None), None),
+            (
+                WorkflowStatusEventEnum.RETRY,
+                "test goal",
+                type(None),
+                {"checkpoint": "test"},
+            ),
+            (WorkflowStatusEventEnum.RETRY, "test goal", dict, None),
         ],
         ids=[
             "start_event",
@@ -261,39 +243,20 @@ class TestFlow:  # pylint: disable=too-many-public-methods
             "retry_without_checkpoint",
         ],
     )
+    @pytest.mark.usefixtures("mock_fetch_workflow_and_container_data")
     async def test_graph_input(
         self,
         flow_instance: Flow,
         status_event,
         goal,
         expected_type,
-        checkpoint_tuple_present,
         mock_checkpointer,
         mock_state_graph,
-        mock_project,
+        project,
     ):
         """Test get_graph_input returns appropriate input based on status event."""
         mock_checkpointer.initial_status_event = status_event
-        if checkpoint_tuple_present:
-            with patch(
-                "duo_workflow_service.workflows.abstract_workflow.fetch_workflow_and_container_data"
-            ) as mock_fetch:
-                mock_fetch.return_value = (
-                    mock_project,
-                    None,
-                    {
-                        "agent_privileges_names": [],
-                        "pre_approved_agent_privileges_names": [],
-                        "allow_agent_to_request_user": False,
-                        "mcp_enabled": False,
-                        "first_checkpoint": {"checkpoint": "test"},
-                        "workflow_status": "",
-                        "gitlab_host": "gitlab.com",
-                    },
-                )
-                await flow_instance.run(goal)
-        else:
-            await flow_instance.run(goal)
+        await flow_instance.run(goal)
 
         kwargs = mock_state_graph.compile.return_value.astream.call_args[1]
 
@@ -301,7 +264,7 @@ class TestFlow:  # pylint: disable=too-many-public-methods
         if expected_type == dict:
             assert isinstance(input, expected_type)
             assert input["context"]["goal"] == goal
-            assert input["context"]["project_id"] == mock_project["id"]
+            assert input["context"]["project_id"] == project["id"]
             assert input["status"] == WorkflowStatusEnum.NOT_STARTED
             assert "conversation_history" in input
             assert "ui_chat_log" in input

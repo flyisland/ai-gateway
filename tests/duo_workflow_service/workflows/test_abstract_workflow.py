@@ -139,17 +139,6 @@ def langsmith_trace_headers():
     }
 
 
-@pytest.fixture(name="mock_project")
-def mock_project_fixture():
-    return {
-        "id": MagicMock(),
-        "description": MagicMock(),
-        "name": MagicMock(),
-        "http_url_to_repo": MagicMock(),
-        "web_url": "https://example.com/project",
-    }
-
-
 @pytest.fixture(name="mock_namespace")
 def mock_namespace_fixture():
     return {
@@ -231,9 +220,6 @@ async def test_set_action_response(workflow):
 
 
 @pytest.mark.asyncio
-@patch(
-    "duo_workflow_service.workflows.abstract_workflow.fetch_workflow_and_container_data"
-)
 @patch("duo_workflow_service.workflows.abstract_workflow.convert_mcp_tools_to_configs")
 @patch("duo_workflow_service.workflows.abstract_workflow.GitLabWorkflow")
 @patch("duo_workflow_service.workflows.abstract_workflow.ToolsRegistry.configure")
@@ -242,8 +228,8 @@ async def test_compile_and_run_graph(
     mock_tools_registry,
     mock_gitlab_workflow,
     mock_convert_mcp_tools,
-    mock_fetch_workflow,
-    mock_project,
+    mock_fetch_workflow_and_container_data,
+    project,
     mcp_enabled,
     user,
 ):
@@ -253,20 +239,6 @@ async def test_compile_and_run_graph(
     mock_checkpointer.aget_tuple = AsyncMock(return_value=None)
     mock_checkpointer.initial_status_event = "START"
     mock_gitlab_workflow.return_value.__aenter__.return_value = mock_checkpointer
-    mock_fetch_workflow.return_value = (
-        mock_project,
-        None,
-        {
-            "project_id": 1,
-            "mcp_enabled": mcp_enabled,
-            "agent_privileges_names": [],
-            "pre_approved_agent_privileges_names": [],
-            "allow_agent_to_request_user": False,
-            "first_checkpoint": None,
-            "workflow_status": "",
-            "gitlab_host": "example.com",
-        },
-    )
 
     mcp_tool = MagicMock()
     mock_convert_mcp_tools.return_value = [mcp_tool]
@@ -286,14 +258,14 @@ async def test_compile_and_run_graph(
     assert workflow.is_done
     assert (
         workflow._session_url
-        == "https://example.com/project/-/automate/agent-sessions/id"
+        == "https://gitlab.com/test/repo/-/automate/agent-sessions/id"
     )
-    mock_fetch_workflow.assert_called_once()
+    mock_fetch_workflow_and_container_data.assert_called_once()
     mock_tools_registry.assert_called_once_with(
         outbox=workflow._outbox,
         workflow_config=workflow._workflow_config,
         gl_http_client=workflow._http_client,
-        project=mock_project,
+        project=project,
         mcp_tools=[mcp_tool] if mcp_enabled else [],
         language_server_version=None,
     )
@@ -360,45 +332,37 @@ def test_track_internal_event(workflow, internal_event_client: Mock):
 
 
 @pytest.mark.asyncio
-@patch(
-    "duo_workflow_service.workflows.abstract_workflow.fetch_workflow_and_container_data"
-)
 @patch("duo_workflow_service.workflows.abstract_workflow.GitLabWorkflow")
 @patch("duo_workflow_service.workflows.abstract_workflow.ToolsRegistry.configure")
 async def test_compile_and_run_graph_with_exception(
     mock_tools_registry,
     mock_gitlab_workflow,
-    mock_fetch_workflow,
+    mock_fetch_workflow_and_container_data,
     workflow,
-    mock_project,
 ):
     # Setup mocks to raise an exception
     mock_tools_registry.side_effect = Exception("Test exception")
-    mock_fetch_workflow.return_value = (mock_project, None, {"project_id": 1})
 
     with pytest.raises(TraceableException) as exc_info:
         await workflow._compile_and_run_graph("Test goal")
 
     mock_tools_registry.assert_called_once()
-    mock_fetch_workflow.assert_called_once()
+    mock_fetch_workflow_and_container_data.assert_called_once()
     assert workflow.is_done
     assert isinstance(exc_info.value.original_exception, Exception)
     assert str(exc_info.value.original_exception) == "Test exception"
 
 
 @pytest.mark.asyncio
-@patch(
-    "duo_workflow_service.workflows.abstract_workflow.fetch_workflow_and_container_data"
-)
 @patch("duo_workflow_service.workflows.abstract_workflow.UserInterface")
 async def test_compile_and_run_graph_with_cancellation_during_fetch(
     mock_user_interface,
-    mock_fetch_workflow,
+    mock_fetch_workflow_and_container_data,
     workflow,
 ):
     from duo_workflow_service.entities.state import WorkflowStatusEnum
 
-    mock_fetch_workflow.side_effect = asyncio.CancelledError(
+    mock_fetch_workflow_and_container_data.side_effect = asyncio.CancelledError(
         AIO_CANCEL_STOP_WORKFLOW_REQUEST
     )
 
@@ -408,7 +372,7 @@ async def test_compile_and_run_graph_with_cancellation_during_fetch(
     with pytest.raises(TraceableException) as exc_info:
         await workflow._compile_and_run_graph("Test goal")
 
-    mock_fetch_workflow.assert_called_once()
+    mock_fetch_workflow_and_container_data.assert_called_once()
     assert workflow.is_done
     assert isinstance(exc_info.value.original_exception, asyncio.CancelledError)
     assert str(exc_info.value.original_exception) == AIO_CANCEL_STOP_WORKFLOW_REQUEST
@@ -441,17 +405,27 @@ async def test_run_passes_correct_metadata_to_langsmith_extra(
 
 
 @pytest.mark.asyncio
-@patch(
-    "duo_workflow_service.workflows.abstract_workflow.fetch_workflow_and_container_data"
+@pytest.mark.parametrize(
+    "project,namespace",
+    [
+        (
+            None,
+            {
+                "id": 123,
+                "name": "test-namespace",
+                "description": "This is a test namespace",
+                "web_url": "https://gitlab.com/test",
+            },
+        )
+    ],
 )
+@pytest.mark.usefixtures("mock_fetch_workflow_and_container_data")
 @patch("duo_workflow_service.workflows.abstract_workflow.GitLabWorkflow")
 @patch("duo_workflow_service.workflows.abstract_workflow.ToolsRegistry.configure")
 async def test_namespace_level_workflow(
     mock_tools_registry,
     mock_gitlab_workflow,
-    mock_fetch_workflow,
     workflow,
-    mock_namespace,
 ):
     # Setup mocks
     mock_tools_registry.return_value = MagicMock()
@@ -459,20 +433,6 @@ async def test_namespace_level_workflow(
     mock_checkpointer.aget_tuple = AsyncMock(return_value=None)
     mock_checkpointer.initial_status_event = "START"
     mock_gitlab_workflow.return_value.__aenter__.return_value = mock_checkpointer
-    mock_fetch_workflow.return_value = (
-        None,
-        mock_namespace,
-        {
-            "namespace_id": 1,
-            "agent_privileges_names": [],
-            "pre_approved_agent_privileges_names": [],
-            "allow_agent_to_request_user": False,
-            "mcp_enabled": False,
-            "first_checkpoint": None,
-            "workflow_status": "",
-            "gitlab_host": "example.com",
-        },
-    )
 
     # Run the method
     with pytest.raises(TraceableException) as exc_info:
@@ -584,9 +544,7 @@ async def test_tracing_context_with_parent_trace_headers(
 
 
 @pytest.mark.asyncio
-@patch(
-    "duo_workflow_service.workflows.abstract_workflow.fetch_workflow_and_container_data"
-)
+@pytest.mark.usefixtures("mock_fetch_workflow_and_container_data")
 @patch("duo_workflow_service.workflows.abstract_workflow.GitLabWorkflow")
 @patch("duo_workflow_service.workflows.abstract_workflow.ToolsRegistry.configure")
 @patch("duo_workflow_service.workflows.abstract_workflow.duo_workflow_metrics")
@@ -594,8 +552,6 @@ async def test_compile_and_run_graph_records_first_response_on_first_graph_updat
     mock_metrics,
     mock_tools_registry,
     mock_gitlab_workflow,
-    mock_fetch_workflow,
-    mock_project,
     user,
 ):
     """Test that _compile_and_run_graph records time to first response when graph is updated."""
@@ -611,20 +567,6 @@ async def test_compile_and_run_graph_records_first_response_on_first_graph_updat
     mock_checkpointer.aget_tuple = AsyncMock(return_value=None)
     mock_checkpointer.initial_status_event = "START"
     mock_gitlab_workflow.return_value.__aenter__.return_value = mock_checkpointer
-    mock_fetch_workflow.return_value = (
-        mock_project,
-        None,
-        {
-            "project_id": 1,
-            "agent_privileges_names": [],
-            "pre_approved_agent_privileges_names": [],
-            "allow_agent_to_request_user": False,
-            "mcp_enabled": False,
-            "first_checkpoint": None,
-            "workflow_status": "",
-            "gitlab_host": "example.com",
-        },
-    )
 
     workflow = MockWorkflow(
         "id",
@@ -642,16 +584,12 @@ async def test_compile_and_run_graph_records_first_response_on_first_graph_updat
 
 
 @pytest.mark.asyncio
-@patch(
-    "duo_workflow_service.workflows.abstract_workflow.fetch_workflow_and_container_data"
-)
+@pytest.mark.usefixtures("mock_fetch_workflow_and_container_data")
 @patch("duo_workflow_service.workflows.abstract_workflow.GitLabWorkflow")
 @patch("duo_workflow_service.workflows.abstract_workflow.ToolsRegistry.configure")
 async def test_compile_and_run_graph_returns_final_response_content(
     mock_tools_registry,
     mock_gitlab_workflow,
-    mock_fetch_workflow,
-    mock_project,
     user,
 ):
     """Test that _compile_and_run_graph returns the final response content from ui_chat_log."""
@@ -660,20 +598,6 @@ async def test_compile_and_run_graph_returns_final_response_content(
     mock_checkpointer.aget_tuple = AsyncMock(return_value=None)
     mock_checkpointer.initial_status_event = "START"
     mock_gitlab_workflow.return_value.__aenter__.return_value = mock_checkpointer
-    mock_fetch_workflow.return_value = (
-        mock_project,
-        None,
-        {
-            "project_id": 1,
-            "agent_privileges_names": [],
-            "pre_approved_agent_privileges_names": [],
-            "allow_agent_to_request_user": False,
-            "mcp_enabled": False,
-            "first_checkpoint": None,
-            "workflow_status": "",
-            "gitlab_host": "example.com",
-        },
-    )
 
     workflow = MockWorkflow(
         "id",
@@ -690,16 +614,12 @@ async def test_compile_and_run_graph_returns_final_response_content(
 
 
 @pytest.mark.asyncio
-@patch(
-    "duo_workflow_service.workflows.abstract_workflow.fetch_workflow_and_container_data"
-)
+@pytest.mark.usefixtures("mock_fetch_workflow_and_container_data")
 @patch("duo_workflow_service.workflows.abstract_workflow.GitLabWorkflow")
 @patch("duo_workflow_service.workflows.abstract_workflow.ToolsRegistry.configure")
 async def test_compile_and_run_graph_returns_none_when_no_ui_chat_log(
     mock_tools_registry,
     mock_gitlab_workflow,
-    mock_fetch_workflow,
-    mock_project,
     user,
 ):
     """Test that _compile_and_run_graph returns None when ui_chat_log is empty."""
@@ -713,20 +633,6 @@ async def test_compile_and_run_graph_returns_none_when_no_ui_chat_log(
     mock_checkpointer.aget_tuple = AsyncMock(return_value=None)
     mock_checkpointer.initial_status_event = "START"
     mock_gitlab_workflow.return_value.__aenter__.return_value = mock_checkpointer
-    mock_fetch_workflow.return_value = (
-        mock_project,
-        None,
-        {
-            "project_id": 1,
-            "agent_privileges_names": [],
-            "pre_approved_agent_privileges_names": [],
-            "allow_agent_to_request_user": False,
-            "mcp_enabled": False,
-            "first_checkpoint": None,
-            "workflow_status": "",
-            "gitlab_host": "example.com",
-        },
-    )
 
     workflow = MockWorkflow(
         "id",
@@ -743,9 +649,7 @@ async def test_compile_and_run_graph_returns_none_when_no_ui_chat_log(
 
 
 @pytest.mark.asyncio
-@patch(
-    "duo_workflow_service.workflows.abstract_workflow.fetch_workflow_and_container_data"
-)
+@pytest.mark.usefixtures("mock_fetch_workflow_and_container_data")
 @patch("duo_workflow_service.workflows.abstract_workflow.convert_mcp_tools_to_configs")
 @patch("duo_workflow_service.workflows.abstract_workflow.GitLabWorkflow")
 @patch("duo_workflow_service.workflows.abstract_workflow.ToolsRegistry.configure")
@@ -755,7 +659,6 @@ async def test_compile_and_run_graph_notifiable_exception_handling(
     mock_tools_registry,
     mock_gitlab_workflow,
     mock_convert_mcp_tools,
-    mock_fetch_workflow,
     user,
 ):
     """Test that NotifiableException is caught and properly converted to error state with UI notification."""
@@ -779,22 +682,6 @@ async def test_compile_and_run_graph_notifiable_exception_handling(
     mock_checkpointer.initial_status_event = "START"
     mock_checkpointer.send_event = AsyncMock()
     mock_gitlab_workflow.return_value.__aenter__.return_value = mock_checkpointer
-
-    mock_project = MagicMock()
-    mock_fetch_workflow.return_value = (
-        mock_project,
-        None,
-        {
-            "project_id": 1,
-            "mcp_enabled": False,
-            "agent_privileges_names": [],
-            "pre_approved_agent_privileges_names": [],
-            "allow_agent_to_request_user": False,
-            "first_checkpoint": None,
-            "workflow_status": "",
-            "gitlab_host": "example.com",
-        },
-    )
 
     mcp_tool = MagicMock()
     mock_convert_mcp_tools.return_value = [mcp_tool]

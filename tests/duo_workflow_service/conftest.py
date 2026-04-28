@@ -6,6 +6,7 @@ import pytest
 from gitlab_cloud_connector import CloudConnectorUser, UserClaims
 
 from duo_workflow_service.components.tools_registry import ToolMetadata, ToolsRegistry
+from duo_workflow_service.entities.event import WorkflowEvent
 from duo_workflow_service.entities.state import (
     Plan,
     Task,
@@ -13,7 +14,7 @@ from duo_workflow_service.entities.state import (
     WorkflowStatusEnum,
 )
 from duo_workflow_service.executor.outbox import Outbox
-from duo_workflow_service.gitlab.gitlab_api import Project
+from duo_workflow_service.gitlab.gitlab_api import Namespace, Project
 from duo_workflow_service.gitlab.http_client import GitlabHttpClient
 from lib.context import gitlab_version
 from lib.events import GLReportingEventContext
@@ -176,3 +177,92 @@ def user_fixture():
             issuer="gitlab-duo-workflow-service",
         ),
     )
+
+
+@pytest.fixture(name="namespace")
+def namespace_fixture() -> Namespace | None:
+    return None
+
+
+@pytest.fixture(name="agent_privileges_names")
+def agent_privileges_names_fixture() -> list[str]:
+    return []
+
+
+@pytest.fixture(name="mcp_enabled")
+def mcp_enabled_fixture() -> bool:
+    return False
+
+
+@pytest.fixture(name="allow_agent_to_request_user")
+def allow_agent_to_request_user_fixture() -> bool:
+    return False
+
+
+@pytest.fixture(name="first_checkpoint")
+def first_checkpoint_fixture() -> dict[str, Any] | None:
+    return None
+
+
+@pytest.fixture(name="workflow_config")
+def workflow_config_fixture(
+    agent_privileges_names: list[str],
+    allow_agent_to_request_user: bool,
+    mcp_enabled: bool,
+    first_checkpoint: dict[str, Any],
+) -> dict[str, Any]:
+    return {
+        "project_id": 1,
+        "agent_privileges_names": agent_privileges_names,
+        "pre_approved_agent_privileges_names": [],
+        "allow_agent_to_request_user": allow_agent_to_request_user,
+        "mcp_enabled": mcp_enabled,
+        "first_checkpoint": first_checkpoint,
+        "latest_checkpoint": None,
+        "workflow_status": "",
+        "gitlab_host": "gitlab.com",
+        "archived": False,
+        "stalled": False,
+    }
+
+
+@pytest.fixture(name="mock_fetch_workflow_and_container_data")
+def mock_fetch_workflow_and_container_data_fixture(
+    project: Project, namespace: Namespace | None, workflow_config: dict[str, Any]
+):
+    with patch(
+        "duo_workflow_service.workflows.abstract_workflow.fetch_workflow_and_container_data"
+    ) as mock:
+        mock.return_value = (project, namespace, workflow_config)
+        yield mock
+
+
+@pytest.fixture(name="mock_gitlab_workflow_aget_tuple")
+def mock_gitlab_workflow_aget_tuple_fixture():
+    with patch(
+        "duo_workflow_service.workflows.abstract_workflow.GitLabWorkflow.aget_tuple",
+        return_value=None,
+    ) as mock:
+        yield mock
+
+
+@pytest.fixture(name="mock_gitlab_workflow_aput")
+def mock_gitlab_workflow_aput_fixture():
+    with patch(
+        "duo_workflow_service.workflows.abstract_workflow.GitLabWorkflow.aput",
+        return_value=None,
+    ) as mock:
+        yield mock
+
+
+@pytest.fixture(name="event")
+def event_fixture() -> WorkflowEvent | None:
+    return None
+
+
+@pytest.fixture(name="mock_get_event")
+def mock_get_event_fixture(event: WorkflowEvent | None):
+    with patch(
+        "duo_workflow_service.agents.agent.get_event", return_value=event
+    ) as mock:
+        yield mock

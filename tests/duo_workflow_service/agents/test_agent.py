@@ -13,7 +13,6 @@ from duo_workflow_service.conversation.compaction import (
     ConversationCompactor,
 )
 from duo_workflow_service.entities import WorkflowEventType
-from duo_workflow_service.entities.event import WorkflowEvent
 from duo_workflow_service.entities.state import (
     DuoWorkflowStateType,
     MessageTypeEnum,
@@ -142,7 +141,6 @@ Human message"""
         assert result["conversation_history"][prompt_name] == [mock_response]
 
     @pytest.mark.asyncio
-    @patch("duo_workflow_service.agents.agent.get_event")
     @pytest.mark.parametrize("check_events", [True, False])
     @pytest.mark.parametrize(
         "last_human_input",
@@ -276,7 +274,6 @@ Human message"""
             assert len(result["ui_chat_log"]) == 0
 
     @pytest.mark.asyncio
-    @patch("duo_workflow_service.agents.agent.get_event")
     @pytest.mark.parametrize(
         ("event", "expected_status"),
         [
@@ -298,15 +295,13 @@ Human message"""
             ),
         ],
     )
+    @pytest.mark.usefixtures("mock_get_event")
     async def test_run_with_cancelled_workflow(
         self,
-        mock_get_event: Mock,
         agent: Agent,
         workflow_state: DuoWorkflowStateType,
-        event: WorkflowEvent | None,
         expected_status: WorkflowStatusEnum,
     ):
-        mock_get_event.return_value = event
         result = await agent.run(workflow_state)
 
         if expected_status:
@@ -476,11 +471,10 @@ def test_create_agent_without_compaction_config(
 
 class TestAgentCompaction:
     @pytest.mark.asyncio
+    @pytest.mark.usefixtures("mock_get_event")
     @patch("duo_workflow_service.agents.agent.maybe_compact_history")
-    @patch("duo_workflow_service.agents.agent.get_event")
     async def test_agent_run_calls_maybe_compact_history(
         self,
-        mock_get_event,
         mock_maybe_compact,
         prompt: Prompt,
         gl_http_client: GitlabHttpClient,
@@ -489,7 +483,6 @@ class TestAgentCompaction:
         prompt_name: str,
         mock_ainvoke: Mock,  # pylint: disable=unused-argument
     ):
-        mock_get_event.return_value = None
         mock_compactor = Mock(spec=ConversationCompactor)
         original_messages = [HumanMessage(content="test message")]
         compacted_messages = [HumanMessage(content="compacted")]
@@ -517,11 +510,10 @@ class TestAgentCompaction:
         assert workflow_state["conversation_history"][prompt_name] == compacted_messages
 
     @pytest.mark.asyncio
+    @pytest.mark.usefixtures("mock_get_event")
     @patch("duo_workflow_service.agents.agent.maybe_compact_history")
-    @patch("duo_workflow_service.agents.agent.get_event")
     async def test_agent_run_without_compactor_still_calls_maybe_compact(
         self,
-        mock_get_event,
         mock_maybe_compact,
         prompt: Prompt,
         gl_http_client: GitlabHttpClient,
@@ -530,7 +522,6 @@ class TestAgentCompaction:
         prompt_name: str,
         mock_ainvoke: Mock,  # pylint: disable=unused-argument
     ):
-        mock_get_event.return_value = None
         original_messages = [HumanMessage(content="test message")]
         mock_maybe_compact.return_value = original_messages
 
@@ -554,11 +545,10 @@ class TestAgentCompaction:
         )
 
     @pytest.mark.asyncio
+    @pytest.mark.usefixtures("mock_get_event")
     @patch("duo_workflow_service.agents.agent.maybe_compact_history")
-    @patch("duo_workflow_service.agents.agent.get_event")
     async def test_agent_run_calls_compaction_with_empty_history(
         self,
-        mock_get_event,
         mock_maybe_compact,
         prompt: Prompt,
         gl_http_client: GitlabHttpClient,
@@ -567,7 +557,6 @@ class TestAgentCompaction:
         prompt_name: str,
         mock_ainvoke: Mock,  # pylint: disable=unused-argument
     ):
-        mock_get_event.return_value = None
         mock_maybe_compact.return_value = []
         workflow_state["conversation_history"] = {}
 

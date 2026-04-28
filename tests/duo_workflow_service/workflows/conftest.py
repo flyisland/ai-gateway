@@ -8,7 +8,6 @@ from langgraph.checkpoint.memory import BaseCheckpointSaver
 
 from duo_workflow_service.components.tools_registry import _AGENT_PRIVILEGES
 from duo_workflow_service.entities import WorkflowStatusEnum
-from duo_workflow_service.gitlab.gitlab_api import Project
 
 
 @pytest.fixture(name="mock_tools_registry_cls")
@@ -39,34 +38,6 @@ def mock_checkpoint_notifier_fixture():
 @pytest.fixture(name="agent_privileges_names")
 def agent_privileges_names_fixture() -> list[str]:
     return list(_AGENT_PRIVILEGES.keys())
-
-
-@pytest.fixture(name="workflow_config")
-def workflow_config_fixture(agent_privileges_names: list[str]) -> dict[str, Any]:
-    return {
-        "project_id": 1,
-        "agent_privileges_names": agent_privileges_names,
-        "pre_approved_agent_privileges_names": [],
-        "allow_agent_to_request_user": False,
-        "mcp_enabled": False,
-        "first_checkpoint": None,
-        "latest_checkpoint": None,
-        "workflow_status": "",
-        "gitlab_host": "gitlab.com",
-        "archived": False,
-        "stalled": False,
-    }
-
-
-@pytest.fixture(name="mock_fetch_workflow_and_container_data")
-def mock_fetch_workflow_and_container_data_fixture(
-    project: Project, workflow_config: dict[str, Any]
-):
-    with patch(
-        "duo_workflow_service.workflows.abstract_workflow.fetch_workflow_and_container_data"
-    ) as mock:
-        mock.return_value = (project, None, workflow_config)
-        yield mock
 
 
 @pytest.fixture(name="checkpoint_tuple")

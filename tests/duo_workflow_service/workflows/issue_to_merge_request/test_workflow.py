@@ -146,11 +146,11 @@ def workflow_fixture(
 
 @pytest.mark.asyncio
 @pytest.mark.parametrize("offline_mode", [True])
+@pytest.mark.usefixtures("mock_fetch_workflow_and_container_data")
 @patch("duo_workflow_service.workflows.abstract_workflow.UserInterface", autospec=True)
 async def test_workflow_run(
     mock_checkpoint_notifier,
     mock_git_lab_workflow_instance,
-    mock_fetch_workflow_and_container_data,  # pylint: disable=unused-argument
     mock_run_tool_node_class,
     mock_tools_executor,
     mock_tools_approval_component,
@@ -211,10 +211,8 @@ async def test_workflow_run(
 
 
 @pytest.mark.asyncio
-async def test_workflow_run_when_exception(
-    mock_fetch_workflow_and_container_data,  # pylint: disable=unused-argument
-    workflow,
-):
+@pytest.mark.usefixtures("mock_fetch_workflow_and_container_data")
+async def test_workflow_run_when_exception(workflow):
     class AsyncIterator:
         def __init__(self):
             pass
