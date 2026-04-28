@@ -465,7 +465,17 @@ class UpdateMergeRequestInput(MergeRequestResourceInput):
     )
     labels: Optional[str] = Field(
         default=None,
-        description="Comma-separated label names for the merge request. For example: 'bug,feature,high-priority'",
+        description="Comma-separated label names. Replaces all existing labels on the merge request. "
+        "Set to an empty string to unassign all labels. "
+        "To add or remove labels without replacing, use add_labels or remove_labels instead.",
+    )
+    add_labels: Optional[str] = Field(
+        default=None,
+        description="Comma-separated label names to add to a merge request",
+    )
+    remove_labels: Optional[str] = Field(
+        default=None,
+        description="Comma-separated label names to remove from a merge request",
     )
 
 
