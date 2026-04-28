@@ -311,8 +311,8 @@ def test_apply_token_based_trim_preserves_tool_messages(
 
     # apply_token_based_trim must return messages unchanged —
     # no consistency repair, no message type conversion.
-    assert [type(m) for m in result] == [type(m) for m in original_messages]
-    assert [m.model_dump() for m in result] == original_serialized
+    assert [type(m) for m in result.messages] == [type(m) for m in original_messages]
+    assert [m.model_dump() for m in result.messages] == original_serialized
 
     # Original message objects must not have been mutated in place.
     assert [id(m) for m in original_messages] == original_ids
@@ -334,9 +334,9 @@ def test_apply_token_based_trim_exceeding_context_limit():
 
     # Should trim to fit within context limit
     # System message should be preserved
-    assert any(isinstance(msg, SystemMessage) for msg in result)
+    assert any(isinstance(msg, SystemMessage) for msg in result.messages)
     # Should have fewer messages than original
-    assert len(result) <= len(messages)
+    assert len(result.messages) <= len(messages)
 
 
 def test_apply_token_based_trim_with_tool_messages_exceeding_context_limit_for_existing_message():
@@ -357,11 +357,11 @@ def test_apply_token_based_trim_with_tool_messages_exceeding_context_limit_for_e
     )
 
     # Should trim but maintain message consistency
-    assert len(result) > 0
+    assert len(result.messages) > 0
     # System message should be preserved
-    assert any(isinstance(msg, SystemMessage) for msg in result)
+    assert any(isinstance(msg, SystemMessage) for msg in result.messages)
     # Orphaned tool messages should be converted to HumanMessage
-    for msg in result:
+    for msg in result.messages:
         if isinstance(msg, ToolMessage):
             # If it's still a ToolMessage, it should have a valid parent
             assert msg.tool_call_id is not None
@@ -388,7 +388,7 @@ def test_apply_token_based_trim_single_message_too_large():
     # The very large message should be replaced with placeholder
     placeholder_found = any(
         "Previous message was too large for context window" in msg.content
-        for msg in result
+        for msg in result.messages
         if isinstance(msg, HumanMessage)
     )
     assert placeholder_found
@@ -422,11 +422,11 @@ def test_apply_token_based_trim_error_handling(
     # trim_messages should have been called (and raised)
     mock_trim_messages.assert_called_once()
     # Verify the fallback mechanism worked
-    assert len(result) > 0
+    assert len(result.messages) > 0
     # System message should be retained
-    assert any(isinstance(msg, SystemMessage) for msg in result)
+    assert any(isinstance(msg, SystemMessage) for msg in result.messages)
     # Should keep some recent messages (fallback uses min_recent=5)
-    assert any(isinstance(msg, HumanMessage) for msg in result)
+    assert any(isinstance(msg, HumanMessage) for msg in result.messages)
 
 
 def test_restore_message_consistency_with_invalid_tool_call_responses():
@@ -757,11 +757,11 @@ def test_apply_token_based_trim_empty_result_handling(
     # trim_messages should have been called (and returned [])
     mock_trim_messages.assert_called_once()
     # Verify the fallback mechanism worked
-    assert len(result) > 0
+    assert len(result.messages) > 0
     # At minimum should have system message
-    assert any(isinstance(msg, SystemMessage) for msg in result)
+    assert any(isinstance(msg, SystemMessage) for msg in result.messages)
     # Should have at least one recent message (fallback uses min_recent=3)
-    assert any(msg.content == "new message" for msg in result)
+    assert any(msg.content == "new message" for msg in result.messages)
 
 
 @patch("duo_workflow_service.conversation.trimmer.logger")
@@ -779,7 +779,7 @@ def test_apply_token_based_trim_without_warnings(mock_logger):
     # Should not log any warnings for normal operation
     mock_logger.warning.assert_not_called()
     # Should return the messages
-    assert len(result) == 2
+    assert len(result.messages) == 2
 
 
 @patch("duo_workflow_service.conversation.trimmer.logger")
@@ -799,8 +799,8 @@ def test_apply_token_based_trim_single_human_message_no_unnecessary_fallback(
         messages=messages_1, component_name="agent_a", max_context_tokens=400_000
     )
 
-    assert len(result_1) == 1
-    assert result_1[0].content == "first message"
+    assert len(result_1.messages) == 1
+    assert result_1.messages[0].content == "first message"
 
     # Check that fallback warning was NOT triggered
     warning_calls = [
@@ -825,10 +825,10 @@ def test_apply_token_based_trim_single_human_message_no_unnecessary_fallback(
     )
 
     # Should have both messages
-    assert len(result_2) == 2
-    assert [msg.type for msg in result_2] == ["human", "human"]
-    assert result_2[0].content == "first message"
-    assert result_2[1].content == "second message"
+    assert len(result_2.messages) == 2
+    assert [msg.type for msg in result_2.messages] == ["human", "human"]
+    assert result_2.messages[0].content == "first message"
+    assert result_2.messages[1].content == "second message"
 
 
 @patch("duo_workflow_service.conversation.trimmer.logger")
@@ -849,10 +849,11 @@ def test_apply_token_based_trim_skips_when_under_budget(mock_logger):
     )
 
     # All messages should be returned
-    assert len(result) == 3
-    assert result[0].content == "system message"
-    assert result[1].content == "hello"
-    assert result[2].content == "hi there"
+    assert len(result.messages) == 3
+    assert result.messages[0].content == "system message"
+    assert result.messages[1].content == "hello"
+    assert result.messages[2].content == "hi there"
+    assert result.was_trimmed is False
 
     # Should log the skip message with utilization info
     skip_calls = [
@@ -914,7 +915,7 @@ def test_apply_token_based_trim_trims_when_over_threshold(
     mock_trim_messages.assert_called_once()
     # Verify the token budget (0.7 * max_context_tokens) was passed, not raw max_context_tokens
     assert mock_trim_messages.call_args.kwargs["max_tokens"] == int(0.7 * 400_000)
-    assert len(result) == 2
+    assert len(result.messages) == 2
 
 
 def test_apply_token_based_trim_under_budget_returns_messages_unchanged():
@@ -945,14 +946,14 @@ def test_apply_token_based_trim_under_budget_returns_messages_unchanged():
     )
 
     # Under budget: no trimming applied, messages pass through as-is
-    assert len(result) == 5
-    assert isinstance(result[0], SystemMessage)
-    assert isinstance(result[1], HumanMessage)
-    assert isinstance(result[2], AIMessage)
-    assert isinstance(result[3], ToolMessage)
-    assert isinstance(result[4], HumanMessage)
-    assert result[3].tool_call_id == "call_1"
-    assert "completed successfully" in result[4].content
+    assert len(result.messages) == 5
+    assert isinstance(result.messages[0], SystemMessage)
+    assert isinstance(result.messages[1], HumanMessage)
+    assert isinstance(result.messages[2], AIMessage)
+    assert isinstance(result.messages[3], ToolMessage)
+    assert isinstance(result.messages[4], HumanMessage)
+    assert result.messages[3].tool_call_id == "call_1"
+    assert "completed successfully" in result.messages[4].content
 
 
 @pytest.mark.parametrize(
@@ -1109,3 +1110,43 @@ class TestEstimateTokensFromHistory:
 
         expected = token_counter.count_tokens(messages, include_tool_tokens=False)
         assert result == expected
+
+
+class TestTrimResultFields:
+    """Test that TrimResult has correct metadata."""
+
+    def test_trim_result_was_trimmed_true_when_trimmed(self):
+        messages = [
+            SystemMessage(content="system message"),
+            HumanMessage(content="first a message"),
+            HumanMessage(content="second a message"),
+            HumanMessage(content="third a message"),
+        ]
+
+        result = apply_token_based_trim(
+            messages=messages, component_name="agent_a", max_context_tokens=22
+        )
+
+        assert result.was_trimmed is True
+        assert result.tokens_before > 0
+        assert result.messages_before == 4
+        assert result.token_budget > 0
+        assert result.max_context_tokens == 22
+
+    def test_trim_result_was_trimmed_false_when_under_budget(self):
+        messages = [HumanMessage(content="short")]
+
+        result = apply_token_based_trim(
+            messages=messages, component_name="agent_a", max_context_tokens=400_000
+        )
+
+        assert result.was_trimmed is False
+        assert result.messages == messages
+
+    def test_trim_result_empty_messages(self):
+        result = apply_token_based_trim(
+            messages=[], component_name="agent_a", max_context_tokens=400_000
+        )
+
+        assert result.was_trimmed is False
+        assert result.messages == []

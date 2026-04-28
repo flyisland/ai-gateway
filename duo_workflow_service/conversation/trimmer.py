@@ -1,4 +1,5 @@
 import time
+from dataclasses import dataclass
 from typing import List, cast
 
 import structlog
@@ -19,6 +20,21 @@ logger = structlog.stdlib.get_logger("conversation_trimmer")
 LEGACY_MAX_CONTEXT_TOKENS = 200_000  # old default for backwards compatibility
 TRIM_THRESHOLD = 0.7  # Only run expensive trimming when utilization exceeds this
 MAX_SINGLE_MESSAGE_TOKEN_SHARE = 0.65  # If a single message exceeds this percentage of the context window, pre-trim it
+
+
+@dataclass
+class TrimResult:
+    """Result of a token-based trim operation."""
+
+    messages: list[BaseMessage]
+    was_trimmed: bool
+    tokens_before: int = 0
+    tokens_after: int = 0
+    messages_before: int = 0
+    messages_after: int = 0
+    token_budget: int = 0
+    max_context_tokens: int = 0
+    duration_ms: float = 0.0
 
 
 def _find_last_ai_with_usage(
@@ -251,7 +267,7 @@ def apply_token_based_trim(
     messages: List[BaseMessage],
     component_name: str,
     max_context_tokens: int,
-) -> List[BaseMessage]:
+) -> TrimResult:
     """Apply token-based trimming to conversation history.
 
     Only runs when token count exceeds budget. This is expensive due to token counting.
@@ -274,7 +290,7 @@ def apply_token_based_trim(
         max_context_tokens: Maximum number of tokens allowed in the context window
 
     Returns:
-        Trimmed list of messages that fits within the context window
+        TrimResult with trimmed messages and metadata
     """
     if not messages:
         logger.info(
@@ -282,7 +298,7 @@ def apply_token_based_trim(
             component_name=component_name,
             max_context_tokens=max_context_tokens,
         )
-        return []
+        return TrimResult(messages=[], was_trimmed=False)
 
     token_budget = int(TRIM_THRESHOLD * max_context_tokens)
     max_single_message_tokens = int(token_budget * MAX_SINGLE_MESSAGE_TOKEN_SHARE)
@@ -305,7 +321,13 @@ def apply_token_based_trim(
                 round(initial_tokens / token_budget * 100, 1) if token_budget > 0 else 0
             ),
         )
-        return messages
+        return TrimResult(
+            messages=messages,
+            was_trimmed=False,
+            tokens_before=initial_tokens,
+            token_budget=token_budget,
+            max_context_tokens=max_context_tokens,
+        )
 
     t_start = time.perf_counter()
 
@@ -373,4 +395,14 @@ def apply_token_based_trim(
         duration_ms=duration_ms,
     )
 
-    return result
+    return TrimResult(
+        messages=result,
+        was_trimmed=True,
+        tokens_before=initial_tokens,
+        tokens_after=final_tokens,
+        messages_before=len(messages),
+        messages_after=len(result),
+        token_budget=token_budget,
+        max_context_tokens=max_context_tokens,
+        duration_ms=duration_ms,
+    )
