@@ -36,7 +36,6 @@ from lib.billing_events import BillingEvent, ExecutionEnvironment
 from lib.billing_events.service import LLMOperation
 from lib.context import llm_operations
 from lib.context.tool_executions import init_tool_executions, tool_executions
-from lib.feature_flags.context import FeatureFlag
 from lib.internal_events import InternalEventAdditionalProperties
 from lib.internal_events.event_enum import EventEnum, EventLabelEnum, EventPropertyEnum
 
@@ -876,11 +875,16 @@ async def test_workflow_context_manager_error(
 
 @pytest.mark.asyncio
 async def test_aget_tuple(
-    gitlab_workflow, http_client, config, workflow_id, checkpoint_data
+    gitlab_workflow,
+    http_client,
+    config,
+    workflow_id,
+    checkpoint_data,
+    compressed_checkpoint_data,
 ):
     mock_response = GitLabHttpResponse(
         status_code=200,
-        body=checkpoint_data,
+        body=compressed_checkpoint_data,
     )
     http_client.aget.return_value = mock_response
 
@@ -898,15 +902,19 @@ async def test_aget_tuple(
     assert result.checkpoint == checkpoint_data[0]["checkpoint"]
     assert result.metadata == checkpoint_data[0]["metadata"]
 
-    http_client.aget.assert_called_once_with(
-        path=f"/api/v4/ai/duo_workflows/workflows/{workflow_id}/checkpoints",
-        object_hook=checkpoint_decoder,
+    http_client.aget.assert_called_once()
+    call_kwargs = http_client.aget.call_args[1]
+    assert (
+        f"/api/v4/ai/duo_workflows/workflows/{workflow_id}/checkpoints"
+        in call_kwargs["path"]
     )
+    assert "accept_compressed=true" in call_kwargs["path"]
+    assert call_kwargs.get("object_hook") == checkpoint_decoder
 
 
 @pytest.mark.asyncio
 async def test_aget_tuple_when_config_has_no_checkpoint_id_and_checkpoints_present(
-    http_client, workflow_id, checkpoint_data, workflow_type
+    http_client, workflow_id, checkpoint_data, compressed_checkpoint_data, workflow_type
 ):
     # Set first_checkpoint to non-None to allow API call
     workflow_config = {
@@ -932,7 +940,7 @@ async def test_aget_tuple_when_config_has_no_checkpoint_id_and_checkpoints_prese
 
     mock_response = GitLabHttpResponse(
         status_code=200,
-        body=checkpoint_data,
+        body=compressed_checkpoint_data,
     )
     http_client.aget.return_value = mock_response
 
@@ -942,10 +950,15 @@ async def test_aget_tuple_when_config_has_no_checkpoint_id_and_checkpoints_prese
     assert result.checkpoint == checkpoint_data[0]["checkpoint"]
     assert result.metadata == checkpoint_data[0]["metadata"]
 
-    http_client.aget.assert_called_once_with(
-        path=f"/api/v4/ai/duo_workflows/workflows/{workflow_id}/checkpoints?per_page=1",
-        object_hook=checkpoint_decoder,
+    http_client.aget.assert_called_once()
+    call_kwargs = http_client.aget.call_args[1]
+    assert (
+        f"/api/v4/ai/duo_workflows/workflows/{workflow_id}/checkpoints"
+        in call_kwargs["path"]
     )
+    assert "per_page=1" in call_kwargs["path"]
+    assert "accept_compressed=true" in call_kwargs["path"]
+    assert call_kwargs.get("object_hook") == checkpoint_decoder
 
 
 @pytest.mark.asyncio
@@ -999,14 +1012,19 @@ async def test_aget_tuple_when_server_returns_non_success_response(
         == "Failed to fetch checkpoints: {'status': 400, 'reason': 'Bad request'}"
     )
 
-    gitlab_workflow._client.aget.assert_called_once_with(
-        path=f"/api/v4/ai/duo_workflows/workflows/{workflow_id}/checkpoints?per_page=1",
-        object_hook=checkpoint_decoder,
+    gitlab_workflow._client.aget.assert_called_once()
+    call_kwargs = gitlab_workflow._client.aget.call_args[1]
+    assert (
+        f"/api/v4/ai/duo_workflows/workflows/{workflow_id}/checkpoints"
+        in call_kwargs["path"]
     )
+    assert "per_page=1" in call_kwargs["path"]
+    assert "accept_compressed=true" in call_kwargs["path"]
+    assert call_kwargs.get("object_hook") == checkpoint_decoder
 
 
 @pytest.mark.asyncio
-async def test_alist(gitlab_workflow, http_client):
+async def test_alist(gitlab_workflow, http_client, workflow_id):
     checkpoints = [
         {
             "thread_ts": "checkpoint-1",
@@ -1021,9 +1039,18 @@ async def test_alist(gitlab_workflow, http_client):
             "metadata": {"timestamp": "2024-01-02"},
         },
     ]
+
+    compressed_checkpoints = [
+        {
+            **{k: v for k, v in cp.items() if k != "checkpoint"},
+            "compressed_checkpoint": compress_checkpoint(cp["checkpoint"]),
+        }
+        for cp in checkpoints
+    ]
+
     mock_response = GitLabHttpResponse(
         status_code=200,
-        body=checkpoints,
+        body=compressed_checkpoints,
     )
     http_client.aget.return_value = mock_response
 
@@ -1034,6 +1061,10 @@ async def test_alist(gitlab_workflow, http_client):
     assert len(results) == 2
     assert results[0].checkpoint == checkpoints[0]["checkpoint"]
     assert results[1].checkpoint == checkpoints[1]["checkpoint"]
+
+    call_path = http_client.aget.call_args[1]["path"]
+    assert f"/api/v4/ai/duo_workflows/workflows/{workflow_id}/checkpoints" in call_path
+    assert "accept_compressed=true" in call_path
 
 
 @pytest.mark.asyncio
@@ -1050,18 +1081,14 @@ async def test_aput(
         config, checkpoint, checkpoint_metadata, ChannelVersions()
     )
 
-    http_client.apost.assert_called_once_with(
-        path=f"/api/v4/ai/duo_workflows/workflows/{workflow_id}/checkpoints",
-        body=json.dumps(
-            {
-                "thread_ts": checkpoint["id"],
-                "parent_ts": "parent-checkpoint",
-                "metadata": checkpoint_metadata,
-                "checkpoint": checkpoint,
-            },
-            cls=CustomEncoder,
-        ),
-    )
+    http_client.apost.assert_called_once()
+    post_call_body = json.loads(http_client.apost.call_args[1]["body"])
+
+    assert "compressed_checkpoint" in post_call_body
+    assert "checkpoint" not in post_call_body
+    assert post_call_body["compressed_checkpoint"] == compress_checkpoint(checkpoint)
+    assert post_call_body["thread_ts"] == checkpoint["id"]
+    assert post_call_body["parent_ts"] == "parent-checkpoint"
 
     assert result == {
         "configurable": {"thread_id": workflow_id, "checkpoint_id": checkpoint["id"]}
@@ -1510,180 +1537,6 @@ async def test_aput_does_not_reset_orbit_called_once_set(
         config, checkpoint, checkpoint_metadata, ChannelVersions()
     )
     assert gitlab_workflow._orbit_called is True
-
-
-@pytest.fixture(autouse=True)
-def mock_compress_checkpoint_flag():
-    """Mock feature flag for COMPRESS_CHECKPOINT."""
-    with patch(
-        "duo_workflow_service.checkpointer.gitlab_workflow.is_feature_enabled"
-    ) as mock_flag:
-        mock_flag.return_value = False
-        yield mock_flag
-
-
-@pytest.mark.asyncio
-async def test_aget_tuple_with_compression_enabled(
-    gitlab_workflow,
-    http_client,
-    config,
-    workflow_id,
-    checkpoint_data,
-    compressed_checkpoint_data,
-    mock_compress_checkpoint_flag,
-):
-    """Test aget_tuple fetches and uncompresses checkpoint when compression is enabled."""
-    mock_compress_checkpoint_flag.return_value = True
-
-    mock_response = GitLabHttpResponse(
-        status_code=200,
-        body=compressed_checkpoint_data,
-    )
-    http_client.aget.return_value = mock_response
-
-    result = await gitlab_workflow.aget_tuple(config)
-    assert result is not None
-    assert result.checkpoint == checkpoint_data[0]["checkpoint"]
-
-    http_client.aget.assert_called_once()
-    call_path = http_client.aget.call_args[1]["path"]
-    assert "compressed=true" in call_path
-    assert f"/api/v4/ai/duo_workflows/workflows/{workflow_id}/checkpoints" in call_path
-
-    mock_compress_checkpoint_flag.assert_called_with(FeatureFlag.COMPRESS_CHECKPOINT)
-
-
-@pytest.mark.asyncio
-async def test_aget_tuple_per_page_with_compression_enabled(
-    http_client,
-    workflow_id,
-    workflow_type,
-    checkpoint_data,
-    compressed_checkpoint_data,
-    mock_compress_checkpoint_flag,
-):
-    """Test aget_tuple with per_page query when compression is enabled."""
-    mock_compress_checkpoint_flag.return_value = True
-
-    # Set first_checkpoint to non-None to allow API call
-    workflow_config = {
-        "first_checkpoint": {},
-        "latest_checkpoint": None,
-        "workflow_status": "created",
-        "agent_privileges_names": ["read_repository"],
-        "pre_approved_agent_privileges_names": [],
-        "mcp_enabled": True,
-        "allow_agent_to_request_user": True,
-        "archived": False,
-        "stalled": False,
-    }
-
-    gitlab_workflow = GitLabWorkflow(
-        http_client,
-        workflow_id,
-        workflow_type,
-        workflow_config,
-    )
-
-    config = {"configurable": {"thread_id": workflow_id}}
-
-    mock_response = GitLabHttpResponse(
-        status_code=200,
-        body=compressed_checkpoint_data,
-    )
-    http_client.aget.return_value = mock_response
-
-    result = await gitlab_workflow.aget_tuple(config)
-
-    assert result is not None
-    assert result.checkpoint == checkpoint_data[0]["checkpoint"]
-
-    call_path = http_client.aget.call_args[1]["path"]
-    assert "per_page=1" in call_path
-    assert "compressed=true" in call_path
-
-
-@pytest.mark.asyncio
-async def test_alist_with_compression_enabled(
-    gitlab_workflow,
-    http_client,
-    workflow_id,
-    mock_compress_checkpoint_flag,
-):
-    """Test alist fetches and uncompresses checkpoints when compression is enabled."""
-    mock_compress_checkpoint_flag.return_value = True
-
-    checkpoints = [
-        {
-            "thread_ts": "checkpoint-1",
-            "parent_ts": None,
-            "checkpoint": {"id": "checkpoint-1", "data": "test1"},
-            "metadata": {"timestamp": "2024-01-01"},
-        },
-        {
-            "thread_ts": "checkpoint-2",
-            "parent_ts": "checkpoint-1",
-            "checkpoint": {"id": "checkpoint-2", "data": "test2"},
-            "metadata": {"timestamp": "2024-01-02"},
-        },
-    ]
-
-    compressed_checkpoints = [
-        {
-            **{k: v for k, v in cp.items() if k != "checkpoint"},
-            "compressed_checkpoint": compress_checkpoint(cp["checkpoint"]),
-        }
-        for cp in checkpoints
-    ]
-
-    mock_response = GitLabHttpResponse(
-        status_code=200,
-        body=compressed_checkpoints,
-    )
-    http_client.aget.return_value = mock_response
-
-    results = [checkpoint async for checkpoint in gitlab_workflow.alist(None)]
-
-    assert len(results) == 2
-    assert results[0].checkpoint == checkpoints[0]["checkpoint"]
-    assert results[1].checkpoint == checkpoints[1]["checkpoint"]
-
-    call_path = http_client.aget.call_args[1]["path"]
-    assert "compressed=true" in call_path
-
-
-@pytest.mark.asyncio
-async def test_aput_with_compression_enabled(
-    gitlab_workflow,
-    http_client,
-    checkpoint_data,
-    checkpoint_metadata,
-    workflow_id,
-    mock_compress_checkpoint_flag,
-):
-    """Test aput compresses checkpoint when compression is enabled."""
-    mock_compress_checkpoint_flag.return_value = True
-
-    config = {"configurable": {"checkpoint_id": "parent-checkpoint"}}
-    checkpoint = checkpoint_data[0]["checkpoint"]
-    checkpoint["channel_values"]["status"] = WorkflowStatusEnum.COMPLETED
-
-    http_client.apatch.return_value = GitLabHttpResponse(status_code=200, body={})
-    http_client.apost.return_value = GitLabHttpResponse(status_code=200, body={})
-
-    await gitlab_workflow.aput(
-        config, checkpoint, checkpoint_metadata, ChannelVersions()
-    )
-
-    http_client.apost.assert_called_once()
-    post_call_body = json.loads(http_client.apost.call_args[1]["body"])
-
-    assert "compressed_checkpoint" in post_call_body
-    assert "checkpoint" not in post_call_body
-
-    assert post_call_body["compressed_checkpoint"] == compress_checkpoint(checkpoint)
-
-    mock_compress_checkpoint_flag.assert_called_with(FeatureFlag.COMPRESS_CHECKPOINT)
 
 
 @pytest.mark.asyncio
