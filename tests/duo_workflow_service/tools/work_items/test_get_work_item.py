@@ -199,6 +199,49 @@ async def test_get_work_item_missing_root_key(gitlab_client_mock, metadata):
     gitlab_client_mock.graphql.assert_called_once()
 
 
+@pytest.mark.asyncio
+async def test_get_work_item_returns_current_user_todos(gitlab_client_mock, metadata):
+    """Ensure currentUserTodos widget data is surfaced in the tool response."""
+    work_item_with_todos = {
+        "id": "gid://gitlab/WorkItem/123",
+        "iid": "42",
+        "title": "Test Work Item",
+        "widgets": [
+            {
+                "currentUserTodos": {
+                    "nodes": [
+                        {
+                            "id": "gid://gitlab/Todo/1",
+                            "createdAt": "2025-04-29T11:35:36.000+02:00",
+                            "body": "Review work item #42",
+                            "targetUrl": "https://gitlab.com/namespace/project/-/work_items/42",
+                            "action": "assigned",
+                        }
+                    ]
+                }
+            }
+        ],
+    }
+    graphql_response = {"project": {"workItems": {"nodes": [work_item_with_todos]}}}
+    gitlab_client_mock.graphql = AsyncMock(return_value=graphql_response)
+
+    tool = GetWorkItem(description="get work item", metadata=metadata)
+
+    response = await tool._arun(project_id="namespace/project", work_item_iid=42)
+
+    assert response == json.dumps({"work_item": work_item_with_todos})
+    payload = json.loads(response)
+    todos_widget = next(
+        w for w in payload["work_item"]["widgets"] if "currentUserTodos" in w
+    )
+    todo_node = todos_widget["currentUserTodos"]["nodes"][0]
+    assert todo_node["body"] == "Review work item #42"
+    assert (
+        todo_node["targetUrl"] == "https://gitlab.com/namespace/project/-/work_items/42"
+    )
+    assert todo_node["action"] == "assigned"
+
+
 @pytest.mark.parametrize(
     "input_data,expected_message",
     [
