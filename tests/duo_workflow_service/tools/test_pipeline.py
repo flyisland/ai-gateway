@@ -726,7 +726,7 @@ async def test_get_downstream_pipelines_success(gitlab_client_mock, metadata):
             "status": "success",
             "downstream_pipeline": {
                 "id": 2002,
-                "status": "failed",
+                "status": "success",
                 "web_url": "https://gitlab.com/namespace/project/-/pipelines/1232",
             },
         },
@@ -744,8 +744,14 @@ async def test_get_downstream_pipelines_success(gitlab_client_mock, metadata):
 
     assert isinstance(response_json, list)
     assert response_json == [
-        {"url": "https://gitlab.com/namespace/project/-/pipelines/1233"},
-        {"url": "https://gitlab.com/namespace/project/-/pipelines/1232"},
+        {
+            "url": "https://gitlab.com/namespace/project/-/pipelines/1233",
+            "status": "failed",
+        },
+        {
+            "url": "https://gitlab.com/namespace/project/-/pipelines/1232",
+            "status": "success",
+        },
     ]
 
     gitlab_client_mock.aget.assert_called_once_with(
@@ -950,7 +956,7 @@ async def test_get_downstream_pipelines_url_parsing(
     response_json = json.loads(response)
 
     assert isinstance(response_json, list)
-    assert response_json == [{"url": downstream_url}]
+    assert response_json == [{"url": downstream_url, "status": "failed"}]
 
     gitlab_client_mock.aget.assert_called_once_with(
         path=f"/api/v4/projects/{expected_project_id}/pipelines/{expected_pipeline_id}/bridges"

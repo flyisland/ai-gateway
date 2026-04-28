@@ -58,6 +58,7 @@ _SIMPLE_GITLAB_READ_ONLY_TOOLS = [
     "get_job_logs",
     "get_merge_request",
     "get_pipeline_failing_jobs",
+    "get_downstream_pipelines",
     "get_project",
     "list_all_merge_request_notes",
     "get_repository_file",
