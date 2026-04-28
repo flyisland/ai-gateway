@@ -16,6 +16,7 @@ from duo_workflow_service.security.tool_output_security import ToolTrustLevel
 from duo_workflow_service.tools.duo_base_tool import DuoBaseTool
 from duo_workflow_service.tools.gitlab_resource_input import ProjectResourceInput
 from duo_workflow_service.tools.tool_output_manager import TruncationConfig
+from lib.feature_flags import FeatureFlag, is_feature_enabled
 
 logger = structlog.stdlib.get_logger(__name__)
 
@@ -172,7 +173,10 @@ class BuildReviewMergeRequestContext(DuoBaseTool):
 
         # Get custom instructions filtered by matching files
         custom_instructions = await self._get_custom_instructions(
-            validation_result.project_id, target_branch, diff_file_paths
+            validation_result.project_id,
+            validation_result.merge_request_iid,
+            target_branch,
+            diff_file_paths,
         )
 
         # Lightweight mode: return only file paths and custom instructions
@@ -323,6 +327,22 @@ class BuildReviewMergeRequestContext(DuoBaseTool):
     async def _get_custom_instructions(
         self,
         project_id: int,
+        merge_request_iid: int,
+        branch: str,
+        diff_file_paths: List[str],
+    ) -> List[Dict[str, Any]]:
+        if is_feature_enabled(FeatureFlag.DUO_CODE_REVIEW_GROUP_LEVEL_INSTRUCTIONS):
+            return await self._fetch_all_custom_instructions(
+                project_id, merge_request_iid
+            )
+
+        return await self._fetch_project_only_custom_instructions(
+            project_id, branch, diff_file_paths
+        )
+
+    async def _fetch_project_only_custom_instructions(
+        self,
+        project_id: int,
         branch: str,
         diff_file_paths: List[str],
     ) -> List[Dict[str, Any]]:
@@ -333,6 +353,26 @@ class BuildReviewMergeRequestContext(DuoBaseTool):
 
         all_instructions = self._parse_custom_instructions(instructions_content)
         return self._filter_matching_instructions(all_instructions, diff_file_paths)
+
+    async def _fetch_all_custom_instructions(
+        self, project_id: int, merge_request_iid: int
+    ) -> List[Dict[str, Any]]:
+        """Fetch custom instructions from the GitLab API, including group-level instructions."""
+        response = await self.gitlab_client.aget(
+            "/api/v4/ai/duo_workflows/code_review/custom_instructions",
+            params={
+                "project_id": project_id,
+                "merge_request_iid": merge_request_iid,
+            },
+            parse_json=False,
+        )
+
+        body = self._process_http_response(
+            "fetch custom instructions", response, logger
+        )
+
+        data = json.loads(body)
+        return data.get("instructions", [])
 
     async def _fetch_custom_instructions_file(
         self, project_id: int, branch: str

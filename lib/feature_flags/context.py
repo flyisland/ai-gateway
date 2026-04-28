@@ -14,6 +14,9 @@ class FeatureFlag(StrEnum):
     DAP_WEB_SEARCH = "dap_web_search"
     AI_CONTEXT_COMPACTION = "ai_context_compaction"
     DUO_WORKFLOW_AUDIT_EVENTS = "duo_workflow_audit_events"
+    DUO_CODE_REVIEW_GROUP_LEVEL_INSTRUCTIONS = (
+        "duo_code_review_group_level_instructions"
+    )
 
 
 def is_feature_enabled(feature_name: FeatureFlag | str) -> bool:

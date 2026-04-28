@@ -134,18 +134,20 @@ def diffs_data_with_renames_only_fixture():
     ]
 
 
-@pytest.fixture(name="custom_instructions_yaml")
-def custom_instructions_yaml_fixture():
-    yaml_content = """---
-instructions:
-    - name: Ruby Code Quality
-        fileFilters:
-            - "**/*.rb"
-        instructions: |
-            1. Ensure proper error handling
-            2. Follow Ruby naming conventions
-"""
-    return {"content": base64.b64encode(yaml_content.encode("utf-8")).decode("utf-8")}
+@pytest.fixture(name="custom_instructions_response")
+def custom_instructions_response_fixture():
+    return {
+        "instructions": [
+            {
+                "name": "Ruby Code Quality",
+                "instructions": "1. Ensure proper error handling\n2. Follow Ruby naming conventions\n",
+                "include_patterns": ["**/*.rb"],
+                "exclude_patterns": [],
+                "location": "https://gitlab.com/group/project/-/blob/main/.gitlab/duo/mr-review-instructions.yaml",
+                "priority": 0,
+            }
+        ]
+    }
 
 
 @pytest.mark.asyncio
@@ -324,7 +326,7 @@ async def test_build_review_context_basic_success(
         side_effect=[
             GitLabHttpResponse(status_code=200, body=json.dumps(mr_data)),
             GitLabHttpResponse(status_code=200, body=json.dumps(diffs_data)),
-            Exception("Custom instructions not found"),
+            GitLabHttpResponse(status_code=200, body=json.dumps({"instructions": []})),
             GitLabHttpResponse(status_code=200, body=json.dumps(original_file_content)),
         ]
     )
@@ -373,7 +375,7 @@ async def test_build_review_context_with_null_title_and_description(
         side_effect=[
             GitLabHttpResponse(status_code=200, body=json.dumps(mr_data_null)),
             GitLabHttpResponse(status_code=200, body=json.dumps(diffs_data)),
-            Exception("Custom instructions not found"),
+            GitLabHttpResponse(status_code=200, body=json.dumps({"instructions": []})),
             GitLabHttpResponse(status_code=200, body=json.dumps(original_file_content)),
         ]
     )
@@ -404,7 +406,7 @@ async def test_build_review_context_with_renames(
             GitLabHttpResponse(
                 status_code=200, body=json.dumps(diffs_data_with_renames)
             ),
-            Exception("Custom instructions not found"),
+            GitLabHttpResponse(status_code=200, body=json.dumps({"instructions": []})),
             GitLabHttpResponse(status_code=200, body=json.dumps(original_file_content)),
         ]
     )
@@ -460,7 +462,7 @@ async def test_build_review_context_with_renames_only(
             GitLabHttpResponse(
                 status_code=200, body=json.dumps(diffs_data_with_renames_only)
             ),
-            Exception("Custom instructions not found"),
+            GitLabHttpResponse(status_code=200, body=json.dumps({"instructions": []})),
             GitLabHttpResponse(status_code=200, body=json.dumps(original_file_content)),
         ]
     )
@@ -525,40 +527,31 @@ async def test_build_review_context_only_diffs(
 
 
 @pytest.mark.asyncio
-@patch("yaml.safe_load")
 async def test_build_review_context_only_diffs_with_custom_instructions(
-    mock_yaml_load,
     gitlab_client_mock,
     metadata,
     mr_data,
     diffs_data,
-    custom_instructions_yaml,
+    custom_instructions_response,
 ):
     """Test that custom instructions are included when only_diffs=True."""
-    mock_yaml_load.return_value = {
-        "instructions": [
-            {
-                "name": "Ruby Code Quality",
-                "fileFilters": ["*.rb"],
-                "instructions": "1. Ensure proper error handling\n2. Follow Ruby naming conventions",
-            }
-        ]
-    }
-
     gitlab_client_mock.aget = AsyncMock(
         side_effect=[
             GitLabHttpResponse(status_code=200, body=json.dumps(mr_data)),
             GitLabHttpResponse(status_code=200, body=json.dumps(diffs_data)),
             GitLabHttpResponse(
-                status_code=200, body=json.dumps(custom_instructions_yaml)
+                status_code=200, body=json.dumps(custom_instructions_response)
             ),
         ]
     )
 
     tool = BuildReviewMergeRequestContext(metadata=metadata)
-    response = await tool._arun(
-        project_id="test%2Fproject", merge_request_iid=123, only_diffs=True
-    )
+    with patch(
+        "duo_workflow_service.tools.code_review.is_feature_enabled", return_value=True
+    ):
+        response = await tool._arun(
+            project_id="test%2Fproject", merge_request_iid=123, only_diffs=True
+        )
 
     # Should include custom instructions
     assert "<custom_instructions>" in response
@@ -590,7 +583,7 @@ async def test_build_review_context_skips_large_files(
         side_effect=[
             GitLabHttpResponse(status_code=200, body=json.dumps(mr_data)),
             GitLabHttpResponse(status_code=200, body=json.dumps(diffs_data)),
-            Exception("Custom instructions not found"),
+            GitLabHttpResponse(status_code=200, body=json.dumps({"instructions": []})),
             GitLabHttpResponse(status_code=200, body=json.dumps(large_file_encoded)),
         ]
     )
@@ -602,24 +595,13 @@ async def test_build_review_context_skips_large_files(
 
 
 @pytest.mark.asyncio
-@patch("yaml.safe_load")
 async def test_build_review_context_with_custom_instructions(
-    mock_yaml_load,
     gitlab_client_mock,
     metadata,
     mr_data,
     diffs_data,
-    custom_instructions_yaml,
+    custom_instructions_response,
 ):
-    mock_yaml_load.return_value = {
-        "instructions": [
-            {
-                "name": "Ruby Code Quality",
-                "fileFilters": ["*.rb"],
-                "instructions": "1. Ensure proper error handling\n2. Follow Ruby naming conventions",
-            }
-        ]
-    }
     original_file_content = {
         "content": base64.b64encode(b"class Calculator\nend").decode("utf-8")
     }
@@ -628,13 +610,16 @@ async def test_build_review_context_with_custom_instructions(
             GitLabHttpResponse(status_code=200, body=json.dumps(mr_data)),
             GitLabHttpResponse(status_code=200, body=json.dumps(diffs_data)),
             GitLabHttpResponse(
-                status_code=200, body=json.dumps(custom_instructions_yaml)
+                status_code=200, body=json.dumps(custom_instructions_response)
             ),
             GitLabHttpResponse(status_code=200, body=json.dumps(original_file_content)),
         ]
     )
     tool = BuildReviewMergeRequestContext(metadata=metadata)
-    response = await tool._arun(project_id="test%2Fproject", merge_request_iid=123)
+    with patch(
+        "duo_workflow_service.tools.code_review.is_feature_enabled", return_value=True
+    ):
+        response = await tool._arun(project_id="test%2Fproject", merge_request_iid=123)
 
     assert "custom_instructions" in response
     assert "Ruby Code Quality" in response
@@ -656,7 +641,7 @@ async def test_build_review_context_with_url(
         side_effect=[
             GitLabHttpResponse(status_code=200, body=json.dumps(mr_data)),
             GitLabHttpResponse(status_code=200, body=json.dumps(diffs_data)),
-            Exception("Custom instructions not found"),
+            GitLabHttpResponse(status_code=200, body=json.dumps({"instructions": []})),
             GitLabHttpResponse(status_code=200, body=json.dumps(original_file_content)),
         ]
     )
@@ -671,24 +656,13 @@ async def test_build_review_context_with_url(
 
 
 @pytest.mark.asyncio
-@patch("yaml.safe_load")
-async def test_build_review_context_no_matching_custom_instructions(
-    mock_yaml_load,
+async def test_build_review_context_no_custom_instructions_returned(
     gitlab_client_mock,
     metadata,
     mr_data,
     diffs_data,
-    custom_instructions_yaml,
 ):
-    mock_yaml_load.return_value = {
-        "instructions": [
-            {
-                "name": "JavaScript Rules",
-                "fileFilters": ["*.js", "**/*.ts"],
-                "instructions": "JavaScript and TypeScript specific rules",
-            }
-        ]
-    }
+    """Test that no custom instructions section appears when the API returns empty list."""
     original_file_content = {
         "content": base64.b64encode(b"class Calculator\nend").decode("utf-8")
     }
@@ -696,9 +670,7 @@ async def test_build_review_context_no_matching_custom_instructions(
         side_effect=[
             GitLabHttpResponse(status_code=200, body=json.dumps(mr_data)),
             GitLabHttpResponse(status_code=200, body=json.dumps(diffs_data)),
-            GitLabHttpResponse(
-                status_code=200, body=json.dumps(custom_instructions_yaml)
-            ),
+            GitLabHttpResponse(status_code=200, body=json.dumps({"instructions": []})),
             GitLabHttpResponse(status_code=200, body=json.dumps(original_file_content)),
         ]
     )
@@ -709,14 +681,12 @@ async def test_build_review_context_no_matching_custom_instructions(
 
 
 @pytest.mark.asyncio
-@patch("yaml.safe_load")
-async def test_build_review_context_nested_vs_root_patterns(
-    mock_yaml_load,
+async def test_build_review_context_multiple_custom_instructions(
     gitlab_client_mock,
     metadata,
     mr_data,
-    custom_instructions_yaml,
 ):
+    """Test that multiple custom instructions from the API are all included."""
     nested_diffs_data = [
         {
             "diff": "@@ -1,3 +1,4 @@ class Calculator",
@@ -733,17 +703,23 @@ async def test_build_review_context_nested_vs_root_patterns(
             "generated_file": False,
         },
     ]
-    mock_yaml_load.return_value = {
+    multi_instructions_response = {
         "instructions": [
             {
                 "name": "Nested Ruby Files Only",
-                "fileFilters": ["**/*.rb"],
                 "instructions": "Rules for nested Ruby files",
+                "include_patterns": ["**/*.rb"],
+                "exclude_patterns": [],
+                "location": "https://gitlab.com/group/project/-/blob/main/.gitlab/duo/mr-review-instructions.yaml",
+                "priority": 0,
             },
             {
                 "name": "All Ruby Files",
-                "fileFilters": ["*.rb", "**/*.rb"],
                 "instructions": "Rules for all Ruby files",
+                "include_patterns": ["*.rb", "**/*.rb"],
+                "exclude_patterns": [],
+                "location": "https://gitlab.com/group/project/-/blob/main/.gitlab/duo/mr-review-instructions.yaml",
+                "priority": 1,
             },
         ]
     }
@@ -755,14 +731,17 @@ async def test_build_review_context_nested_vs_root_patterns(
             GitLabHttpResponse(status_code=200, body=json.dumps(mr_data)),
             GitLabHttpResponse(status_code=200, body=json.dumps(nested_diffs_data)),
             GitLabHttpResponse(
-                status_code=200, body=json.dumps(custom_instructions_yaml)
+                status_code=200, body=json.dumps(multi_instructions_response)
             ),
             GitLabHttpResponse(status_code=200, body=json.dumps(original_file_content)),
             GitLabHttpResponse(status_code=200, body=json.dumps(original_file_content)),
         ]
     )
     tool = BuildReviewMergeRequestContext(metadata=metadata)
-    response = await tool._arun(project_id="test%2Fproject", merge_request_iid=123)
+    with patch(
+        "duo_workflow_service.tools.code_review.is_feature_enabled", return_value=True
+    ):
+        response = await tool._arun(project_id="test%2Fproject", merge_request_iid=123)
 
     assert "Nested Ruby Files Only" in response
     assert "All Ruby Files" in response
@@ -844,7 +823,7 @@ async def test_build_review_context_no_files_content(
         side_effect=[
             GitLabHttpResponse(status_code=200, body=json.dumps(mr_data)),
             GitLabHttpResponse(status_code=200, body=json.dumps(new_files_diffs)),
-            Exception("Custom instructions not found"),
+            GitLabHttpResponse(status_code=200, body=json.dumps({"instructions": []})),
         ]
     )
     tool = BuildReviewMergeRequestContext(metadata=metadata)
@@ -855,25 +834,150 @@ async def test_build_review_context_no_files_content(
     assert '<line type="added"' in response
 
 
+class TestFetchAllCustomInstructions:
+    """Tests for the _fetch_all_custom_instructions API call."""
+
+    @pytest.mark.asyncio
+    async def test_returns_instructions_from_api(self, gitlab_client_mock, metadata):
+        """Test that instructions are fetched from the API and returned as-is."""
+        instructions = [
+            {
+                "name": "Ruby Code Quality",
+                "instructions": "Follow naming conventions",
+                "include_patterns": ["**/*.rb"],
+                "exclude_patterns": [],
+                "location": "https://gitlab.com/group/project/-/blob/main/.gitlab/duo/mr-review-instructions.yaml",
+                "priority": 0,
+            }
+        ]
+        gitlab_client_mock.aget = AsyncMock(
+            return_value=GitLabHttpResponse(
+                status_code=200, body=json.dumps({"instructions": instructions})
+            )
+        )
+        tool = BuildReviewMergeRequestContext(metadata=metadata)
+        result = await tool._fetch_all_custom_instructions(
+            project_id=123, merge_request_iid=45
+        )
+
+        assert result == instructions
+        gitlab_client_mock.aget.assert_called_once_with(
+            "/api/v4/ai/duo_workflows/code_review/custom_instructions",
+            params={"project_id": 123, "merge_request_iid": 45},
+            parse_json=False,
+        )
+
+    @pytest.mark.asyncio
+    async def test_raises_on_api_error(self, gitlab_client_mock, metadata):
+        """Test that a ToolException is raised when the API returns a non-success status."""
+        from langchain_core.tools import ToolException
+
+        gitlab_client_mock.aget = AsyncMock(
+            return_value=GitLabHttpResponse(
+                status_code=403, body=json.dumps({"message": "403 Forbidden"})
+            )
+        )
+        tool = BuildReviewMergeRequestContext(metadata=metadata)
+        with pytest.raises(ToolException, match="HTTP 403"):
+            await tool._fetch_all_custom_instructions(
+                project_id=123, merge_request_iid=45
+            )
+
+    @pytest.mark.asyncio
+    async def test_raises_on_exception(self, gitlab_client_mock, metadata):
+        """Test that exceptions from the API call propagate."""
+        gitlab_client_mock.aget = AsyncMock(side_effect=Exception("Network error"))
+        tool = BuildReviewMergeRequestContext(metadata=metadata)
+        with pytest.raises(Exception, match="Network error"):
+            await tool._fetch_all_custom_instructions(
+                project_id=123, merge_request_iid=45
+            )
+
+    @pytest.mark.asyncio
+    async def test_returns_empty_list_when_instructions_key_missing(
+        self, gitlab_client_mock, metadata
+    ):
+        """Test that an empty list is returned when the response has no 'instructions' key."""
+        gitlab_client_mock.aget = AsyncMock(
+            return_value=GitLabHttpResponse(status_code=200, body=json.dumps({}))
+        )
+        tool = BuildReviewMergeRequestContext(metadata=metadata)
+        result = await tool._fetch_all_custom_instructions(
+            project_id=123, merge_request_iid=45
+        )
+
+        assert result == []
+
+
+class TestGetCustomInstructions:
+    """Tests for _get_custom_instructions feature-flag routing."""
+
+    @pytest.mark.asyncio
+    async def test_calls_fetch_all_when_flag_enabled(self, metadata):
+        """When DUO_CODE_REVIEW_GROUP_LEVEL_INSTRUCTIONS is enabled, delegates to _fetch_all_custom_instructions."""
+        tool = BuildReviewMergeRequestContext(metadata=metadata)
+        with patch(
+            "duo_workflow_service.tools.code_review.is_feature_enabled",
+            return_value=True,
+        ):
+            with (
+                patch.object(
+                    tool,
+                    "_fetch_all_custom_instructions",
+                    new=AsyncMock(return_value=[]),
+                ) as mock_all,
+                patch.object(
+                    tool,
+                    "_fetch_project_only_custom_instructions",
+                    new=AsyncMock(return_value=[]),
+                ) as mock_project,
+            ):
+                await tool._get_custom_instructions(
+                    project_id=1, merge_request_iid=2, branch="main", diff_file_paths=[]
+                )
+                mock_all.assert_called_once_with(1, 2)
+                mock_project.assert_not_called()
+
+    @pytest.mark.asyncio
+    async def test_calls_fetch_project_only_when_flag_disabled(self, metadata):
+        """When DUO_CODE_REVIEW_GROUP_LEVEL_INSTRUCTIONS is disabled, delegates to
+        _fetch_project_only_custom_instructions."""
+        tool = BuildReviewMergeRequestContext(metadata=metadata)
+        with patch(
+            "duo_workflow_service.tools.code_review.is_feature_enabled",
+            return_value=False,
+        ):
+            with (
+                patch.object(
+                    tool,
+                    "_fetch_all_custom_instructions",
+                    new=AsyncMock(return_value=[]),
+                ) as mock_all,
+                patch.object(
+                    tool,
+                    "_fetch_project_only_custom_instructions",
+                    new=AsyncMock(return_value=[]),
+                ) as mock_project,
+            ):
+                await tool._get_custom_instructions(
+                    project_id=1,
+                    merge_request_iid=2,
+                    branch="main",
+                    diff_file_paths=["a.rb"],
+                )
+                mock_project.assert_called_once_with(1, "main", ["a.rb"])
+                mock_all.assert_not_called()
+
+
 class TestBuildReviewMergeRequestContextLightweight:
     """Tests for lightweight mode of BuildReviewMergeRequestContext."""
 
     @pytest.mark.asyncio
-    @patch("yaml.safe_load")
     async def test_lightweight_returns_file_paths_and_custom_instructions(
-        self, mock_yaml_load, gitlab_client_mock, metadata
+        self, gitlab_client_mock, metadata
     ):
         """Test that lightweight=True returns file paths and custom instructions, without diff content, original files,
         or MR title/description."""
-        mock_yaml_load.return_value = {
-            "instructions": [
-                {
-                    "name": "Security Review",
-                    "instructions": "Check for SQL injection",
-                    "fileFilters": ["*.py"],
-                }
-            ]
-        }
         gitlab_client_mock.aget = AsyncMock(
             side_effect=[
                 GitLabHttpResponse(
@@ -910,16 +1014,31 @@ class TestBuildReviewMergeRequestContextLightweight:
                 GitLabHttpResponse(
                     status_code=200,
                     body=json.dumps(
-                        {"content": base64.b64encode(b"instructions: []").decode()}
+                        {
+                            "instructions": [
+                                {
+                                    "name": "Security Review",
+                                    "instructions": "Check for SQL injection",
+                                    "include_patterns": ["*.py"],
+                                    "exclude_patterns": [],
+                                    "location": "https://gitlab.com/group/project/-/blob/main/.gitlab/duo/mr-review-instructions.yaml",
+                                    "priority": 0,
+                                }
+                            ]
+                        }
                     ),
                 ),
             ]
         )
 
         tool = BuildReviewMergeRequestContext(metadata=metadata)
-        result = await tool._arun(
-            project_id=123, merge_request_iid=45, lightweight=True
-        )
+        with patch(
+            "duo_workflow_service.tools.code_review.is_feature_enabled",
+            return_value=True,
+        ):
+            result = await tool._arun(
+                project_id=123, merge_request_iid=45, lightweight=True
+            )
 
         # File paths present
         assert "<changed_files>" in result
