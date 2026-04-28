@@ -114,6 +114,7 @@ class ContainerModels(containers.DeclarativeContainer):
             async_fireworks_client=async_fireworks_client,
             vertex_model_location=config.vertex_text_model.location,
             fireworks_api_base_url=config.fireworks_api_base_url,
+            bedrock_guardrail_config=config.bedrock_guardrail_config,
         ),
         mocked=providers.Factory(mock.LLM),
     )
@@ -127,6 +128,7 @@ class ContainerModels(containers.DeclarativeContainer):
             provider_keys=config.model_keys,
             async_fireworks_client=async_fireworks_client,
             fireworks_api_base_url=config.fireworks_api_base_url,
+            bedrock_guardrail_config=config.bedrock_guardrail_config,
         ),
         mocked=providers.Factory(mock.ChatModel),
     )

@@ -123,6 +123,7 @@ class ContainerModels(containers.DeclarativeContainer):
             ChatLiteLLM,
             model_keys=config.model_keys,
             custom_models_enabled=config.custom_models.enabled,
+            bedrock_guardrail_config=config.bedrock_guardrail_config,
         ),
         mocked=providers.Factory(mock.FakeModel),
         agentic=providers.Factory(
@@ -143,6 +144,7 @@ class ContainerModels(containers.DeclarativeContainer):
             CompletionLiteLLM,
             custom_models_enabled=config.custom_models.enabled,
             allowed_api_bases=_fireworks_allowed_api_bases,
+            bedrock_guardrail_config=config.bedrock_guardrail_config,
         ),
         mocked=providers.Factory(mock.FakeCompletionModel),
         agentic=providers.Factory(mock.AgenticFakeModel),

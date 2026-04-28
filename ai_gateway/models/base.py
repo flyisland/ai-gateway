@@ -10,9 +10,10 @@ from anthropic._base_client import _DefaultAsyncHttpxClient
 from google.cloud.aiplatform.gapic import PredictionServiceAsyncClient
 from pydantic import BaseModel
 
-from ai_gateway.config import Config
+from ai_gateway.config import Config, ConfigBedrockGuardrail
 from ai_gateway.instrumentators.model_requests import ModelRequestInstrumentator
 from ai_gateway.model_metadata import PROVIDERS_WITHOUT_API_BASE
+from ai_gateway.models.guardrails import bedrock_guardrail_params
 from ai_gateway.structured_logging import can_log_request_data, get_request_logger
 
 # TODO: The instrumentator needs the config here to know what limit needs to be
@@ -155,8 +156,11 @@ class ModelBase(ABC):
     def metadata(self) -> ModelMetadata:
         pass
 
-    def model_metadata_to_params(self) -> dict[str, str]:
-        params = {
+    def model_metadata_to_params(
+        self,
+        bedrock_guardrail_config: Optional[ConfigBedrockGuardrail] = None,
+    ) -> dict[str, Any]:
+        params: dict[str, Any] = {
             "api_base": str(self.metadata.endpoint),
             "api_key": str(self.metadata.api_key),
             "model": self.metadata.name,
@@ -176,6 +180,12 @@ class ModelBase(ABC):
         else:
             params["custom_llm_provider"] = "custom_openai"
             params["model"] = self.metadata.identifier
+
+        guardrail_params = bedrock_guardrail_params(
+            params.get("custom_llm_provider"), bedrock_guardrail_config
+        )
+        if guardrail_params:
+            params["guardrailConfig"] = guardrail_params["guardrailConfig"]
 
         return params
 

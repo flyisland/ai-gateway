@@ -5,6 +5,7 @@ from litellm import CustomStreamWrapper, ModelResponse, acompletion
 from litellm.exceptions import APIConnectionError, InternalServerError
 from openai import AsyncOpenAI
 
+from ai_gateway.config import ConfigBedrockGuardrail
 from ai_gateway.model_selection import ModelSelectionConfig
 from ai_gateway.models.base import (
     KindModelProvider,
@@ -177,6 +178,7 @@ class LiteLlmChatModel(ChatModelBase):
         metadata: Optional[ModelMetadata] = None,
         disable_streaming: bool = False,
         async_fireworks_client: Optional[AsyncOpenAI] = None,
+        bedrock_guardrail_config: Optional[ConfigBedrockGuardrail] = None,
     ):
         self._metadata = _init_litellm_model_metadata(metadata, model_name, provider)
         self.provider = provider
@@ -184,6 +186,7 @@ class LiteLlmChatModel(ChatModelBase):
         self.stop_tokens = MODEL_STOP_TOKENS.get(model_name, [])
         self.disable_streaming = disable_streaming
         self.async_fireworks_client = async_fireworks_client
+        self.bedrock_guardrail_config = bedrock_guardrail_config
 
     @property
     @override
@@ -207,6 +210,9 @@ class LiteLlmChatModel(ChatModelBase):
 
         litellm_messages = [message.model_dump(mode="json") for message in messages]
 
+        metadata_params = self.model_metadata_to_params(
+            bedrock_guardrail_config=self.bedrock_guardrail_config,
+        )
         completion_args = {
             "messages": litellm_messages,
             "stream": should_stream,
@@ -215,7 +221,7 @@ class LiteLlmChatModel(ChatModelBase):
             "max_tokens": max_output_tokens,
             "timeout": 30.0,
             "stop": self.stop_tokens,
-            **self.model_metadata_to_params(),
+            **metadata_params,
         }
 
         if self.provider == KindModelProvider.FIREWORKS:
@@ -276,6 +282,7 @@ class LiteLlmChatModel(ChatModelBase):
         provider_keys: Optional[dict] = None,
         async_fireworks_client: Optional[AsyncOpenAI] = None,
         fireworks_api_base_url: str = "",
+        bedrock_guardrail_config: Optional[ConfigBedrockGuardrail] = None,
     ):
         validate_custom_endpoint(
             custom_models_enabled, api_base=endpoint, api_key=api_key
@@ -309,6 +316,7 @@ class LiteLlmChatModel(ChatModelBase):
             model_metadata,
             disable_streaming,
             async_fireworks_client=async_fireworks_client,
+            bedrock_guardrail_config=bedrock_guardrail_config,
         )
 
 
@@ -327,6 +335,7 @@ class LiteLlmTextGenModel(TextGenModelBase):
         metadata: Optional[ModelMetadata] = None,
         disable_streaming: bool = False,
         async_fireworks_client: Optional[AsyncOpenAI] = None,
+        bedrock_guardrail_config: Optional[ConfigBedrockGuardrail] = None,
     ):
         self.provider = provider
         self.model_name = model_name
@@ -337,6 +346,7 @@ class LiteLlmTextGenModel(TextGenModelBase):
         self.stop_tokens = MODEL_STOP_TOKENS.get(model_name, [])
         self.async_fireworks_client = async_fireworks_client
         self.using_cache = using_cache
+        self.bedrock_guardrail_config = bedrock_guardrail_config
 
     @property
     @override
@@ -442,7 +452,10 @@ class LiteLlmTextGenModel(TextGenModelBase):
             completion_args["vertex_ai_location"] = self._get_vertex_model_location()
             completion_args["model"] = self.metadata.name
         else:
-            completion_args = completion_args | self.model_metadata_to_params()
+            metadata_params = self.model_metadata_to_params(
+                bedrock_guardrail_config=self.bedrock_guardrail_config,
+            )
+            completion_args = completion_args | metadata_params
 
         if self._completion_type() == ModelCompletionType.TEXT:
             completion_args["suffix"] = suffix
@@ -516,6 +529,7 @@ class LiteLlmTextGenModel(TextGenModelBase):
         async_fireworks_client: Optional[AsyncOpenAI] = None,
         using_cache: bool = True,
         fireworks_api_base_url: str = "",
+        bedrock_guardrail_config: Optional[ConfigBedrockGuardrail] = None,
     ):
         validate_custom_endpoint(
             custom_models_enabled, api_base=endpoint, api_key=api_key
@@ -557,6 +571,7 @@ class LiteLlmTextGenModel(TextGenModelBase):
             async_fireworks_client=async_fireworks_client,
             vertex_model_location=vertex_model_location,
             using_cache=using_cache,
+            bedrock_guardrail_config=bedrock_guardrail_config,
         )
 
 

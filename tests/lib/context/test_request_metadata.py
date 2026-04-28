@@ -123,6 +123,7 @@ class TestLLMFinishReason(unittest.TestCase):
             "tool_calls",
             "tool_use",
             "content_filter",
+            "guardrail_intervened",
             "model_context_window_exceeded",
         ]
         self.assertEqual(LLMFinishReason.values(), expected_values)
@@ -140,9 +141,10 @@ class TestLLMFinishReason(unittest.TestCase):
         abnormal = LLMFinishReason.abnormal_values()
         self.assertIn("length", abnormal)
         self.assertIn("content_filter", abnormal)
+        self.assertIn("guardrail_intervened", abnormal)
         self.assertIn("max_tokens", abnormal)
         self.assertIn("model_context_window_exceeded", abnormal)
-        self.assertEqual(len(abnormal), 4)
+        self.assertEqual(len(abnormal), 5)
 
     def test_finish_reason_stop(self):
         self.assertEqual(LLMFinishReason.STOP.value, "stop")

@@ -13,6 +13,8 @@ from langchain_core.messages.ai import InputTokenDetails, UsageMetadata
 from langchain_core.outputs import ChatGenerationChunk
 from langchain_core.runnables import Runnable
 
+from ai_gateway.config import ConfigBedrockGuardrail
+from ai_gateway.models.guardrails import BEDROCK_GUARDRAIL_PROVIDERS
 from ai_gateway.models.v2._model_compat import PREVIOUS_ASSISTANT_CONTEXT_PREFIX
 from ai_gateway.models.v2.chat_litellm import ChatLiteLLM
 from ai_gateway.vendor.langchain_litellm.litellm import _create_usage_metadata
@@ -594,3 +596,80 @@ class TestClaude46PrefillCompat:
         else:
             expected = {"role": "assistant", "content": "Thought: "}
         assert dicts[-1] == expected
+
+
+class TestBedrockGuardrailConfig:
+    @pytest.fixture(name="guardrail_config")
+    def guardrail_config_fixture(self):
+        return ConfigBedrockGuardrail(
+            guardrailIdentifier="abc123",
+            guardrailVersion="1",
+            trace="enabled",
+        )
+
+    @staticmethod
+    def _expected_guardrail_config():
+        return {
+            "guardrailIdentifier": "abc123",
+            "guardrailVersion": "1",
+            "trace": "enabled",
+        }
+
+    @pytest.mark.parametrize("provider", sorted(BEDROCK_GUARDRAIL_PROVIDERS))
+    def test_default_params_includes_guardrail_config(self, guardrail_config, provider):
+        chat = ChatLiteLLM(
+            model="test-model",
+            custom_llm_provider=provider,
+            bedrock_guardrail_config=guardrail_config,
+        )
+
+        params = chat._default_params
+
+        assert params["guardrailConfig"] == self._expected_guardrail_config()
+
+    def test_default_params_no_guardrail_when_not_bedrock(self, guardrail_config):
+        chat = ChatLiteLLM(
+            model="test-model",
+            custom_llm_provider="anthropic",
+            bedrock_guardrail_config=guardrail_config,
+        )
+
+        params = chat._default_params
+
+        assert "guardrailConfig" not in params
+
+    def test_default_params_no_guardrail_when_config_is_none(self):
+        chat = ChatLiteLLM(model="test-model", custom_llm_provider="bedrock")
+
+        params = chat._default_params
+
+        assert "guardrailConfig" not in params
+
+    @pytest.mark.parametrize("provider", sorted(BEDROCK_GUARDRAIL_PROVIDERS))
+    @pytest.mark.asyncio
+    async def test_agenerate_passes_guardrail_config(self, guardrail_config, provider):
+        chat = ChatLiteLLM(
+            model="test-model",
+            custom_llm_provider=provider,
+            bedrock_guardrail_config=guardrail_config,
+        )
+        message = HumanMessage(content="Hello")
+
+        mock_response = {
+            "choices": [
+                {
+                    "message": {"role": "assistant", "content": "Hi"},
+                    "finish_reason": "stop",
+                }
+            ],
+            "usage": {},
+        }
+
+        with patch(
+            "ai_gateway.vendor.langchain_litellm.litellm.ChatLiteLLM.acompletion_with_retry",
+            new=AsyncMock(return_value=mock_response),
+        ) as mock_acompletion:
+            await chat._agenerate(messages=[message])
+
+            call_kwargs = mock_acompletion.call_args[1]
+            assert call_kwargs["guardrailConfig"] == self._expected_guardrail_config()

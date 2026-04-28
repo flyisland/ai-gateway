@@ -5,9 +5,11 @@ import pytest
 from anthropic import AsyncAnthropic
 from httpx import AsyncClient, Limits
 
+from ai_gateway.config import ConfigBedrockGuardrail
 from ai_gateway.models import ModelMetadata
 from ai_gateway.models.base import init_anthropic_client, validate_custom_endpoint
 from ai_gateway.models.base_text import TextGenModelBase
+from ai_gateway.models.guardrails import BEDROCK_GUARDRAIL_PROVIDERS
 
 
 @pytest.mark.asyncio
@@ -130,3 +132,107 @@ class TestValidateCustomEndpoint:
             api_key=None,
             allowed_api_bases=allowed,
         )
+
+
+class TestModelMetadataToParamsBedrockGuardrail:
+    class _TestModel(TextGenModelBase):
+        def __init__(self, metadata):
+            self._metadata = metadata
+
+        @property
+        def metadata(self):
+            return self._metadata
+
+        async def generate(self, **kwargs):
+            pass
+
+    @pytest.fixture(name="guardrail_config")
+    def guardrail_config_fixture(self):
+        return ConfigBedrockGuardrail(
+            guardrailIdentifier="abc123",
+            guardrailVersion="1",
+            trace="enabled",
+        )
+
+    @pytest.mark.parametrize("provider", sorted(BEDROCK_GUARDRAIL_PROVIDERS))
+    def test_includes_guardrail_config_for_bedrock_providers(
+        self, guardrail_config, provider
+    ):
+        model = self._TestModel(
+            ModelMetadata(
+                engine="litellm",
+                name="model-a",
+                api_key="abcde",
+                identifier=f"{provider}/some-model",
+            )
+        )
+
+        params = model.model_metadata_to_params(
+            bedrock_guardrail_config=guardrail_config,
+        )
+        assert params["guardrailConfig"] == {
+            "guardrailIdentifier": "abc123",
+            "guardrailVersion": "1",
+            "trace": "enabled",
+        }
+
+    def test_no_guardrail_config_for_non_bedrock_provider(self, guardrail_config):
+        model = self._TestModel(
+            ModelMetadata(
+                engine="litellm",
+                name="model-a",
+                endpoint="https://api.example.com",
+                api_key="abcde",
+                identifier="anthropic/some-model",
+            )
+        )
+
+        params = model.model_metadata_to_params(
+            bedrock_guardrail_config=guardrail_config,
+        )
+        assert "guardrailConfig" not in params
+
+    def test_no_guardrail_config_when_none(self):
+        model = self._TestModel(
+            ModelMetadata(
+                engine="litellm",
+                name="model-a",
+                api_key="abcde",
+                identifier="bedrock/some-model",
+            )
+        )
+
+        params = model.model_metadata_to_params()
+        assert "guardrailConfig" not in params
+
+    def test_no_guardrail_config_without_identifier(self, guardrail_config):
+        model = self._TestModel(
+            ModelMetadata(
+                engine="litellm",
+                name="model-a",
+                endpoint="https://api.example.com",
+                api_key="abcde",
+            )
+        )
+
+        params = model.model_metadata_to_params(
+            bedrock_guardrail_config=guardrail_config,
+        )
+        assert "guardrailConfig" not in params
+
+    def test_excludes_none_values_from_guardrail_config(self):
+        config = ConfigBedrockGuardrail(guardrailIdentifier="abc123")
+        model = self._TestModel(
+            ModelMetadata(
+                engine="litellm",
+                name="model-a",
+                api_key="abcde",
+                identifier="bedrock/some-model",
+            )
+        )
+
+        params = model.model_metadata_to_params(bedrock_guardrail_config=config)
+        assert params["guardrailConfig"] == {
+            "guardrailIdentifier": "abc123",
+            "trace": "disabled",
+        }

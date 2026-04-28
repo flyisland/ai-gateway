@@ -1,14 +1,16 @@
 # pylint: disable=too-many-lines
-from typing import Optional
+from typing import AsyncIterator, Optional, cast
 from unittest.mock import AsyncMock, MagicMock, Mock, patch
 
 import pytest
 from litellm.exceptions import APIConnectionError, InternalServerError
 
+from ai_gateway.config import ConfigBedrockGuardrail
 from ai_gateway.models import KindLiteLlmModel, LiteLlmChatModel
 from ai_gateway.models.base import KindModelProvider
 from ai_gateway.models.base_chat import Message, Role
-from ai_gateway.models.base_text import TextGenModelOutput
+from ai_gateway.models.base_text import TextGenModelChunk, TextGenModelOutput
+from ai_gateway.models.guardrails import BEDROCK_GUARDRAIL_PROVIDERS
 from ai_gateway.models.litellm import (
     LiteLlmAPIConnectionError,
     LiteLlmInternalServerError,
@@ -233,10 +235,11 @@ class TestLiteLlmChatModel:
                 choices=[AsyncMock(message=AsyncMock(content="Test response"))],
                 usage=AsyncMock(completion_tokens=999),
             )
-            messages = [Message(content="Test message", role="user")]
+            messages = [Message(content="Test message", role=Role.USER)]
             output = await lite_llm_chat_model.generate(messages)
             assert isinstance(output, TextGenModelOutput)
             assert output.text == "Test response"
+            assert output.metadata
             assert output.metadata.output_tokens == 999
 
             mock_acompletion.assert_called_with(
@@ -319,7 +322,7 @@ class TestLiteLlmChatModel:
 
             mock_acompletion.return_value = streamed_response
 
-            messages = [Message(content="Test message", role="user")]
+            messages = [Message(content="Test message", role=Role.USER)]
             response = await lite_llm_chat_model.generate(
                 messages=messages,
                 stream=True,
@@ -329,7 +332,7 @@ class TestLiteLlmChatModel:
             )
 
             content = []
-            async for chunk in response:
+            async for chunk in cast(AsyncIterator[TextGenModelChunk], response):
                 content.append(chunk.text)
             assert content == ["Streamed content"]
 
@@ -375,7 +378,7 @@ class TestLiteLlmChatModel:
 
             mock_acompletion.side_effect = AsyncMock(side_effect=mock_stream)
 
-            messages = [Message(content="Test message", role="user")]
+            messages = [Message(content="Test message", role=Role.USER)]
             response = await lite_llm_chat_model.generate(
                 messages=messages, stream=True
             )
@@ -1058,7 +1061,7 @@ class TestLiteLlmTextGenModel:
             assert kwargs["stream"] is True
 
             content = []
-            async for chunk in response:
+            async for chunk in cast(AsyncIterator[TextGenModelChunk], response):
                 content.append(chunk.text)
             assert content == ["Streamed content"]
 
@@ -1144,3 +1147,131 @@ class TestLiteLlmTextGenModel:
             assert isinstance(passed_exception, OverloadedError)
             assert "Overloaded" in str(passed_exception)
             watcher.finish.assert_called_once()
+
+
+class TestBedrockGuardrailConfig:
+    @pytest.fixture(name="guardrail_config")
+    def guardrail_config_fixture(self):
+        return ConfigBedrockGuardrail(
+            guardrailIdentifier="abc123",
+            guardrailVersion="1",
+            trace="enabled",
+        )
+
+    @staticmethod
+    def _expected_guardrail_config():
+        return {
+            "guardrailIdentifier": "abc123",
+            "guardrailVersion": "1",
+            "trace": "enabled",
+        }
+
+    @pytest.mark.parametrize("provider", sorted(BEDROCK_GUARDRAIL_PROVIDERS))
+    @pytest.mark.asyncio
+    async def test_chat_model_includes_guardrail_config(
+        self, guardrail_config, provider
+    ):
+        model = LiteLlmChatModel.from_model_name(
+            name="mistral",
+            endpoint=None,
+            api_key="key",
+            identifier=f"{provider}/some-model",
+            custom_models_enabled=True,
+            bedrock_guardrail_config=guardrail_config,
+        )
+
+        with patch("ai_gateway.models.litellm.acompletion") as mock_acompletion:
+            mock_acompletion.return_value = AsyncMock(
+                choices=[AsyncMock(message=AsyncMock(content="resp"))],
+                usage=AsyncMock(completion_tokens=1),
+            )
+            await model.generate([Message(content="hi", role=Role.USER)])
+
+            call_kwargs = mock_acompletion.call_args[1]
+            assert call_kwargs["guardrailConfig"] == self._expected_guardrail_config()
+
+    @pytest.mark.asyncio
+    async def test_chat_model_no_guardrail_when_not_bedrock(self, guardrail_config):
+        model = LiteLlmChatModel.from_model_name(
+            name="mistral",
+            endpoint="http://localhost:1111/v1",
+            api_key="key",
+            identifier="anthropic/some-model",
+            custom_models_enabled=True,
+            bedrock_guardrail_config=guardrail_config,
+        )
+
+        with patch("ai_gateway.models.litellm.acompletion") as mock_acompletion:
+            mock_acompletion.return_value = AsyncMock(
+                choices=[AsyncMock(message=AsyncMock(content="resp"))],
+                usage=AsyncMock(completion_tokens=1),
+            )
+            await model.generate([Message(content="hi", role=Role.USER)])
+
+            call_kwargs = mock_acompletion.call_args[1]
+            assert "guardrailConfig" not in call_kwargs
+
+    @pytest.mark.asyncio
+    async def test_chat_model_no_guardrail_when_config_is_none(self):
+        model = LiteLlmChatModel.from_model_name(
+            name="mistral",
+            endpoint=None,
+            api_key="key",
+            identifier="bedrock/some-model",
+            custom_models_enabled=True,
+        )
+
+        with patch("ai_gateway.models.litellm.acompletion") as mock_acompletion:
+            mock_acompletion.return_value = AsyncMock(
+                choices=[AsyncMock(message=AsyncMock(content="resp"))],
+                usage=AsyncMock(completion_tokens=1),
+            )
+            await model.generate([Message(content="hi", role=Role.USER)])
+
+            call_kwargs = mock_acompletion.call_args[1]
+            assert "guardrailConfig" not in call_kwargs
+
+    @pytest.mark.parametrize("provider", sorted(BEDROCK_GUARDRAIL_PROVIDERS))
+    @pytest.mark.asyncio
+    async def test_text_model_includes_guardrail_config(
+        self, guardrail_config, provider
+    ):
+        model = LiteLlmTextGenModel.from_model_name(
+            name="mistral",
+            endpoint=None,
+            api_key="key",
+            identifier=f"{provider}/some-model",
+            custom_models_enabled=True,
+            bedrock_guardrail_config=guardrail_config,
+        )
+
+        with patch("ai_gateway.models.litellm.acompletion") as mock_acompletion:
+            mock_acompletion.return_value = AsyncMock(
+                choices=[AsyncMock(message=AsyncMock(content="resp"))],
+                usage=AsyncMock(completion_tokens=1),
+            )
+            await model.generate(prefix="test")
+
+            call_kwargs = mock_acompletion.call_args[1]
+            assert call_kwargs["guardrailConfig"] == self._expected_guardrail_config()
+
+    @pytest.mark.asyncio
+    async def test_text_model_no_guardrail_when_not_bedrock(self, guardrail_config):
+        model = LiteLlmTextGenModel.from_model_name(
+            name="mistral",
+            endpoint="http://localhost:1111/v1",
+            api_key="key",
+            identifier="anthropic/some-model",
+            custom_models_enabled=True,
+            bedrock_guardrail_config=guardrail_config,
+        )
+
+        with patch("ai_gateway.models.litellm.acompletion") as mock_acompletion:
+            mock_acompletion.return_value = AsyncMock(
+                choices=[AsyncMock(message=AsyncMock(content="resp"))],
+                usage=AsyncMock(completion_tokens=1),
+            )
+            await model.generate(prefix="test")
+
+            call_kwargs = mock_acompletion.call_args[1]
+            assert "guardrailConfig" not in call_kwargs

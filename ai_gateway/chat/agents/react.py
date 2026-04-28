@@ -23,6 +23,7 @@ from ai_gateway.models.base_chat import Role
 from ai_gateway.prompts import Prompt, jinja2_formatter
 from ai_gateway.prompts.config.base import PromptConfig
 from ai_gateway.structured_logging import get_request_logger
+from lib.guardrails import GUARDRAIL_INTERVENED_WARNING
 
 __all__ = [
     "ReActPlainTextParser",
@@ -52,7 +53,6 @@ class ReActPlainTextParser(BaseCumulativeTransformOutputParser):
         self, message: str, finish_reason: Optional[str]
     ) -> Optional[AgentFinalAnswer]:
         if match_answer := self.re_final_answer.search(message):
-
             return AgentFinalAnswer(
                 text=match_answer.group(1), finish_reason=finish_reason
             )
@@ -224,11 +224,13 @@ class ReActAgent(RunnableBinding[ReActAgentInputs, TypeAgentEvent]):
     def __init__(self, prompt: Prompt) -> None:
         super().__init__(bound=prompt | ReActPlainTextParser())
 
-    def _append_warning_if_response_exceeded_max_tokens(
+    def _append_final_message_warnings(
         self, event: AgentFinalAnswer
     ) -> AgentFinalAnswer:
         if event.finish_reason == "length":
             event.text = event.text + "\n\n" + _RESPONSE_MAX_TOKENS_WARNING
+        elif event.finish_reason == "guardrail_intervened":
+            event.text = event.text + "\n\n" + GUARDRAIL_INTERVENED_WARNING
         return event
 
     @override
@@ -258,9 +260,7 @@ class ReActAgent(RunnableBinding[ReActAgentInputs, TypeAgentEvent]):
                             text=event.text[len_final_answer:],
                             finish_reason=event.finish_reason,
                         )
-                        response = self._append_warning_if_response_exceeded_max_tokens(
-                            response
-                        )
+                        response = self._append_final_message_warnings(response)
                         yield cast(TypeAgentEvent, response)
 
                         len_final_answer = len(event.text)
@@ -268,6 +268,7 @@ class ReActAgent(RunnableBinding[ReActAgentInputs, TypeAgentEvent]):
                 events.append(event)
         except Exception as e:
             error_message = str(e)
+
             retryable = any(err in error_message for err in self.RETRYABLE_ERRORS)
 
             yield cast(

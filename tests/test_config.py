@@ -2,12 +2,14 @@ import os
 from unittest import mock
 
 import pytest
+from pydantic import ValidationError
 
 from ai_gateway.config import (
     Config,
     ConfigAmazonQ,
     ConfigAuditEvent,
     ConfigAuth,
+    ConfigBedrockGuardrail,
     ConfigBillingEvent,
     ConfigCachingProxy,
     ConfigCustomModels,
@@ -566,6 +568,90 @@ def test_config_audit_event(values: dict, expected: ConfigAuditEvent):
 
 
 @pytest.mark.parametrize(
+    ("values", "expected"),
+    [
+        ({}, None),
+        (
+            {"AIGW_BEDROCK_GUARDRAIL_CONFIG": '{"guardrailIdentifier": "abc123"}'},
+            ConfigBedrockGuardrail(guardrailIdentifier="abc123"),
+        ),
+        (
+            {
+                "AIGW_BEDROCK_GUARDRAIL_CONFIG": '{"guardrailIdentifier": "abc123", "guardrailVersion": "1"}'
+            },
+            ConfigBedrockGuardrail(
+                guardrailIdentifier="abc123",
+                guardrailVersion="1",
+                trace="disabled",
+            ),
+        ),
+        (
+            {
+                "AIGW_BEDROCK_GUARDRAIL_CONFIG": (
+                    '{"guardrailIdentifier": "abc123",'
+                    ' "guardrailVersion": "2", "trace": "enabled"}'
+                )
+            },
+            ConfigBedrockGuardrail(
+                guardrailIdentifier="abc123",
+                guardrailVersion="2",
+                trace="enabled",
+            ),
+        ),
+        (
+            {
+                "AIGW_BEDROCK_GUARDRAIL_CONFIG": '{"guardrailIdentifier": "abc123", "guardrailVersion": "DRAFT"}'
+            },
+            ConfigBedrockGuardrail(
+                guardrailIdentifier="abc123", guardrailVersion="DRAFT"
+            ),
+        ),
+        (
+            {
+                "AIGW_BEDROCK_GUARDRAIL_CONFIG": '{"guardrailIdentifier": "abc123", "guardrailVersion": "12345678"}'
+            },
+            ConfigBedrockGuardrail(
+                guardrailIdentifier="abc123", guardrailVersion="12345678"
+            ),
+        ),
+        (
+            {
+                "AIGW_BEDROCK_GUARDRAIL_CONFIG": '{"guardrailIdentifier": "abc123", "guardrailVersion": ""}'
+            },
+            ConfigBedrockGuardrail(guardrailIdentifier="abc123", guardrailVersion=""),
+        ),
+        (
+            {
+                "AIGW_BEDROCK_GUARDRAIL_CONFIG": (
+                    '{"guardrailIdentifier":'
+                    ' "arn:aws:bedrock:us-east-1:123456789012:guardrail/abc123"}'
+                )
+            },
+            ConfigBedrockGuardrail(
+                guardrailIdentifier="arn:aws:bedrock:us-east-1:123456789012:guardrail/abc123",
+            ),
+        ),
+        (
+            {
+                "AIGW_BEDROCK_GUARDRAIL_CONFIG": (
+                    '{"guardrailIdentifier":'
+                    ' "arn:aws-cn:bedrock:cn-north-1:123456789012:guardrail/def456"}'
+                )
+            },
+            ConfigBedrockGuardrail(
+                guardrailIdentifier="arn:aws-cn:bedrock:cn-north-1:123456789012:guardrail/def456",
+            ),
+        ),
+    ],
+)
+def test_config_bedrock_guardrail(values: dict, expected: ConfigBedrockGuardrail):
+    with mock.patch.dict(os.environ, values, clear=True):
+        config = Config(_env_file=None)
+
+        assert config.bedrock_guardrail_config == expected
+
+
+@pytest.mark.parametrize(
     ("values", "expected_use_caching_proxy"),
     [
         ({}, False),
@@ -648,6 +734,91 @@ def test_aigw_config_has_duo_workflow_field():
 )
 def test_caching_proxy_url(duo_workflow_config, expected_url):
     assert duo_workflow_config.caching_proxy_url() == expected_url
+
+
+@pytest.mark.parametrize(
+    "invalid_json",
+    [
+        "not-valid-json",
+        "{}",
+        '{"guardrailVersion": "1"}',
+        '{"guardrailVersion": "1", "trace": "enabled"}',
+        '{"guardrailIdentifier": ""}',
+    ],
+)
+def test_config_bedrock_guardrail_missing_identifier(invalid_json):
+    values = {"AIGW_BEDROCK_GUARDRAIL_CONFIG": invalid_json}
+    with mock.patch.dict(os.environ, values, clear=True):
+        with pytest.raises(ValidationError):
+            Config(_env_file=None)
+
+
+def test_config_bedrock_guardrail_invalid_trace_value():
+    values = {
+        "AIGW_BEDROCK_GUARDRAIL_CONFIG": (
+            '{"guardrailIdentifier": "abc123",'
+            ' "guardrailVersion": "1", "trace": "invalid"}'
+        )
+    }
+    with mock.patch.dict(os.environ, values, clear=True):
+        with pytest.raises(ValidationError):
+            Config(_env_file=None)
+
+
+@pytest.mark.parametrize(
+    "invalid_identifier",
+    [
+        "HAS-UPPERCASE",
+        "has spaces",
+        "special!chars",
+        "arn:aws:bedrock:us-east-1:short:guardrail/abc",
+        "arn:aws:s3:us-east-1:123456789012:guardrail/abc",
+    ],
+)
+def test_config_bedrock_guardrail_invalid_identifier(invalid_identifier):
+    values = {
+        "AIGW_BEDROCK_GUARDRAIL_CONFIG": f'{{"guardrailIdentifier": "{invalid_identifier}"}}'
+    }
+    with mock.patch.dict(os.environ, values, clear=True):
+        with pytest.raises(ValidationError):
+            Config(_env_file=None)
+
+
+@pytest.mark.parametrize(
+    "invalid_version",
+    [
+        "0",
+        "01",
+        "abc",
+        "123456789",
+        "draft",
+    ],
+)
+def test_config_bedrock_guardrail_invalid_version(invalid_version):
+    values = {
+        "AIGW_BEDROCK_GUARDRAIL_CONFIG": f'{{"guardrailIdentifier": "abc123", "guardrailVersion": "{invalid_version}"}}'
+    }
+    with mock.patch.dict(os.environ, values, clear=True):
+        with pytest.raises(ValidationError):
+            Config(_env_file=None)
+
+
+def test_config_bedrock_guardrail_identifier_max_length():
+    long_id = "a" * 2049
+    values = {
+        "AIGW_BEDROCK_GUARDRAIL_CONFIG": f'{{"guardrailIdentifier": "{long_id}"}}'
+    }
+    with mock.patch.dict(os.environ, values, clear=True):
+        with pytest.raises(ValidationError):
+            Config(_env_file=None)
+
+
+def test_config_bedrock_guardrail_identifier_at_max_length():
+    max_id = "a" * 2048
+    values = {"AIGW_BEDROCK_GUARDRAIL_CONFIG": f'{{"guardrailIdentifier": "{max_id}"}}'}
+    with mock.patch.dict(os.environ, values, clear=True):
+        config = Config(_env_file=None)
+        assert config.bedrock_guardrail_config.guardrailIdentifier == max_id
 
 
 # pylint: enable=direct-environment-variable-reference

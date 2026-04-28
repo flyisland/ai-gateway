@@ -103,6 +103,7 @@ class LLMFinishReason(str, Enum):
     TOOL_CALLS = "tool_calls"
     TOOL_USE = "tool_use"
     CONTENT_FILTER = "content_filter"
+    GUARDRAIL_INTERVENED = "guardrail_intervened"
     MODEL_CONTEXT_WINDOW_EXCEEDED = "model_context_window_exceeded"
 
     @classmethod
@@ -125,6 +126,7 @@ class LLMFinishReason(str, Enum):
         return [
             cls.LENGTH,
             cls.CONTENT_FILTER,
+            cls.GUARDRAIL_INTERVENED,
             cls.MAX_TOKENS,
             cls.MODEL_CONTEXT_WINDOW_EXCEEDED,
         ]

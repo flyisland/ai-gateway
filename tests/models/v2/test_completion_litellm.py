@@ -1,3 +1,4 @@
+# pylint: disable=too-many-lines
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import litellm
@@ -5,7 +6,9 @@ import pytest
 from langchain_core.messages import AIMessage, AIMessageChunk, BaseMessage, HumanMessage
 from langchain_core.outputs import ChatGeneration, ChatGenerationChunk, ChatResult
 
+from ai_gateway.config import ConfigBedrockGuardrail
 from ai_gateway.model_selection.models import CompletionType
+from ai_gateway.models.guardrails import BEDROCK_GUARDRAIL_PROVIDERS
 from ai_gateway.models.v2.completion_litellm import MODEL_STOP_TOKENS, CompletionLiteLLM
 
 
@@ -991,3 +994,64 @@ class TestFireworksRetry:
                     )
                 ]
             )
+            assert result.generations[0].message.content == mock_response_text
+
+
+class TestBedrockGuardrailConfig:
+    @pytest.fixture(name="guardrail_config")
+    def guardrail_config_fixture(self):
+        return ConfigBedrockGuardrail(
+            guardrailIdentifier="abc123",
+            guardrailVersion="1",
+            trace="enabled",
+        )
+
+    @staticmethod
+    def _expected_guardrail_config():
+        return {
+            "guardrailIdentifier": "abc123",
+            "guardrailVersion": "1",
+            "trace": "enabled",
+        }
+
+    @pytest.mark.parametrize("provider", sorted(BEDROCK_GUARDRAIL_PROVIDERS))
+    def test_build_completion_args_includes_guardrail_config(
+        self, guardrail_config, provider
+    ):
+        model = CompletionLiteLLM(
+            model="some-model",
+            completion_type=CompletionType.FIM,
+            fim_format="<prefix>{prefix}<suffix>{suffix}<middle>",
+            custom_llm_provider=provider,
+            bedrock_guardrail_config=guardrail_config,
+        )
+
+        args = model._build_completion_args("prompt", None, None, False)
+
+        assert args["guardrailConfig"] == self._expected_guardrail_config()
+
+    def test_build_completion_args_no_guardrail_when_not_bedrock(
+        self, guardrail_config
+    ):
+        model = CompletionLiteLLM(
+            model="some-model",
+            completion_type=CompletionType.FIM,
+            fim_format="<prefix>{prefix}<suffix>{suffix}<middle>",
+            custom_llm_provider="fireworks_ai",
+            bedrock_guardrail_config=guardrail_config,
+        )
+
+        args = model._build_completion_args("prompt", None, None, False)
+        assert "guardrailConfig" not in args
+
+    def test_build_completion_args_no_guardrail_when_config_is_none(self):
+        model = CompletionLiteLLM(
+            model="some-model",
+            completion_type=CompletionType.FIM,
+            fim_format="<prefix>{prefix}<suffix>{suffix}<middle>",
+            custom_llm_provider="bedrock",
+        )
+
+        args = model._build_completion_args("prompt", None, None, False)
+
+        assert "guardrailConfig" not in args

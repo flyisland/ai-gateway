@@ -93,10 +93,12 @@ from litellm.utils import get_valid_models
 from pydantic import BaseModel, Field, model_validator
 from typing_extensions import is_typeddict
 
+from ai_gateway.config import ConfigBedrockGuardrail
 from ai_gateway.models.fireworks_retry import (
     DEFAULT_FIREWORKS_ERRORS,
     create_fireworks_retry_decorator,
 )
+from ai_gateway.models.guardrails import bedrock_guardrail_params
 
 logger = logging.getLogger(__name__)
 
@@ -338,6 +340,7 @@ class ChatLiteLLM(BaseChatModel):
     max_tokens: Optional[int] = None
 
     max_retries: int = 1
+    bedrock_guardrail_config: Optional[ConfigBedrockGuardrail] = None
 
     def _setup_fireworks_kwargs(self, kwargs: dict[str, Any]) -> None:
         """Setup Fireworks-specific kwargs including prompt caching, session affinity headers, and logprobs."""
@@ -411,7 +414,7 @@ class ChatLiteLLM(BaseChatModel):
         set_model_value = self.model
         if self.model_name is not None:
             set_model_value = self.model_name
-        return {
+        params = {
             "model": set_model_value,
             "force_timeout": self.request_timeout,
             "max_tokens": self.max_tokens,
@@ -421,6 +424,12 @@ class ChatLiteLLM(BaseChatModel):
             "custom_llm_provider": self.custom_llm_provider,
             **self.model_kwargs,
         }
+        guardrail_params = bedrock_guardrail_params(
+            self.custom_llm_provider, self.bedrock_guardrail_config
+        )
+        if guardrail_params:
+            params["guardrailConfig"] = guardrail_params["guardrailConfig"]
+        return params
 
     @property
     def _client_params(self) -> Dict[str, Any]:
@@ -862,7 +871,6 @@ class ChatLiteLLM(BaseChatModel):
                 raise ValueError(msg)
 
         elif method == "json_schema":
-
             if strict is None:
                 strict_flag = True
             else:
