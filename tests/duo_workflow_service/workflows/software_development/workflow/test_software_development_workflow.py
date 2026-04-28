@@ -90,18 +90,14 @@ def workflow_fixture(
     return workflow
 
 
-@pytest.fixture(name="workflow_config")
-def workflow_config_fixture():
-    return {
-        "first_checkpoint": None,
-        "workflow_status": "created",
-        "agent_privileges_names": [],
-        "pre_approved_agent_privileges_names": [],
-        "mcp_enabled": True,
-        "allow_agent_to_request_user": True,
-        "archived": False,
-        "stalled": False,
-    }
+@pytest.fixture(name="mcp_enabled")
+def mcp_enabled_fixture() -> bool:
+    return True
+
+
+@pytest.fixture(name="allow_agent_to_request_user")
+def allow_agent_to_request_user_fixture() -> bool:
+    return True
 
 
 @pytest.fixture(name="mock_log_exception")
@@ -248,8 +244,7 @@ async def test_workflow_initialization(workflow):
 
 
 @pytest.mark.asyncio
-@patch("duo_workflow_service.workflows.abstract_workflow.GitLabWorkflow.aget_tuple")
-@patch("duo_workflow_service.workflows.abstract_workflow.GitLabWorkflow.aput")
+@pytest.mark.usefixtures("mock_fetch_workflow_and_container_data")
 @patch(
     "duo_workflow_service.checkpointer.gitlab_workflow.GitLabStatusUpdater",
     autospec=True,
@@ -262,7 +257,6 @@ async def test_workflow_run(
     mock_tools_approval_component,
     mock_planner_component,
     mock_executor_component,
-    mock_fetch_workflow_and_container_data,
     mock_tools_executor,
     mock_plan_supervisor_agent,
     mock_handover_agent,
@@ -272,9 +266,6 @@ async def test_workflow_run(
     checkpoint_tuple,
     workflow,
 ):
-    mock_gitlab_workflow_aput.return_value = None
-    mock_gitlab_workflow_aget_tuple.return_value = None
-
     mock_user_interface_instance = mock_checkpoint_notifier.return_value
 
     mock_tools_executor.return_value.run.side_effect = [
@@ -338,12 +329,12 @@ async def test_workflow_run(
 
 @pytest.mark.asyncio
 @pytest.mark.parametrize("offline_mode", [True])
+@pytest.mark.usefixtures("mock_fetch_workflow_and_container_data")
 async def test_workflow_run_with_memory_saver(
     mock_checkpoint_notifier,
     mock_executor_component,
     mock_planner_component,
     mock_gitlab_workflow,
-    mock_fetch_workflow_and_container_data,
     mock_tools_executor,
     mock_plan_supervisor_agent,
     mock_handover_agent,
@@ -384,11 +375,11 @@ async def test_workflow_run_with_memory_saver(
 
 
 @pytest.mark.asyncio
+@pytest.mark.usefixtures("mock_fetch_workflow_and_container_data")
 async def test_workflow_run_when_exception(
     mock_log_exception,
     mock_planner_component,
     mock_executor_component,
-    mock_fetch_workflow_and_container_data,
     mock_gitlab_workflow,
     mock_tools_executor,
     mock_plan_supervisor_agent,
@@ -421,8 +412,11 @@ async def test_workflow_run_when_exception(
 
 
 @pytest.mark.asyncio
-@patch("duo_workflow_service.workflows.abstract_workflow.GitLabWorkflow.aget_tuple")
-@patch("duo_workflow_service.workflows.abstract_workflow.GitLabWorkflow.aput")
+@pytest.mark.usefixtures(
+    "mock_fetch_workflow_and_container_data",
+    "mock_gitlab_workflow_aput",
+    "mock_gitlab_workflow_aget_tuple",
+)
 @patch(
     "duo_workflow_service.checkpointer.gitlab_workflow.GitLabStatusUpdater",
     autospec=True,
@@ -435,14 +429,10 @@ async def test_workflow_run_with_error_state(
     mock_planner_component,
     mock_tools_approval_component,
     mock_executor_component,
-    mock_fetch_workflow_and_container_data,
     mock_tools_executor,
     mock_agent,
     workflow,
 ):
-    mock_gitlab_workflow_aput.return_value = None
-    mock_gitlab_workflow_aget_tuple.return_value = None
-
     mock_tools_executor.return_value.run.side_effect = [
         {
             "plan": Plan(steps=[]),
@@ -468,12 +458,12 @@ async def test_workflow_run_with_error_state(
 
 
 @pytest.mark.asyncio
+@pytest.mark.usefixtures("mock_fetch_workflow_and_container_data")
 async def test_workflow_run_with_tools_registry(
     mock_log_exception,
     mock_executor_component,
     mock_planner_component,
     mock_gitlab_workflow,
-    mock_fetch_workflow_and_container_data,
     mock_tools_executor,
     mock_plan_supervisor_agent,
     mock_handover_agent,
@@ -552,10 +542,10 @@ def test_context_builder_tools(tools_registry, workflow):
 
 
 @pytest.mark.asyncio
+@pytest.mark.usefixtures("mock_fetch_workflow_and_container_data")
 async def test_workflow_run_with_setup_error(
     mock_executor_component,
     mock_planner_component,
-    mock_fetch_workflow_and_container_data,
     mock_gitlab_workflow,
     mock_git_lab_workflow_instance,
     mock_tools_registry_cls,
@@ -575,25 +565,25 @@ async def test_workflow_run_with_setup_error(
 
 
 @pytest.mark.asyncio
-async def test_workflow_run_with_missing_web_url(
-    mock_fetch_workflow_and_container_data,
-    mock_gitlab_workflow,
-    mock_git_lab_workflow_instance,
-    checkpoint_tuple,
-    workflow,
-):
-    mock_fetch_workflow_and_container_data.return_value = (
+@pytest.mark.parametrize(
+    "project",
+    [
         {
             "id": 1,
             "name": "test-project",
             "description": "This is a test project",
             "http_url_to_repo": "https://example.com/project",
             # web_url is missing
-        },
-        None,
-        {"project_id": 1},
-    )
-
+        }
+    ],
+)
+@pytest.mark.usefixtures("mock_fetch_workflow_and_container_data")
+async def test_workflow_run_with_missing_web_url(
+    mock_gitlab_workflow,
+    mock_git_lab_workflow_instance,
+    checkpoint_tuple,
+    workflow,
+):
     mock_git_lab_workflow_instance.aget_tuple = AsyncMock(return_value=checkpoint_tuple)
     mock_git_lab_workflow_instance.alist = AsyncMock(return_value=[checkpoint_tuple])
 
@@ -602,28 +592,27 @@ async def test_workflow_run_with_missing_web_url(
 
 
 @pytest.mark.asyncio
-@patch("duo_workflow_service.gitlab.gitlab_api.GitLabUrlParser", autospec=True)
-async def test_workflow_run_with_invalid_web_url(
-    mock_gitlab_url_parser,
-    mock_fetch_workflow_and_container_data,
-    mock_gitlab_workflow,
-    mock_git_lab_workflow_instance,
-    checkpoint_tuple,
-    workflow,
-):
-    # Test case for invalid web_url (cannot extract gitlab_host)
-    mock_fetch_workflow_and_container_data.return_value = (
+@pytest.mark.parametrize(
+    "project",
+    [
         {
             "id": 1,
             "name": "test-project",
             "description": "This is a test project",
             "http_url_to_repo": "https://example.com/project",
             "web_url": "invalid-url",  # Invalid URL format
-        },
-        None,
-        {"project_id": 1},
-    )
-
+        }
+    ],
+)
+@pytest.mark.usefixtures("mock_fetch_workflow_and_container_data")
+@patch("duo_workflow_service.gitlab.gitlab_api.GitLabUrlParser", autospec=True)
+async def test_workflow_run_with_invalid_web_url(
+    mock_gitlab_url_parser,
+    mock_gitlab_workflow,
+    mock_git_lab_workflow_instance,
+    checkpoint_tuple,
+    workflow,
+):
     mock_gitlab_url_parser.extract_host_from_url.return_value = None
 
     mock_git_lab_workflow_instance.aget_tuple = AsyncMock(return_value=checkpoint_tuple)
@@ -634,11 +623,11 @@ async def test_workflow_run_with_invalid_web_url(
 
 
 @pytest.mark.asyncio
+@pytest.mark.usefixtures("mock_fetch_workflow_and_container_data")
 async def test_workflow_run_with_retry(
     mock_log_exception,
     mock_executor_component,
     mock_planner_component,
-    mock_fetch_workflow_and_container_data,
     mock_gitlab_workflow,
     mock_git_lab_workflow_instance,
     mock_tools_executor,
@@ -761,13 +750,13 @@ async def test_workflow_run_with_retry(
     ],
 )
 @pytest.mark.parametrize("tool_approval_required", [[True, False, False]])
+@pytest.mark.usefixtures("mock_fetch_workflow_and_container_data")
 async def test_workflow_run_with_tool_approvals(
     mock_checkpoint_notifier,
     mock_executor_component,
     mock_tools_approval_component,
     mock_gitlab_workflow,
     mock_git_lab_workflow_instance,
-    mock_fetch_workflow_and_container_data,
     mock_tools_executor,
     mock_planner_component,
     mock_handover_agent,
@@ -790,21 +779,8 @@ async def test_workflow_run_with_tool_approvals(
 
 
 @pytest.mark.asyncio
-@pytest.mark.parametrize(
-    "workflow_config",
-    [
-        {
-            "project_id": 1,
-            "allow_agent_to_request_user": False,
-            "agent_privileges_names": [],
-            "pre_approved_agent_privileges_names": [],
-            "mcp_enabled": False,
-            "first_checkpoint": None,
-            "workflow_status": "",
-            "gitlab_host": "gitlab.com",
-        }
-    ],
-)
+@pytest.mark.parametrize("mcp_enabled,allow_agent_to_request_user", [(False, False)])
+@pytest.mark.usefixtures("mock_fetch_workflow_and_container_data")
 @patch(
     "duo_workflow_service.workflows.software_development.workflow.PlanApprovalComponent",
     autospec=True,
@@ -814,7 +790,6 @@ async def test_workflow_run_without_plan_approval_component(
     mock_executor_component,
     mock_tools_approval_component,
     mock_gitlab_workflow,
-    mock_fetch_workflow_and_container_data,
     mock_tools_executor,
     mock_planner_component,
     mock_handover_agent,
@@ -875,9 +850,9 @@ async def test_workflow_cleanup(workflow, mock_action):
 
 
 @pytest.mark.asyncio
+@pytest.mark.usefixtures("mock_fetch_workflow_and_container_data")
 async def test_workflow_reject_slash_commands(
     mock_checkpoint_notifier,
-    mock_fetch_workflow_and_container_data,
     mock_gitlab_workflow,
     mock_tools_registry_cls,
     workflow,
