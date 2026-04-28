@@ -42,6 +42,10 @@ class GetPipelineFailingJobs(DuoBaseTool):
     This tool can be used when you have a pipeline URL.
     Be careful to differentiate between a pipeline_id and a job_id when using this tool
 
+    If this tool returns no failing jobs, always call `get_downstream_pipelines` with the same pipeline URL.
+    Only report no failing jobs after checking the original pipeline and all downstream pipelines.
+    Do not ask the user before checking downstream pipelines.
+
     {MERGE_REQUEST_IDENTIFICATION_DESCRIPTION}
 
     To identify a pipeline you must provide:
@@ -242,7 +246,12 @@ class GetDownstreamPipelines(DuoBaseTool):
                     raise ToolException("; ".join(downstream_validation_result.errors))
 
                 if downstream_validation_result.project_id == project_id:
-                    downstream_pipeline_urls.append({"url": downstream_url})
+                    downstream_pipeline_urls.append(
+                        {
+                            "url": downstream_url,
+                            "status": downstream_pipeline.get("status"),
+                        }
+                    )
 
         return json.dumps(downstream_pipeline_urls)
 
