@@ -95,8 +95,9 @@ def test_get_models_returns_correct_data(mock_model_config, client):
     assert response.status_code == 200
     data = response.json()
 
+    # Models with a provider should have " - [provider]" appended to their name.
     assert data["models"][0] == {
-        "name": "Model 1",
+        "name": "Model 1 - Anthropic",
         "identifier": "model1",
         "provider": "Anthropic",
         "deprecation": None,
@@ -104,13 +105,14 @@ def test_get_models_returns_correct_data(mock_model_config, client):
         "cost_indicator": "$",
     }
     assert data["models"][1] == {
-        "name": "Model 2",
+        "name": "Model 2 - Vertex",
         "identifier": "model2",
         "provider": "Vertex",
         "deprecation": None,
         "description": "Fast, cost-effective responses.",
         "cost_indicator": "$$",
     }
+    # Models without a provider should not have a suffix appended.
     assert data["models"][2] == {
         "name": "Model 3",
         "identifier": "model3",
@@ -120,19 +122,32 @@ def test_get_models_returns_correct_data(mock_model_config, client):
         "cost_indicator": None,
     }
 
+    # config1 has multiple default models: a pseudo-model should be created and used as default_model.
     resp0 = data["unit_primitives"][0]
+    pseudo_identifier = "__default__config1"
     expected0 = {
         "feature_setting": "config1",
         "unit_primitives": ["ask_issue", "ask_epic"],
-        "default_model": "model1",
+        "default_model": pseudo_identifier,
         "default_models": ["model1", "model2"],
-        "selectable_models": ["model1", "model2"],
+        "selectable_models": [pseudo_identifier, "model1", "model2"],
         "beta_models": [],
     }
     # subset match for dict keys/values (tolerates dev_* extras)
     assert expected0.items() <= resp0.items()
     assert set(resp0["unit_primitives"]) == set(expected0["unit_primitives"])
 
+    # The pseudo-model should appear in the models list with the first default model's name and no provider.
+    pseudo_model = next(
+        (m for m in data["models"] if m["identifier"] == pseudo_identifier), None
+    )
+    assert pseudo_model is not None
+    assert pseudo_model["name"] == "Model 1"
+    assert pseudo_model["provider"] is None
+    assert pseudo_model["description"] == "Fast, cost-effective responses."
+    assert pseudo_model["cost_indicator"] == "$"
+
+    # config2 has a single default model: default_model should point directly to it.
     resp1 = data["unit_primitives"][1]
     expected1 = {
         "feature_setting": "config2",
@@ -146,6 +161,7 @@ def test_get_models_returns_correct_data(mock_model_config, client):
     assert expected1.items() <= resp1.items()
     assert set(resp1["unit_primitives"]) == set(expected1["unit_primitives"])
 
+    # config3 has a single default model without a provider.
     resp2 = data["unit_primitives"][2]
     expected2 = {
         "feature_setting": "config3",
