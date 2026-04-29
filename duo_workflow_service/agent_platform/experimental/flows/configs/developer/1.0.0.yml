@@ -60,6 +60,9 @@ components:
       - from: "context:inputs.agent_platform_standard_context.primary_branch"
         as: "primary_branch"
         optional: True
+      - from: "context:inputs.agent_platform_standard_context.session_owner_id"
+        as: "session_owner_id"
+        optional: True
     toolset:
       - "read_file"
       - "find_files"
@@ -273,6 +276,9 @@ prompts:
           {%- if agent_user_environment %}
           User environment: {{ agent_user_environment }}
           {%- endif %}
+          {%- if session_owner_id %}
+          Triggering user ID: {{ session_owner_id }}
+          {%- endif %}
         </env>
 
         {% include 'agents_dot_md/base/1.0.0.jinja' %}
@@ -300,12 +306,12 @@ prompts:
         `/api/v4/projects/{{ project_id }}/{resource_type}/{IID}/notes`
         where both `{resource_type}` (`issues`, `work_items`, or `merge_requests`) and `{IID}` come from `resource_context`.
 
-        Find the note whose body matches the content in `mention` above and note its `id`. Read the surrounding conversation thread (parent discussion and sibling replies) to fully understand what is being asked. Then determine the appropriate course of action — this could be implementing code changes, researching a topic, creating an issue, answering a question, posting a status update, or any other task.
+        Find the note whose body matches the content in `mention` above and note its `id` and `author` fields. Read the surrounding conversation thread (parent discussion and sibling replies) to fully understand what is being asked. Then determine the appropriate course of action — this could be implementing code changes, researching a topic, creating an issue, answering a question, posting a status update, or any other task.
 
-        To reply in the same thread, use the appropriate note creation tool with `note_id: {found_note_id}`. Only post a new top-level comment if the task explicitly calls for a standalone update (e.g. a status update posted to an issue, not a reply to the mention). If you cannot find the specific note, post a top-level comment on the resource at:
+        To reply in the same thread, use the appropriate note creation tool with `note_id: {found_note_id}`. @mention the triggering user (use the `author.username` from the note you found) in your reply so they are notified. Only post a new top-level comment if the task explicitly calls for a standalone update (e.g. a status update posted to an issue, not a reply to the mention). If you cannot find the specific note, post a top-level comment on the resource at:
         `{{ project_url[:-4] if project_url and project_url[-4:] == '.git' else project_url }}/-/{resource_type}/{IID}`
 
-        If the task involves code changes, verify they work. Use your judgment on whether to push to an existing branch (e.g. if asked to fix something on the current MR) or create a new merge request — the task context should make this clear.
+        If the task involves code changes, verify they work. Use your judgment on whether to push to an existing branch (e.g. if asked to fix something on the current MR) or create a new merge request — the task context should make this clear. If you create a merge request, assign the triggering user (use the `author.id` from the note) as the assignee using the `assignee_ids` parameter, unless told differently.
         {% elif is_bare_url and '/-/merge_requests/' in trimmed %}
         Review the merge request: {{ goal }}
 
@@ -314,10 +320,14 @@ prompts:
         Focus your review on the **new code being introduced**. Look for correctness issues, edge cases, security concerns, and deviations from project conventions. Every comment should be specific and actionable — avoid restating what the code already shows or offering generic observations.
 
         Post your review as a comment on the merge request, referencing specific files and line numbers. Do not approve the merge request.
+
+        When you have finished your review, @mention the triggering user (look up their username first via `GET /api/v4/users/{{ session_owner_id }}`) in a comment to notify them that your review is complete.
         {% elif is_bare_url and ('/-/issues/' in trimmed or '/-/work_items/' in trimmed) %}
         Solve the following GitLab issue: {{ goal }}
 
         Fetch the issue details and understand the problem thoroughly before writing any code. Consider what might be causing the issue and where in the codebase the relevant logic lives. If there are multiple possible approaches, reason about the tradeoffs and pick the simplest one that fully addresses the issue. Implement your solution, verify it works, then create a merge request with your changes.
+
+        When you have completed your work, @mention the triggering user (look up their username first via `GET /api/v4/users/{{ session_owner_id }}`) in a comment on the issue to notify them. Assign them (ID: `{{ session_owner_id }}`) to the merge request using the `assignee_ids` parameter, unless told differently.
         {% else %}
         {{ goal }}
         {% endif %}
