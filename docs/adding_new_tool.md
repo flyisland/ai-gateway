@@ -377,6 +377,46 @@ CONTEXT_BUILDER_TOOLS = [
    - Optimize for minimal API calls when possible
    - Use async properly to avoid blocking operations
 
+1. **Error Handling - Tools Should Not Swallow Exceptions**:
+   - Tool `_execute()` methods **must not** catch exceptions without re-raising them.
+     When exceptions are swallowed, `ToolNodeWithErrorCorrection` cannot detect the
+     failure and the agent loses its ability to self-correct.
+   - **Don't** return `json.dumps({"error": ...})` as an error signal — raise a
+     `ToolException` instead so upstream nodes handle errors properly.
+   - Two custom pylint rules enforce this automatically:
+     - **`W9002`** (`exception-swallowing-in-tool`): Fires when an `except` block in
+       `_execute()` doesn't re-raise. Either let the exception propagate or catch-and-reraise.
+     - **`W9003`** (`error-json-return-in-tool`): Fires when `_execute()` returns a
+       `json.dumps({"error": ...})` payload. Use `raise ToolException(...)` instead.
+   - These checks run in CI via the
+     [`no_exception_swallowing_in_tools`](../lints/no_exception_swallowing_in_tools.py)
+     pylint plugin.
+   - See [issue #1974](https://gitlab.com/gitlab-org/modelops/applied-ml/code-suggestions/ai-assist/-/issues/1974)
+     for the full rationale.
+
+   ```python
+   # Good: let exceptions propagate
+   async def _execute(self, path: str) -> str:
+       result = await some_operation(path)
+       return result
+
+   # Good: catch and re-raise as ToolException
+   async def _execute(self, path: str) -> str:
+       try:
+           result = await some_operation(path)
+           return result
+       except SomeSpecificError as e:
+           raise ToolException(f"Operation failed: {e}") from e
+
+   # Bad: swallows the exception (triggers W9002 + W9003)
+   async def _execute(self, path: str) -> str:
+       try:
+           result = await some_operation(path)
+           return result
+       except Exception:
+           return json.dumps({"error": "something went wrong"})
+   ```
+
 ## Troubleshooting
 
 ### Common Issues
