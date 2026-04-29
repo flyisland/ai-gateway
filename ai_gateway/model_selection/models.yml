@@ -1,6 +1,6 @@
 # see docs/model_selection for documentation
 models:
-  - name: "Codestral 25.01 - Fireworks"
+  - name: "Codestral 25.01"
     provider: "Fireworks"
     gitlab_identifier: "codestral_2501_fireworks"
     description: "Fast code generation and assistance."
@@ -20,7 +20,7 @@ models:
       max_tokens: 48
       max_retries: 10
 
-  - name: "Codestral 25.08 - Vertex"
+  - name: "Codestral 25.08"
     provider: "Vertex"
     gitlab_identifier: "codestral_2508_vertex"
     description: "Fast code generation and assistance."
@@ -35,7 +35,7 @@ models:
       custom_llm_provider: "vertex_ai"
       completion_type: text
 
-  - name: "Codestral 25.08 - Fireworks"
+  - name: "Codestral 25.08"
     provider: "Fireworks"
     gitlab_identifier: "codestral_2508_fireworks"
     description: "Fast code generation and assistance."
@@ -55,7 +55,7 @@ models:
       max_tokens: 48
       max_retries: 10
 
-  - name: "Gemini 1.5 Flash - Vertex"
+  - name: "Gemini 1.5 Flash"
     provider: "Vertex"
     gitlab_identifier: "gemini_1_5_flash_vertex"
     description: "Multimodal for high-volume tasks."
@@ -69,7 +69,7 @@ models:
       top_k: 1
       max_tokens: 8_192
 
-  - name: "Gemini 2.0 Flash Lite - Vertex"
+  - name: "Gemini 2.0 Flash Lite"
     provider: "Vertex"
     gitlab_identifier: "gemini_2_0_flash_lite_vertex"
     description: "Optimized for high-volume, latency-sensitive tasks."
@@ -85,7 +85,7 @@ models:
     prompt_params:
       vertex_location: us-central1
 
-  - name: "Gemini 2.5 Flash - Vertex"
+  - name: "Gemini 2.5 Flash"
     provider: "Vertex"
     gitlab_identifier: "gemini_2_5_flash_vertex"
     description: "Multimodal reasoning with extended context."
@@ -100,7 +100,7 @@ models:
       deprecation_date: "2026-03-01"
       removal_version: "19.1"
 
-  - name: "Claude Opus 4.0 - Anthropic"
+  - name: "Claude Opus 4.0"
     provider: "Anthropic"
     gitlab_identifier: "claude_opus_4_20250514"
     description: "Earlier generation model for coding, reasoning, and agentic workflows."
@@ -115,7 +115,7 @@ models:
       deprecation_date: "2026-04-14"
       removal_version: "19.1"
 
-  - name: "Claude Opus 4.1 - Anthropic"
+  - name: "Claude Opus 4.1"
     provider: "Anthropic"
     gitlab_identifier: "claude_opus_4_1_20250805"
     description: "Superseded by Sonnet 4.5 for coding, reasoning, and agentic workflows."
@@ -127,7 +127,7 @@ models:
       temperature: 0.0
       max_tokens: 32_000
 
-  - name: "Claude Opus 4.5 - Anthropic"
+  - name: "Claude Opus 4.5"
     provider: "Anthropic"
     gitlab_identifier: "claude_opus_4_5_20251101"
     description: "Claude's most intelligent model, combining maximum capability with practical performance."
@@ -143,7 +143,7 @@ models:
       temperature: 0.0
       max_tokens: 64_000
 
-  - name: "Claude Opus 4.5 - Vertex"
+  - name: "Claude Opus 4.5"
     provider: "Anthropic"
     gitlab_identifier: "claude_opus_4_5_20251101_vertex"
     description: "Claude's most intelligent model, combining maximum capability with practical performance."
@@ -162,7 +162,7 @@ models:
     prompt_params:
       vertex_location: global
 
-  - name: "Claude Opus 4.6 - Anthropic"
+  - name: "Claude Opus 4.6"
     provider: "Anthropic"
     gitlab_identifier: "claude_opus_4_6_20260205"
     description: "Anthropic's most intelligent model, combining maximum capability with practical performance."
@@ -177,7 +177,7 @@ models:
       temperature: 0.0
       max_tokens: 128_000
 
-  - name: "Claude Opus 4.6 - Vertex"
+  - name: "Claude Opus 4.6"
     provider: "Anthropic"
     gitlab_identifier: "claude_opus_4_6_vertex"
     description: "Anthropic's most intelligent model, combining maximum capability with practical performance."
@@ -195,7 +195,7 @@ models:
     prompt_params:
       vertex_location: global
 
-  - name: "Claude Opus 4.7 - Vertex"
+  - name: "Claude Opus 4.7"
     provider: "Anthropic"
     gitlab_identifier: "claude_opus_4_7_vertex"
     description: "Anthropic's most intelligent model, combining maximum capability with practical performance."
@@ -212,7 +212,7 @@ models:
     prompt_params:
       vertex_location: global
 
-  - name: "Claude Opus 4.7 - Anthropic"
+  - name: "Claude Opus 4.7"
     provider: "Anthropic"
     gitlab_identifier: "claude_opus_4_7"
     description: "Anthropic's most intelligent model, combining maximum capability with practical performance."
@@ -226,7 +226,7 @@ models:
       model: "claude-opus-4-7"
       max_tokens: 128_000
 
-  - name: "Claude Opus 4.7 - Bedrock"
+  - name: "Claude Opus 4.7"
     provider: "Bedrock"
     gitlab_identifier: "claude_opus_4_7_bedrock"
     description: "Anthropic's most intelligent model, combining maximum capability with practical performance."
@@ -241,7 +241,7 @@ models:
       max_tokens: 128_000
       max_retries: 1
 
-  - name: "Claude Opus 4.6 - Bedrock"
+  - name: "Claude Opus 4.6"
     provider: "Bedrock"
     gitlab_identifier: "claude_opus_4_6_bedrock"
     description: "Anthropic's most intelligent model, combining maximum capability with practical performance."
@@ -255,7 +255,7 @@ models:
       max_tokens: 128_000
       max_retries: 1
 
-  - name: "Claude Sonnet 4.6 - Anthropic"
+  - name: "Claude Sonnet 4.6"
     provider: "Anthropic"
     gitlab_identifier: "claude_sonnet_4_6"
     max_context_tokens: 1_000_000
@@ -270,7 +270,7 @@ models:
       temperature: 0.0
       max_tokens: 64_000
 
-  - name: "Claude Sonnet 4.6 - Vertex"
+  - name: "Claude Sonnet 4.6"
     provider: "Vertex"
     gitlab_identifier: "claude_sonnet_4_6_vertex"
     description: "Anthropic's flagship model for real-world coding, reasoning, and agentic workflows."
@@ -288,7 +288,7 @@ models:
     prompt_params:
       vertex_location: global
 
-  - name: "Claude Sonnet 4.6 - Bedrock"
+  - name: "Claude Sonnet 4.6"
     provider: "Bedrock"
     gitlab_identifier: "claude_sonnet_4_6_bedrock"
     description: "Anthropic's flagship model for real-world coding, reasoning, and agentic workflows."
@@ -304,7 +304,7 @@ models:
       max_tokens: 64_000
       max_retries: 1
 
-  - name: "Claude Sonnet 4.5 - Anthropic"
+  - name: "Claude Sonnet 4.5"
     provider: "Anthropic"
     gitlab_identifier: "claude_sonnet_4_5_20250929"
     max_context_tokens: 200000 # https://docs.claude.com/en/docs/about-claude/models/overview#latest-models-comparison
@@ -321,7 +321,7 @@ models:
       temperature: 0.0
       max_tokens: 64_000
 
-  - name: "Claude Sonnet 4.5 - Vertex"
+  - name: "Claude Sonnet 4.5"
     provider: "Vertex"
     gitlab_identifier: "claude_sonnet_4_5_20250929_vertex"
     description: "Anthropic's flagship model for real-world coding, reasoning, and agentic workflows."
@@ -343,7 +343,7 @@ models:
     prompt_params:
       vertex_location: global
 
-  - name: "Claude Sonnet 4.5 - Bedrock"
+  - name: "Claude Sonnet 4.5"
     provider: "Bedrock"
     gitlab_identifier: "claude_sonnet_4_5_20250929_bedrock"
     description: "Anthropic's flagship model for real-world coding, reasoning, and agentic workflows."
@@ -360,7 +360,7 @@ models:
       max_tokens: 64_000
       max_retries: 1
 
-  - name: "Claude Haiku 4.5 - Anthropic"
+  - name: "Claude Haiku 4.5"
     provider: "Anthropic"
     gitlab_identifier: "claude_haiku_4_5_20251001"
     max_context_tokens: 200000 # https://docs.claude.com/en/docs/about-claude/models/overview#latest-models-comparison
@@ -376,7 +376,7 @@ models:
       temperature: 0.0
       max_tokens: 64_000
 
-  - name: "Claude Haiku 4.5 - Vertex"
+  - name: "Claude Haiku 4.5"
     provider: "Vertex"
     gitlab_identifier: "claude_haiku_4_5_20251001_vertex"
     description: "Fast, cost-effective responses."
@@ -395,7 +395,7 @@ models:
     prompt_params:
       vertex_location: global
 
-  - name: "Claude Haiku 4.5 - Bedrock"
+  - name: "Claude Haiku 4.5"
     provider: "Bedrock"
     gitlab_identifier: "claude_haiku_4_5_20251001_bedrock"
     description: "Fast, cost-effective responses."
@@ -412,7 +412,7 @@ models:
       max_tokens: 64_000
       max_retries: 1
 
-  - name: "Claude Sonnet 4.0 - Anthropic"
+  - name: "Claude Sonnet 4.0"
     provider: "Anthropic"
     gitlab_identifier: "claude_sonnet_4_20250514"
     description: "Earlier generation model for coding, reasoning, and agentic workflows."
@@ -430,7 +430,7 @@ models:
       deprecation_date: "2026-04-14"
       removal_version: "19.1"
 
-  - name: "Claude Sonnet 4.0 - Vertex"
+  - name: "Claude Sonnet 4.0"
     provider: "Vertex"
     gitlab_identifier: "claude_sonnet_4_20250514_vertex"
     description: "Earlier generation model for coding, reasoning, and agentic workflows."
@@ -452,7 +452,7 @@ models:
       deprecation_date: "2026-04-14"
       removal_version: "19.1"
 
-  - name: "Claude Sonnet 4.0 - Bedrock"
+  - name: "Claude Sonnet 4.0"
     provider: "Bedrock"
     gitlab_identifier: "claude_sonnet_4_20250514_bedrock"
     description: "Earlier generation model for coding, reasoning, and agentic workflows."
@@ -470,7 +470,7 @@ models:
       deprecation_date: "2026-04-14"
       removal_version: "19.1"
 
-  - name: "Gemini 3.1 Pro Preview - Vertex"
+  - name: "Gemini 3.1 Pro Preview"
     provider: "Vertex"
     gitlab_identifier: "gemini_3_1_pro_preview_vertex"
     description: "Designed to deliver strong agentic capabilities (near-Pro level) at substantial speed and value."
@@ -486,7 +486,7 @@ models:
       thinking_level: "low"
       streaming: "true"
 
-  - name: "GPT-5.4 - OpenAI"
+  - name: "GPT-5.4"
     provider: "OpenAI"
     gitlab_identifier: "gpt_5_4"
     description: "OpenAI's most capable frontier model for complex professional work."
@@ -500,7 +500,7 @@ models:
       model: gpt-5.4-2026-03-05
       max_tokens: 128_000
 
-  - name: "GPT-5.2 - OpenAI"
+  - name: "GPT-5.2"
     provider: "OpenAI"
     gitlab_identifier: "gpt_5_2"
     description: "OpenAI's best general-purpose model, part of the GPT-5 flagship model family."
@@ -515,7 +515,7 @@ models:
       temperature: 1.0 # this model always requires temperature to be 1
       max_tokens: 128_000
 
-  - name: "GPT-5.1 - OpenAI"
+  - name: "GPT-5.1"
     provider: "OpenAI"
     gitlab_identifier: "gpt_5"
     description: "OpenAI's flagship model for coding, reasoning, writing, and agentic tasks."
@@ -530,7 +530,7 @@ models:
       temperature: 1.0 # this model always requires temperature to be 1
       max_tokens: 128_000
 
-  - name: "GPT-5-Mini - OpenAI"
+  - name: "GPT-5-Mini"
     provider: "OpenAI"
     gitlab_identifier: "gpt_5_mini"
     description: "Model for high-volume coding, reasoning, and routine workflows."
@@ -544,7 +544,7 @@ models:
       model: gpt-5-mini-2025-08-07
       max_tokens: 128_000
 
-  - name: "GPT-5.4-Mini - OpenAI"
+  - name: "GPT-5.4-Mini"
     provider: "OpenAI"
     gitlab_identifier: "gpt_5_4_mini"
     description: "Model for high-volume coding, reasoning, and routine workflows."
@@ -558,7 +558,7 @@ models:
       model: gpt-5.4-mini
       max_tokens: 128_000
 
-  - name: "GPT-5.4-Nano - OpenAI"
+  - name: "GPT-5.4-Nano"
     provider: "OpenAI"
     gitlab_identifier: "gpt_5_4_nano"
     description: "Model for high-volume coding, reasoning, and routine workflows."
@@ -572,7 +572,7 @@ models:
       model: gpt-5.4-nano
       max_tokens: 128_000
 
-  - name: "GPT-5-Codex - OpenAI"
+  - name: "GPT-5-Codex"
     provider: "OpenAI"
     gitlab_identifier: "gpt_5_codex"
     description: "Optimized for agentic coding, refactoring, code review, and extended tasks."
@@ -591,7 +591,7 @@ models:
       removal_version: "19.2"
 
   # proxy endpoint only
-  - name: "GPT-5 - OpenAI (alias)"
+  - name: "GPT-5 (alias)"
     provider: "OpenAI"
     gitlab_identifier: "gpt_5_alias"
     description: "Alias for GPT-5.1, maintained for backward compatibility."
@@ -603,7 +603,7 @@ models:
       max_tokens: 128_000
 
   # proxy endpoint only
-  - name: "GPT-5.1 - OpenAI (alias)"
+  - name: "GPT-5.1 (alias)"
     provider: "OpenAI"
     gitlab_identifier: "gpt_5_1_alias"
     description: "Alias for GPT-5.1, maintained for backward compatibility."
@@ -614,7 +614,7 @@ models:
       model: gpt-5.1
       max_tokens: 128_000
 
-  - name: "GPT-5.1-Codex - OpenAI"
+  - name: "GPT-5.1-Codex"
     provider: "OpenAI"
     gitlab_identifier: "gpt_5_1_codex"
     description: "Earlier GPT-5.1 Codex release for coding tasks."
@@ -629,7 +629,7 @@ models:
       deprecation_date: "2026-04-23"
       removal_version: "19.2"
 
-  - name: "GPT-5.2-Codex - OpenAI"
+  - name: "GPT-5.2-Codex"
     provider: "OpenAI"
     gitlab_identifier: "gpt_5_2_codex"
     description: "Earlier GPT-5.2 Codex release for coding tasks."
@@ -645,7 +645,7 @@ models:
       deprecation_date: "2026-04-23"
       removal_version: "19.2"
 
-  - name: "GPT-5.3-Codex - OpenAI"
+  - name: "GPT-5.3-Codex"
     provider: "OpenAI"
     gitlab_identifier: "gpt_5_3_codex"
     description: "Latest GPT-5.3 Codex release for coding tasks."
@@ -771,7 +771,7 @@ models:
       temperature: 0.0
       max_tokens: 4_096
 
-  - name: "text-embedding-005 - Vertex"
+  - name: "text-embedding-005"
     provider: "Vertex"
     gitlab_identifier: "text_embedding_005_vertex"
     description: "Natural language processing technique that converts textual data into numerical vectors."
