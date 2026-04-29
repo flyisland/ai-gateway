@@ -4,6 +4,9 @@ from typing import Any, Callable, Optional, Self, Sequence, TypeAlias, override
 from duo_workflow_service.agent_platform.experimental.components.base import (
     BaseComponent,
 )
+from duo_workflow_service.agent_platform.v1.components.base import (
+    BaseComponent as V1BaseComponent,
+)
 
 __all__ = [
     "ComponentRegistry",
@@ -205,7 +208,7 @@ class ComponentRegistry(Mapping):
 
         def _validated_factory(*args: Any, **kwargs: Any) -> BaseComponent:
             result = factory(*args, **kwargs)
-            if not isinstance(result, BaseComponent):
+            if not isinstance(result, (BaseComponent, V1BaseComponent)):
                 raise TypeError(
                     f"Factory '{name}' must return a BaseComponent instance, "
                     f"got {type(result).__name__!r} instead"

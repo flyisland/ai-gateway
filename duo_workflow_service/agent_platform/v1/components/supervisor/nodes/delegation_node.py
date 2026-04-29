@@ -3,15 +3,15 @@ from typing import Any, Callable, NamedTuple, Optional
 import structlog
 from langchain_core.messages import AIMessage, BaseMessage, HumanMessage, ToolMessage
 
-from duo_workflow_service.agent_platform.experimental.components.supervisor.delegate_task import (
+from duo_workflow_service.agent_platform.v1.components.supervisor.delegate_task import (
     DelegateTask,
 )
-from duo_workflow_service.agent_platform.experimental.state import (
+from duo_workflow_service.agent_platform.v1.state import (
     FlowState,
     IOKey,
     merge_nested_dict,
 )
-from duo_workflow_service.agent_platform.experimental.state.base import RuntimeIOKey
+from duo_workflow_service.agent_platform.v1.state.base import RuntimeIOKey
 
 # Factory that builds a subsession-scoped conversation-history IOKey given the
 # subagent type name and subsession ID.  Defined as a named type so callers

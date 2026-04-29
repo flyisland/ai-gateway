@@ -1,85 +1,20 @@
 """AgentComponent factory for the experimental Flow Registry.
 
-This module provides a factory that is registered in the ``ComponentRegistry``
-under the name ``"AgentComponent"``.  The factory transparently dispatches to
-either :class:`AgentComponent` or :class:`SupervisorAgentComponent` depending
-on whether the ``subagents`` keyword argument is present in the component
-configuration.
-
-This allows flow authors to use a single ``type: AgentComponent`` declaration
-for both standalone agents and supervisor agents, reducing the perceived
-complexity of the framework.  When ``subagents`` is present and non-empty
-the factory creates a :class:`SupervisorAgentComponent`; otherwise it creates
-a plain :class:`AgentComponent`.
-
-When creating a :class:`SupervisorAgentComponent`, the factory passes the
-shared ``_built_components`` dict (injected by the flow builder) as
-``subagent_components``.  All subagent-selection and validation logic is
-centralised in
-:meth:`SupervisorAgentComponent.validate_and_consume_subagents`, which
-filters the pool to only the agents named in ``subagents``.
-
-The factory does **not** mutate ``_built_components`` — removing consumed
-subagents from the shared dict is the responsibility of the flow builder
-(``Flow._instantiate_component``), which detects consumed components via the
-``subagent_components`` attribute on the created component.
-
-Note: This module must be imported **after** both ``agent.component`` and
-``supervisor.component`` have been loaded (as ``__init__.py`` ensures) so that
-the module-level imports below do not create circular dependencies.
+Re-registers the v1 ``agent_component_factory`` in the experimental
+``ComponentRegistry`` for backward compatibility with experimental flows.
+The implementation has been migrated to v1; this module delegates to v1
+components while keeping the factory available under the experimental registry.
 """
 
-from typing import Any
-
-from duo_workflow_service.agent_platform.experimental.components.agent.component import (
-    AgentComponent,
-    AgentComponentBase,
-)
-from duo_workflow_service.agent_platform.experimental.components.base import (
-    BaseComponent,
-)
 from duo_workflow_service.agent_platform.experimental.components.registry import (
     register_component_factory,
 )
-from duo_workflow_service.agent_platform.experimental.components.supervisor.component import (
-    SupervisorAgentComponent,
+from duo_workflow_service.agent_platform.v1.components.factory import (  # noqa: F401
+    agent_component_factory as _v1_agent_component_factory,
 )
 
 __all__ = ["agent_component_factory"]
 
-
-@register_component_factory("AgentComponent")
-def agent_component_factory(**kwargs: Any) -> AgentComponentBase:
-    """Dispatch to AgentComponent or SupervisorAgentComponent.
-
-    Inspects the ``subagents`` keyword argument to decide which concrete
-    component class to instantiate:
-
-    - If ``subagents`` is present (and non-empty): SupervisorAgentComponent.
-        The factory passes the shared ``_built_components`` dict as
-        ``subagent_components`` so that
-        :meth:`SupervisorAgentComponent.validate_and_consume_subagents`
-        can select and validate the named subagents.  The dict is passed
-        read-only — removing consumed subagents is the caller's responsibility.
-    - Otherwise: plain AgentComponent.
-
-    All remaining keyword arguments are forwarded to the chosen class.
-
-    The ``_built_components`` key is extracted from ``kwargs`` before forwarding
-    so it is never passed to the component constructors as an unexpected field.
-
-    Args:
-        **kwargs: Component constructor arguments as parsed from the flow YAML,
-            plus ``_built_components`` injected by the flow builder.
-            The ``subagents`` key is the discriminator.
-
-    Returns:
-        The created :class:`AgentComponentBase` instance (either
-        :class:`AgentComponent` or :class:`SupervisorAgentComponent`).
-    """
-    built_components: dict[str, BaseComponent] = kwargs.pop("_built_components", {})
-
-    if kwargs.get("subagents"):
-        return SupervisorAgentComponent(subagent_components=built_components, **kwargs)
-
-    return AgentComponent(**kwargs)
+agent_component_factory = register_component_factory("AgentComponent")(
+    _v1_agent_component_factory
+)

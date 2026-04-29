@@ -8,18 +8,19 @@ from langchain_core.messages import AIMessage, HumanMessage
 from langchain_core.tools import BaseTool
 from pydantic import BaseModel, ConfigDict, Field
 
+from ai_gateway.prompts.registry import LocalPromptRegistry
 from ai_gateway.response_schemas import BaseResponseSchemaRegistry
 from duo_workflow_service.agent_platform.experimental.components.agent.nodes.agent_node import (
     AgentFinalOutput,
 )
-from duo_workflow_service.agent_platform.experimental.components.supervisor.delegate_task import (
+from duo_workflow_service.agent_platform.v1.components.supervisor.delegate_task import (
     DelegateTask,
     SubagentDescriptor,
     build_delegate_task_model,
 )
-from duo_workflow_service.agent_platform.experimental.state import FlowStateKeys, IOKey
-from duo_workflow_service.agent_platform.experimental.state.base import RuntimeIOKey
-from duo_workflow_service.agent_platform.experimental.ui_log import UIHistory
+from duo_workflow_service.agent_platform.v1.state import FlowStateKeys, IOKey
+from duo_workflow_service.agent_platform.v1.state.base import RuntimeIOKey
+from duo_workflow_service.agent_platform.v1.ui_log import UIHistory
 from duo_workflow_service.entities.state import WorkflowStatusEnum
 from duo_workflow_service.tools.toolset import Toolset
 from lib.events import GLReportingEventContext
@@ -101,6 +102,18 @@ def max_delegations_fixture():
 def mock_internal_event_client_fixture():
     """Fixture for mock internal event client."""
     return Mock(spec=InternalEventsClient)
+
+
+@pytest.fixture(name="mock_prompt_registry")
+def mock_prompt_registry_fixture():
+    """Fixture for mock prompt registry."""
+    mock_registry = Mock(spec=LocalPromptRegistry)
+    mock_prompt = Mock()
+    mock_prompt.model = Mock()
+    mock_prompt.model.model_name = "claude-3-sonnet"
+    mock_registry.get_on_behalf.return_value = mock_prompt
+    mock_registry.get_required_variables.return_value = set()
+    return mock_registry
 
 
 @pytest.fixture(name="mock_tool")

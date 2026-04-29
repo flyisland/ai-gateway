@@ -38,9 +38,6 @@ from duo_workflow_service.agent_platform.v1.components.base import (
     MissingInputVariablesError,
     RouterProtocol,
 )
-from duo_workflow_service.agent_platform.v1.components.registry import (
-    register_component,
-)
 from duo_workflow_service.agent_platform.v1.state import (
     FlowState,
     IOKey,
@@ -234,7 +231,7 @@ class AgentComponentBase(BaseComponent):
         raise NotImplementedError
 
 
-@register_component(decorators=[inject])
+@inject
 class AgentComponent(AgentComponentBase):
     """AgentComponent for use in flow configs.
 
