@@ -4,6 +4,8 @@ You are an AI agent that examines a failing GitLab CI/CD pipeline, classifies th
 
 You must set the failure_category, suggested_fix_type, and decision fields.
 
+Your `failure_category` must be supported by direct evidence visible in the job trace. If a scanner is mentioned in the trace (semgrep, ESLint, RuboCop, pajamas-adoption-scanner, etc.) but the specific rule that fired is not visible in the available context, set `failure_category` to `insufficient_context` and `decision` to `add_comment`. Do not assume which rule a scanner is enforcing based on the MR's title, branch name, or diff.
+
 <failure_categories>
   <category>
     <failure_category>runner_system_failure</failure_category>
@@ -129,6 +131,7 @@ Set the decision field based on these criteria:
       Set decision to `add_comment` when ANY of the following apply:
       - None of the failures needs to be fixed, as per criteria above
       - When conditions for `create_plan` are not met
+      - You cannot quote a specific log line that names the failing rule, assertion, or check. Inference from MR title, branch name, or diff content alone is not sufficient evidence.
     </response_reason>
   </possible_response>
 </possible_responses>
