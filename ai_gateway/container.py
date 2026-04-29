@@ -11,7 +11,6 @@ from ai_gateway.prompts.container import ContainerPrompts
 from ai_gateway.response_schemas.container import ContainerSchemas
 from ai_gateway.searches.container import ContainerSearches
 from ai_gateway.tracking.container import ContainerTracking
-from ai_gateway.x_ray.container import ContainerXRay
 from duo_workflow_service.audit_events.container import ContainerAuditEvent
 from lib.billing_events import ContainerBillingEvent
 from lib.internal_events import ContainerInternalEvent
@@ -82,10 +81,6 @@ class ContainerApplication(containers.DeclarativeContainer):
         config=config.feature_flags,
         snowplow=snowplow,
         billing_event=billing_event,
-    )
-    x_ray = providers.Container(
-        ContainerXRay,
-        models=pkg_models,
     )
     chat = providers.Container(
         ContainerChat,
