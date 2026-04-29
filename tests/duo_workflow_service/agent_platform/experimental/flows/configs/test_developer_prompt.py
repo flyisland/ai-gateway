@@ -66,6 +66,7 @@ class TestLangChainTemplateCompatibility:
         "agent_user_environment": None,
         "today": "2026-03-20",
         "primary_branch": "main",
+        "session_owner_id": None,
         "history": [],
     }
 
