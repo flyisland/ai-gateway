@@ -30,6 +30,9 @@ from duo_workflow_service.agent_platform.experimental.state.base import (
     FlowEvent,
     FlowEventType,
 )
+from duo_workflow_service.agent_platform.v1.components.base import (
+    BaseComponent as V1BaseComponent,
+)
 from duo_workflow_service.agent_platform.v1.flows.base import (
     persist_error_to_ui_chat_log,
 )
@@ -386,7 +389,9 @@ class Flow(AbstractWorkflow):
             from_comp = components[router_config["from"]]
 
             if "condition" in router_config:
-                to_components = {}
+                to_components: dict[
+                    str | int | bool, BaseComponent | V1BaseComponent
+                ] = {}
                 for route_key, comp_name in router_config["condition"][
                     "routes"
                 ].items():

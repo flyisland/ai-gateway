@@ -1,4 +1,4 @@
-"""Test suite for SupervisorAgentComponent."""
+"""Test suite for v1 SupervisorAgentComponent."""
 
 from unittest.mock import Mock, patch
 
@@ -6,30 +6,28 @@ import pytest
 from langchain_core.messages import AIMessage
 from langgraph.graph import END, StateGraph
 
-from duo_workflow_service.agent_platform.experimental.components.agent.component import (
+from duo_workflow_service.agent_platform.v1.components.agent.component import (
     RoutingError,
 )
-from duo_workflow_service.agent_platform.experimental.components.supervisor.component import (
+from duo_workflow_service.agent_platform.v1.components.supervisor.component import (
     SupervisorAgentComponent,
 )
-from duo_workflow_service.agent_platform.experimental.state import FlowStateKeys
-from duo_workflow_service.agent_platform.experimental.state.base import FlowState
+from duo_workflow_service.agent_platform.v1.state import FlowStateKeys
+from duo_workflow_service.agent_platform.v1.state.base import FlowState
+
+_SUPERVISOR_MODULE = (
+    "duo_workflow_service.agent_platform.v1.components.supervisor.component"
+)
 
 
 class MockSubagentComponent:
     """Minimal stub satisfying the supervisor's subagent type check.
-
-    The supervisor's validate_config checks for the ``_is_subagent_component``
-    marker attribute (set as a ClassVar on the real SubagentComponent) to
-    identify managed subagents without relying on class-name string comparison.
 
     Both ``attach`` and ``bind_to_supervisor`` are no-op Mocks, suitable for
     tests that only need to verify those calls were made.  Use
     ``RoutingMockSubagentComponent`` when the test needs to actually execute
     through the subagent node inside a compiled graph.
     """
-
-    _is_subagent_component = True
 
     def __init__(self, name: str, description: str = "A test subagent."):
         self.name = name
@@ -47,8 +45,6 @@ class RoutingMockSubagentComponent:
     This allows tests to execute the full delegation loop without needing a real
     ``SubagentComponent`` with all its dependencies.
     """
-
-    _is_subagent_component = True
 
     def __init__(self, name: str, description: str = "A test subagent."):
         self.name = name
@@ -131,11 +127,7 @@ def make_supervisor_fixture(
     mock_sub_agents,
     mock_schema_registry,
 ):
-    """Fixture that returns a factory for creating a SupervisorAgentComponent.
-
-    Captures all common supervisor construction arguments so individual tests only need to supply optional overrides
-    (subagent_components, schema params).
-    """
+    """Fixture that returns a factory for creating a SupervisorAgentComponent."""
 
     def factory(
         subagent_components=None, response_schema_id=None, response_schema_version=None
@@ -160,10 +152,6 @@ def make_supervisor_fixture(
 
 
 # --- Node class mock fixtures ---
-
-_SUPERVISOR_MODULE = (
-    "duo_workflow_service.agent_platform.v1.components.supervisor.component"
-)
 
 
 @pytest.fixture(name="mock_agent_node_cls")
@@ -563,8 +551,7 @@ class TestSupervisorExecutionFlow:
         """Agent → delegation → (no active subagent) → agent → final_response → exit.
 
         The delegation node returns state with active_subagent_name=None, so _delegation_router falls back to the
-        supervisor agent node rather than routing into a subagent subgraph (which would require a real attached
-        subagent).
+        supervisor agent node rather than routing into a subagent subgraph.
         """
         nodes = all_node_mocks
 

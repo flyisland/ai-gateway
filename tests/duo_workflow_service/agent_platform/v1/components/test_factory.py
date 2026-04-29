@@ -1,28 +1,22 @@
-"""Test suite for AgentComponent factory (experimental registry).
-
-The factory implementation has been migrated to v1; this module verifies that the factory is correctly re-registered in
-the experimental ComponentRegistry and that it delegates to the v1 implementation.
-"""
+"""Test suite for the v1 AgentComponent factory function."""
 
 from unittest.mock import Mock
 
 import pytest
 
 from ai_gateway.response_schemas import BaseResponseSchemaRegistry
-from duo_workflow_service.agent_platform.experimental.components.base import (
-    BaseComponent,
-)
-from duo_workflow_service.agent_platform.experimental.components.factory import (
-    agent_component_factory,
-)
-from duo_workflow_service.agent_platform.experimental.components.registry import (
-    ComponentRegistry,
-)
-from duo_workflow_service.agent_platform.experimental.components.supervisor.component import (
-    SupervisorAgentComponent,
-)
 from duo_workflow_service.agent_platform.v1.components.agent.component import (
     AgentComponent,
+)
+from duo_workflow_service.agent_platform.v1.components.base import BaseComponent
+from duo_workflow_service.agent_platform.v1.components.factory import (
+    agent_component_factory,
+)
+from duo_workflow_service.agent_platform.v1.components.registry import (
+    ComponentRegistry,
+)
+from duo_workflow_service.agent_platform.v1.components.supervisor.component import (
+    SupervisorAgentComponent,
 )
 
 # The @inject decorator wraps the class into a function when the class has
@@ -38,10 +32,10 @@ def mock_schema_registry_fixture():
 
 
 class TestAgentComponentFactoryRegistry:
-    """Test suite verifying factory registration in the ComponentRegistry."""
+    """Test suite verifying factory registration in the v1 ComponentRegistry."""
 
     def test_factory_registered_as_agent_component(self):
-        """The factory is registered under 'AgentComponent' in the ComponentRegistry."""
+        """The factory is registered under 'AgentComponent' in the v1 ComponentRegistry."""
         registry = ComponentRegistry.instance()
         # pylint: disable-next=unsupported-membership-test
         assert "AgentComponent" in registry
@@ -154,3 +148,87 @@ class TestAgentComponentFactoryDispatch:
 
         assert isinstance(component, _AgentComponentClass)
         assert not isinstance(component, _SupervisorAgentComponentClass)
+
+    def test_factory_creates_supervisor_component_with_subagents(
+        self,
+        flow_id,
+        flow_type,
+        mock_toolset,
+        mock_prompt_registry,
+        mock_internal_event_client,
+        mock_schema_registry,
+        user,
+    ):
+        """Factory returns SupervisorAgentComponent when subagents is non-empty.
+
+        The factory passes the shared ``_built_components`` dict as
+        ``subagent_components`` so that
+        :meth:`SupervisorAgentComponent.validate_and_consume_subagents`
+        can select and validate the named subagents.  The dict is passed
+        read-only — removing consumed subagents is the caller's responsibility.
+        """
+        developer_mock = Mock(spec=BaseComponent)
+        developer_mock.description = "Developer agent"
+        developer_mock.bind_to_supervisor = Mock()
+
+        built_components: dict[str, BaseComponent] = {"developer": developer_mock}
+
+        result = agent_component_factory(
+            name="supervisor",
+            flow_id=flow_id,
+            flow_type=flow_type,
+            user=user,
+            prompt_id="supervisor_prompt",
+            toolset=mock_toolset,
+            subagents=[{"name": "developer"}],
+            max_delegations=5,
+            _built_components=built_components,
+            prompt_registry=mock_prompt_registry,
+            internal_event_client=mock_internal_event_client,
+            schema_registry=mock_schema_registry,
+        )
+
+        assert isinstance(result, _SupervisorAgentComponentClass)
+        # The factory must NOT pop from the shared dict — Flow owns that cleanup.
+        assert "developer" in built_components
+        # The created component must have the resolved subagent injected.
+        assert "developer" in result.subagent_components
+
+    def test_factory_does_not_mutate_built_components(
+        self,
+        flow_id,
+        flow_type,
+        mock_toolset,
+        mock_prompt_registry,
+        mock_internal_event_client,
+        mock_schema_registry,
+        user,
+    ):
+        """Factory does not remove consumed subagents from _built_components.
+
+        Removal of consumed subagents is the responsibility of the flow builder
+        (``Flow._instantiate_component``), not the factory.
+        """
+        developer_mock = Mock(spec=BaseComponent)
+        developer_mock.description = "Developer agent"
+        developer_mock.bind_to_supervisor = Mock()
+
+        built_components: dict[str, BaseComponent] = {"developer": developer_mock}
+        original_keys = set(built_components.keys())
+
+        agent_component_factory(
+            name="supervisor",
+            flow_id=flow_id,
+            flow_type=flow_type,
+            user=user,
+            prompt_id="supervisor_prompt",
+            toolset=mock_toolset,
+            subagents=[{"name": "developer"}],
+            max_delegations=5,
+            _built_components=built_components,
+            prompt_registry=mock_prompt_registry,
+            internal_event_client=mock_internal_event_client,
+            schema_registry=mock_schema_registry,
+        )
+
+        assert set(built_components.keys()) == original_keys

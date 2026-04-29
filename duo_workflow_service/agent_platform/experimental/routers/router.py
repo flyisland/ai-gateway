@@ -7,6 +7,9 @@ from pydantic import model_validator
 from duo_workflow_service.agent_platform.experimental.components import BaseComponent
 from duo_workflow_service.agent_platform.experimental.routers.base import BaseRouter
 from duo_workflow_service.agent_platform.experimental.state import FlowState
+from duo_workflow_service.agent_platform.v1.components.base import (
+    BaseComponent as V1BaseComponent,
+)
 from duo_workflow_service.monitoring import duo_workflow_metrics
 from lib.events import GLReportingEventContext
 from lib.internal_events import InternalEventAdditionalProperties
@@ -19,8 +22,12 @@ log = structlog.stdlib.get_logger("router")
 
 
 class Router(BaseRouter):
-    from_component: BaseComponent
-    to_component: BaseComponent | dict[str | int | bool, BaseComponent]
+    from_component: BaseComponent | V1BaseComponent
+    to_component: (
+        BaseComponent
+        | V1BaseComponent
+        | dict[str | int | bool, BaseComponent | V1BaseComponent]
+    )
     flow_id: Optional[str] = None
     flow_type: Optional[GLReportingEventContext] = None
     internal_event_client: Optional[InternalEventsClient] = None
@@ -29,7 +36,9 @@ class Router(BaseRouter):
 
     @model_validator(mode="after")
     def validate_router_fields(self) -> Self:
-        if self.input is None and not isinstance(self.to_component, BaseComponent):
+        if self.input is None and not isinstance(
+            self.to_component, (BaseComponent, V1BaseComponent)
+        ):
             raise ValueError(
                 "If input is None, then to_component must be a BaseComponent"
             )
