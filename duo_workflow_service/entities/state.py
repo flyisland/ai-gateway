@@ -94,6 +94,7 @@ class UiChatLog(TypedDict):
     tool_info: Optional[ToolInfo]
     additional_context: Optional[List[AdditionalContext]]
     message_id: Optional[str]
+    required_plan: NotRequired[Optional[str]]
 
 
 def _plan_reducer(current: Plan, new: Optional[Plan]) -> Plan:

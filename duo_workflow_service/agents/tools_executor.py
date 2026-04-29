@@ -48,6 +48,8 @@ MALFORMED_TOOL_CALL_ERROR_TEMPLATE = (
 
 TIER_ACCESS_DENIED_LEARN_MORE_URL = "https://docs.gitlab.com/user/duo_agent_platform/"
 
+TIER_ACCESS_DENIED_SUB_TYPE = "tier_access_denied"
+
 _HIDDEN_TOOLS = ["get_plan"]
 
 _ACTION_HANDLERS = [
@@ -305,6 +307,8 @@ class ToolsExecutor:
         error_message: Optional[str] = None,
         tool_response: Optional[Any] = None,
         project_name: Optional[str] = None,
+        message_sub_type: Optional[str] = None,
+        required_plan: Optional[str] = None,
     ):
         chat_log = self._create_tool_ui_chat_log(
             tool_call=tool_call,
@@ -312,6 +316,8 @@ class ToolsExecutor:
             error_message=error_message,
             tool_response=tool_response,
             project_name=project_name,
+            message_sub_type=message_sub_type,
+            required_plan=required_plan,
         )
         if chat_log:
             ui_chat_logs.append(chat_log)
@@ -548,6 +554,8 @@ class ToolsExecutor:
             ui_chat_logs=chat_logs,
             error_message=tier_message,
             project_name=project_name,
+            message_sub_type=TIER_ACCESS_DENIED_SUB_TYPE,
+            required_plan=required_plan,
         )
 
         return {
@@ -594,6 +602,8 @@ class ToolsExecutor:
         error_message: Optional[str] = None,
         tool_response: Optional[Any] = None,
         project_name: Optional[str] = None,
+        message_sub_type: Optional[str] = None,
+        required_plan: Optional[str] = None,
     ) -> Optional[UiChatLog]:
         tool_name = tool_call["name"]
         tool_args = tool_call.get("args", {})
@@ -614,9 +624,9 @@ class ToolsExecutor:
             tool_args = {**tool_args, "project_name": project_name}
 
         tool_response = redact_secrets_for_ui(tool_response, tool_name=tool_name)
-        return UiChatLog(
+        chat_log = UiChatLog(
             message_type=MessageTypeEnum.TOOL,
-            message_sub_type=tool_name,
+            message_sub_type=message_sub_type or tool_name,
             content=content,
             timestamp=datetime.now(timezone.utc).isoformat(),
             status=status,
@@ -643,6 +653,9 @@ class ToolsExecutor:
             additional_context=None,
             message_id=tool_call_id,
         )
+        if required_plan is not None:
+            chat_log["required_plan"] = required_plan
+        return chat_log
 
     def get_tool_display_message(
         self, tool_name: str, args: Dict[str, Any], tool_response: Any = None
