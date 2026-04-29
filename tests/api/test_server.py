@@ -35,7 +35,6 @@ from ai_gateway.structured_logging import setup_logging
 
 _ROUTES_V1 = [
     ("/v1/chat/{chat_invokable}", ["POST"]),  # legacy path
-    ("/v1/x-ray/libraries", ["POST"]),
     ("/v1/embeddings/code_embeddings", ["POST"]),
 ]
 
@@ -88,7 +87,6 @@ def fastapi_server_app_fixture(auth_enabled) -> FastAPI:
     fast_api_container = ContainerApplication()
     fast_api_container.wire(
         modules=[
-            "ai_gateway.api.v1.x_ray.libraries",
             "ai_gateway.api.v1.chat.agent",
             "ai_gateway.api.v1.search.docs",
             "ai_gateway.api.v2.code.completions",
