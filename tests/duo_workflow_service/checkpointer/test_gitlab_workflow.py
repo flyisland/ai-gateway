@@ -1836,12 +1836,12 @@ async def test_track_workflow_completion_with_billing_event_includes_tool_names(
         unit_of_measure="request",
         quantity=1,
         metadata={
-            "workflow_id": workflow_id,
             "feature_qualified_name": workflow_type.feature_qualified_name,
             "feature_ai_catalog_item": workflow_type.feature_ai_catalog_item,
             "execution_environment": ExecutionEnvironment.DAP.value,
             "llm_operations": mock_llm_operations,
             "tool_names": ["read_file", "write_file", "read_file"],
             "orbit_called": False,
+            "workflow_id": workflow_id,
         },
     )

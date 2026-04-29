@@ -49,9 +49,9 @@ class TestBillingEventService:
     ):
         """Test billing event with explicit LLM operations and custom parameters."""
         billing_event_service.track_billing(
+            user,
+            gl_context,
             workflow_id="workflow-123",
-            user=user,
-            gl_context=gl_context,
             event=BillingEvent.DAP_FLOW_ON_COMPLETION,
             execution_env=ExecutionEnvironment.DAP,
             category="test_category",
@@ -67,7 +67,6 @@ class TestBillingEventService:
             unit_of_measure="execution",
             quantity=1,
             metadata={
-                "workflow_id": "workflow-123",
                 "feature_qualified_name": "software_development",
                 "feature_ai_catalog_item": True,
                 "execution_environment": ExecutionEnvironment.DAP.value,
@@ -86,6 +85,7 @@ class TestBillingEventService:
                 ],
                 "tool_names": [],
                 "orbit_called": False,
+                "workflow_id": "workflow-123",
             },
         )
 
@@ -108,9 +108,9 @@ class TestBillingEventService:
         )
 
         billing_event_service.track_billing(
+            user,
+            gl_context,
             workflow_id="workflow-456",
-            user=user,
-            gl_context=gl_context,
             event=BillingEvent.DAP_FLOW_ON_COMPLETION,
             execution_env=ExecutionEnvironment.DAP,
             category="test_category",
@@ -131,9 +131,9 @@ class TestBillingEventService:
         )
 
         billing_event_service.track_billing(
+            user,
+            gl_context,
             workflow_id="workflow-test",
-            user=user,
-            gl_context=gl_context,
             event=BillingEvent.DAP_FLOW_ON_COMPLETION,
             execution_env=ExecutionEnvironment.DAP,
             category="test_category",
@@ -163,9 +163,9 @@ class TestBillingEventService:
 
         with pytest.raises(Exception, match="Billing error"):
             billing_event_service.track_billing(
+                user,
+                gl_context,
                 workflow_id="workflow-error",
-                user=user,
-                gl_context=gl_context,
                 event=BillingEvent.DAP_FLOW_ON_COMPLETION,
                 execution_env=ExecutionEnvironment.DAP,
                 category="test_category",
@@ -197,9 +197,9 @@ class TestBillingEventService:
         mock_get_llm_operations.return_value = context_ops
 
         billing_event_service.track_billing(
+            user,
+            gl_context,
             workflow_id="workflow-context",
-            user=user,
-            gl_context=gl_context,
             event=BillingEvent.DAP_FLOW_ON_COMPLETION,
             execution_env=ExecutionEnvironment.DAP,
             category="test_category",
@@ -222,9 +222,9 @@ class TestBillingEventService:
             ValueError, match="No LLM operations available for billing tracking"
         ):
             billing_event_service.track_billing(
+                user,
+                gl_context,
                 workflow_id="workflow-no-ops",
-                user=user,
-                gl_context=gl_context,
                 event=BillingEvent.DAP_FLOW_ON_COMPLETION,
                 execution_env=ExecutionEnvironment.DAP,
                 category="test_category",
@@ -262,9 +262,9 @@ class TestBillingEventService:
         ]
 
         billing_event_service.track_billing(
+            user,
+            gl_context,
             workflow_id="workflow-priority",
-            user=user,
-            gl_context=gl_context,
             event=BillingEvent.DAP_FLOW_ON_COMPLETION,
             execution_env=ExecutionEnvironment.DAP,
             category="test_category",
@@ -286,9 +286,9 @@ class TestBillingEventService:
     ):
         """Test that explicit operations skip context retrieval."""
         billing_event_service.track_billing(
+            user,
+            gl_context,
             workflow_id="workflow-explicit",
-            user=user,
-            gl_context=gl_context,
             event=BillingEvent.DAP_FLOW_ON_COMPLETION,
             execution_env=ExecutionEnvironment.DAP,
             category="test_category",
@@ -315,9 +315,9 @@ class TestBillingEventService:
         )
 
         billing_event_service.track_billing(
+            user,
+            gl_context,
             workflow_id="workflow-cache",
-            user=user,
-            gl_context=gl_context,
             event=BillingEvent.DAP_FLOW_ON_COMPLETION,
             execution_env=ExecutionEnvironment.DAP,
             category="test_category",
@@ -337,9 +337,9 @@ class TestBillingEventService:
         llm_operation,
     ):
         billing_event_service.track_billing(
+            user,
+            gl_context,
             workflow_id="workflow-tools",
-            user=user,
-            gl_context=gl_context,
             event=BillingEvent.DAP_FLOW_ON_COMPLETION,
             execution_env=ExecutionEnvironment.DAP,
             category="test_category",
@@ -359,9 +359,9 @@ class TestBillingEventService:
     ):
         """Test that orbit_called flag is included in billing metadata."""
         billing_event_service.track_billing(
+            user,
+            gl_context,
             workflow_id="workflow-123",
-            user=user,
-            gl_context=gl_context,
             event=BillingEvent.DAP_FLOW_ON_COMPLETION,
             execution_env=ExecutionEnvironment.DAP,
             category="test_category",
@@ -371,3 +371,28 @@ class TestBillingEventService:
 
         metadata = get_call_metadata(billing_event_client)
         assert metadata["orbit_called"] is True
+
+    def test_track_billing_without_workflow_id(
+        self,
+        billing_event_service,
+        billing_event_client,
+        user,
+        gl_context,
+        llm_operation,
+    ):
+        """Test billing event without workflow_id for stateless operations like code suggestions."""
+        billing_event_service.track_billing(
+            user,
+            gl_context,
+            event=BillingEvent.DAP_FLOW_ON_COMPLETION,
+            execution_env=ExecutionEnvironment.DAP,
+            category="test_category",
+            llm_ops=[llm_operation],
+        )
+
+        billing_event_client.track_billing_event.assert_called_once()
+        metadata = get_call_metadata(billing_event_client)
+        assert "workflow_id" not in metadata
+        assert metadata["feature_qualified_name"] == "software_development"
+        assert metadata["execution_environment"] == ExecutionEnvironment.DAP.value
+        assert len(metadata["llm_operations"]) == 1
