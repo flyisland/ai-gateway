@@ -29,6 +29,7 @@ from duo_workflow_service.interceptors.route.usage_billing import (
 )
 from duo_workflow_service.tools.toolset import Toolset
 from duo_workflow_service.workflows.chat.workflow import (
+    CHAT_FLOW_TOOLS,
     CHAT_GITLAB_MUTATION_TOOLS,
     CHAT_MUTATION_TOOLS,
     CHAT_READ_ONLY_TOOLS,
@@ -549,6 +550,19 @@ class TestUnauthorizedChatExecution:
             + RUN_COMMAND_TOOLS
             + CHAT_GITLAB_MUTATION_TOOLS,
         ),
+        (
+            ["agentic_foundational_flow_tool"],
+            {},
+            CHAT_READ_ONLY_TOOLS
+            + CHAT_MUTATION_TOOLS
+            + RUN_COMMAND_TOOLS
+            + CHAT_GITLAB_MUTATION_TOOLS
+            + CHAT_FLOW_TOOLS,
+        ),
+    ],
+    ids=[
+        "without_flow_tools_feature_flag",
+        "with_flow_tools_feature_flag",
     ],
 )
 @patch("duo_workflow_service.components.tools_registry.ToolsRegistry.toolset")

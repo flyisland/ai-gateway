@@ -16,6 +16,7 @@ class FeatureFlag(StrEnum):
     DUO_CODE_REVIEW_GROUP_LEVEL_INSTRUCTIONS = (
         "duo_code_review_group_level_instructions"
     )
+    AGENTIC_FOUNDATIONAL_FLOW_TOOL = "agentic_foundational_flow_tool"
 
 
 def is_feature_enabled(feature_name: FeatureFlag | str) -> bool:

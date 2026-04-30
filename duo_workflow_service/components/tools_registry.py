@@ -193,6 +193,9 @@ _AGENT_PRIVILEGES: dict[str, list[Type[BaseTool]]] = {
         tools.RunCommand,
     ],
     _RUN_MCP_TOOLS_PRIVILEGE: [],
+    "start_flows": [
+        tools.StartFlow,
+    ],
 }
 
 
