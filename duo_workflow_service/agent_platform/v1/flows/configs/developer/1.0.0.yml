@@ -321,13 +321,13 @@ prompts:
 
         Post your review as a comment on the merge request, referencing specific files and line numbers. Do not approve the merge request.
 
-        When you have finished your review, @mention the triggering user (look up their username first via `GET /api/v4/users/{{ session_owner_id }}`) in a comment to notify them that your review is complete.
+        When you have finished your review, @mention the triggering user (look up their username via `GET /api/v4/user` which returns the data of the user that triggered you) in a comment to notify them that your review is complete.
         {% elif is_bare_url and ('/-/issues/' in trimmed or '/-/work_items/' in trimmed) %}
         Solve the following GitLab issue: {{ goal }}
 
         Fetch the issue details and understand the problem thoroughly before writing any code. Consider what might be causing the issue and where in the codebase the relevant logic lives. If there are multiple possible approaches, reason about the tradeoffs and pick the simplest one that fully addresses the issue. Implement your solution, verify it works, then create a merge request with your changes.
 
-        When you have completed your work, @mention the triggering user (look up their username first via `GET /api/v4/users/{{ session_owner_id }}`) in a comment on the issue to notify them. Assign them (ID: `{{ session_owner_id }}`) to the merge request using the `assignee_ids` parameter, unless told differently.
+        When you have completed your work, @mention the triggering user (look up their username via `GET /api/v4/user` which returns the data of the user that triggered you) in a comment on the issue to notify them. Assign them (ID: `{{ session_owner_id }}`) to the merge request using the `assignee_ids` parameter, unless told differently.
         {% else %}
         {{ goal }}
         {% endif %}
