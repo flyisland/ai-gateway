@@ -555,8 +555,19 @@ class DuoBaseTool(BaseTool):
                     status_code=response.status_code,
                     page=next_page,
                 )
+                body_snippet = ""
+                if response.body:
+                    body_str = (
+                        response.body
+                        if isinstance(response.body, str)
+                        else str(response.body)
+                    )
+                    body_snippet = (
+                        body_str[:200] + "..." if len(body_str) > 200 else body_str
+                    )
                 raise ToolException(
                     f"Failed to fetch {endpoint}: HTTP {response.status_code}"
+                    + (f", response={body_snippet}" if body_snippet else "")
                 )
 
             try:

@@ -1,3 +1,8 @@
+# pylint: disable=too-many-lines
+# This test module covers DuoBaseTool and all its helper methods (_paginate_get,
+# _process_http_response, _validate_*_url, _check_tier_access, etc.).
+# Splitting it would scatter related tests across multiple files and reduce
+# cohesion. The line count is expected to grow as new base-tool features are added.
 import json
 from typing import Any, ClassVar, Optional, Type
 from unittest.mock import AsyncMock, MagicMock, Mock, patch
@@ -477,6 +482,7 @@ async def test_get_discussion_id_from_note_rest_api_failure(
     mock_response = Mock()
     mock_response.is_success.return_value = False
     mock_response.status_code = 500
+    mock_response.body = None
 
     gitlab_client_mock.aget.return_value = mock_response
 
@@ -512,6 +518,7 @@ async def test_get_discussion_id_from_note_rest_api_failure_mid_pagination(
     mock_response_page2 = Mock()
     mock_response_page2.is_success.return_value = False
     mock_response_page2.status_code = 500
+    mock_response_page2.body = None
 
     gitlab_client_mock.aget.side_effect = [mock_response_page1, mock_response_page2]
 
@@ -961,16 +968,36 @@ async def test_paginate_get_extra_params(tool_with_client, gitlab_client_mock):
 async def test_paginate_get_non_success_response_raises(
     tool_with_client, gitlab_client_mock
 ):
-    """A non-success HTTP response raises ToolException."""
+    """A non-success HTTP response raises ToolException with status code and response body."""
     mock_response = Mock()
     mock_response.is_success.return_value = False
     mock_response.status_code = 403
+    mock_response.body = '{"message": "403 Forbidden"}'
 
     gitlab_client_mock.aget.return_value = mock_response
 
     with pytest.raises(
         ToolException,
-        match=r"Failed to fetch /api/v4/projects/1/notes: HTTP 403",
+        match=r'Failed to fetch /api/v4/projects/1/notes: HTTP 403, response=\{"message": "403 Forbidden"\}',
+    ):
+        await tool_with_client._paginate_get("/api/v4/projects/1/notes")
+
+
+@pytest.mark.asyncio
+async def test_paginate_get_non_success_response_no_body_raises(
+    tool_with_client, gitlab_client_mock
+):
+    """A non-success HTTP response with no body raises ToolException with status code only."""
+    mock_response = Mock()
+    mock_response.is_success.return_value = False
+    mock_response.status_code = 403
+    mock_response.body = None
+
+    gitlab_client_mock.aget.return_value = mock_response
+
+    with pytest.raises(
+        ToolException,
+        match=r"Failed to fetch /api/v4/projects/1/notes: HTTP 403$",
     ):
         await tool_with_client._paginate_get("/api/v4/projects/1/notes")
 
