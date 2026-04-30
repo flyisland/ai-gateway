@@ -149,35 +149,12 @@ class GetPipelineFailingJobs(DuoBaseTool):
     async def _get_failing_jobs(
         self, project_id: str | None, pipeline_id: int | None
     ) -> list[dict]:
-        next_page = "1"
-        page_count = 0
-        failing_jobs: list[dict] = []
-        while next_page and page_count < MAX_LOG_PAGES_FOR_PIPELINE:
-            page_count += 1
-            jobs_response = await self.gitlab_client.aget(
-                path=f"/api/v4/projects/{project_id}/pipelines/{pipeline_id}"
-                f"/jobs?per_page=100&page={next_page}",
-            )
-
-            if not jobs_response.is_success():
-                error_str = (
-                    f"Failed to fetch jobs: status_code={jobs_response.status_code}, "
-                    f"response={jobs_response.body}"
-                )
-                raise ToolException(error_str)
-
-            jobs = jobs_response.body
-            if not isinstance(jobs, list):
-                raise ToolException(
-                    f"Failed to fetch jobs for pipeline {pipeline_id}: {jobs}"
-                )
-            for job in jobs:
-                if job["status"] == "failed":
-                    failing_jobs.append(job)
-
-            next_page = jobs_response.headers.get("X-Next-Page", "")
-
-        return failing_jobs
+        return await self._paginate_get(
+            endpoint=f"/api/v4/projects/{project_id}/pipelines/{pipeline_id}/jobs",
+            per_page=100,
+            max_pages=MAX_LOG_PAGES_FOR_PIPELINE,
+            extra_params={"scope[]": "failed"},
+        )
 
     def format_display_message(
         self, args: GetPipelineFailingJobsInput, _tool_response: Any = None

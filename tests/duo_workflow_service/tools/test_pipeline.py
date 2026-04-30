@@ -1,3 +1,4 @@
+# pylint: disable=too-many-lines
 import json
 from unittest.mock import AsyncMock, Mock, call
 
@@ -27,6 +28,9 @@ def metadata_fixture(gitlab_client_mock):
 
 @pytest.mark.asyncio
 async def test_get_pipeline_failing_jobs(gitlab_client_mock, metadata):
+    jobs = [
+        {"id": 102, "name": "job2", "status": "failed"},
+    ]
     responses = [
         GitLabHttpResponse(status_code=200, body={"id": 1, "title": "Merge Request 1"}),
         GitLabHttpResponse(
@@ -35,10 +39,8 @@ async def test_get_pipeline_failing_jobs(gitlab_client_mock, metadata):
         ),
         GitLabHttpResponse(
             status_code=200,
-            body=[
-                {"id": 101, "name": "job1", "status": "success"},
-                {"id": 102, "name": "job2", "status": "failed"},
-            ],
+            body=json.dumps(jobs),
+            headers={"X-Next-Page": ""},
         ),
     ]
 
@@ -67,7 +69,9 @@ async def test_get_pipeline_failing_jobs(gitlab_client_mock, metadata):
         call(path="/api/v4/projects/1/merge_requests/1"),
         call(path="/api/v4/projects/1/merge_requests/1/pipelines"),
         call(
-            path="/api/v4/projects/1/pipelines/10/jobs?per_page=100&page=1",
+            path="/api/v4/projects/1/pipelines/10/jobs",
+            params={"page": "1", "per_page": 100, "scope[]": "failed"},
+            parse_json=False,
         ),
     ]
 
@@ -148,15 +152,17 @@ async def test_get_pipeline_failing_jobs_with_url_success(
         {"id": 10, "status": "success"},
         {"id": 11, "status": "failed"},
     ]
+    # API returns only failed jobs when scope[]=failed is passed
     jobs_response = [
-        {"id": 101, "name": "job1", "status": "success"},
         {"id": 102, "name": "job2", "status": "failed"},
     ]
 
     responses = [
         GitLabHttpResponse(status_code=200, body=merge_request_response),
         GitLabHttpResponse(status_code=200, body=pipelines_response),
-        GitLabHttpResponse(status_code=200, body=jobs_response),
+        GitLabHttpResponse(
+            status_code=200, body=json.dumps(jobs_response), headers={"X-Next-Page": ""}
+        ),
     ]
     gitlab_client_mock.aget = AsyncMock(side_effect=responses)
 
@@ -292,7 +298,8 @@ async def test_get_pipeline_failing_jobs_jobs_error(gitlab_client_mock, metadata
         GitLabHttpResponse(status_code=200, body={"id": 1, "title": "Merge Request 1"}),
         GitLabHttpResponse(status_code=200, body=[{"id": 10, "status": "success"}]),
         GitLabHttpResponse(
-            status_code=404, body={"status": 404, "message": "Jobs not found"}
+            status_code=404,
+            body=json.dumps({"status": 404, "message": "Jobs not found"}),
         ),
     ]
 
@@ -303,12 +310,18 @@ async def test_get_pipeline_failing_jobs_jobs_error(gitlab_client_mock, metadata
     with pytest.raises(ToolException) as exc_info:
         await tool.arun({"project_id": "1", "merge_request_iid": "1"})
 
+    assert "Failed to fetch" in str(exc_info.value)
+    assert "404" in str(exc_info.value)
     assert "Jobs not found" in str(exc_info.value)
 
     assert gitlab_client_mock.aget.call_args_list == [
         call(path="/api/v4/projects/1/merge_requests/1"),
         call(path="/api/v4/projects/1/merge_requests/1/pipelines"),
-        call(path="/api/v4/projects/1/pipelines/10/jobs?per_page=100&page=1"),
+        call(
+            path="/api/v4/projects/1/pipelines/10/jobs",
+            params={"page": "1", "per_page": 100, "scope[]": "failed"},
+            parse_json=False,
+        ),
     ]
 
 
@@ -357,13 +370,15 @@ async def test_get_pipeline_failing_jobs_network_exception(
 async def test_get_pipeline_failing_jobs_with_pipeline_url_success(
     url, expected_project_id, expected_pipeline_id, gitlab_client_mock, metadata
 ):
+    # API returns only failed jobs when scope[]=failed is passed
     jobs_response = [
-        {"id": 101, "name": "job1", "status": "success"},
         {"id": 102, "name": "job2", "status": "failed"},
         {"id": 103, "name": "job3", "status": "failed"},
     ]
     responses = [
-        GitLabHttpResponse(status_code=200, body=jobs_response),
+        GitLabHttpResponse(
+            status_code=200, body=json.dumps(jobs_response), headers={"X-Next-Page": ""}
+        ),
     ]
     gitlab_client_mock.aget = AsyncMock(side_effect=responses)
 
@@ -392,7 +407,9 @@ async def test_get_pipeline_failing_jobs_with_pipeline_url_success(
 
     assert gitlab_client_mock.aget.call_args_list == [
         call(
-            path=f"/api/v4/projects/{expected_project_id}/pipelines/{expected_pipeline_id}/jobs?per_page=100&page=1",
+            path=f"/api/v4/projects/{expected_project_id}/pipelines/{expected_pipeline_id}/jobs",
+            params={"page": "1", "per_page": 100, "scope[]": "failed"},
+            parse_json=False,
         ),
     ]
 
@@ -402,14 +419,13 @@ async def test_get_pipeline_failing_jobs_with_pipeline_url_no_failed_jobs(
     gitlab_client_mock, metadata
 ):
     """Test that pipelines with no failed jobs raise ToolException."""
-    jobs_response = [
-        {"id": 101, "name": "job1", "status": "success"},
-        {"id": 102, "name": "job2", "status": "success"},
-    ]
+    # API returns empty list when scope[]=failed is passed and there are no failures
+    jobs_response: list = []
 
     mock_response = GitLabHttpResponse(
         status_code=200,
-        body=jobs_response,
+        body=json.dumps(jobs_response),
+        headers={"X-Next-Page": ""},
     )
     gitlab_client_mock.aget = AsyncMock(return_value=mock_response)
 
@@ -421,7 +437,9 @@ async def test_get_pipeline_failing_jobs_with_pipeline_url_no_failed_jobs(
     assert "No Failing Jobs Found" in str(exc_info.value)
 
     gitlab_client_mock.aget.assert_called_once_with(
-        path="/api/v4/projects/namespace%2Fproject/pipelines/123/jobs?per_page=100&page=1",
+        path="/api/v4/projects/namespace%2Fproject/pipelines/123/jobs",
+        params={"page": "1", "per_page": 100, "scope[]": "failed"},
+        parse_json=False,
     )
 
 
@@ -431,7 +449,7 @@ async def test_get_pipeline_failing_jobs_with_pipeline_url_jobs_not_found(
 ):
     mock_response = GitLabHttpResponse(
         status_code=404,
-        body={"status": 404, "message": "Pipeline not found"},
+        body=json.dumps({"status": 404, "message": "Pipeline not found"}),
     )
     gitlab_client_mock.aget = AsyncMock(return_value=mock_response)
 
@@ -440,10 +458,14 @@ async def test_get_pipeline_failing_jobs_with_pipeline_url_jobs_not_found(
     with pytest.raises(ToolException) as exc_info:
         await tool._arun(url="https://gitlab.com/namespace/project/-/pipelines/123")
 
+    assert "Failed to fetch" in str(exc_info.value)
+    assert "404" in str(exc_info.value)
     assert "Pipeline not found" in str(exc_info.value)
 
     gitlab_client_mock.aget.assert_called_once_with(
-        path="/api/v4/projects/namespace%2Fproject/pipelines/123/jobs?per_page=100&page=1",
+        path="/api/v4/projects/namespace%2Fproject/pipelines/123/jobs",
+        params={"page": "1", "per_page": 100, "scope[]": "failed"},
+        parse_json=False,
     )
 
 
@@ -493,7 +515,9 @@ async def test_get_pipeline_failing_jobs_with_pipeline_url_and_conflicting_param
     ]
 
     responses = [
-        GitLabHttpResponse(status_code=200, body=jobs_response),
+        GitLabHttpResponse(
+            status_code=200, body=json.dumps(jobs_response), headers={"X-Next-Page": ""}
+        ),
     ]
     gitlab_client_mock.aget = AsyncMock(side_effect=responses)
 
@@ -523,7 +547,9 @@ async def test_get_pipeline_failing_jobs_with_pipeline_url_and_conflicting_param
     # Should use the pipeline URL, not the merge request params
     assert gitlab_client_mock.aget.call_args_list == [
         call(
-            path="/api/v4/projects/namespace%2Fproject/pipelines/123/jobs?per_page=100&page=1",
+            path="/api/v4/projects/namespace%2Fproject/pipelines/123/jobs",
+            params={"page": "1", "per_page": 100, "scope[]": "failed"},
+            parse_json=False,
         ),
     ]
 
@@ -558,24 +584,27 @@ async def test_get_pipeline_failing_jobs_jobs_pagination(gitlab_client_mock, met
         status_code=200, body=[{"id": 10, "status": "success"}]
     )
 
+    # API returns only failed jobs when scope[]=failed is passed.
     # Mock first page of jobs with X-Next-Page header indicating there's a second page
     jobs_page_1_response = GitLabHttpResponse(
         status_code=200,
-        body=[
-            {"id": 101, "name": "job1", "status": "success"},
-            {"id": 102, "name": "job2", "status": "failed"},
-        ],
+        body=json.dumps(
+            [
+                {"id": 102, "name": "job2", "status": "failed"},
+            ]
+        ),
         headers={"X-Next-Page": "2"},
     )
 
     # Mock second page of jobs with no X-Next-Page header (last page)
     jobs_page_2_response = GitLabHttpResponse(
         status_code=200,
-        body=[
-            {"id": 103, "name": "job3", "status": "failed"},
-            {"id": 104, "name": "job4", "status": "success"},
-        ],
-        headers={},
+        body=json.dumps(
+            [
+                {"id": 103, "name": "job3", "status": "failed"},
+            ]
+        ),
+        headers={"X-Next-Page": ""},
     )
 
     responses = [
@@ -613,10 +642,14 @@ async def test_get_pipeline_failing_jobs_jobs_pagination(gitlab_client_mock, met
         call(path="/api/v4/projects/1/merge_requests/1"),
         call(path="/api/v4/projects/1/merge_requests/1/pipelines"),
         call(
-            path="/api/v4/projects/1/pipelines/10/jobs?per_page=100&page=1",
+            path="/api/v4/projects/1/pipelines/10/jobs",
+            params={"page": "1", "per_page": 100, "scope[]": "failed"},
+            parse_json=False,
         ),
         call(
-            path="/api/v4/projects/1/pipelines/10/jobs?per_page=100&page=2",
+            path="/api/v4/projects/1/pipelines/10/jobs",
+            params={"page": "2", "per_page": 100, "scope[]": "failed"},
+            parse_json=False,
         ),
     ]
 
@@ -628,32 +661,34 @@ async def test_get_pipeline_failing_jobs_jobs_pagination_with_pipeline_url(
     gitlab_client_mock, metadata
 ):
     """Test pagination works correctly when using a pipeline URL directly."""
+    # API returns only failed jobs when scope[]=failed is passed.
     # Mock first page of jobs with X-Next-Page header
     jobs_page_1_response = GitLabHttpResponse(
         status_code=200,
-        body=[
-            {"id": 201, "name": "build", "status": "failed"},
-            {"id": 202, "name": "test", "status": "success"},
-        ],
+        body=json.dumps(
+            [
+                {"id": 201, "name": "build", "status": "failed"},
+            ]
+        ),
         headers={"X-Next-Page": "2"},
     )
 
     # Mock second page of jobs with X-Next-Page header for third page
     jobs_page_2_response = GitLabHttpResponse(
         status_code=200,
-        body=[
-            {"id": 203, "name": "deploy", "status": "failed"},
-        ],
+        body=json.dumps(
+            [
+                {"id": 203, "name": "deploy", "status": "failed"},
+            ]
+        ),
         headers={"X-Next-Page": "3"},
     )
 
     # Mock third page of jobs with no X-Next-Page header (last page)
     jobs_page_3_response = GitLabHttpResponse(
         status_code=200,
-        body=[
-            {"id": 204, "name": "cleanup", "status": "success"},
-        ],
-        headers={},
+        body=json.dumps([]),
+        headers={"X-Next-Page": ""},
     )
 
     responses = [
@@ -693,13 +728,19 @@ async def test_get_pipeline_failing_jobs_jobs_pagination_with_pipeline_url(
     # Verify pagination calls were made correctly
     expected_calls = [
         call(
-            path="/api/v4/projects/namespace%2Fproject/pipelines/456/jobs?per_page=100&page=1",
+            path="/api/v4/projects/namespace%2Fproject/pipelines/456/jobs",
+            params={"page": "1", "per_page": 100, "scope[]": "failed"},
+            parse_json=False,
         ),
         call(
-            path="/api/v4/projects/namespace%2Fproject/pipelines/456/jobs?per_page=100&page=2",
+            path="/api/v4/projects/namespace%2Fproject/pipelines/456/jobs",
+            params={"page": "2", "per_page": 100, "scope[]": "failed"},
+            parse_json=False,
         ),
         call(
-            path="/api/v4/projects/namespace%2Fproject/pipelines/456/jobs?per_page=100&page=3",
+            path="/api/v4/projects/namespace%2Fproject/pipelines/456/jobs",
+            params={"page": "3", "per_page": 100, "scope[]": "failed"},
+            parse_json=False,
         ),
     ]
 
