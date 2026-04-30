@@ -127,6 +127,8 @@ CHAT_MUTATION_TOOLS = [
 
 RUN_COMMAND_TOOLS = ["run_command"]
 
+CHAT_FLOW_TOOLS = ["start_flow"]
+
 
 @support_self_hosted_billing(class_schema="legacy")
 class Workflow(AbstractWorkflow):
@@ -368,13 +370,19 @@ class Workflow(AbstractWorkflow):
                 tool for tool in read_only_tools if tool not in _SEARCH_TOOLS
             ]
 
+        flow_tools = (
+            CHAT_FLOW_TOOLS
+            if is_feature_enabled(FeatureFlag.AGENTIC_FOUNDATIONAL_FLOW_TOOL)
+            else []
+        )
+
         available_tools = (
             read_only_tools
             + CHAT_MUTATION_TOOLS
             + RUN_COMMAND_TOOLS
             + CHAT_GITLAB_MUTATION_TOOLS
+            + flow_tools
         )
-
         return available_tools
 
     async def _handle_workflow_failure(

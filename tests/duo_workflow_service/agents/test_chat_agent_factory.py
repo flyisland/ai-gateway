@@ -223,8 +223,9 @@ class TestCreateAgent:
             call_kwargs["bind_tools_params"] == expected_params
         ), f"Failed for scenario: {test_description}"
 
-        # Verify the feature flag was always checked
-        mock_is_feature_enabled.assert_called_once_with(FeatureFlag.DAP_WEB_SEARCH)
+        # Verify the feature flag was checked once for DAP_WEB_SEARCH
+        assert mock_is_feature_enabled.call_count == 1
+        mock_is_feature_enabled.assert_any_call(FeatureFlag.DAP_WEB_SEARCH)
 
         # Verify client capability was checked only when feature flag is enabled
         # (due to short-circuit evaluation of the 'and' operator)
