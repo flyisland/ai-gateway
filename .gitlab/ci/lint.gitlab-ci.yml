@@ -32,7 +32,10 @@ lint:pricing_multipliers:
   needs:
     - install
   rules:
-    - if: $CI_PROJECT_PATH == "gitlab-org/modelops/applied-ml/code-suggestions/ai-assist"
+    - if: $CI_PROJECT_PATH == "gitlab-org/modelops/applied-ml/code-suggestions/ai-assist" && $CI_PIPELINE_SOURCE == "merge_request_event" && $CI_MERGE_REQUEST_EVENT_TYPE != "merge_train" && $CI_MERGE_REQUEST_TARGET_BRANCH_NAME == $CI_DEFAULT_BRANCH
+      changes:
+        - "ai_gateway/model_selection/*.{yml}"
+    - if: $CI_PROJECT_PATH == "gitlab-org/modelops/applied-ml/code-suggestions/ai-assist" && $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
       changes:
         - "ai_gateway/model_selection/*.{yml}"
   script:
