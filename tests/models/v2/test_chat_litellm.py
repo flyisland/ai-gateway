@@ -20,14 +20,47 @@ from ai_gateway.models.v2.chat_litellm import ChatLiteLLM
 from ai_gateway.vendor.langchain_litellm.litellm import _create_usage_metadata
 
 
-@pytest.mark.asyncio
-async def test_astream_with_stream_options_and_stop_reason():
-    """Test that stream_options is added correctly and finish_reason is extracted from stop_reason."""
+@pytest.fixture(name="acompletion_non_stream_response")
+def acompletion_non_stream_response_fixture():
+    return {
+        "choices": [
+            {
+                "message": {
+                    "role": "assistant",
+                    "content": "    print('Hello')",
+                },
+                "finish_reason": "stop",
+                "index": 0,
+            }
+        ],
+        "usage": {"prompt_tokens": 10, "completion_tokens": 5, "total_tokens": 15},
+    }
 
-    message = HumanMessage(content="Hello")
 
-    # Mock the raw LiteLLM response chunks
-    mock_chunks = [
+@pytest.fixture(name="acompletion_non_stream_with_logprobs_response")
+def acompletion_non_stream_with_logprobs_response_fixture():
+    return {
+        "choices": [
+            {
+                "message": {
+                    "role": "assistant",
+                    "content": "    print('Hello, World!')",
+                },
+                "finish_reason": "stop",
+                "index": 0,
+                "logprobs": {
+                    "token_logprobs": [-0.5, -1.2, -0.8],
+                    "tokens": ["    ", "print", "('Hello, World!')"],
+                },
+            }
+        ],
+        "usage": {"prompt_tokens": 10, "completion_tokens": 15, "total_tokens": 25},
+    }
+
+
+@pytest.fixture(name="acompletion_stream_response")
+def acompletion_stream_response_fixture():
+    chunks = [
         {
             "choices": [
                 {
@@ -60,28 +93,47 @@ async def test_astream_with_stream_options_and_stop_reason():
         },
     ]
 
-    async def mock_acompletion(*_args, **_kwargs):
-        for chunk in mock_chunks:
+    async def _stream_generator(*_args, **_kwargs):
+        for chunk in chunks:
             yield chunk
 
+    return _stream_generator()
+
+
+@pytest.fixture(name="mock_acompletion_with_retry")
+def mock_acompletion_with_retry_fixture(request, acompletion_response_fixture):
     with patch(
         "ai_gateway.vendor.langchain_litellm.litellm.ChatLiteLLM.acompletion_with_retry",
-        new=AsyncMock(return_value=mock_acompletion()),
-    ):
-        chat = ChatLiteLLM(model="gpt-3.5-turbo")
+        new=AsyncMock(
+            return_value=request.getfixturevalue(acompletion_response_fixture)
+        ),
+    ) as mock:
+        yield mock
 
-        result = []
-        async for item in chat._astream(messages=[message]):
-            result.append(item)
 
-        # Verify we got chunks
-        assert len(result) == 3
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    "acompletion_response_fixture", ["acompletion_stream_response"]
+)
+@pytest.mark.usefixtures("mock_acompletion_with_retry")
+async def test_astream_with_stream_options_and_stop_reason():
+    """Test that stream_options is added correctly and finish_reason is extracted from stop_reason."""
+    message = HumanMessage(content="Hello")
 
-        # Verify the last chunk has finish_reason in response_metadata
-        last_chunk = result[-1]
-        assert isinstance(last_chunk, ChatGenerationChunk)
-        assert isinstance(last_chunk.message, AIMessageChunk)
-        assert last_chunk.message.response_metadata.get("finish_reason") == "stop"
+    chat = ChatLiteLLM(model="gpt-3.5-turbo")
+
+    result = []
+    async for item in chat._astream(messages=[message]):
+        result.append(item)
+
+    # Verify we got chunks
+    assert len(result) == 3
+
+    # Verify the last chunk has finish_reason in response_metadata
+    last_chunk = result[-1]
+    assert isinstance(last_chunk, ChatGenerationChunk)
+    assert isinstance(last_chunk.message, AIMessageChunk)
+    assert last_chunk.message.response_metadata.get("finish_reason") == "stop"
 
 
 @pytest.mark.asyncio
@@ -153,116 +205,68 @@ async def test_fireworks_logprobs_in_streaming():
 
 
 @pytest.mark.asyncio
+@pytest.mark.parametrize(
+    "acompletion_response_fixture", ["acompletion_non_stream_with_logprobs_response"]
+)
+@pytest.mark.usefixtures("mock_acompletion_with_retry")
 async def test_fireworks_logprobs_in_non_streaming():
     """Test that Fireworks logprobs are correctly extracted and returned as score in non-streaming mode."""
 
     message = HumanMessage(content="def hello():")
 
     # Mock Fireworks non-streaming response with logprobs
-    mock_response = {
-        "choices": [
-            {
-                "message": {
-                    "role": "assistant",
-                    "content": "    print('Hello, World!')",
-                },
-                "finish_reason": "stop",
-                "index": 0,
-                "logprobs": {
-                    "token_logprobs": [-0.5, -1.2, -0.8],
-                    "tokens": ["    ", "print", "('Hello, World!')"],
-                },
-            }
-        ],
-        "usage": {"prompt_tokens": 10, "completion_tokens": 15, "total_tokens": 25},
-    }
+    chat = ChatLiteLLM(model="test-model", custom_llm_provider="fireworks_ai")
 
-    with patch(
-        "ai_gateway.vendor.langchain_litellm.litellm.ChatLiteLLM.acompletion_with_retry",
-        new=AsyncMock(return_value=mock_response),
-    ):
-        chat = ChatLiteLLM(model="test-model", custom_llm_provider="fireworks_ai")
+    result = await chat._agenerate(messages=[message])
 
-        result = await chat._agenerate(messages=[message])
+    # Verify the result has generations
+    assert len(result.generations) == 1
+    generation = result.generations[0]
 
-        # Verify the result has generations
-        assert len(result.generations) == 1
-        generation = result.generations[0]
+    # Verify logprobs are in generation_info
+    assert generation.generation_info is not None
+    assert "logprobs" in generation.generation_info
 
-        # Verify logprobs are in generation_info
-        assert generation.generation_info is not None
-        assert "logprobs" in generation.generation_info
-
-        # Verify score was extracted from first token logprob
-        assert "score" in generation.generation_info
-        assert generation.generation_info["score"] == -0.5
+    # Verify score was extracted from first token logprob
+    assert "score" in generation.generation_info
+    assert generation.generation_info["score"] == -0.5
 
 
 @pytest.mark.asyncio
-async def test_fireworks_session_affinity_header():
+@pytest.mark.parametrize(
+    "acompletion_response_fixture", ["acompletion_non_stream_response"]
+)
+async def test_fireworks_session_affinity_header(mock_acompletion_with_retry):
     """Test that Fireworks session affinity header is correctly set."""
 
     message = HumanMessage(content="def hello():")
 
-    mock_response = {
-        "choices": [
-            {
-                "message": {
-                    "role": "assistant",
-                    "content": "    print('Hello')",
-                },
-                "finish_reason": "stop",
-                "index": 0,
-            }
-        ],
-        "usage": {"prompt_tokens": 10, "completion_tokens": 5, "total_tokens": 15},
-    }
+    chat = ChatLiteLLM(model="test-model", custom_llm_provider="fireworks_ai")
 
-    with patch(
-        "ai_gateway.vendor.langchain_litellm.litellm.ChatLiteLLM.acompletion_with_retry",
-        new=AsyncMock(return_value=mock_response),
-    ) as mock_acompletion:
-        chat = ChatLiteLLM(model="test-model", custom_llm_provider="fireworks_ai")
+    await chat._agenerate(messages=[message], session_id="test-session-123")
 
-        await chat._agenerate(messages=[message], session_id="test-session-123")
-
-        # Verify the call was made with session affinity header
-        call_kwargs = mock_acompletion.call_args[1]
-        assert "extra_headers" in call_kwargs
-        assert call_kwargs["extra_headers"]["x-session-affinity"] == "test-session-123"
+    # Verify the call was made with session affinity header
+    call_kwargs = mock_acompletion_with_retry.call_args[1]
+    assert "extra_headers" in call_kwargs
+    assert call_kwargs["extra_headers"]["x-session-affinity"] == "test-session-123"
 
 
 @pytest.mark.asyncio
-async def test_fireworks_prompt_caching_disabled():
+@pytest.mark.parametrize(
+    "acompletion_response_fixture", ["acompletion_non_stream_response"]
+)
+async def test_fireworks_prompt_caching_disabled(mock_acompletion_with_retry):
     """Test that Fireworks prompt caching can be disabled."""
 
     message = HumanMessage(content="def hello():")
 
-    mock_response = {
-        "choices": [
-            {
-                "message": {
-                    "role": "assistant",
-                    "content": "    print('Hello')",
-                },
-                "finish_reason": "stop",
-                "index": 0,
-            }
-        ],
-        "usage": {"prompt_tokens": 10, "completion_tokens": 5, "total_tokens": 15},
-    }
+    chat = ChatLiteLLM(model="test-model", custom_llm_provider="fireworks_ai")
 
-    with patch(
-        "ai_gateway.vendor.langchain_litellm.litellm.ChatLiteLLM.acompletion_with_retry",
-        new=AsyncMock(return_value=mock_response),
-    ) as mock_acompletion:
-        chat = ChatLiteLLM(model="test-model", custom_llm_provider="fireworks_ai")
+    await chat._agenerate(messages=[message], using_cache="false")
 
-        await chat._agenerate(messages=[message], using_cache="false")
-
-        # Verify the call was made with prompt_cache_max_len=0
-        call_kwargs = mock_acompletion.call_args[1]
-        assert call_kwargs["prompt_cache_max_len"] == 0
+    # Verify the call was made with prompt_cache_max_len=0
+    call_kwargs = mock_acompletion_with_retry.call_args[1]
+    assert call_kwargs["prompt_cache_max_len"] == 0
 
 
 @pytest.mark.asyncio

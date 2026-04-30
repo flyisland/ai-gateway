@@ -134,25 +134,6 @@ def flow_state_no_history_fixture(base_flow_state):
     return state
 
 
-@pytest.fixture(name="mock_ai_message")
-def mock_ai_message_fixture():
-    """Fixture for mock AI message."""
-    mock_message = Mock(spec=AIMessage)
-    mock_message.content = "Test response from agent"
-    mock_message.usage_metadata = {
-        "input_tokens": 100,
-        "output_tokens": 50,
-        "total_tokens": 150,
-    }
-    mock_message.response_metadata = {
-        "finish_reason": "stop"
-    }  # OpenAI format used by LiteLLM
-    mock_message.tool_calls = []
-    mock_message.invalid_tool_calls = []
-    mock_message.additional_kwargs = {}
-    return mock_message
-
-
 @pytest.fixture(name="mock_ai_message_no_metadata")
 def mock_ai_message_no_metadata_fixture():
     """Fixture for mock AI message without metadata."""
