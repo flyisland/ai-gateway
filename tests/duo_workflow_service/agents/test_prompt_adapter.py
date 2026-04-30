@@ -2,6 +2,7 @@ from datetime import datetime, timezone
 from unittest.mock import AsyncMock, Mock, patch
 
 import pytest
+from gitlab_cloud_connector import GitLabUnitPrimitive
 from langchain_core.messages import AIMessage, HumanMessage, SystemMessage, ToolMessage
 from langchain_core.prompt_values import ChatPromptValue
 
@@ -57,6 +58,96 @@ def sample_chat_workflow_state_fixture(project, namespace) -> ChatWorkflowState:
         approval=None,
         preapproved_tools=None,
     )
+
+
+@patch("duo_workflow_service.agents.prompt_adapter.get_model_metadata")
+def test_chat_agent_prompt_template_can_compose_base_system_prompt(
+    mock_get_model_metadata,
+    sample_chat_workflow_state: ChatWorkflowState,
+):
+    mock_get_model_metadata.return_value = None
+    prompt_config = PromptConfig(
+        name="Chat Agent",
+        unit_primitive=GitLabUnitPrimitive.DUO_CHAT,
+        prompt_template={
+            "system_static": """{% if system_template_override %}
+{{ system_template_override }}
+{% else %}
+Base chat for {{ gitlab_instance_url }}.
+{% endif %}""",
+            "user": "{{ message.content }}",
+        },
+    )
+    template = ChatAgentPromptTemplate(ModelClassProvider.ANTHROPIC, prompt_config)
+    mock_gitlab_info = GitLabInstanceInfo(
+        instance_type="GitLab Dedicated",
+        instance_url="https://gitlab.example.com",
+        instance_version="18.0.0-ee",
+    )
+
+    with patch.object(
+        GitLabServiceContext,
+        "get_current_instance_info",
+        return_value=mock_gitlab_info,
+    ):
+        result = template.invoke(
+            sample_chat_workflow_state,
+            agent_name="test_agent",
+            system_template_override=(
+                "{{ base_agentic_chat_system }}\n\nOrbit instructions."
+            ),
+        )
+
+    system_message = result.to_messages()[0]
+
+    assert isinstance(system_message, SystemMessage)
+    assert "<tool_output_policy>" in system_message.content
+    assert "Base chat for https://gitlab.example.com." in system_message.content
+    assert "Orbit instructions." in system_message.content
+    assert "base_agentic_chat_system" not in system_message.content
+
+
+@patch("duo_workflow_service.agents.prompt_adapter.get_model_metadata")
+def test_chat_agent_prompt_template_renders_system_template_override(
+    mock_get_model_metadata,
+    sample_chat_workflow_state: ChatWorkflowState,
+):
+    mock_get_model_metadata.return_value = None
+    prompt_config = PromptConfig(
+        name="Chat Agent",
+        unit_primitive=GitLabUnitPrimitive.DUO_CHAT,
+        prompt_template={
+            "system_static": """{% if system_template_override %}
+{{ system_template_override }}
+{% else %}
+Base chat for {{ gitlab_instance_url }}.
+{% endif %}""",
+            "user": "{{ message.content }}",
+        },
+    )
+    template = ChatAgentPromptTemplate(ModelClassProvider.ANTHROPIC, prompt_config)
+    mock_gitlab_info = GitLabInstanceInfo(
+        instance_type="GitLab Dedicated",
+        instance_url="https://gitlab.example.com",
+        instance_version="18.0.0-ee",
+    )
+
+    with patch.object(
+        GitLabServiceContext,
+        "get_current_instance_info",
+        return_value=mock_gitlab_info,
+    ):
+        result = template.invoke(
+            sample_chat_workflow_state,
+            agent_name="test_agent",
+            system_template_override="Override for {{ gitlab_instance_url }}.",
+        )
+
+    system_message = result.to_messages()[0]
+
+    assert isinstance(system_message, SystemMessage)
+    assert "Override for https://gitlab.example.com." in system_message.content
+    assert "{{ gitlab_instance_url }}" not in system_message.content
 
 
 @pytest.mark.parametrize(

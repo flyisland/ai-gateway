@@ -1,0 +1,94 @@
+version: "v1"
+environment: chat-partial
+name: "Orbit Agent"
+description: "Agent backed by an SDLC Context Graph"
+product_group: "knowledge_graph"
+
+components:
+  - name: "orbit_agent"
+    type: AgentComponent
+    prompt_id: "orbit_agent_prompt"
+    model_size_preference: "large"
+    inputs:
+      - from: "context:goal"
+        as: "goal"
+    toolset:
+      # Orbit MCP tools are supplied by Rails/Workhorse for orbit_agent/v1 at runtime.
+      - "orbit_query_graph"
+      - "orbit_get_graph_schema"
+      # Base agentic chat tools.
+      - "list_merge_request_diffs"
+      - "gitlab_documentation_search"
+      - "gitlab_issue_search"
+      - "gitlab_blob_search"
+      - "gitlab_merge_request_search"
+      - "read_file"
+      - "read_files"
+      - "list_dir"
+      - "find_files"
+      - "grep"
+      - "gitlab_api_get"
+      - "gitlab_graphql"
+      - "get_current_user"
+      - "create_file_with_contents"
+      - "edit_file"
+      - "mkdir"
+      - "run_command"
+      - "create_merge_request"
+      - "update_merge_request"
+      - "create_merge_request_note"
+      - "create_commit"
+      - "create_work_item"
+      - "create_work_item_note"
+      - "update_work_item"
+    ui_log_events:
+      - "on_agent_final_answer"
+      - "on_tool_execution_success"
+      - "on_tool_execution_failed"
+
+routers: []
+
+flow:
+  entry_point: "orbit_agent"
+
+prompts:
+  - name: "orbit_agent_prompt"
+    prompt_id: "orbit_agent_prompt"
+    model:
+      params:
+        max_tokens: 32768
+    unit_primitives:
+      - duo_agent_platform
+    prompt_template:
+      system: |
+        {{ base_agentic_chat_system }}
+
+        In this chat, you are powered by GitLab Orbit, a Knowledge Graph that
+        serves as a unified context API for SDLC and Code data.
+
+        Think in entities and relationships. For GitLab SDLC questions, map the
+        request to graph nodes, properties, and relationships before choosing a
+        tool. Use the graph when it can answer the question more directly than
+        browsing GitLab REST resources one item at a time.
+
+        Important: prefer Orbit when the user is looking for context, research,
+        or related items.
+
+        <tools>
+        The Orbit MCP server is GitLab-provided and trusted.
+
+        Use orbit_get_graph_schema to inspect available graph schema when needed,
+        and use orbit_query_graph to answer GitLab SDLC or Code questions from
+        the Knowledge Graph.
+        </tools>
+
+        <orbit_rules>
+        - Do not guess node, relationship, or property names from GitLab API
+          terminology. Prefer orbit_get_graph_schema when the ontology is
+          unclear.
+        - Avoid unbounded traversals. Keep traversal depth at 3 or less and
+          select only the columns needed for the answer.
+        </orbit_rules>
+      user: |
+        {{goal}}
+      placeholder: history

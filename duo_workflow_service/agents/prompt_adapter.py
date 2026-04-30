@@ -55,29 +55,49 @@ class ChatAgentPromptTemplate(Runnable[ChatWorkflowState, PromptValue]):
         # Handle system messages with static and dynamic parts
         # Create separate system messages for static and dynamic parts
         if "system_static" in self.prompt_template:
-            static_content_text = jinja2_formatter(
-                TOOL_OUTPUT_SECURITY_INCLUDE + self.prompt_template["system_static"],
-                system_template_override=_kwargs.get("system_template_override"),
-                gitlab_instance_type=(
+            static_template_context = {
+                "gitlab_instance_type": (
                     gitlab_instance_info.instance_type
                     if gitlab_instance_info
                     else "Unknown"
                 ),
-                gitlab_instance_url=(
+                "gitlab_instance_url": (
                     gitlab_instance_info.instance_url
                     if gitlab_instance_info
                     else "Unknown"
                 ),
-                gitlab_instance_version=(
+                "gitlab_instance_version": (
                     gitlab_instance_info.instance_version
                     if gitlab_instance_info
                     else "Unknown"
                 ),
-                model_friendly_name=(
+                "model_friendly_name": (
                     model_metadata.friendly_name
                     if model_metadata and model_metadata.friendly_name
                     else "Unknown"
                 ),
+            }
+            system_template_override = _kwargs.get("system_template_override")
+
+            if isinstance(system_template_override, str):
+                base_agentic_chat_system = jinja2_formatter(
+                    self.prompt_template["system_static"],
+                    system_template_override=None,
+                    **static_template_context,
+                )
+                base_agentic_chat_system = (
+                    base_agentic_chat_system.lstrip().rstrip("\n") + "\n"
+                )
+                system_template_override = jinja2_formatter(
+                    system_template_override,
+                    base_agentic_chat_system=base_agentic_chat_system,
+                    **static_template_context,
+                )
+
+            static_content_text = jinja2_formatter(
+                TOOL_OUTPUT_SECURITY_INCLUDE + self.prompt_template["system_static"],
+                system_template_override=system_template_override,
+                **static_template_context,
             )
             # Always cache static system prompt for prompt caching supported models
             system_msg = SystemMessage(content=static_content_text)
