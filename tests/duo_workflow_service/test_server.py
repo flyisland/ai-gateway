@@ -13,9 +13,7 @@ import pytest
 from dependency_injector import providers
 from gitlab_cloud_connector import (
     CloudConnectorConfig,
-    CloudConnectorUser,
     GitLabUnitPrimitive,
-    UserClaims,
 )
 from google.protobuf import struct_pb2
 from google.protobuf.json_format import MessageToDict
@@ -77,11 +75,61 @@ def simple_flow_config():
     }
 
 
+@pytest.fixture(name="workflow_definition")
+def workflow_definition_fixture() -> str:
+    return "software_development"
+
+
+@pytest.fixture(name="start_workflow_client_event")
+def start_workflow_client_event_fixture(
+    workflow_definition: str,
+) -> contract_pb2.ClientEvent:
+    return contract_pb2.ClientEvent(
+        startRequest=contract_pb2.StartWorkflowRequest(
+            workflowID="123",
+            workflowDefinition=workflow_definition,
+            goal="test",
+            clientCapabilities=["capability_a", "capability_b"],
+        )
+    )
+
+
+@pytest.fixture(name="start_request_iterator")
+def start_request_iterator_fixture(
+    start_workflow_client_event: contract_pb2.ClientEvent,
+):
+    async def _iterator() -> AsyncIterable[contract_pb2.ClientEvent]:
+        yield start_workflow_client_event
+
+    return _iterator()
+
+
+@pytest.fixture(name="scopes")
+def scopes_fixture():
+    return ["duo_agent_platform"]
+
+
 def create_mock_internal_event_client():
     """Helper function to create a mock internal event client for tests."""
     mock_client = MagicMock()
     mock_client.track_event = MagicMock()
     return mock_client
+
+
+@pytest.fixture(name="servicer")
+def servicer_fixture(auth_user) -> DuoWorkflowService:
+    current_user.set(auth_user)
+
+    return DuoWorkflowService()
+
+
+@pytest.fixture(name="mock_context")
+def mock_context_fixture() -> grpc.ServicerContext:
+    mock = MagicMock(spec=grpc.ServicerContext)
+    mock.invocation_metadata.return_value = []
+    mock.abort.side_effect = grpc.RpcError("Aborted")
+
+    return mock
 
 
 @pytest.fixture(autouse=True)
@@ -176,6 +224,8 @@ async def test_list_tools(
     mock_agent_privileges,
     mock_readonly_tools,
     mock_default_tools,
+    mock_context,
+    servicer,
 ):
     # avoid duplicated mock tool with the same tool name
     _tool_class_cache = {}
@@ -229,9 +279,7 @@ async def test_list_tools(
         [create_mock_tool(name="tool3")],
     ]
     mock_convert_to_openai_tool.side_effect = mock_convert_side_effect
-    mock_context = MagicMock(spec=grpc.ServicerContext)
-    service = DuoWorkflowService()
-    response = await service.ListTools(contract_pb2.ListToolsRequest(), mock_context)
+    response = await servicer.ListTools(contract_pb2.ListToolsRequest(), mock_context)
     assert isinstance(response, contract_pb2.ListToolsResponse)
     assert len(response.tools) == 3
     assert mock_convert_to_openai_tool.called
@@ -270,6 +318,8 @@ async def test_list_tools_excludes_experimental(
     mock_agent_privileges,
     mock_readonly_tools,
     mock_default_tools,
+    mock_context,
+    servicer,
 ):
     _tool_class_cache = {}
 
@@ -317,9 +367,7 @@ async def test_list_tools_excludes_experimental(
     mock_agent_privileges.values.return_value = []
     mock_convert_to_openai_tool.side_effect = mock_convert_side_effect
 
-    mock_context = MagicMock(spec=grpc.ServicerContext)
-    service = DuoWorkflowService()
-    response = await service.ListTools(contract_pb2.ListToolsRequest(), mock_context)
+    response = await servicer.ListTools(contract_pb2.ListToolsRequest(), mock_context)
 
     assert isinstance(response, contract_pb2.ListToolsResponse)
     assert len(response.tools) == 1
@@ -333,15 +381,13 @@ async def test_list_tools_excludes_experimental(
 
 @pytest.mark.asyncio
 @patch("duo_workflow_service.server.flow_registry.list_configs")
-async def test_list_flows(mock_list_configs):
+async def test_list_flows(mock_list_configs, mock_context, servicer):
     mock_list_configs.return_value = [
         {"name": "flow1", "description": "First flow config"},
         {"name": "flow2", "description": "Second flow config"},
     ]
 
-    mock_context = MagicMock(spec=grpc.ServicerContext)
-    service = DuoWorkflowService()
-    response = await service.ListFlows(contract_pb2.ListFlowsRequest(), mock_context)
+    response = await servicer.ListFlows(contract_pb2.ListFlowsRequest(), mock_context)
 
     assert isinstance(response, contract_pb2.ListFlowsResponse)
     assert len(response.configs) == 2
@@ -418,7 +464,12 @@ async def test_list_flows(mock_list_configs):
 )
 @patch("duo_workflow_service.server.flow_registry.list_configs")
 async def test_list_flows_with_filters(
-    mock_list_configs, filter_params, expected_count, validation_func
+    mock_list_configs,
+    filter_params,
+    expected_count,
+    validation_func,
+    mock_context,
+    servicer,
 ):
     mock_list_configs.return_value = [
         {
@@ -441,16 +492,13 @@ async def test_list_flows_with_filters(
         },
     ]
 
-    mock_context = MagicMock(spec=grpc.ServicerContext)
-    service = DuoWorkflowService()
-
     if filter_params is None:
         request = contract_pb2.ListFlowsRequest(filters=None)
     else:
         filters = contract_pb2.ListFlowsRequestFilter(**filter_params)
         request = contract_pb2.ListFlowsRequest(filters=filters)
 
-    response = await service.ListFlows(request, mock_context)
+    response = await servicer.ListFlows(request, mock_context)
 
     assert len(response.configs) == expected_count
 
@@ -464,6 +512,9 @@ async def test_list_flows_with_filters(
 async def test_execute_workflow_when_no_events_ends(
     mock_resolve_flow,
     mock_abstract_workflow_class,
+    start_request_iterator,
+    mock_context,
+    servicer,
 ):
     mock_resolve_flow.return_value = mock_abstract_workflow_class
     mock_workflow = mock_abstract_workflow_class.return_value
@@ -474,16 +525,8 @@ async def test_execute_workflow_when_no_events_ends(
         return_value=OutboxSignal.NO_MORE_OUTBOUND_REQUESTS
     )
 
-    async def mock_request_iterator() -> AsyncIterable[contract_pb2.ClientEvent]:
-        yield contract_pb2.ClientEvent(
-            startRequest=contract_pb2.StartWorkflowRequest(goal="test")
-        )
-
-    current_user.set(CloudConnectorUser(authenticated=True, is_debug=True))
-    mock_context = MagicMock(spec=grpc.ServicerContext)
-    servicer = DuoWorkflowService()
     result = servicer.ExecuteWorkflow(
-        mock_request_iterator(),
+        start_request_iterator,
         mock_context,
         internal_event_client=create_mock_internal_event_client(),
     )
@@ -498,6 +541,9 @@ async def test_execute_workflow_when_no_events_ends(
 async def test_execute_workflow_when_message_too_large_cancels_workflow(
     mock_resolve_flow,
     mock_abstract_workflow_class,
+    start_request_iterator,
+    mock_context,
+    servicer,
 ):
     mock_resolve_flow.return_value = mock_abstract_workflow_class
     mock_workflow = mock_abstract_workflow_class.return_value
@@ -519,16 +565,8 @@ async def test_execute_workflow_when_message_too_large_cancels_workflow(
         ]
     )
 
-    async def mock_request_iterator() -> AsyncIterable[contract_pb2.ClientEvent]:
-        yield contract_pb2.ClientEvent(
-            startRequest=contract_pb2.StartWorkflowRequest(goal="test")
-        )
-
-    current_user.set(CloudConnectorUser(authenticated=True, is_debug=True))
-    mock_context = MagicMock(spec=grpc.ServicerContext)
-    servicer = DuoWorkflowService()
     result = servicer.ExecuteWorkflow(
-        mock_request_iterator(),
+        start_request_iterator,
         mock_context,
         internal_event_client=create_mock_internal_event_client(),
     )
@@ -545,7 +583,11 @@ async def test_execute_workflow_when_message_too_large_cancels_workflow(
 @patch("duo_workflow_service.server.AbstractWorkflow")
 @patch("duo_workflow_service.server.resolve_flow")
 async def test_execute_workflow_when_nothing_in_outbox(
-    mock_resolve_flow, mock_abstract_workflow_class
+    mock_resolve_flow,
+    mock_abstract_workflow_class,
+    start_request_iterator,
+    mock_context,
+    servicer,
 ):
     mock_workflow = mock_abstract_workflow_class.return_value
     mock_workflow.is_done = False
@@ -559,16 +601,8 @@ async def test_execute_workflow_when_nothing_in_outbox(
 
     mock_workflow.get_from_outbox = AsyncMock(side_effect=side_effect)
 
-    async def mock_request_iterator() -> AsyncIterable[contract_pb2.ClientEvent]:
-        yield contract_pb2.ClientEvent(
-            startRequest=contract_pb2.StartWorkflowRequest(goal="test")
-        )
-
-    current_user.set(CloudConnectorUser(authenticated=True, is_debug=True))
-    mock_context = MagicMock(spec=grpc.ServicerContext)
-    servicer = DuoWorkflowService()
     result = servicer.ExecuteWorkflow(
-        mock_request_iterator(),
+        start_request_iterator,
         mock_context,
         internal_event_client=create_mock_internal_event_client(),
     )
@@ -581,7 +615,11 @@ async def test_execute_workflow_when_nothing_in_outbox(
 @patch("duo_workflow_service.server.AbstractWorkflow")
 @patch("duo_workflow_service.server.resolve_flow")
 async def test_workflow_is_cancelled_on_parent_task_cancellation(
-    mock_resolve_flow, mock_abstract_workflow_class
+    mock_resolve_flow,
+    mock_abstract_workflow_class,
+    start_request_iterator,
+    mock_context,
+    servicer,
 ):
     """Test that workflow task is properly cancelled when parent task is cancelled."""
     mock_workflow = mock_abstract_workflow_class.return_value
@@ -595,14 +633,6 @@ async def test_workflow_is_cancelled_on_parent_task_cancellation(
         side_effect=asyncio.CancelledError("Task cancelled")
     )
 
-    async def mock_request_iterator() -> AsyncIterable[contract_pb2.ClientEvent]:
-        yield contract_pb2.ClientEvent(
-            startRequest=contract_pb2.StartWorkflowRequest(goal="test")
-        )
-
-    current_user.set(CloudConnectorUser(authenticated=True, is_debug=True))
-    mock_context = MagicMock(spec=grpc.ServicerContext)
-
     real_workflow_task: asyncio.Task = None
     original_create_task = asyncio.create_task
 
@@ -615,9 +645,8 @@ async def test_workflow_is_cancelled_on_parent_task_cancellation(
         return real_workflow_task
 
     with patch("asyncio.create_task", side_effect=mock_create_task):
-        servicer = DuoWorkflowService()
         result = servicer.ExecuteWorkflow(
-            mock_request_iterator(),
+            start_request_iterator,
             mock_context,
             internal_event_client=create_mock_internal_event_client(),
         )
@@ -712,6 +741,9 @@ async def test_execute_workflow_status_codes(
     stop_reason,
     expected_status,
     expected_detail_prefix,
+    start_request_iterator,
+    mock_context,
+    servicer,
 ):
     """Test that ExecuteWorkflow sets correct status codes for different workflow states."""
     mock_workflow = mock_abstract_workflow_class.return_value
@@ -730,16 +762,8 @@ async def test_execute_workflow_status_codes(
     mock_monitoring_context.workflow_stop_reason = stop_reason
     mock_current_monitoring_context.get.return_value = mock_monitoring_context
 
-    async def mock_request_iterator() -> AsyncIterable[contract_pb2.ClientEvent]:
-        yield contract_pb2.ClientEvent(
-            startRequest=contract_pb2.StartWorkflowRequest(goal="test")
-        )
-
-    current_user.set(CloudConnectorUser(authenticated=True, is_debug=True))
-    mock_context = MagicMock(spec=grpc.ServicerContext)
-    servicer = DuoWorkflowService()
     result = servicer.ExecuteWorkflow(
-        mock_request_iterator(),
+        start_request_iterator,
         mock_context,
         internal_event_client=create_mock_internal_event_client(),
     )
@@ -788,6 +812,9 @@ async def test_execute_workflow_cancellation_handling(
     expected_status,
     expected_detail_prefix,
     expected_log_count,
+    start_request_iterator,
+    mock_context,
+    servicer,
 ):
     """Test that ExecuteWorkflow handles different CancelledError scenarios correctly.
 
@@ -806,16 +833,8 @@ async def test_execute_workflow_cancellation_handling(
     )
     mock_resolve_flow.return_value = mock_abstract_workflow_class
 
-    async def mock_request_iterator() -> AsyncIterable[contract_pb2.ClientEvent]:
-        yield contract_pb2.ClientEvent(
-            startRequest=contract_pb2.StartWorkflowRequest(goal="test")
-        )
-
-    current_user.set(CloudConnectorUser(authenticated=True, is_debug=True))
-    mock_context = MagicMock(spec=grpc.ServicerContext)
-    servicer = DuoWorkflowService()
     result = servicer.ExecuteWorkflow(
-        mock_request_iterator(),
+        start_request_iterator,
         mock_context,
         internal_event_client=create_mock_internal_event_client(),
     )
@@ -854,6 +873,9 @@ async def test_execute_workflow(
     mock_abstract_workflow_class,
     unidirectional_streaming_enabled,
     request_iterator_count,
+    start_workflow_client_event,
+    mock_context,
+    servicer,
 ):
     mock_workflow_instance = mock_abstract_workflow_class.return_value
     mock_workflow_instance.is_done = False
@@ -888,12 +910,7 @@ async def test_execute_workflow(
     mock_resolve_flow.return_value = mock_abstract_workflow_class
 
     async def mock_request_iterator() -> AsyncIterable[contract_pb2.ClientEvent]:
-        yield contract_pb2.ClientEvent(
-            startRequest=contract_pb2.StartWorkflowRequest(
-                goal="test",
-                clientCapabilities=["capability_a", "capability_b"],
-            )
-        )
+        yield start_workflow_client_event
 
         for _ in range(request_iterator_count):
             yield contract_pb2.ClientEvent(
@@ -904,12 +921,9 @@ async def test_execute_workflow(
                 )
             )
 
-    current_user.set(CloudConnectorUser(authenticated=True, is_debug=True))
-    mock_context = MagicMock(spec=grpc.ServicerContext)
     mock_context.invocation_metadata.return_value = [
         ("x-gitlab-unidirectional-streaming", unidirectional_streaming_enabled),
     ]
-    servicer = DuoWorkflowService()
     result = servicer.ExecuteWorkflow(
         mock_request_iterator(),
         mock_context,
@@ -933,32 +947,24 @@ async def test_execute_workflow(
 
 
 @pytest.mark.asyncio
+@pytest.mark.parametrize(
+    "scopes",
+    [["duo_agent_platform", "duo_chat", "include_file_context", "unknown_scope"]],
+)
 @patch("duo_workflow_service.server.TokenAuthority")
 @patch("contract.contract_pb2.GenerateTokenResponse")
 @patch.dict(os.environ, {"CLOUD_CONNECTOR_SERVICE_NAME": "gitlab-duo-workflow-service"})
-async def test_generate_token(mock_generate_token_response, mock_token_authority):
+async def test_generate_token(
+    mock_generate_token_response,
+    mock_token_authority,
+    mock_context,
+    servicer,
+):
     one_hour_later = datetime.now(tz=timezone.utc) + timedelta(hours=1)
     mock_token_authority.return_value.encode = MagicMock(
         return_value=("token", one_hour_later)
     )
-    mock_context = MagicMock(spec=grpc.ServicerContext)
 
-    user = CloudConnectorUser(
-        authenticated=True,
-        is_debug=False,
-        claims=UserClaims(
-            issuer="gitlab.com",
-            scopes=[
-                "duo_agent_platform",
-                "duo_chat",
-                "include_file_context",
-                "unknown_scope",
-            ],
-        ),
-    )
-    current_user.set(user)
-
-    servicer = DuoWorkflowService()
     await servicer.GenerateToken(contract_pb2.GenerateTokenRequest(), mock_context)
 
     args = mock_token_authority.return_value.encode.call_args.args
@@ -976,33 +982,29 @@ async def test_generate_token(mock_generate_token_response, mock_token_authority
 
 
 @pytest.mark.asyncio
+@pytest.mark.parametrize(
+    "claims_extra",
+    [
+        {
+            SKIP_USAGE_CUTOFF_CLAIM: True,
+            "non_propagated_claim": "should_be_excluded",
+        }
+    ],
+)
 @patch("duo_workflow_service.server.TokenAuthority")
 @patch("contract.contract_pb2.GenerateTokenResponse")
 @patch.dict(os.environ, {"CLOUD_CONNECTOR_SERVICE_NAME": "gitlab-duo-workflow-service"})
 async def test_generate_token_propagates_skip_usage_cutoff(
-    _mock_generate_token_response, mock_token_authority
+    _mock_generate_token_response,
+    mock_token_authority,
+    mock_context,
+    servicer,
 ):
     one_hour_later = datetime.now(tz=timezone.utc) + timedelta(hours=1)
     mock_token_authority.return_value.encode = MagicMock(
         return_value=("token", one_hour_later)
     )
-    mock_context = MagicMock(spec=grpc.ServicerContext)
 
-    user = CloudConnectorUser(
-        authenticated=True,
-        is_debug=False,
-        claims=UserClaims(
-            issuer="gitlab.com",
-            scopes=["duo_agent_platform"],
-            extra={
-                SKIP_USAGE_CUTOFF_CLAIM: True,
-                "non_propagated_claim": "should_be_excluded",
-            },
-        ),
-    )
-    current_user.set(user)
-
-    servicer = DuoWorkflowService()
     await servicer.GenerateToken(contract_pb2.GenerateTokenRequest(), mock_context)
 
     kwargs = mock_token_authority.return_value.encode.call_args.kwargs
@@ -1015,25 +1017,16 @@ async def test_generate_token_propagates_skip_usage_cutoff(
 @patch("contract.contract_pb2.GenerateTokenResponse")
 @patch.dict(os.environ, {"CLOUD_CONNECTOR_SERVICE_NAME": "gitlab-duo-workflow-service"})
 async def test_generate_token_without_skip_usage_cutoff(
-    _mock_generate_token_response, mock_token_authority
+    _mock_generate_token_response,
+    mock_token_authority,
+    mock_context,
+    servicer,
 ):
     one_hour_later = datetime.now(tz=timezone.utc) + timedelta(hours=1)
     mock_token_authority.return_value.encode = MagicMock(
         return_value=("token", one_hour_later)
     )
-    mock_context = MagicMock(spec=grpc.ServicerContext)
 
-    user = CloudConnectorUser(
-        authenticated=True,
-        is_debug=False,
-        claims=UserClaims(
-            issuer="gitlab.com",
-            scopes=["duo_agent_platform"],
-        ),
-    )
-    current_user.set(user)
-
-    servicer = DuoWorkflowService()
     await servicer.GenerateToken(contract_pb2.GenerateTokenRequest(), mock_context)
 
     kwargs = mock_token_authority.return_value.encode.call_args.kwargs
@@ -1041,34 +1034,31 @@ async def test_generate_token_without_skip_usage_cutoff(
 
 
 @pytest.mark.asyncio
+@pytest.mark.parametrize(
+    "scopes",
+    [
+        [
+            "duo_workflow_execute_workflow",
+            "duo_chat",
+            "include_file_context",
+            "unknown_scope",
+        ]
+    ],
+)
 @patch("duo_workflow_service.server.TokenAuthority")
 @patch("contract.contract_pb2.GenerateTokenResponse")
 @patch.dict(os.environ, {"CLOUD_CONNECTOR_SERVICE_NAME": "gitlab-duo-workflow-service"})
 async def test_generate_token_with_legacy_duo_workflow_execute_workflow_up(
-    mock_generate_token_response, mock_token_authority
+    mock_generate_token_response,
+    mock_token_authority,
+    mock_context,
+    servicer,
 ):
     one_hour_later = datetime.now(tz=timezone.utc) + timedelta(hours=1)
     mock_token_authority.return_value.encode = MagicMock(
         return_value=("token", one_hour_later)
     )
-    mock_context = MagicMock(spec=grpc.ServicerContext)
 
-    user = CloudConnectorUser(
-        authenticated=True,
-        is_debug=False,
-        claims=UserClaims(
-            issuer="gitlab.com",
-            scopes=[
-                "duo_workflow_execute_workflow",
-                "duo_chat",
-                "include_file_context",
-                "unknown_scope",
-            ],
-        ),
-    )
-    current_user.set(user)
-
-    servicer = DuoWorkflowService()
     await servicer.GenerateToken(contract_pb2.GenerateTokenRequest(), mock_context)
 
     args = mock_token_authority.return_value.encode.call_args.args
@@ -1088,26 +1078,16 @@ async def test_generate_token_with_legacy_duo_workflow_execute_workflow_up(
 @pytest.mark.asyncio
 @patch("duo_workflow_service.server.TokenAuthority")
 @patch.dict(os.environ, {"CLOUD_CONNECTOR_SERVICE_NAME": "gitlab-duo-workflow-service"})
-async def test_generate_token_returns_server_capabilities(mock_token_authority):
+async def test_generate_token_returns_server_capabilities(
+    mock_token_authority, mock_context, servicer
+):
     """Test that GenerateToken returns server capabilities in the response."""
     one_hour_later = datetime.now(tz=timezone.utc) + timedelta(hours=1)
     expires_at_timestamp = int(one_hour_later.timestamp())
     mock_token_authority.return_value.encode = MagicMock(
         return_value=("token", expires_at_timestamp)
     )
-    mock_context = MagicMock(spec=grpc.ServicerContext)
 
-    user = CloudConnectorUser(
-        authenticated=True,
-        is_debug=False,
-        claims=UserClaims(
-            issuer="gitlab.com",
-            scopes=["duo_agent_platform"],
-        ),
-    )
-    current_user.set(user)
-
-    servicer = DuoWorkflowService()
     response = await servicer.GenerateToken(
         contract_pb2.GenerateTokenRequest(), mock_context
     )
@@ -1122,21 +1102,10 @@ async def test_generate_token_returns_server_capabilities(mock_token_authority):
 
 
 @pytest.mark.asyncio
+@pytest.mark.parametrize("issuer", ["gitlab-duo-workflow-service"])
 @patch.dict(os.environ, {"CLOUD_CONNECTOR_SERVICE_NAME": "gitlab-duo-workflow-service"})
-async def test_generate_token_with_self_signed_token_issuer():
-    user = CloudConnectorUser(
-        authenticated=True,
-        is_debug=False,
-        claims=UserClaims(
-            issuer=CloudConnectorConfig().service_name,
-            scopes=["duo_agent_platform"],
-        ),
-    )
-    current_user.set(user)
-    mock_context = MagicMock(spec=grpc.ServicerContext)
-    mock_context.abort.side_effect = grpc.RpcError("Aborted")
+async def test_generate_token_with_self_signed_token_issuer(mock_context, servicer):
 
-    servicer = DuoWorkflowService()
     with pytest.raises(grpc.RpcError):
         await servicer.GenerateToken(contract_pb2.GenerateTokenRequest(), mock_context)
 
@@ -1147,31 +1116,19 @@ async def test_generate_token_with_self_signed_token_issuer():
 
 @pytest.mark.asyncio
 @patch.dict(os.environ, {"CLOUD_CONNECTOR_SERVICE_NAME": "gitlab-duo-workflow-service"})
-async def test_generate_token_unauthorized_for_chat_workflow():
-    user = CloudConnectorUser(
-        authenticated=True,
-        is_debug=False,
-        claims=UserClaims(
-            issuer="gitlab.com",
-            scopes=["duo_agent_platform"],  # Missing duo_chat scope
-        ),
-    )
-
+async def test_generate_token_unauthorized_for_chat_workflow(
+    auth_user, mock_context, servicer
+):
     # Mock the can method to return False for chat primitive
-    user.can = MagicMock(return_value=False)
-    current_user.set(user)
+    auth_user.can = MagicMock(return_value=False)
 
-    mock_context = MagicMock(spec=grpc.ServicerContext)
-    mock_context.abort.side_effect = grpc.RpcError("Aborted")
-
-    servicer = DuoWorkflowService()
     request = contract_pb2.GenerateTokenRequest(workflowDefinition="chat")
 
     with pytest.raises(grpc.RpcError):
         await servicer.GenerateToken(request, mock_context)
 
     # Verify user.can was called with DUO_CHAT primitive
-    user.can.assert_called_once_with(
+    auth_user.can.assert_called_once_with(
         unit_primitive=GitLabUnitPrimitive.DUO_CHAT,
         disallowed_issuers=[CloudConnectorConfig().service_name],
     )
@@ -1182,31 +1139,20 @@ async def test_generate_token_unauthorized_for_chat_workflow():
 
 
 @pytest.mark.asyncio
+@pytest.mark.parametrize("scopes", [["duo_chat"]])
 @patch.dict(os.environ, {"CLOUD_CONNECTOR_SERVICE_NAME": "gitlab-duo-workflow-service"})
-async def test_generate_token_unauthorized_for_any_flow():
-    user = CloudConnectorUser(
-        authenticated=True,
-        is_debug=False,
-        claims=UserClaims(
-            issuer="gitlab.com",
-            scopes=["duo_chat"],  # Missing duo_agent_platform scope
-        ),
-    )
-
+async def test_generate_token_unauthorized_for_any_flow(
+    auth_user, mock_context, servicer
+):
     # Mock the can method to return False for chat primitive
-    user.can = MagicMock(return_value=False)
-    current_user.set(user)
+    auth_user.can = MagicMock(return_value=False)
 
-    mock_context = MagicMock(spec=grpc.ServicerContext)
-    mock_context.abort.side_effect = grpc.RpcError("Aborted")
-
-    servicer = DuoWorkflowService()
     request = contract_pb2.GenerateTokenRequest(workflowDefinition="agent")
 
     with pytest.raises(grpc.RpcError):
         await servicer.GenerateToken(request, mock_context)
 
-    user.can.assert_has_calls(
+    auth_user.can.assert_has_calls(
         [
             call(
                 unit_primitive=GitLabUnitPrimitive.DUO_AGENT_PLATFORM,
@@ -1402,7 +1348,12 @@ async def test_signal_handler_sets_not_serving_on_shutdown(signal_type):
 @patch("duo_workflow_service.server.AbstractWorkflow")
 @patch("duo_workflow_service.server.resolve_flow")
 async def test_execute_workflow_missing_workflow_metadata(
-    mock_resolve_flow, mock_abstract_workflow_class
+    mock_resolve_flow,
+    mock_abstract_workflow_class,
+    auth_user,
+    start_request_iterator,
+    mock_context,
+    servicer,
 ):
     mock_workflow = mock_abstract_workflow_class.return_value
     mock_workflow.is_done = True
@@ -1415,17 +1366,8 @@ async def test_execute_workflow_missing_workflow_metadata(
     )
     mock_resolve_flow.return_value = mock_abstract_workflow_class
 
-    async def mock_request_iterator() -> AsyncIterable[contract_pb2.ClientEvent]:
-        yield contract_pb2.ClientEvent(
-            startRequest=contract_pb2.StartWorkflowRequest(workflowID="123")
-        )
-
-    user = CloudConnectorUser(authenticated=True, is_debug=True)
-    current_user.set(user)
-    mock_context = MagicMock(spec=grpc.ServicerContext)
-    servicer = DuoWorkflowService()
     result = servicer.ExecuteWorkflow(
-        mock_request_iterator(),
+        start_request_iterator,
         mock_context,
         internal_event_client=create_mock_internal_event_client(),
     )
@@ -1438,7 +1380,7 @@ async def test_execute_workflow_missing_workflow_metadata(
         workflow_type=GLReportingEventContext.from_workflow_definition(
             "software_development"
         ),  # backward compatibility when workflow_definition is empty
-        user=user,
+        user=auth_user,
         additional_context=None,
         mcp_tools=[],
         approval=contract_pb2.Approval(),
@@ -1456,7 +1398,7 @@ async def test_execute_workflow_missing_workflow_metadata(
 @patch("duo_workflow_service.server.AbstractWorkflow")
 @patch("duo_workflow_service.server.resolve_flow")
 async def test_execute_workflow_valid_workflow_metadata(
-    mock_resolve_flow, mock_abstract_workflow_class
+    mock_resolve_flow, mock_abstract_workflow_class, auth_user, mock_context, servicer
 ):
     mock_workflow = mock_abstract_workflow_class.return_value
     mock_workflow.is_done = True
@@ -1492,10 +1434,6 @@ async def test_execute_workflow_valid_workflow_metadata(
             )
         )
 
-    user = CloudConnectorUser(authenticated=True, is_debug=True)
-    current_user.set(user)
-    mock_context = MagicMock(spec=grpc.ServicerContext)
-    servicer = DuoWorkflowService()
     result = servicer.ExecuteWorkflow(
         mock_request_iterator(),
         mock_context,
@@ -1511,7 +1449,7 @@ async def test_execute_workflow_valid_workflow_metadata(
         workflow_type=GLReportingEventContext.from_workflow_definition(
             "software_development"
         ),  # backward compatibility when workflow_definition is empty,
-        user=user,
+        user=auth_user,
         additional_context=[
             AdditionalContext(
                 category="merge_request",
@@ -1618,18 +1556,15 @@ async def test_next_client_event_client_streaming_closed():
     ],
 )
 async def test_self_hosted_execute_workflow(
-    billing_event_service, request_ids, expected_action_ids
+    billing_event_service,
+    request_ids,
+    expected_action_ids,
+    auth_user,
+    mock_context,
+    servicer,
 ):
     """Test that TrackSelfHostedExecuteWorkflow echoes back client events with matching requestID."""
-    user = CloudConnectorUser(
-        authenticated=True,
-        claims=UserClaims(
-            issuer="gitlab.com",
-            scopes=["duo_agent_platform"],
-        ),
-    )
-    user.can = MagicMock(return_value=True)
-    current_user.set(user)
+    auth_user.can = MagicMock(return_value=True)
 
     async def mock_request_iterator() -> (
         AsyncIterable[contract_pb2.TrackSelfHostedClientEvent]
@@ -1641,9 +1576,6 @@ async def test_self_hosted_execute_workflow(
                 featureQualifiedName="test_feature",
                 featureAiCatalogItem=True,
             )
-
-    mock_context = MagicMock(spec=grpc.ServicerContext)
-    servicer = DuoWorkflowService()
 
     result = servicer.TrackSelfHostedExecuteWorkflow(
         mock_request_iterator(),
@@ -1662,20 +1594,13 @@ async def test_self_hosted_execute_workflow(
 
 
 @pytest.mark.asyncio
+@pytest.mark.parametrize("scopes", [["duo_chat"]])
 @patch.dict(os.environ, {"CLOUD_CONNECTOR_SERVICE_NAME": "gitlab-duo-workflow-service"})
-async def test_track_self_hosted_execute_workflow_unauthorized(billing_event_service):
-    user = CloudConnectorUser(
-        authenticated=True,
-        is_debug=False,
-        claims=UserClaims(
-            issuer="gitlab.com",
-            scopes=["duo_chat"],
-        ),
-    )
-    user.can = MagicMock(return_value=False)
-    current_user.set(user)
+async def test_track_self_hosted_execute_workflow_unauthorized(
+    billing_event_service, auth_user, mock_context, servicer
+):
+    auth_user.can = MagicMock(return_value=False)
 
-    mock_context = MagicMock(spec=grpc.ServicerContext)
     mock_context.abort = AsyncMock(side_effect=grpc.RpcError("Aborted"))
 
     async def mock_request_iterator() -> (
@@ -1688,7 +1613,6 @@ async def test_track_self_hosted_execute_workflow_unauthorized(billing_event_ser
             featureAiCatalogItem=True,
         )
 
-    servicer = DuoWorkflowService()
     result_generator = servicer.TrackSelfHostedExecuteWorkflow(
         mock_request_iterator(),
         mock_context,
@@ -1698,7 +1622,7 @@ async def test_track_self_hosted_execute_workflow_unauthorized(billing_event_ser
     with pytest.raises(grpc.RpcError):
         _ = [action async for action in result_generator]
 
-    user.can.assert_called_once_with(
+    auth_user.can.assert_called_once_with(
         unit_primitive=GitLabUnitPrimitive.DUO_AGENT_PLATFORM,
         disallowed_issuers=[CloudConnectorConfig().service_name],
     )
@@ -1712,19 +1636,14 @@ async def test_track_self_hosted_execute_workflow_unauthorized(billing_event_ser
 @pytest.mark.asyncio
 @patch("duo_workflow_service.server.ContainerApplication")
 async def test_track_self_hosted_execute_workflow_billing_event(
-    _mock_container, billing_event_service, billing_event_client
+    _mock_container,
+    billing_event_service,
+    billing_event_client,
+    auth_user,
+    mock_context,
+    servicer,
 ):
-    user = CloudConnectorUser(
-        authenticated=True,
-        claims=UserClaims(
-            issuer="gitlab.com",
-            scopes=["duo_agent_platform"],
-        ),
-    )
-    user.can = MagicMock(return_value=True)
-    current_user.set(user)
-
-    mock_context = MagicMock(spec=grpc.ServicerContext)
+    auth_user.can = MagicMock(return_value=True)
 
     async def mock_request_iterator() -> (
         AsyncIterable[contract_pb2.TrackSelfHostedClientEvent]
@@ -1736,7 +1655,6 @@ async def test_track_self_hosted_execute_workflow_billing_event(
             featureAiCatalogItem=True,
         )
 
-    servicer = DuoWorkflowService()
     result = servicer.TrackSelfHostedExecuteWorkflow(
         mock_request_iterator(),
         mock_context,
@@ -1748,7 +1666,7 @@ async def test_track_self_hosted_execute_workflow_billing_event(
     assert actions[0].requestID == "test-req-id"
 
     billing_event_client.track_billing_event.assert_called_once_with(
-        user,
+        auth_user,
         BillingEvent.DAP_FLOW_ON_COMPLETION,
         "DuoWorkflowService",
         unit_of_measure="request",
@@ -1797,6 +1715,8 @@ async def test_execute_workflow_with_flow_config_schema_version_parameterized(
     flow_config_schema_version,
     ignore_schema_version,
     expected_version,
+    mock_context,
+    servicer,
 ):
     # Setup mocks
     mock_language_server_version.get.return_value.ignore_broken_flow_schema_version.return_value = (
@@ -1826,12 +1746,7 @@ async def test_execute_workflow_with_flow_config_schema_version_parameterized(
         )
 
     # Setup user and context
-    user = CloudConnectorUser(authenticated=True, is_debug=True)
-    current_user.set(user)
-    mock_context = MagicMock(spec=grpc.ServicerContext)
-    mock_context.invocation_metadata.return_value = []
 
-    servicer = DuoWorkflowService()
     result = servicer.ExecuteWorkflow(
         mock_request_iterator(),
         mock_context,
@@ -1857,7 +1772,12 @@ async def test_execute_workflow_with_flow_config_schema_version_parameterized(
 @patch("duo_workflow_service.server.AbstractWorkflow")
 @patch("duo_workflow_service.server.resolve_flow")
 async def test_execute_workflow_tracks_receive_start_request_internal_event(
-    mock_resolve_flow, mock_abstract_workflow_class, mock_duo_workflow_metrics
+    mock_resolve_flow,
+    mock_abstract_workflow_class,
+    mock_duo_workflow_metrics,
+    start_request_iterator,
+    mock_context,
+    servicer,
 ):
     """Test that both the receive_start_request internal event and Prometheus metric are tracked when ExecuteWorkflow is
     called."""
@@ -1871,27 +1791,12 @@ async def test_execute_workflow_tracks_receive_start_request_internal_event(
     )
     mock_resolve_flow.return_value = mock_abstract_workflow_class
 
-    async def mock_request_iterator() -> AsyncIterable[contract_pb2.ClientEvent]:
-        yield contract_pb2.ClientEvent(
-            startRequest=contract_pb2.StartWorkflowRequest(
-                workflowID="test-workflow-123",
-                workflowDefinition="software_development",
-            )
-        )
-
     # Setup user and context
-    user = CloudConnectorUser(authenticated=True, is_debug=True)
-    current_user.set(user)
-    mock_context = MagicMock(spec=grpc.ServicerContext)
-    mock_context.invocation_metadata.return_value = []
-
-    # Setup servicer
-    servicer = DuoWorkflowService()
 
     # Execute the test with mocked internal_event_client parameter
     mock_internal_event_client = create_mock_internal_event_client()
     result = servicer.ExecuteWorkflow(
-        mock_request_iterator(),
+        start_request_iterator,
         mock_context,
         internal_event_client=mock_internal_event_client,
     )
@@ -1911,14 +1816,14 @@ async def test_execute_workflow_tracks_receive_start_request_internal_event(
         additional_properties=InternalEventAdditionalProperties(
             label=EventLabelEnum.WORKFLOW_RECEIVE_START_REQUEST_LABEL.value,
             property=EventPropertyEnum.WORKFLOW_ID.value,
-            value="test-workflow-123",
+            value="123",
         ),
         category=CategoryEnum.WORKFLOW_SOFTWARE_DEVELOPMENT.value,
     )
 
 
 @pytest.mark.asyncio
-async def test_send_events_sends_all_checkpoints_if_number_increases():
+async def test_send_events_sends_all_checkpoints_if_number_increases(servicer):
     yielded = []
 
     events = [
@@ -1947,7 +1852,6 @@ async def test_send_events_sends_all_checkpoints_if_number_increases():
         side_effect=[checkpoint1, checkpoint2]
     )
     mock_workflow.checkpoint_notifier = mock_notifier
-    servicer = DuoWorkflowService()
     async for action in servicer.send_events(mock_workflow, mock_workflow_task):
         yielded.append(action)
 
@@ -1957,7 +1861,7 @@ async def test_send_events_sends_all_checkpoints_if_number_increases():
 
 
 @pytest.mark.asyncio
-async def test_send_events_sends_skips_checkpoint_if_already_sent():
+async def test_send_events_sends_skips_checkpoint_if_already_sent(servicer):
     yielded = []
 
     # Add 2 newCheckpoint but we only expect to yield them once
@@ -1985,7 +1889,6 @@ async def test_send_events_sends_skips_checkpoint_if_already_sent():
     checkpoint1 = contract_pb2.NewCheckpoint(checkpoint='{"checkpoint":1}')
     mock_notifier.most_recent_new_checkpoint = MagicMock(side_effect=[checkpoint1])
     mock_workflow.checkpoint_notifier = mock_notifier
-    servicer = DuoWorkflowService()
     async for action in servicer.send_events(mock_workflow, mock_workflow_task):
         yielded.append(action)
 
@@ -1994,6 +1897,7 @@ async def test_send_events_sends_skips_checkpoint_if_already_sent():
 
 
 @pytest.mark.asyncio
+@pytest.mark.parametrize("scopes", [["duo_agent_platform", "duo_chat"]])
 @pytest.mark.parametrize(
     "workflow_definition, expected_mapped_definition",
     [
@@ -2016,8 +1920,10 @@ async def test_workflow_definition_mapping(
     mock_gl_event_context_cls,
     mock_resolve_flow,
     mock_abstract_workflow_class,
-    workflow_definition,
     expected_mapped_definition,
+    start_request_iterator,
+    mock_context,
+    servicer,
 ):
     """Integration test: verify experimental→v1 mapping is applied before billing/metrics."""
     # Setup mocks
@@ -2033,26 +1939,12 @@ async def test_workflow_definition_mapping(
         value="test"
     )
 
-    async def mock_request_iterator() -> AsyncIterable[contract_pb2.ClientEvent]:
-        yield contract_pb2.ClientEvent(
-            startRequest=contract_pb2.StartWorkflowRequest(
-                workflowID="test-workflow-123",
-                workflowDefinition=workflow_definition,
-            )
-        )
-
     # Setup user and context
-    user = CloudConnectorUser(authenticated=True, is_debug=True)
-    current_user.set(user)
-    mock_context = MagicMock(spec=grpc.ServicerContext)
-    mock_context.invocation_metadata.return_value = []
 
-    # Setup servicer
-    servicer = DuoWorkflowService()
     mock_internal_event_client = create_mock_internal_event_client()
 
     result = servicer.ExecuteWorkflow(
-        mock_request_iterator(),
+        start_request_iterator,
         mock_context,
         internal_event_client=mock_internal_event_client,
     )
@@ -2073,6 +1965,8 @@ async def test_workflow_definition_mapping(
 async def test_execute_workflow_with_flow_config_id_happy_path(
     mock_resolve_flow,
     mock_abstract_workflow_class,
+    mock_context,
+    servicer,
 ):
     """Server resolves flowConfigId + flowConfigSchemaVersion + flowVersion correctly."""
     mock_resolve_flow.return_value = mock_abstract_workflow_class
@@ -2095,10 +1989,6 @@ async def test_execute_workflow_with_flow_config_id_happy_path(
             )
         )
 
-    current_user.set(CloudConnectorUser(authenticated=True, is_debug=True))
-    mock_context = MagicMock(spec=grpc.ServicerContext)
-    mock_context.invocation_metadata.return_value = []
-    servicer = DuoWorkflowService()
     result = servicer.ExecuteWorkflow(
         mock_request_iterator(),
         mock_context,
@@ -2117,6 +2007,8 @@ async def test_execute_workflow_with_flow_config_id_happy_path(
 @patch("duo_workflow_service.server.resolve_flow")
 async def test_execute_workflow_flow_config_id_and_flow_config_conflict(
     mock_resolve_flow,
+    mock_context,
+    servicer,
 ):
     """Server returns INVALID_ARGUMENT when both flowConfigId and flowConfig are set."""
     flow_config = struct_pb2.Struct()
@@ -2134,10 +2026,6 @@ async def test_execute_workflow_flow_config_id_and_flow_config_conflict(
             )
         )
 
-    current_user.set(CloudConnectorUser(authenticated=True, is_debug=True))
-    mock_context = MagicMock(spec=grpc.ServicerContext)
-    mock_context.abort.side_effect = grpc.RpcError("Aborted")
-    servicer = DuoWorkflowService()
     result = servicer.ExecuteWorkflow(
         mock_request_iterator(),
         mock_context,
@@ -2158,26 +2046,15 @@ async def test_execute_workflow_flow_config_id_and_flow_config_conflict(
 @patch("duo_workflow_service.server.resolve_flow")
 async def test_execute_workflow_value_error_from_resolve_returns_invalid_argument(
     mock_resolve_flow,
+    start_request_iterator,
+    mock_context,
+    servicer,
 ):
     """ValueError from resolve_flow surfaces as INVALID_ARGUMENT, not INTERNAL."""
     mock_resolve_flow.side_effect = ValueError("Unknown flow: bad/v1")
 
-    async def mock_request_iterator() -> AsyncIterable[contract_pb2.ClientEvent]:
-        yield contract_pb2.ClientEvent(
-            startRequest=contract_pb2.StartWorkflowRequest(
-                workflowID="test-id",
-                workflowDefinition="software_development",
-                goal="test",
-            )
-        )
-
-    current_user.set(CloudConnectorUser(authenticated=True, is_debug=True))
-    mock_context = MagicMock(spec=grpc.ServicerContext)
-    mock_context.abort.side_effect = grpc.RpcError("Aborted")
-    mock_context.invocation_metadata.return_value = []
-    servicer = DuoWorkflowService()
     result = servicer.ExecuteWorkflow(
-        mock_request_iterator(),
+        start_request_iterator,
         mock_context,
         internal_event_client=create_mock_internal_event_client(),
     )

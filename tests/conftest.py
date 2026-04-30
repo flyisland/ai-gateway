@@ -761,17 +761,37 @@ def scopes_fixture():
     return []
 
 
+@pytest.fixture(name="issuer")
+def issuer_fixture() -> str:
+    return ""
+
+
+@pytest.fixture(name="claims_extra")
+def claims_extra_fixture() -> dict[str, Any] | None:
+    return None
+
+
 @pytest.fixture(name="user_is_debug")
 def user_is_debug_fixture():
     return False
 
 
 @pytest.fixture(name="auth_user")
-def auth_user_fixture(user_is_debug: bool, scopes: list[str]):
+def auth_user_fixture(
+    user_is_debug: bool,
+    scopes: list[str],
+    issuer: str,
+    claims_extra: dict[str, Any] | None,
+):
     return CloudConnectorUser(
         authenticated=True,
         is_debug=user_is_debug,
-        claims=UserClaims(scopes=scopes, gitlab_instance_uid="unique-instance-uid"),
+        claims=UserClaims(
+            scopes=scopes,
+            gitlab_instance_uid="unique-instance-uid",
+            issuer=issuer,
+            extra=claims_extra,
+        ),
     )
 
 
