@@ -1,9 +1,10 @@
 from datetime import datetime, timezone
 from typing import Any
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import AsyncMock, MagicMock, Mock, patch
 
 import pytest
 from gitlab_cloud_connector import CloudConnectorUser, UserClaims
+from langchain.messages import AIMessage
 
 from duo_workflow_service.components.tools_registry import ToolMetadata, ToolsRegistry
 from duo_workflow_service.entities.event import WorkflowEvent
@@ -266,3 +267,22 @@ def mock_get_event_fixture(event: WorkflowEvent | None):
         "duo_workflow_service.agents.agent.get_event", return_value=event
     ) as mock:
         yield mock
+
+
+@pytest.fixture(name="mock_ai_message")
+def mock_ai_message_fixture():
+    """Fixture for mock AI message."""
+    mock_message = Mock(spec=AIMessage)
+    mock_message.content = "Test response from agent"
+    mock_message.usage_metadata = {
+        "input_tokens": 100,
+        "output_tokens": 50,
+        "total_tokens": 150,
+    }
+    mock_message.response_metadata = {
+        "finish_reason": "stop"
+    }  # OpenAI format used by LiteLLM
+    mock_message.tool_calls = []
+    mock_message.invalid_tool_calls = []
+    mock_message.additional_kwargs = {}
+    return mock_message

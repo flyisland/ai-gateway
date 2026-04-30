@@ -479,38 +479,6 @@ def mock_litellm_acompletion_streamed_fixture():
         yield mock_acompletion
 
 
-@pytest.fixture(name="mock_litellm_completion")
-def mock_litellm_completion_fixture():
-    with patch("litellm.completion") as mock_completion:
-        mock_completion.return_value = Mock(
-            choices=[
-                Mock(
-                    message=Mock(content="test completion"),
-                    text="test completion",
-                    logprobs=Mock(token_logprobs=[999]),
-                ),
-            ],
-            usage=Mock(completion_tokens=999),
-        )
-        yield mock_completion
-
-
-@pytest.fixture(name="mock_litellm_acompletion_for_vertex")
-def mock_litellm_acompletion_for_vertex_fixture():
-    with patch("litellm.acompletion") as mock_acompletion:
-        mock_acompletion.return_value = AsyncMock(
-            choices=[
-                AsyncMock(
-                    message=AsyncMock(content="test completion"),
-                    text="test completion",
-                    logprobs=AsyncMock(token_logprobs=[999]),
-                ),
-            ],
-            usage=AsyncMock(completion_tokens=999),
-        )
-        yield mock_acompletion
-
-
 @pytest.fixture(name="mock_litellm_aembedding_response")
 def mock_litellm_aembedding_response_fixture():
     return AsyncMock(
