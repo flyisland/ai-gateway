@@ -1288,6 +1288,91 @@ async def test_run_command_output(workflow_state, tools_executor, mock_client_ev
     "all_tools",
     [
         {
+            "run_command": RunCommand(
+                metadata={
+                    "outbox": MagicMock(spec=Outbox),
+                }
+            )
+        }
+    ],
+)
+@pytest.mark.parametrize(
+    "lsp_error, lsp_response, expected_status",
+    [
+        (
+            "Command timed out after 10s\nPartial output:\nsome partial output",
+            "",
+            ToolStatus.TIMED_OUT,
+        ),
+        (
+            "Command was interrupted by the user\nPartial output:\nsome partial output",
+            "",
+            ToolStatus.CANCELLED,
+        ),
+        (
+            "",
+            "/home output",
+            ToolStatus.SUCCESS,
+        ),
+        (
+            "Process exited with code 1\nsome error output",
+            "",
+            ToolStatus.FAILURE,
+        ),
+    ],
+)
+async def test_run_command_output_status_detection(
+    workflow_state,
+    tools_executor,
+    mock_action_response,
+    lsp_error,
+    lsp_response,
+    expected_status,
+):
+    """Test that timed-out and cancelled LSP error responses set the correct ToolStatus."""
+    mock_action_response.plainTextResponse.error = lsp_error
+    mock_action_response.plainTextResponse.response = lsp_response
+    mock_client_event = contract_pb2.ClientEvent()
+    mock_client_event.actionResponse.CopyFrom(mock_action_response)
+
+    outbox_mock = tools_executor._toolset["run_command"].metadata["outbox"]
+    outbox_mock.put_action_and_wait_for_response = AsyncMock(
+        return_value=mock_client_event
+    )
+
+    workflow_state["conversation_history"]["planner"] = [
+        AIMessage(
+            content=[{"type": "text", "text": "testing"}],
+            tool_calls=[
+                {
+                    "id": "run-command-status-test",
+                    "name": "run_command",
+                    "args": {
+                        "program": "sleep",
+                        "args": "30",
+                    },
+                }
+            ],
+            id="ai-msg-run-command-status",
+        )
+    ]
+
+    result = await tools_executor.run(workflow_state)
+
+    update = cast(Command, result[-1]).update
+    assert update and "ui_chat_log" in update
+    ui_chat_logs = update["ui_chat_log"]
+
+    command_log = ui_chat_logs[-1]
+    assert command_log["message_sub_type"] == "command_output"
+    assert command_log["status"] == expected_status
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    "all_tools",
+    [
+        {
             "a": mock_tool(name="a", content="a" * 10000),
             "b": mock_tool(name="b", content="tool b"),
         }

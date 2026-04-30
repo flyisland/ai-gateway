@@ -66,6 +66,8 @@ class ToolStatus(StrEnum):
     PENDING = "pending"
     SUCCESS = "success"
     FAILURE = "failure"
+    TIMED_OUT = "timed_out"
+    CANCELLED = "cancelled"
 
 
 class SlashCommandStatus(StrEnum):
