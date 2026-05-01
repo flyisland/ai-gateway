@@ -446,6 +446,11 @@ class CreateIssueNoteInput(IssueResourceInput):
         "The tool will automatically find the discussion containing this note. "
         "If not provided, creates a standalone comment.",
     )
+    internal: bool = Field(
+        default=False,
+        description="If true, creates an internal note visible only to project members "
+        "with at least the Reporter role.",
+    )
 
 
 class CreateIssueNote(IssueBaseTool):
@@ -472,6 +477,7 @@ The body parameter is always required.
         project_id = kwargs.pop("project_id", None)
         issue_iid = kwargs.pop("issue_iid", None)
         note_id = kwargs.pop("note_id", None)
+        internal = kwargs.pop("internal", False)
 
         project_id, issue_iid, errors = self._validate_issue_url(
             url, project_id, issue_iid
@@ -496,9 +502,13 @@ The body parameter is always required.
         else:
             path = f"{base_path}/notes"
 
+        payload: dict[str, Any] = {"body": body}
+        if internal:
+            payload["internal"] = True
+
         response = await self.gitlab_client.apost(
             path=path,
-            body=json.dumps({"body": body}),
+            body=json.dumps(payload),
         )
 
         response = self._process_http_response(

@@ -1303,6 +1303,55 @@ async def test_create_issue_note_without_note_id(issue_tool_setup, note_data):
     )
 
 
+@pytest.mark.asyncio
+async def test_create_issue_note_internal(issue_tool_setup, note_data):
+    """Test that internal=True is included in the API payload."""
+    gitlab_client_mock, metadata = issue_tool_setup
+    gitlab_client_mock.apost.return_value = note_data
+
+    tool = CreateIssueNote(
+        description="create issue note description", metadata=metadata
+    )
+
+    response = await tool._arun(
+        project_id=1,
+        issue_iid=123,
+        body="Internal note",
+        internal=True,
+    )
+
+    parsed = json.loads(response)
+    assert parsed["status"] == "success"
+
+    gitlab_client_mock.apost.assert_called_once_with(
+        path="/api/v4/projects/1/issues/123/notes",
+        body=json.dumps({"body": "Internal note", "internal": True}),
+    )
+
+
+@pytest.mark.asyncio
+async def test_create_issue_note_not_internal_by_default(issue_tool_setup, note_data):
+    """Test that internal is not included in the API payload when not set."""
+    gitlab_client_mock, metadata = issue_tool_setup
+    gitlab_client_mock.apost.return_value = note_data
+
+    tool = CreateIssueNote(
+        description="create issue note description", metadata=metadata
+    )
+
+    response = await tool._arun(
+        project_id=1,
+        issue_iid=123,
+        body="Public note",
+    )
+
+    parsed = json.loads(response)
+    assert parsed["status"] == "success"
+
+    call_body = json.loads(gitlab_client_mock.apost.call_args.kwargs["body"])
+    assert "internal" not in call_body
+
+
 @pytest.mark.parametrize(
     "input_data,expected_message",
     [
