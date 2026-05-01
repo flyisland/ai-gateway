@@ -49,3 +49,20 @@ class TestChatLiteLLMSSRFProtection:
 
         bound = model.bind(api_key="custom-key")
         assert bound is not None
+
+    def test_bind_allows_fireworks_provider_when_custom_models_disabled(self):
+        """Trusted provider (fireworks_ai) bypasses the SSRF check even when custom models are disabled."""
+        model = ChatLiteLLM(model="gpt-4", custom_models_enabled=False)
+
+        bound = model.bind(
+            custom_llm_provider="fireworks_ai",
+            api_base="https://api.fireworks.ai/inference/v1",
+        )
+        assert bound is not None
+
+    def test_bind_allows_mistral_provider_when_custom_models_disabled(self):
+        """Trusted provider (mistral) bypasses the SSRF check even when custom models are disabled."""
+        model = ChatLiteLLM(model="devstral", custom_models_enabled=False)
+
+        bound = model.bind(custom_llm_provider="mistral", api_key="mistral-key")
+        assert bound is not None

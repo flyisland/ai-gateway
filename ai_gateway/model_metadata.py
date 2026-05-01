@@ -178,61 +178,75 @@ def create_model_metadata_by_size(
     return ModelMetadataBySize(default=default_metadata, by_size=by_size)
 
 
-def create_model_metadata(
-    data: dict[str, Any] | None, mock_model_responses: bool = False
-) -> TypeModelMetadata:
-    if not data or "provider" not in data:
-        raise ValueError("Argument error: provider must be present.")
-
+def _create_fireworks_metadata(
+    data: dict[str, Any], mock_model_responses: bool
+) -> FireworksModelMetadata:
     configs = ModelSelectionConfig.instance()
+    llm_definition = configs.get_model(data["name"]) if data.get("name") else None
 
-    if data["provider"] == "amazon_q":
-        llm_definition = configs.get_model("amazon_q")
-        return AmazonQModelMetadata(
-            llm_definition=llm_definition,
-            family=llm_definition.family,
-            friendly_name=llm_definition.name,
-            **data,
+    if not llm_definition:
+        raise ValueError(f"No LLM definition found for Fireworks model {data['name']}.")
+
+    # Fireworks models using a router have a separate `identifier` distinct from
+    # `model` (e.g. Codestral: model="codestral-2501", identifier=the router path).
+    # Models deployed directly (no router indirection) only have `model`, which IS
+    # the Fireworks deployment path. Fall back to it so every Fireworks model works
+    # without requiring a redundant `identifier` field in models.yml.
+    model_identifier = getattr(llm_definition.params, "identifier", None) or getattr(
+        llm_definition.params, "model", None
+    )
+
+    if not model_identifier and not mock_model_responses:
+        raise ValueError(
+            f"Fireworks model identifier is missing for model {data['name']}."
         )
 
-    if data["provider"] == "fireworks_ai":
-        fireworks_llm_definition = (
-            configs.get_model(data["name"]) if data.get("name") else None
+    provider_keys = data.get("provider_keys", {})
+
+    return FireworksModelMetadata(
+        provider="fireworks_ai",
+        name=data["name"],
+        endpoint=data.get("fireworks_api_base_url"),
+        api_key=provider_keys.get("fireworks_provider_api_key"),
+        model_identifier=model_identifier or "",
+        using_cache=data.get("using_cache"),
+        session_id=data.get("session_id"),
+        llm_definition=llm_definition,
+        family=llm_definition.family,
+        friendly_name=llm_definition.name,
+    )
+
+
+def _create_mistral_metadata(data: dict[str, Any]) -> ModelMetadata:
+    configs = ModelSelectionConfig.instance()
+    llm_definition = configs.get_model(data["name"]) if data.get("name") else None
+
+    if not llm_definition:
+        raise ValueError(f"No LLM definition found for Mistral model {data['name']}.")
+
+    model = llm_definition.params.model
+    if not model:
+        raise ValueError(
+            f"Mistral model `{data['name']}` is missing `params.model` in models.yml."
         )
 
-        if not fireworks_llm_definition:
-            raise ValueError(
-                f"No LLM definition found for Fireworks model {data['name']}."
-            )
+    provider_keys = data.get("provider_keys", {})
 
-        provider_keys = data.get("provider_keys", {})
+    return ModelMetadata(
+        llm_definition=llm_definition,
+        family=llm_definition.family,
+        friendly_name=llm_definition.name,
+        provider="mistral",
+        name=data["name"],
+        api_key=provider_keys.get("mistral_api_key"),
+        # identifier uses LiteLLM's "provider/model" convention expected by
+        # ModelMetadata.to_params
+        identifier=f"mistral/{model.removeprefix('mistral/')}",
+    )
 
-        model_identifier: str | None = getattr(
-            fireworks_llm_definition.params, "identifier", None
-        )
 
-        if (
-            not model_identifier or model_identifier == ""
-        ) and not mock_model_responses:
-            raise ValueError(
-                f"Fireworks model identifier is missing for model {data['name']}."
-            )
-
-        if not model_identifier:
-            # Allow empty identifier when mock_model_responses is True
-            model_identifier = ""
-
-        return FireworksModelMetadata(
-            provider="fireworks_ai",
-            name=data["name"],
-            endpoint=data.get("fireworks_api_base_url"),
-            api_key=provider_keys.get("fireworks_provider_api_key"),
-            model_identifier=model_identifier,
-            using_cache=data.get("using_cache"),
-            session_id=data.get("session_id"),
-            llm_definition=fireworks_llm_definition,
-            family=fireworks_llm_definition.family,
-        )
+def _create_gitlab_metadata(data: dict[str, Any]) -> ModelMetadata:
+    configs = ModelSelectionConfig.instance()
 
     if name := data.get("name"):
         llm_definition = configs.get_model(name)
@@ -261,6 +275,32 @@ def create_model_metadata(
         friendly_name=llm_definition.name,
         **data,
     )
+
+
+def create_model_metadata(
+    data: dict[str, Any] | None, mock_model_responses: bool = False
+) -> TypeModelMetadata:
+    if not data or "provider" not in data:
+        raise ValueError("Argument error: provider must be present.")
+
+    configs = ModelSelectionConfig.instance()
+    provider = data["provider"]
+
+    if provider == "amazon_q":
+        llm_definition = configs.get_model("amazon_q")
+        return AmazonQModelMetadata(
+            llm_definition=llm_definition,
+            family=llm_definition.family,
+            friendly_name=llm_definition.name,
+            **data,
+        )
+
+    if provider == "fireworks_ai":
+        return _create_fireworks_metadata(data, mock_model_responses)
+    if provider == "mistral":
+        return _create_mistral_metadata(data)
+
+    return _create_gitlab_metadata(data)
 
 
 def build_default_code_completions_metadata(
@@ -301,3 +341,60 @@ def build_default_code_completions_metadata(
         {"provider": "gitlab", "feature_setting": "code_completions"},
         mock_model_responses=mock_model_responses,
     )
+
+
+def build_default_feature_setting_metadata(
+    feature_setting: Optional[str],
+    model_keys: Dict[str, Any],
+    fireworks_api_base_url: str,
+    identifier: Optional[str] = None,
+    user: Optional[StarletteUser] = None,
+    mock_model_responses: bool = False,
+) -> TypeModelMetadata:
+    """Build default metadata for a gitlab-provider request, injecting server-side provider configuration when the
+    resolved model is Fireworks- or Mistral-backed.
+
+    Resolution precedence:
+    1. ``identifier``: the user's explicit model selection (dropdown).
+    2. ``feature_setting``: YAML default for the feature.
+
+    Dispatches directly to the typed metadata creators based on
+    ``llm_def.params.custom_llm_provider`` so the provider decision is made exactly once.
+    """
+    configs = ModelSelectionConfig.instance()
+
+    if identifier:
+        llm_def = configs.get_model(identifier)
+    elif feature_setting:
+        llm_def = configs.get_model_for_feature(feature_setting)
+    else:
+        raise ValueError("Either identifier or feature_setting must be provided.")
+
+    custom_llm_provider = getattr(llm_def.params, "custom_llm_provider", None)
+
+    if custom_llm_provider == "fireworks_ai":
+        return _create_fireworks_metadata(
+            {
+                "name": llm_def.gitlab_identifier,
+                "fireworks_api_base_url": fireworks_api_base_url,
+                "provider_keys": model_keys,
+                "session_id": user.global_user_id if user else None,
+            },
+            mock_model_responses,
+        )
+
+    if custom_llm_provider == "mistral":
+        return _create_mistral_metadata(
+            {
+                "name": llm_def.gitlab_identifier,
+                "provider_keys": model_keys,
+            }
+        )
+
+    # Non-Fireworks/Mistral: preserve original resolution semantics.
+    gitlab_payload: dict[str, Any] = {"provider": "gitlab"}
+    if identifier:
+        gitlab_payload["identifier"] = identifier
+    else:
+        gitlab_payload["feature_setting"] = feature_setting
+    return _create_gitlab_metadata(gitlab_payload)
