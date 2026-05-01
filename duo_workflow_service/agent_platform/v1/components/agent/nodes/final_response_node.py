@@ -30,7 +30,7 @@ __all__ = ["FinalResponseNode"]
 log = structlog.stdlib.get_logger("final_response_node")
 
 
-class FinalResponseNode:
+class FinalResponseNode:  # pylint: disable=too-many-instance-attributes
     """LangGraph node that handles the final response and writes the result to state.
 
     All state interactions are performed exclusively through ``IOKey`` instances,
@@ -60,6 +60,7 @@ class FinalResponseNode:
         conversation_history_key: RuntimeIOKey,
         output_key: RuntimeIOKey,
         response_schema_tracking: bool = False,
+        response_schema_tracking_context: Optional[dict[str, str]] = None,
         component_name: Optional[str] = None,
         flow_id: Optional[str] = None,
         flow_type: Optional[GLReportingEventContext] = None,
@@ -71,6 +72,7 @@ class FinalResponseNode:
         self._conversation_history_key = conversation_history_key
         self._output_key = output_key
         self._response_schema_tracking = response_schema_tracking
+        self._response_schema_tracking_context = response_schema_tracking_context or {}
         self._component_name = component_name
         self._flow_id = flow_id
         self._flow_type = flow_type
@@ -84,7 +86,7 @@ class FinalResponseNode:
 
         if self._response_schema is not None:
             final_response_text, updates = self._extract_structured_response(
-                last_message, history, history_iokey, output_iokey
+                last_message, history, history_iokey, output_iokey, state
             )
         else:
             final_response_text, updates = self._extract_text_response(
@@ -126,6 +128,7 @@ class FinalResponseNode:
         history: list,
         history_iokey: IOKey,
         output_iokey: IOKey,
+        state: FlowState,
     ) -> tuple[str, dict]:
         if not last_message.tool_calls:
             raise ValueError(
@@ -165,7 +168,7 @@ class FinalResponseNode:
             )
 
         if self._response_schema_tracking:
-            self._track_response_schema_output(parsed_response)
+            self._track_response_schema_output(parsed_response, state)
 
         # Append ToolMessage completion response to existing history for replace-based reducer.
         # The reducer will replace this component's conversation history with the complete list.
@@ -188,10 +191,21 @@ class FinalResponseNode:
 
         return final_response_text, output_iokey.to_nested_dict(final_response_text)
 
-    def _track_response_schema_output(self, parsed_response: BaseAgentOutput) -> None:
+    def _resolve_tracking_context(self, state: FlowState) -> dict[str, str | None]:
+        """Resolve response_schema_tracking_context paths against state."""
+        resolved: dict[str, str | None] = {}
+        for field_name, context_path in self._response_schema_tracking_context.items():
+            key = IOKey.parse_key({"from": context_path, "optional": True})
+            resolved[field_name] = key.value_from_state(state)
+        return resolved
+
+    def _track_response_schema_output(
+        self, parsed_response: BaseAgentOutput, state: FlowState
+    ) -> None:
         output_data = parsed_response.to_output()
         flow_type_value = self._flow_type.value if self._flow_type else "unknown"
         component_name = self._component_name or self.name
+        tracking_context = self._resolve_tracking_context(state)
 
         log.info(
             "Response schema output tracked",
@@ -199,6 +213,7 @@ class FinalResponseNode:
             flow_id=self._flow_id,
             flow_type=flow_type_value,
             response_output=output_data,
+            **tracking_context,
         )
 
         duo_workflow_metrics.count_response_schema_output(

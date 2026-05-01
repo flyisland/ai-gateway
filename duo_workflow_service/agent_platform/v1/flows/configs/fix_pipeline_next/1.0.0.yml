@@ -43,6 +43,9 @@ components:
     response_schema_id: "fix_pipeline_next_decide_approach"
     response_schema_version: "^1.0.0"
     response_schema_tracking: true
+    response_schema_tracking_context:
+      project_id: "context:project_id"
+      merge_request_url: "context:inputs.merge_request.url"
     inputs:
       - from: "context:fix_pipeline_next_context.final_answer"
         as: "fix_pipeline_context_results"
