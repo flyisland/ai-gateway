@@ -37,12 +37,15 @@ __all__ = [
 log = structlog.stdlib.get_logger("models")
 request_log = get_request_logger("models")
 
+_TRUSTED_PROVIDERS = frozenset({"fireworks_ai", "mistral"})
+
 
 def validate_custom_endpoint(
     custom_models_enabled: bool,
     api_base: Optional[str],
     api_key: Optional[str],
     allowed_api_bases: frozenset[str] = frozenset(),
+    custom_llm_provider: Optional[str] = None,
 ) -> None:
     """Raise ValueError if a custom endpoint is not permitted.
 
@@ -51,6 +54,8 @@ def validate_custom_endpoint(
     not rejected due to formatting differences.
     """
     if custom_models_enabled:
+        return
+    if custom_llm_provider in _TRUSTED_PROVIDERS:
         return
     if api_base is not None and api_base.rstrip("/") in {
         b.rstrip("/") for b in allowed_api_bases

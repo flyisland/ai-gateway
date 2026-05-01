@@ -121,9 +121,9 @@ class ContainerModels(containers.DeclarativeContainer):
         _mock_selector,
         original=providers.Factory(
             ChatLiteLLM,
-            model_keys=config.model_keys,
             custom_models_enabled=config.custom_models.enabled,
             bedrock_guardrail_config=config.bedrock_guardrail_config,
+            allowed_api_bases=_fireworks_allowed_api_bases,
         ),
         mocked=providers.Factory(mock.FakeModel),
         agentic=providers.Factory(

@@ -1,4 +1,4 @@
-# Import your model classes
+# pylint: disable=too-many-lines
 from unittest import mock
 from unittest.mock import patch
 
@@ -12,6 +12,7 @@ from ai_gateway.model_metadata import (
     ModelMetadata,
     ModelMetadataBySize,
     build_default_code_completions_metadata,
+    build_default_feature_setting_metadata,
     create_model_metadata,
     create_model_metadata_by_size,
 )
@@ -330,9 +331,7 @@ class TestFireworksModelMetadata:
             name="fireworks_ai",
             max_context_tokens=200000,
             family=["codestral"],
-            params={
-                "model": "test_model",
-            },
+            params={},
         )
         mock_models["test_model"] = model_no_id
 
@@ -355,10 +354,7 @@ class TestFireworksModelMetadata:
             name="fireworks_ai",
             max_context_tokens=200000,
             family=["codestral"],
-            params={
-                "model": "test_model",
-                "identifier": "",
-            },
+            params={},
         )
         mock_models["test_model"] = model_empty_id
 
@@ -382,7 +378,7 @@ class TestFireworksModelMetadata:
             max_context_tokens=200000,
             family=["codestral"],
             params={
-                "model": "test_model",
+                "model": "",
                 "identifier": None,
             },
         )
@@ -449,7 +445,7 @@ class TestFireworksModelMetadata:
         assert isinstance(result, FireworksModelMetadata)
         assert result.provider == "fireworks_ai"
         assert result.name == "test_model"
-        assert result.model_identifier == ""
+        assert result.model_identifier == "test_model"
         assert result.api_key == "test-key"
         assert str(result.endpoint) == "https://api.fireworks.ai/inference/v1"
 
@@ -472,6 +468,31 @@ class TestFireworksModelMetadata:
         assert params["api_base"] == "https://api.fireworks.ai/v1"
         assert params["using_cache"] == "True"
         assert params["session_id"] == "test_session_id"
+
+    def test_falls_back_to_params_model_when_identifier_missing(self, mock_models):
+        """Router-less Fireworks models (GLM/Kimi/Minimax) omit `identifier`; `params.model` must be used."""
+        mock_models["kimi_k2_6_fireworks"] = ChatLiteLLMDefinition(
+            gitlab_identifier="kimi_k2_6_fireworks",
+            name="Kimi K2.6 - Fireworks",
+            max_context_tokens=256000,
+            family=["kimi"],
+            params={
+                "model": "accounts/gitlab/deployments/z6hbhxrt",
+                "custom_llm_provider": "fireworks_ai",
+            },
+        )
+
+        result = create_model_metadata(
+            {
+                "provider": "fireworks_ai",
+                "name": "kimi_k2_6_fireworks",
+                "provider_keys": {"fireworks_provider_api_key": "fw"},
+                "fireworks_api_base_url": "https://api.fireworks.ai/inference/v1",
+            }
+        )
+
+        assert isinstance(result, FireworksModelMetadata)
+        assert result.model_identifier == "accounts/gitlab/deployments/z6hbhxrt"
 
 
 class TestFriendlyName:
@@ -819,3 +840,184 @@ class TestBuildDefaultCodeCompletionsMetadata:
         assert isinstance(metadata, FireworksModelMetadata)
         assert metadata.api_key is None
         assert "api_key" not in metadata.to_params()
+
+
+class TestMistralModelMetadata:
+    """Mistral metadata creation and validation."""
+
+    @pytest.fixture
+    def mistral_def(self):
+        return ChatLiteLLMDefinition(
+            gitlab_identifier="devstral_2_mistral",
+            name="Devstral 2 - Mistral",
+            max_context_tokens=256000,
+            family=["mistral"],
+            params={
+                "model": "mistral/devstral-2512",
+                "custom_llm_provider": "mistral",
+            },
+        )
+
+    def test_happy_path(self, mock_models, mistral_def):
+        mock_models["devstral_2_mistral"] = mistral_def
+
+        result = create_model_metadata(
+            {
+                "provider": "mistral",
+                "name": "devstral_2_mistral",
+                "provider_keys": {"mistral_api_key": "mk"},
+            }
+        )
+
+        assert isinstance(result, ModelMetadata)
+        assert result.provider == "mistral"
+        assert result.api_key == "mk"
+        # `mistral/` prefix already present in params.model must not be duplicated.
+        assert result.identifier == "mistral/devstral-2512"
+        assert result.llm_definition == mistral_def
+
+    def test_adds_prefix_when_missing(self, mock_models):
+        mock_models["devstral_2_mistral"] = ChatLiteLLMDefinition(
+            gitlab_identifier="devstral_2_mistral",
+            name="Devstral 2 - Mistral",
+            max_context_tokens=256000,
+            family=["mistral"],
+            params={"model": "devstral-2512", "custom_llm_provider": "mistral"},
+        )
+
+        result = create_model_metadata(
+            {
+                "provider": "mistral",
+                "name": "devstral_2_mistral",
+                "provider_keys": {"mistral_api_key": "mk"},
+            }
+        )
+
+        assert result.identifier == "mistral/devstral-2512"
+
+    def test_missing_model_raises(self, mock_models):
+        mock_models["devstral_2_mistral"] = ChatLiteLLMDefinition(
+            gitlab_identifier="devstral_2_mistral",
+            name="Devstral 2 - Mistral",
+            max_context_tokens=256000,
+            family=["mistral"],
+            params={"model": "", "custom_llm_provider": "mistral"},
+        )
+
+        with pytest.raises(ValueError, match=r"missing `params.model`"):
+            create_model_metadata(
+                {
+                    "provider": "mistral",
+                    "name": "devstral_2_mistral",
+                    "provider_keys": {"mistral_api_key": "mk"},
+                }
+            )
+
+
+class TestBuildDefaultFeatureSettingMetadata:
+    """Covers the gitlab-provider resolver used by the ModelMetadataInterceptor."""
+
+    @pytest.fixture
+    def fireworks_def(self):
+        return ChatLiteLLMDefinition(
+            gitlab_identifier="kimi_k2_6_fireworks",
+            name="Kimi K2.6 - Fireworks",
+            max_context_tokens=256000,
+            family=["kimi"],
+            params={
+                "model": "accounts/gitlab/deployments/z6hbhxrt",
+                "custom_llm_provider": "fireworks_ai",
+            },
+        )
+
+    @pytest.fixture
+    def mistral_def(self):
+        return ChatLiteLLMDefinition(
+            gitlab_identifier="devstral_2_mistral",
+            name="Devstral 2 - Mistral",
+            max_context_tokens=256000,
+            family=["mistral"],
+            params={
+                "model": "mistral/devstral-2512",
+                "custom_llm_provider": "mistral",
+            },
+        )
+
+    @pytest.fixture
+    def vertex_def(self):
+        return ChatLiteLLMDefinition(
+            gitlab_identifier="gemini_3_1_pro_preview_vertex",
+            name="Gemini 3.1 Pro Preview - Vertex",
+            max_context_tokens=1000000,
+            family=["gemini"],
+            params={"model": "gemini-3-1-pro", "custom_llm_provider": "vertex_ai"},
+        )
+
+    @pytest.fixture
+    def mock_user(self):
+        user = mock.MagicMock()
+        user.global_user_id = "user-42"
+        return user
+
+    def _patch_resolvers(self, llm_def):
+        return patch.multiple(
+            ModelSelectionConfig,
+            get_model=mock.Mock(return_value=llm_def),
+            get_model_for_feature=mock.Mock(return_value=llm_def),
+        )
+
+    def test_identifier_resolves_fireworks(self, fireworks_def, mock_user):
+        with self._patch_resolvers(fireworks_def):
+            metadata = build_default_feature_setting_metadata(
+                feature_setting=None,
+                identifier="kimi_k2_6_fireworks",
+                model_keys={"fireworks_provider_api_key": "fw"},
+                fireworks_api_base_url="https://api.fireworks.ai/inference/v1",
+                user=mock_user,
+            )
+
+        assert isinstance(metadata, FireworksModelMetadata)
+        params = metadata.to_params()
+        assert params["model"] == "accounts/gitlab/deployments/z6hbhxrt"
+        assert params["api_key"] == "fw"
+        assert params["api_base"] == "https://api.fireworks.ai/inference/v1"
+        assert params["session_id"] == "user-42"
+
+    def test_feature_setting_resolves_mistral(self, mistral_def, mock_user):
+        with self._patch_resolvers(mistral_def):
+            metadata = build_default_feature_setting_metadata(
+                feature_setting="duo_agent_platform_agentic_chat",
+                model_keys={"mistral_api_key": "mk"},
+                fireworks_api_base_url="unused",
+                user=mock_user,
+            )
+
+        assert isinstance(metadata, ModelMetadata)
+        assert metadata.provider == "mistral"
+        assert metadata.api_key == "mk"
+        assert metadata.identifier == "mistral/devstral-2512"
+
+    def test_non_fireworks_non_mistral_falls_back_to_gitlab(
+        self, vertex_def, mock_user
+    ):
+        with self._patch_resolvers(vertex_def):
+            metadata = build_default_feature_setting_metadata(
+                feature_setting="duo_agent_platform_agentic_chat",
+                model_keys={"fireworks_provider_api_key": "fw"},
+                fireworks_api_base_url="unused",
+                user=mock_user,
+            )
+
+        assert isinstance(metadata, ModelMetadata)
+        assert metadata.llm_definition == vertex_def
+        # Provider keys must NOT leak into non-fireworks/mistral metadata.
+        assert metadata.api_key is None or metadata.api_key != "fw"
+
+    def test_raises_when_neither_identifier_nor_feature_setting(self):
+        with pytest.raises(ValueError, match="Either identifier or feature_setting"):
+            build_default_feature_setting_metadata(
+                feature_setting=None,
+                identifier=None,
+                model_keys={},
+                fireworks_api_base_url="unused",
+            )

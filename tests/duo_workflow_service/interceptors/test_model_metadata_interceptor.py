@@ -149,3 +149,101 @@ async def test_model_metadata_interceptor_no_processing_scenarios(
         mock_size_context.set.assert_not_called()
         continuation.assert_called_once_with(handler_call_details)
         assert result == "mocked_response"
+
+
+@pytest.mark.asyncio
+async def test_gitlab_provider_with_feature_setting_uses_build_default(mock_user):
+    """Gitlab-provider payload with feature_setting routes through build_default_feature_setting_metadata."""
+    current_user.set(mock_user)
+    interceptor = ModelMetadataInterceptor()
+
+    handler_call_details = MagicMock()
+    handler_call_details.invocation_metadata = [
+        (
+            "x-gitlab-agent-platform-model-metadata",
+            json.dumps(
+                {
+                    "provider": "gitlab",
+                    "feature_setting": "duo_agent_platform_agentic_chat",
+                }
+            ),
+        ),
+    ]
+
+    continuation = AsyncMock(return_value="ok")
+    fake_default = MagicMock()
+
+    fake_model_keys = MagicMock()
+    fake_model_keys.model_dump.return_value = {"fireworks_provider_api_key": "fw"}
+    fake_config = MagicMock()
+    fake_config.model_keys = fake_model_keys
+    fake_config.fireworks_api_base_url = "https://fw"
+
+    with (
+        patch(
+            "duo_workflow_service.interceptors.model_metadata_interceptor.get_config",
+            return_value=fake_config,
+        ),
+        patch(
+            "duo_workflow_service.interceptors.model_metadata_interceptor.build_default_feature_setting_metadata",
+            return_value=fake_default,
+        ) as mock_build,
+        patch(
+            "duo_workflow_service.interceptors.model_metadata_interceptor.ModelMetadataBySize"
+        ) as mock_by_size_cls,
+        patch(
+            "duo_workflow_service.interceptors.model_metadata_interceptor.current_model_metadata_context"
+        ) as mock_context,
+        patch(
+            "duo_workflow_service.interceptors.model_metadata_interceptor.current_model_metadata_with_size_context"
+        ) as mock_size_context,
+    ):
+
+        fake_by_size = MagicMock()
+        fake_by_size.default = fake_default
+        mock_by_size_cls.return_value = fake_by_size
+
+        result = await interceptor.intercept_service(continuation, handler_call_details)
+
+        mock_build.assert_called_once_with(
+            feature_setting="duo_agent_platform_agentic_chat",
+            identifier=None,
+            model_keys={"fireworks_provider_api_key": "fw"},
+            fireworks_api_base_url="https://fw",
+            user=mock_user,
+        )
+        mock_by_size_cls.assert_called_once_with(default=fake_default)
+        mock_context.set.assert_called_once_with(fake_default)
+        mock_size_context.set.assert_called_once_with(fake_by_size)
+        continuation.assert_called_once_with(handler_call_details)
+        assert result == "ok"
+
+
+@pytest.mark.asyncio
+async def test_gitlab_provider_without_identifier_or_feature_setting_falls_through(
+    mock_user,
+):
+    """Gitlab-provider payload without identifier/feature_setting skips the new branch."""
+    current_user.set(mock_user)
+    interceptor = ModelMetadataInterceptor()
+
+    handler_call_details = MagicMock()
+    handler_call_details.invocation_metadata = [
+        ("x-gitlab-agent-platform-model-metadata", json.dumps({"provider": "gitlab"})),
+    ]
+
+    continuation = AsyncMock(return_value="ok")
+
+    with (
+        patch(
+            "duo_workflow_service.interceptors.model_metadata_interceptor.build_default_feature_setting_metadata"
+        ) as mock_build,
+        patch(
+            "duo_workflow_service.interceptors.model_metadata_interceptor.create_model_metadata_by_size"
+        ) as mock_create,
+    ):
+        mock_create.return_value = MagicMock()
+        await interceptor.intercept_service(continuation, handler_call_details)
+
+        mock_build.assert_not_called()
+        mock_create.assert_called_once()

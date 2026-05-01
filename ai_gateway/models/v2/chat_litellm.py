@@ -163,6 +163,7 @@ add_known_models()
 
 class ChatLiteLLM(_LChatLiteLLM):
     custom_models_enabled: bool = False
+    allowed_api_bases: frozenset[str] = frozenset()
 
     @override
     def bind(self, **kwargs: Any) -> Runnable[LanguageModelInput, AIMessage]:
@@ -170,6 +171,9 @@ class ChatLiteLLM(_LChatLiteLLM):
             self.custom_models_enabled,
             api_base=kwargs.get("api_base"),
             api_key=kwargs.get("api_key"),
+            allowed_api_bases=self.allowed_api_bases,
+            custom_llm_provider=kwargs.get("custom_llm_provider")
+            or self.custom_llm_provider,
         )
         return super().bind(**kwargs)
 
@@ -196,3 +200,17 @@ class ChatLiteLLM(_LChatLiteLLM):
             payload = remove_trailing_assistant_message({"messages": message_dicts})
             message_dicts = payload["messages"]
         return message_dicts, params
+
+    @property
+    @override
+    def _client_params(self) -> dict[str, Any]:
+        """Ensure api_key is passed as a kwarg to async litellm.acompletion.
+
+        Upstream _client_params mutates self.client.api_key but does not include api_key in the returned kwargs. That
+        works for the sync path (module-level litellm.api_key) but fails for async acompletion, which reads api_key from
+        kwargs.
+        """
+        params = super()._client_params
+        if self.api_key and "api_key" not in params:
+            params["api_key"] = self.api_key
+        return params
