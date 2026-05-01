@@ -434,26 +434,30 @@ class TestAgentNode:
         base_flow_state,
         component_name,
     ):
-        """Test that a truncated LLM response returns immediately with recovery context."""
+        """Test that a truncated LLM response retries internally with a recovery message."""
         truncated_message = copy.copy(mock_ai_message)
         truncated_message.content = "I was writing a long response but got cut off..."
         truncated_message.response_metadata = {metadata_key: truncation_finish_reason}
         truncated_message.tool_calls = []
 
-        mock_prompt.ainvoke = AsyncMock(return_value=truncated_message)
+        # First call returns truncated response, second call returns normal response
+        mock_prompt.ainvoke = AsyncMock(
+            side_effect=[truncated_message, mock_ai_message]
+        )
 
         result = await agent_node.run(base_flow_state)
 
-        # Only called once — no internal retry, returns to graph loop
-        assert mock_prompt.ainvoke.call_count == 1
+        # Called twice — internal retry after truncation
+        assert mock_prompt.ainvoke.call_count == 2
 
-        # History includes truncated response + recovery message
+        # History includes truncated response + recovery message + final response
         result_history = result[FlowStateKeys.CONVERSATION_HISTORY][component_name]
-        assert len(result_history) == 2
+        assert len(result_history) == 3
         assert result_history[0] == truncated_message
         assert isinstance(result_history[1], HumanMessage)
         assert "cut off" in result_history[1].content
         assert "concise" in result_history[1].content
+        assert result_history[2] == mock_ai_message
 
     @pytest.mark.asyncio
     async def test_run_non_truncation_abnormal_finish_reason_does_not_retry(
