@@ -551,20 +551,20 @@ reference = "litellm"
 
 [[package]]
 name = "boto3"
-version = "1.36.0"
+version = "1.40.76"
 description = "The AWS SDK for Python"
 optional = false
-python-versions = ">= 3.8"
+python-versions = ">= 3.9"
 groups = ["main", "eval"]
 files = [
-    {file = "boto3-1.36.0-py3-none-any.whl", hash = "sha256:d0ca7a58ce25701a52232cc8df9d87854824f1f2964b929305722ebc7959d5a9"},
-    {file = "boto3-1.36.0.tar.gz", hash = "sha256:159898f51c2997a12541c0e02d6e5a8fe2993ddb307b9478fd9a339f98b57e00"},
+    {file = "boto3-1.40.76-py3-none-any.whl", hash = "sha256:8df6df755727be40ad9e309cfda07f9a12c147e17b639430c55d4e4feee8a167"},
+    {file = "boto3-1.40.76.tar.gz", hash = "sha256:16f4cf97f8dd8e0aae015f4dc66219bd7716a91a40d1e2daa0dafa241a4761c5"},
 ]
 
 [package.dependencies]
-botocore = ">=1.36.0,<1.37.0"
+botocore = ">=1.40.76,<1.41.0"
 jmespath = ">=0.7.1,<2.0.0"
-s3transfer = ">=0.11.0,<0.12.0"
+s3transfer = ">=0.14.0,<0.15.0"
 
 [package.extras]
 crt = ["botocore[crt] (>=1.21.0,<2.0a0)"]
@@ -576,14 +576,14 @@ reference = "litellm"
 
 [[package]]
 name = "botocore"
-version = "1.36.26"
+version = "1.40.76"
 description = "Low-level, data-driven core of boto 3."
 optional = false
-python-versions = ">= 3.8"
+python-versions = ">= 3.9"
 groups = ["main", "eval"]
 files = [
-    {file = "botocore-1.36.26-py3-none-any.whl", hash = "sha256:4e3f19913887a58502e71ef8d696fe7eaa54de7813ff73390cd5883f837dfa6e"},
-    {file = "botocore-1.36.26.tar.gz", hash = "sha256:4a63bcef7ecf6146fd3a61dc4f9b33b7473b49bdaf1770e9aaca6eee0c9eab62"},
+    {file = "botocore-1.40.76-py3-none-any.whl", hash = "sha256:fe425d386e48ac64c81cbb4a7181688d813df2e2b4c78b95ebe833c9e868c6f4"},
+    {file = "botocore-1.40.76.tar.gz", hash = "sha256:2b16024d68b29b973005adfb5039adfe9099ebe772d40a90ca89f2e165c495dc"},
 ]
 
 [package.dependencies]
@@ -592,7 +592,7 @@ python-dateutil = ">=2.1,<3.0.0"
 urllib3 = {version = ">=1.25.4,<2.2.0 || >2.2.0,<3", markers = "python_version >= \"3.10\""}
 
 [package.extras]
-crt = ["awscrt (==0.23.8)"]
+crt = ["awscrt (==0.28.4)"]
 
 [package.source]
 type = "legacy"
@@ -1567,14 +1567,14 @@ reference = "litellm"
 
 [[package]]
 name = "fastapi-sso"
-version = "0.19.0"
+version = "0.16.0"
 description = "FastAPI plugin to enable SSO to most common providers (such as Facebook login, Google login and login via Microsoft Office 365 Account)"
 optional = false
-python-versions = ">=3.9,<4.0"
+python-versions = ">=3.8,<4.0"
 groups = ["main"]
 files = [
-    {file = "fastapi_sso-0.19.0-py3-none-any.whl", hash = "sha256:d958c46cd9996234c7b162e192168b4c0807a248224a55b0f877d3a82a16a930"},
-    {file = "fastapi_sso-0.19.0.tar.gz", hash = "sha256:629f00581f72ea7e57f7b8775f8d2c425629c428c194359a2b4ebaa6bcb8e12b"},
+    {file = "fastapi_sso-0.16.0-py3-none-any.whl", hash = "sha256:3a66a942474ef9756d3a9d8b945d55bd9faf99781facdb9b87a40b73d6d6b0c3"},
+    {file = "fastapi_sso-0.16.0.tar.gz", hash = "sha256:f3941f986347566b7d3747c710cf474a907f581bfb6697ff3bb3e44eb76b438c"},
 ]
 
 [package.dependencies]
@@ -1582,7 +1582,6 @@ fastapi = ">=0.80"
 httpx = ">=0.23.0"
 oauthlib = ">=3.1.0"
 pydantic = {version = ">=1.8.0", extras = ["email"]}
-pyjwt = ">=2.10.1,<3.0.0"
 
 [package.source]
 type = "legacy"
@@ -4205,14 +4204,14 @@ reference = "litellm"
 
 [[package]]
 name = "litellm"
-version = "1.81.0"
+version = "1.81.11"
 description = "Library to easily interface with LLM API providers"
 optional = false
 python-versions = ">=3.9,<4.0"
 groups = ["main", "eval"]
 files = [
-    {file = "litellm-1.81.0-py3-none-any.whl", hash = "sha256:2b972c46027d06267cd447524c0f3b217d7b318da5a64064a9fff05bc66a1318"},
-    {file = "litellm-1.81.0.tar.gz", hash = "sha256:c7c06b95bf141e0adc27eb651969e112230a5552f693c2b9ee8af1cfab291776"},
+    {file = "litellm-1.81.11-py3-none-any.whl", hash = "sha256:06a66c24742e082ddd2813c87f40f5c12fe7baa73ce1f9457eaf453dc44a0f65"},
+    {file = "litellm-1.81.11.tar.gz", hash = "sha256:fc55aceafda325bd5f704ada61c8be5bd322e6dfa5f8bdcab3290b8732c5857e"},
 ]
 
 [package.dependencies]
@@ -4221,21 +4220,20 @@ apscheduler = {version = ">=3.10.4,<4.0.0", optional = true, markers = "extra ==
 azure-identity = {version = ">=1.15.0,<2.0.0", optional = true, markers = "python_version >= \"3.9\" and (extra == \"proxy\" or extra == \"extra-proxy\")"}
 azure-storage-blob = {version = ">=12.25.1,<13.0.0", optional = true, markers = "extra == \"proxy\""}
 backoff = {version = "*", optional = true, markers = "extra == \"proxy\""}
-boto3 = {version = "1.36.0", optional = true, markers = "extra == \"proxy\""}
+boto3 = {version = "1.40.76", optional = true, markers = "extra == \"proxy\""}
 click = "*"
 cryptography = {version = "*", optional = true, markers = "extra == \"proxy\""}
 fastapi = {version = ">=0.120.1", optional = true, markers = "extra == \"proxy\""}
-fastapi-sso = {version = ">=0.16,<0.20", optional = true, markers = "extra == \"proxy\""}
+fastapi-sso = {version = ">=0.16.0,<0.17.0", optional = true, markers = "extra == \"proxy\""}
 fastuuid = ">=0.13.0"
-grpcio = {version = ">=1.62.3,<1.68.dev0 || >1.71.0,<1.71.1 || >1.71.1,<1.72.0 || >1.72.0,<1.72.1 || >1.72.1,<1.73.0 || >1.73.0", markers = "python_version < \"3.14\""}
 gunicorn = {version = ">=23.0.0,<24.0.0", optional = true, markers = "extra == \"proxy\""}
 httpx = ">=0.23.0"
 importlib-metadata = ">=6.8.0"
 jinja2 = ">=3.1.2,<4.0.0"
 jsonschema = ">=4.23.0,<5.0.0"
-litellm-enterprise = {version = "0.1.27", optional = true, markers = "extra == \"proxy\""}
-litellm-proxy-extras = {version = "0.4.23", optional = true, markers = "extra == \"proxy\""}
-mcp = {version = ">=1.21.2,<2.0.0", optional = true, markers = "python_version >= \"3.10\" and extra == \"proxy\""}
+litellm-enterprise = {version = "0.1.31", optional = true, markers = "extra == \"proxy\""}
+litellm-proxy-extras = {version = "0.4.35", optional = true, markers = "extra == \"proxy\""}
+mcp = {version = ">=1.25.0,<2.0.0", optional = true, markers = "python_version >= \"3.10\" and extra == \"proxy\""}
 openai = ">=2.8.0"
 orjson = {version = ">=3.9.7,<4.0.0", optional = true, markers = "extra == \"proxy\""}
 polars = {version = ">=1.31.0,<2.0.0", optional = true, markers = "python_version >= \"3.10\" and extra == \"proxy\""}
@@ -4243,7 +4241,7 @@ pydantic = ">=2.5.0,<3.0.0"
 PyJWT = {version = ">=2.10.1,<3.0.0", optional = true, markers = "python_version >= \"3.9\" and extra == \"proxy\""}
 pynacl = {version = ">=1.5.0,<2.0.0", optional = true, markers = "extra == \"proxy\""}
 python-dotenv = ">=0.2.0"
-python-multipart = {version = ">=0.0.18,<0.0.19", optional = true, markers = "extra == \"proxy\""}
+python-multipart = {version = ">=0.0.22,<0.0.23", optional = true, markers = "python_version >= \"3.10\" and extra == \"proxy\""}
 pyyaml = {version = ">=6.0.1,<7.0.0", optional = true, markers = "extra == \"proxy\""}
 rich = {version = "13.7.1", optional = true, markers = "extra == \"proxy\""}
 rq = {version = "*", optional = true, markers = "extra == \"proxy\""}
@@ -4256,27 +4254,29 @@ websockets = {version = ">=15.0.1,<16.0.0", optional = true, markers = "extra ==
 
 [package.extras]
 caching = ["diskcache (>=5.6.1,<6.0.0)"]
-extra-proxy = ["azure-identity (>=1.15.0,<2.0.0) ; python_version >= \"3.9\"", "azure-keyvault-secrets (>=4.8.0,<5.0.0)", "google-cloud-iam (>=2.19.1,<3.0.0)", "google-cloud-kms (>=2.21.3,<3.0.0)", "prisma (==0.11.0)", "redisvl (>=0.4.1,<0.5.0) ; python_version >= \"3.9\" and python_version < \"3.14\"", "resend (>=0.8.0)"]
+extra-proxy = ["a2a-sdk (>=0.3.22,<0.4.0) ; python_version >= \"3.10\"", "azure-identity (>=1.15.0,<2.0.0) ; python_version >= \"3.9\"", "azure-keyvault-secrets (>=4.8.0,<5.0.0)", "google-cloud-iam (>=2.19.1,<3.0.0)", "google-cloud-kms (>=2.21.3,<3.0.0)", "prisma (==0.11.0)", "redisvl (>=0.4.1,<0.5.0) ; python_version >= \"3.9\" and python_version < \"3.14\"", "resend (>=0.8.0)"]
+google = ["google-cloud-aiplatform (>=1.38.0)"]
+grpc = ["grpcio (>=1.62.3,<1.68.dev0 || >1.71.0,!=1.71.1,!=1.72.0,!=1.72.1,!=1.73.0) ; python_version < \"3.14\"", "grpcio (>=1.75.0) ; python_version >= \"3.14\""]
 mlflow = ["mlflow (>3.1.4) ; python_version >= \"3.10\""]
-proxy = ["PyJWT (>=2.10.1,<3.0.0) ; python_version >= \"3.9\"", "apscheduler (>=3.10.4,<4.0.0)", "azure-identity (>=1.15.0,<2.0.0) ; python_version >= \"3.9\"", "azure-storage-blob (>=12.25.1,<13.0.0)", "backoff", "boto3 (==1.36.0)", "cryptography", "fastapi (>=0.120.1)", "fastapi-sso (>=0.16,<0.20)", "gunicorn (>=23.0.0,<24.0.0)", "litellm-enterprise (==0.1.27)", "litellm-proxy-extras (==0.4.23)", "mcp (>=1.21.2,<2.0.0) ; python_version >= \"3.10\"", "orjson (>=3.9.7,<4.0.0)", "polars (>=1.31.0,<2.0.0) ; python_version >= \"3.10\"", "pynacl (>=1.5.0,<2.0.0)", "python-multipart (>=0.0.18,<0.0.19)", "pyyaml (>=6.0.1,<7.0.0)", "rich (==13.7.1)", "rq", "soundfile (>=0.12.1,<0.13.0)", "uvicorn (>=0.31.1,<0.32.0)", "uvloop (>=0.21.0,<0.22.0) ; sys_platform != \"win32\"", "websockets (>=15.0.1,<16.0.0)"]
+proxy = ["PyJWT (>=2.10.1,<3.0.0) ; python_version >= \"3.9\"", "apscheduler (>=3.10.4,<4.0.0)", "azure-identity (>=1.15.0,<2.0.0) ; python_version >= \"3.9\"", "azure-storage-blob (>=12.25.1,<13.0.0)", "backoff", "boto3 (==1.40.76)", "cryptography", "fastapi (>=0.120.1)", "fastapi-sso (>=0.16.0,<0.17.0)", "gunicorn (>=23.0.0,<24.0.0)", "litellm-enterprise (==0.1.31)", "litellm-proxy-extras (==0.4.35)", "mcp (>=1.25.0,<2.0.0) ; python_version >= \"3.10\"", "orjson (>=3.9.7,<4.0.0)", "polars (>=1.31.0,<2.0.0) ; python_version >= \"3.10\"", "pynacl (>=1.5.0,<2.0.0)", "python-multipart (>=0.0.22,<0.0.23) ; python_version >= \"3.10\"", "pyyaml (>=6.0.1,<7.0.0)", "rich (==13.7.1)", "rq", "soundfile (>=0.12.1,<0.13.0)", "uvicorn (>=0.31.1,<0.32.0)", "uvloop (>=0.21.0,<0.22.0) ; sys_platform != \"win32\"", "websockets (>=15.0.1,<16.0.0)"]
 semantic-router = ["semantic-router (>=0.1.12) ; python_version >= \"3.9\" and python_version < \"3.14\""]
 utils = ["numpydoc"]
 
 [package.source]
 type = "legacy"
-url = "https://gitlab.com/api/v4/projects/78063949/packages/pypi/simple"
-reference = "litellm"
+url = "https://gitlab.com/api/v4/projects/58733651/packages/pypi/simple"
+reference = "gitlab_cloud_connector"
 
 [[package]]
 name = "litellm-enterprise"
-version = "0.1.27"
+version = "0.1.31"
 description = "Package for LiteLLM Enterprise features"
 optional = false
 python-versions = ">=3.8, !=2.7.*, !=3.0.*, !=3.1.*, !=3.2.*, !=3.3.*, !=3.4.*, !=3.5.*, !=3.6.*, !=3.7.*"
 groups = ["main"]
 files = [
-    {file = "litellm_enterprise-0.1.27-py3-none-any.whl", hash = "sha256:41b9d41d04123f492060a742091006dc1d182b54ce3a1c0e18ee75d623c63e91"},
-    {file = "litellm_enterprise-0.1.27.tar.gz", hash = "sha256:aa40c87f7c8df64beb79e75f71e1b5c0a458350efa68527e3491e6f27f2cbd57"},
+    {file = "litellm_enterprise-0.1.31-py3-none-any.whl", hash = "sha256:7b0f750343e6f28c88e1557c656a6bea50fa6c8990a13e86ea20497cf666c79b"},
+    {file = "litellm_enterprise-0.1.31.tar.gz", hash = "sha256:684d09daa3ededf1394df4ec1439aab606b884b68af2c92c478af0784a30e588"},
 ]
 
 [package.source]
@@ -4286,20 +4286,20 @@ reference = "litellm"
 
 [[package]]
 name = "litellm-proxy-extras"
-version = "0.4.23"
+version = "0.4.35"
 description = "Additional files for the LiteLLM Proxy. Reduces the size of the main litellm package."
 optional = false
 python-versions = ">=3.8, !=2.7.*, !=3.0.*, !=3.1.*, !=3.2.*, !=3.3.*, !=3.4.*, !=3.5.*, !=3.6.*, !=3.7.*"
 groups = ["main"]
 files = [
-    {file = "litellm_proxy_extras-0.4.23-py3-none-any.whl", hash = "sha256:2ded82fbd2940246bb7ddf9fbc72e15f4f9c742975c78c5b59bfcb7e65a5f06b"},
-    {file = "litellm_proxy_extras-0.4.23.tar.gz", hash = "sha256:8e3f95576dc2a296e7f73d8c87e73628bd899b4644c45863960fe3c3762d8f64"},
+    {file = "litellm_proxy_extras-0.4.35-py3-none-any.whl", hash = "sha256:7c430bb43c04d520ce45fa492e6707e762cfbe10e09f8394cd06feb0689cd1b7"},
+    {file = "litellm_proxy_extras-0.4.35.tar.gz", hash = "sha256:c62f2add33753cffebef73aa5ce993a0765def0ff47bb47fcb498b5573a1aa3f"},
 ]
 
 [package.source]
 type = "legacy"
-url = "https://gitlab.com/api/v4/projects/78063949/packages/pypi/simple"
-reference = "litellm"
+url = "https://gitlab.com/api/v4/projects/58733651/packages/pypi/simple"
+reference = "gitlab_cloud_connector"
 
 [[package]]
 name = "lxml"
@@ -6759,14 +6759,14 @@ reference = "litellm"
 
 [[package]]
 name = "python-multipart"
-version = "0.0.18"
+version = "0.0.22"
 description = "A streaming multipart parser for Python"
 optional = false
-python-versions = ">=3.8"
+python-versions = ">=3.10"
 groups = ["main"]
 files = [
-    {file = "python_multipart-0.0.18-py3-none-any.whl", hash = "sha256:efe91480f485f6a361427a541db4796f9e1591afc0fb8e7a4ba06bfbc6708996"},
-    {file = "python_multipart-0.0.18.tar.gz", hash = "sha256:7a68db60c8bfb82e460637fa4750727b45af1d5e2ed215593f917f64694d34fe"},
+    {file = "python_multipart-0.0.22-py3-none-any.whl", hash = "sha256:2b2cd894c83d21bf49d702499531c7bafd057d730c201782048f7945d82de155"},
+    {file = "python_multipart-0.0.22.tar.gz", hash = "sha256:7340bef99a7e0032613f56dc36027b959fd3b30a787ed62d310e951f7c3a3a58"},
 ]
 
 [package.source]
@@ -7576,21 +7576,21 @@ reference = "litellm"
 
 [[package]]
 name = "s3transfer"
-version = "0.11.3"
+version = "0.14.0"
 description = "An Amazon S3 Transfer Manager"
 optional = false
-python-versions = ">= 3.8"
+python-versions = ">= 3.9"
 groups = ["main", "eval"]
 files = [
-    {file = "s3transfer-0.11.3-py3-none-any.whl", hash = "sha256:ca855bdeb885174b5ffa95b9913622459d4ad8e331fc98eb01e6d5eb6a30655d"},
-    {file = "s3transfer-0.11.3.tar.gz", hash = "sha256:edae4977e3a122445660c7c114bba949f9d191bae3b34a096f18a1c8c354527a"},
+    {file = "s3transfer-0.14.0-py3-none-any.whl", hash = "sha256:ea3b790c7077558ed1f02a3072fb3cb992bbbd253392f4b6e9e8976941c7d456"},
+    {file = "s3transfer-0.14.0.tar.gz", hash = "sha256:eff12264e7c8b4985074ccce27a3b38a485bb7f7422cc8046fee9be4983e4125"},
 ]
 
 [package.dependencies]
-botocore = ">=1.36.0,<2.0a0"
+botocore = ">=1.37.4,<2.0a0"
 
 [package.extras]
-crt = ["botocore[crt] (>=1.36.0,<2.0a0)"]
+crt = ["botocore[crt] (>=1.37.4,<2.0a0)"]
 
 [package.source]
 type = "legacy"
