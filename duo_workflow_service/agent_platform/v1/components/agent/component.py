@@ -100,6 +100,7 @@ class AgentComponentBase(BaseComponent):
     response_schema_id: Optional[str] = None
     response_schema_version: Optional[str] = None
     response_schema_tracking: bool = False
+    response_schema_tracking_context: dict[str, str] = Field(default_factory=dict)
 
     prompt_registry: BasePromptRegistry = Provide[
         ContainerApplication.pkg_prompts.prompt_registry
@@ -474,6 +475,7 @@ class AgentComponent(AgentComponentBase):
             ),
             response_schema=self._response_schema,
             response_schema_tracking=self.response_schema_tracking,
+            response_schema_tracking_context=self.response_schema_tracking_context,
             component_name=self.name,
             flow_id=self.flow_id,
             flow_type=self.flow_type,

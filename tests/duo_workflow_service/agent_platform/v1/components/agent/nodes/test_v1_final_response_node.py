@@ -519,3 +519,117 @@ class TestResponseSchemaTracking:
             assert component_name in results
         finally:
             response_schema_tracking_results.reset(token)
+
+    @pytest.mark.asyncio
+    @patch(
+        "duo_workflow_service.agent_platform.v1.components.agent.nodes.final_response_node.duo_workflow_metrics"
+    )
+    @patch(
+        "duo_workflow_service.agent_platform.v1.components.agent.nodes.final_response_node.log"
+    )
+    async def test_tracking_context_included_in_log(
+        self,
+        mock_log,
+        mock_metrics,
+        component_name,
+        simple_output,
+        flow_state_with_message,
+        ui_history,
+    ):
+        """Test that response_schema_tracking_context values are included in log output."""
+        from duo_workflow_service.tracking.response_schema_tracking_context import (
+            response_schema_tracking_results,
+        )
+        from lib.events import GLReportingEventContext
+
+        flow_type = GLReportingEventContext("fix_pipeline", "fix_pipeline/v1", False)
+
+        flow_state_with_message["context"]["project_id"] = "12345"
+        flow_state_with_message["context"]["inputs"] = {
+            "merge_request": {
+                "url": "https://gitlab.com/group/project/-/merge_requests/1"
+            }
+        }
+
+        node = FinalResponseNode(
+            name="test_node",
+            conversation_history_key=_make_conversation_history_key(component_name),
+            output_key=_make_output_key(simple_output),
+            ui_history=ui_history,
+            response_schema=AgentFinalOutput,
+            response_schema_tracking=True,
+            response_schema_tracking_context={
+                "project_id": "context:project_id",
+                "merge_request_url": "context:inputs.merge_request.url",
+            },
+            component_name=component_name,
+            flow_id="test_flow_123",
+            flow_type=flow_type,
+            internal_event_client=Mock(),
+        )
+
+        token = response_schema_tracking_results.set({})
+        try:
+            await node.run(flow_state_with_message)
+
+            mock_log.info.assert_called_once()
+            call_kwargs = mock_log.info.call_args[1]
+            assert call_kwargs["project_id"] == "12345"
+            assert (
+                call_kwargs["merge_request_url"]
+                == "https://gitlab.com/group/project/-/merge_requests/1"
+            )
+        finally:
+            response_schema_tracking_results.reset(token)
+
+    @pytest.mark.asyncio
+    @patch(
+        "duo_workflow_service.agent_platform.v1.components.agent.nodes.final_response_node.duo_workflow_metrics"
+    )
+    @patch(
+        "duo_workflow_service.agent_platform.v1.components.agent.nodes.final_response_node.log"
+    )
+    async def test_tracking_context_missing_values_resolve_to_none(
+        self,
+        mock_log,
+        mock_metrics,
+        component_name,
+        simple_output,
+        flow_state_with_message,
+        ui_history,
+    ):
+        """Test that missing tracking context paths resolve to None gracefully."""
+        from duo_workflow_service.tracking.response_schema_tracking_context import (
+            response_schema_tracking_results,
+        )
+        from lib.events import GLReportingEventContext
+
+        flow_type = GLReportingEventContext("fix_pipeline", "fix_pipeline/v1", False)
+
+        node = FinalResponseNode(
+            name="test_node",
+            conversation_history_key=_make_conversation_history_key(component_name),
+            output_key=_make_output_key(simple_output),
+            ui_history=ui_history,
+            response_schema=AgentFinalOutput,
+            response_schema_tracking=True,
+            response_schema_tracking_context={
+                "project_id": "context:project_id",
+                "merge_request_url": "context:inputs.merge_request.url",
+            },
+            component_name=component_name,
+            flow_id="test_flow_123",
+            flow_type=flow_type,
+            internal_event_client=Mock(),
+        )
+
+        token = response_schema_tracking_results.set({})
+        try:
+            await node.run(flow_state_with_message)
+
+            mock_log.info.assert_called_once()
+            call_kwargs = mock_log.info.call_args[1]
+            assert call_kwargs["project_id"] is None
+            assert call_kwargs["merge_request_url"] is None
+        finally:
+            response_schema_tracking_results.reset(token)
