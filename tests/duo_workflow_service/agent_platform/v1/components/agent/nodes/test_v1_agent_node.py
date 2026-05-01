@@ -10,6 +10,7 @@ from ai_gateway.prompts import Prompt
 from duo_workflow_service.agent_platform.v1.components.agent.nodes.agent_node import (
     AgentFinalOutput,
     AgentNode,
+    AgentStuckError,
 )
 from duo_workflow_service.agent_platform.v1.state import (
     FlowStateKeys,
@@ -90,6 +91,16 @@ def agent_node_with_schema_fixture(
 
 @pytest.fixture(name="mock_get_vars_from_state")
 def mock_get_vars_from_state_fixture(prompt_variables):
+    with patch(
+        "duo_workflow_service.agent_platform.v1.components.agent.nodes.agent_node.get_vars_from_state"
+    ) as mock_get_vars_from_state:
+        mock_get_vars_from_state.return_value = prompt_variables
+        yield mock_get_vars_from_state
+
+
+@pytest.fixture(name="_mock_get_vars_from_state")
+def _mock_get_vars_from_state_fixture(prompt_variables):
+    """Side-effect fixture: mocks get_vars_from_state (use when return value is not needed in test)."""
     with patch(
         "duo_workflow_service.agent_platform.v1.components.agent.nodes.agent_node.get_vars_from_state"
     ) as mock_get_vars_from_state:
@@ -490,7 +501,7 @@ class TestAgentNodeCompaction:
         agent_node_with_compactor,
         base_flow_state,
         mock_compactor,
-        mock_get_vars_from_state,
+        _mock_get_vars_from_state,
     ):
         """Test that run() passes the compactor to maybe_compact_history."""
         with patch(
@@ -512,7 +523,7 @@ class TestAgentNodeCompaction:
         self,
         agent_node,
         base_flow_state,
-        mock_get_vars_from_state,
+        _mock_get_vars_from_state,
     ):
         """Test that run() passes None to maybe_compact_history when no compactor."""
         with patch(
@@ -541,7 +552,7 @@ class TestAgentNodeTruncation:
             ("max_tokens", "stop_reason"),
         ],
     )
-    async def test_run_truncated_response_returns_with_recovery_message(
+    async def test_run_truncated_response_retries_internally(
         self,
         truncation_finish_reason,
         metadata_key,
@@ -550,27 +561,46 @@ class TestAgentNodeTruncation:
         agent_node,
         base_flow_state,
         component_name,
+        prompt_variables,
+        _mock_maybe_compact_history,
     ):
-        """Test that a truncated LLM response returns immediately with recovery context."""
+        """Test that a truncated LLM response retries internally within AgentNode."""
         truncated_message = copy.copy(mock_ai_message)
         truncated_message.content = "I was writing a long response but got cut off..."
         truncated_message.response_metadata = {metadata_key: truncation_finish_reason}
         truncated_message.tool_calls = []
 
-        mock_prompt.ainvoke = AsyncMock(return_value=truncated_message)
+        # First call returns truncated, second call returns a normal completion
+        normal_message = copy.copy(mock_ai_message)
+        normal_message.response_metadata = {}
+        normal_message.tool_calls = []
+        mock_prompt.ainvoke = AsyncMock(side_effect=[truncated_message, normal_message])
 
         result = await agent_node.run(base_flow_state)
 
-        # Only called once — no internal retry, returns to graph loop
-        assert mock_prompt.ainvoke.call_count == 1
+        # Called twice — internal retry after truncation
+        assert mock_prompt.ainvoke.call_count == 2
 
-        # History includes truncated response + recovery message
+        # Second call should include the truncated message + recovery HumanMessage in history
+        expected_retry_history = [
+            truncated_message,
+            HumanMessage(content=AgentNode._TRUNCATION_RECOVERY_MESSAGE),
+        ]
+        mock_prompt.ainvoke.assert_has_calls(
+            [
+                call(input={**prompt_variables, "history": []}),
+                call(input={**prompt_variables, "history": expected_retry_history}),
+            ]
+        )
+
+        # Final history includes truncated message + recovery message + normal completion
         result_history = result[FlowStateKeys.CONVERSATION_HISTORY][component_name]
-        assert len(result_history) == 2
+        assert len(result_history) == 3
         assert result_history[0] == truncated_message
         assert isinstance(result_history[1], HumanMessage)
         assert "cut off" in result_history[1].content
         assert "concise" in result_history[1].content
+        assert result_history[2] == normal_message
 
     @pytest.mark.asyncio
     async def test_run_non_truncation_abnormal_finish_reason_does_not_retry(
@@ -595,3 +625,60 @@ class TestAgentNodeTruncation:
 
         result_history = result[FlowStateKeys.CONVERSATION_HISTORY][component_name]
         assert result_history == [content_filter_message]
+
+    @pytest.mark.asyncio
+    async def test_run_raises_agent_stuck_error_after_max_truncation_retries(
+        self,
+        mock_ai_message,
+        mock_prompt,
+        agent_node,
+        base_flow_state,
+        _mock_maybe_compact_history,
+    ):
+        """Test that AgentStuckError is raised after exceeding max truncation retries."""
+        truncated_message = copy.copy(mock_ai_message)
+        truncated_message.content = "I was writing a long response but got cut off..."
+        truncated_message.response_metadata = {"finish_reason": "length"}
+        truncated_message.tool_calls = []
+
+        # Always return truncated response
+        mock_prompt.ainvoke = AsyncMock(return_value=truncated_message)
+
+        with pytest.raises(AgentStuckError) as exc_info:
+            await agent_node.run(base_flow_state)
+
+        assert agent_node.name in str(exc_info.value)
+        assert str(AgentNode._MAX_TRUNCATION_RETRIES) in str(exc_info.value)
+        # Should have been called exactly MAX_TRUNCATION_RETRIES times
+        assert mock_prompt.ainvoke.call_count == AgentNode._MAX_TRUNCATION_RETRIES
+
+    @pytest.mark.asyncio
+    async def test_run_truncation_retry_counter_resets_between_runs(
+        self,
+        mock_ai_message,
+        mock_prompt,
+        agent_node,
+        base_flow_state,
+        component_name,
+        _mock_maybe_compact_history,
+    ):
+        """Test that the truncation retry counter is local to each run() call."""
+        truncated_message = copy.copy(mock_ai_message)
+        truncated_message.content = "I was writing a long response but got cut off..."
+        truncated_message.response_metadata = {"finish_reason": "length"}
+        truncated_message.tool_calls = []
+
+        normal_message = copy.copy(mock_ai_message)
+        normal_message.response_metadata = {}
+        normal_message.tool_calls = []
+
+        # First run: truncated once, then normal
+        mock_prompt.ainvoke = AsyncMock(side_effect=[truncated_message, normal_message])
+        await agent_node.run(base_flow_state)
+
+        # Second run: truncated once, then normal — should not accumulate retries from first run
+        mock_prompt.ainvoke = AsyncMock(side_effect=[truncated_message, normal_message])
+        result = await agent_node.run(base_flow_state)
+
+        result_history = result[FlowStateKeys.CONVERSATION_HISTORY][component_name]
+        assert result_history[-1] == normal_message

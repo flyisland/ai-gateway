@@ -24,9 +24,17 @@ from lib.context import LLMFinishReason, extract_finish_reason
 from lib.events import GLReportingEventContext
 from lib.internal_events import InternalEventsClient
 
-__all__ = ["AgentNode", "AgentFinalOutput"]
+__all__ = ["AgentNode", "AgentFinalOutput", "AgentStuckError"]
 
 log = structlog.stdlib.get_logger("agent_node")
+
+
+class AgentStuckError(Exception):
+    """Exception raised when an agent exceeds the maximum number of truncation retries.
+
+    This indicates the agent is stuck in an unrecoverable loop where the LLM repeatedly produces truncated responses
+    despite recovery attempts.
+    """
 
 
 class AgentFinalOutput(BaseAgentOutput):
@@ -124,6 +132,8 @@ class AgentNode:
         "Be more concise and use smaller, incremental steps."
     )
 
+    _MAX_TRUNCATION_RETRIES: int = 5
+
     async def run(self, state: FlowState) -> dict:
         history_iokey = self._conversation_history_key.to_iokey(state)
         history = history_iokey.value_from_state(state) or []
@@ -133,6 +143,8 @@ class AgentNode:
             compactor=self._compactor, history=history, agent_name=self.name
         )
 
+        truncation_retries: int = 0
+
         while True:
             try:
                 completion: AIMessage = cast(
@@ -141,11 +153,20 @@ class AgentNode:
                 )
                 finish_reason = extract_finish_reason(completion.response_metadata)
                 if finish_reason in LLMFinishReason.truncation_values():
+                    truncation_retries += 1
                     log.warning(
                         "LLM response was truncated due to token limit; "
-                        "injecting recovery message and returning to graph loop",
+                        "injecting recovery message and retrying within AgentNode",
                         finish_reason=finish_reason,
+                        truncation_retries=truncation_retries,
+                        max_truncation_retries=self._MAX_TRUNCATION_RETRIES,
                     )
+                    if truncation_retries >= self._MAX_TRUNCATION_RETRIES:
+                        raise AgentStuckError(
+                            f"Agent '{self.name}' is stuck in an unrecoverable loop: "
+                            f"LLM response was truncated {truncation_retries} times in a row, "
+                            f"exceeding the maximum of {self._MAX_TRUNCATION_RETRIES} retries."
+                        )
                     history = restore_message_consistency(
                         [
                             *history,
@@ -153,7 +174,7 @@ class AgentNode:
                             HumanMessage(content=self._TRUNCATION_RECOVERY_MESSAGE),
                         ]
                     )
-                    return history_iokey.to_nested_dict(history)
+                    continue
 
                 if finish_reason in LLMFinishReason.abnormal_values():
                     log.warning(f"LLM stopped abnormally with reason: {finish_reason}")
