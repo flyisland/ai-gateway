@@ -2068,14 +2068,14 @@ reference = "litellm"
 
 [[package]]
 name = "google-auth"
-version = "2.49.1"
+version = "2.50.0"
 description = "Google Authentication Library"
 optional = false
 python-versions = ">=3.8"
 groups = ["main", "eval"]
 files = [
-    {file = "google_auth-2.49.1-py3-none-any.whl", hash = "sha256:195ebe3dca18eddd1b3db5edc5189b76c13e96f29e73043b923ebcf3f1a860f7"},
-    {file = "google_auth-2.49.1.tar.gz", hash = "sha256:16d40da1c3c5a0533f57d268fe72e0ebb0ae1cc3b567024122651c045d879b64"},
+    {file = "google_auth-2.50.0-py3-none-any.whl", hash = "sha256:04382175e28b94f49694977f0a792688b59a668def1499e9d8de996dc9ce5b15"},
+    {file = "google_auth-2.50.0.tar.gz", hash = "sha256:f35eafb191195328e8ce10a7883970877e7aeb49c2bfaa54aa0e394316d353d0"},
 ]
 
 [package.dependencies]
