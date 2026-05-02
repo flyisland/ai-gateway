@@ -6,17 +6,22 @@ import pytest
 from gitlab_cloud_connector import CloudConnectorUser, UserClaims
 from langchain.messages import AIMessage
 
+from ai_gateway.container import ContainerApplication
 from duo_workflow_service.components.tools_registry import ToolMetadata, ToolsRegistry
 from duo_workflow_service.entities.event import WorkflowEvent
 from duo_workflow_service.entities.state import (
+    MessageTypeEnum,
     Plan,
     Task,
+    UiChatLog,
     WorkflowState,
     WorkflowStatusEnum,
 )
 from duo_workflow_service.executor.outbox import Outbox
 from duo_workflow_service.gitlab.gitlab_api import Namespace, Project
 from duo_workflow_service.gitlab.http_client import GitlabHttpClient
+from duo_workflow_service.server import CONTAINER_APPLICATION_PACKAGES
+from duo_workflow_service.workflows.type_definitions import AdditionalContext
 from lib.context import gitlab_version
 from lib.events import GLReportingEventContext
 
@@ -286,3 +291,55 @@ def mock_ai_message_fixture():
     mock_message.invalid_tool_calls = []
     mock_message.additional_kwargs = {}
     return mock_message
+
+
+@pytest.fixture(name="mock_duo_workflow_service_container")
+def mock_duo_workflow_service_container_fixture(
+    mock_container: ContainerApplication,
+) -> ContainerApplication:
+    mock_container.wire(packages=CONTAINER_APPLICATION_PACKAGES)
+
+    return mock_container
+
+
+@pytest.fixture(name="ui_chat_log")
+def ui_chat_log_fixture() -> list[UiChatLog]:
+    return [
+        {
+            "message_type": MessageTypeEnum.AGENT,
+            "content": "This is a test message",
+            "timestamp": "2025-01-08T12:00:00Z",
+            "status": None,
+            "correlation_id": None,
+            "tool_info": None,
+            "message_sub_type": None,
+            "additional_context": None,
+            "message_id": None,
+        }
+    ]
+
+
+@pytest.fixture(name="last_human_input")
+def last_human_input_fixture() -> WorkflowEvent | None:
+    return None
+
+
+@pytest.fixture(name="workflow_state", scope="function")
+def workflow_state_fixture(
+    project: Project,
+    goal: str | None,
+    last_human_input: WorkflowEvent | None,
+    ui_chat_log: list[UiChatLog],
+    additional_context: list[AdditionalContext] | None,
+):
+    return WorkflowState(
+        plan=Plan(steps=[]),
+        status=WorkflowStatusEnum.NOT_STARTED,
+        conversation_history={},
+        handover=[],
+        last_human_input=last_human_input,
+        ui_chat_log=ui_chat_log,
+        project=project,
+        goal=goal,
+        additional_context=additional_context,
+    )
