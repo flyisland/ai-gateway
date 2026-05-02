@@ -1,8 +1,7 @@
 import os
-from contextlib import contextmanager
 from pathlib import Path
 from typing import Any, AsyncIterator, Literal, Optional, Union
-from unittest.mock import AsyncMock, Mock, PropertyMock, patch
+from unittest.mock import AsyncMock, Mock, patch
 
 import httpx
 import litellm
@@ -29,8 +28,6 @@ from ai_gateway.api.middleware import (
 from ai_gateway.api.middleware.internal_event import InternalEventMiddleware
 from ai_gateway.api.middleware.route import usage_quota
 from ai_gateway.api.server import CONTAINER_APPLICATION_MODULES
-from ai_gateway.code_suggestions.base import CodeSuggestionsChunk, CodeSuggestionsOutput
-from ai_gateway.code_suggestions.processing.typing import LanguageId
 from ai_gateway.config import Config, ConfigModelLimits
 from ai_gateway.container import ContainerApplication
 from ai_gateway.model_metadata import ModelMetadata, TypeModelMetadata
@@ -41,26 +38,10 @@ from ai_gateway.model_selection.model_selection_config import (
     PromptParams,
 )
 from ai_gateway.model_selection.models import BaseModelParams, ModelClassProvider
-from ai_gateway.models.base import ModelMetadata as LegacyModelMetadata
-from ai_gateway.models.base_text import (
-    TextGenModelBase,
-    TextGenModelChunk,
-    TextGenModelOutput,
-)
 from ai_gateway.prompts import Prompt
 from ai_gateway.prompts.config.base import ModelConfig, PromptConfig
 from ai_gateway.prompts.typing import Model, TypeModelFactory, TypePromptTemplateFactory
-from ai_gateway.safety_attributes import SafetyAttributes
-from duo_workflow_service.entities.event import WorkflowEvent
-from duo_workflow_service.entities.state import (
-    MessageTypeEnum,
-    Plan,
-    UiChatLog,
-    WorkflowState,
-    WorkflowStatusEnum,
-)
 from duo_workflow_service.gitlab.gitlab_api import Project
-from duo_workflow_service.server import CONTAINER_APPLICATION_PACKAGES
 from duo_workflow_service.workflows.type_definitions import AdditionalContext
 from lib.billing_events.client import BillingEventsClient
 from lib.billing_events.service import BillingEventService
@@ -91,19 +72,6 @@ os.environ["LANGCHAIN_TRACING_V2"] = "false"
 @pytest.fixture(name="assets_dir")
 def assets_dir_fixture() -> Path:
     return Path(__file__).parent / "_assets"
-
-
-@pytest.fixture(name="tpl_assets_codegen_dir")
-def tpl_assets_codegen_dir_fixture(assets_dir) -> Path:
-    tpl_dir = assets_dir / "tpl"
-    return tpl_dir / "codegen"
-
-
-@pytest.fixture(name="text_gen_base_model")
-def text_gen_base_model_fixture():
-    model = Mock(spec=TextGenModelBase)
-    type(model).input_token_limit = PropertyMock(return_value=1_000)
-    return model
 
 
 @pytest.fixture(name="stub_auth_provider", scope="class")
@@ -137,20 +105,6 @@ def test_client_fixture(fast_api_router, stub_auth_provider):
 def model_metadata_context_fixture():
     current_model_metadata_with_size_context.set(None)
     yield current_model_metadata_with_size_context
-
-
-@pytest.fixture(name="mock_track_internal_event")
-def mock_track_internal_event_fixture():
-    with patch("lib.internal_events.InternalEventsClient.track_event") as mock:
-        yield mock
-
-
-@pytest.fixture(name="mock_track_billing_event")
-def mock_track_billing_event_fixture():
-    with patch(
-        "lib.billing_events.client.BillingEventsClient.track_billing_event"
-    ) as mock:
-        yield mock
 
 
 @pytest.fixture(name="mock_client")
@@ -223,212 +177,6 @@ def mock_ai_gateway_container_fixture(
     return mock_container
 
 
-@pytest.fixture(name="mock_duo_workflow_service_container")
-def mock_duo_workflow_service_container_fixture(
-    mock_container: ContainerApplication,
-) -> ContainerApplication:
-    mock_container.wire(packages=CONTAINER_APPLICATION_PACKAGES)
-
-    return mock_container
-
-
-@pytest.fixture(name="mock_output_text")
-def mock_output_text_fixture():
-    return "test completion"
-
-
-@pytest.fixture(name="mock_output")
-def mock_output_fixture(mock_output_text: str):
-    return TextGenModelOutput(
-        text=mock_output_text,
-        score=10_000,
-        safety_attributes=SafetyAttributes(),
-    )
-
-
-@contextmanager
-def _mock_generate(klass: str, mock_output: TextGenModelOutput):
-    with patch(f"{klass}.generate", return_value=mock_output) as mock:
-        yield mock
-
-
-@contextmanager
-def _mock_async_generate(klass: str, mock_output: TextGenModelOutput):
-    async def _stream(*_args: Any, **_kwargs: Any) -> AsyncIterator[TextGenModelChunk]:
-        for c in list(mock_output.text):
-            yield TextGenModelChunk(text=c)
-
-    with patch(f"{klass}.generate", side_effect=_stream) as mock:
-        yield mock
-
-
-@pytest.fixture(name="mock_code_bison")
-def mock_code_bison_fixture(mock_output: TextGenModelOutput):
-    with _mock_generate(
-        "ai_gateway.models.vertex_text.PalmCodeBisonModel", mock_output
-    ) as mock:
-        yield mock
-
-
-@pytest.fixture(name="mock_anthropic")
-def mock_anthropic_fixture(mock_output: TextGenModelOutput):
-    with _mock_generate(
-        "ai_gateway.models.anthropic.AnthropicModel", mock_output
-    ) as mock:
-        yield mock
-
-
-@pytest.fixture(name="mock_anthropic_chat")
-def mock_anthropic_chat_fixture(mock_output: TextGenModelOutput):
-    with _mock_generate(
-        "ai_gateway.models.anthropic.AnthropicChatModel", mock_output
-    ) as mock:
-        yield mock
-
-
-@pytest.fixture(name="mock_anthropic_stream")
-def mock_anthropic_stream_fixture(mock_output: TextGenModelOutput):
-    with _mock_async_generate(  # pylint: disable=contextmanager-generator-missing-cleanup
-        "ai_gateway.models.anthropic.AnthropicModel", mock_output
-    ) as mock:
-        yield mock
-
-
-@pytest.fixture(name="mock_anthropic_chat_stream")
-def mock_anthropic_chat_stream_fixture(mock_output: TextGenModelOutput):
-    with _mock_async_generate(  # pylint: disable=contextmanager-generator-missing-cleanup
-        "ai_gateway.models.anthropic.AnthropicChatModel", mock_output
-    ) as mock:
-        yield mock
-
-
-@pytest.fixture(name="mock_llm_chat")
-def mock_llm_chat_fixture(mock_output: TextGenModelOutput):
-    with _mock_generate(
-        "ai_gateway.models.litellm.LiteLlmChatModel", mock_output
-    ) as mock:
-        yield mock
-
-
-@pytest.fixture(name="mock_llm_text")
-def mock_llm_text_fixture(mock_output: TextGenModelOutput):
-    with _mock_generate(
-        "ai_gateway.models.litellm.LiteLlmTextGenModel", mock_output
-    ) as mock:
-        yield mock
-
-
-@pytest.fixture(name="mock_agent_model")
-def mock_agent_model_fixture(mock_output: TextGenModelOutput):
-    with _mock_generate(
-        "ai_gateway.models.agent_model.AgentModel", mock_output
-    ) as mock:
-        yield mock
-
-
-@pytest.fixture(name="mock_amazon_q_model")
-def mock_amazon_q_model_fixture(mock_output: TextGenModelOutput):
-    with _mock_generate("ai_gateway.models.amazon_q.AmazonQModel", mock_output) as mock:
-        yield mock
-
-
-# Legacy completions output fixtures removed as CodeCompletionsLegacy no longer exists
-
-
-@pytest.fixture(name="mock_suggestions_output_text")
-def mock_suggestions_output_text_fixture():
-    return "def search"
-
-
-@pytest.fixture(name="mock_suggestions_model")
-def mock_suggestions_model_fixture():
-    return "claude-3-haiku-20240307"
-
-
-@pytest.fixture(name="mock_suggestions_engine")
-def mock_suggestions_engine_fixture():
-    return "anthropic"
-
-
-@pytest.fixture(name="mock_suggestions_output")
-def mock_suggestions_output_fixture(
-    mock_suggestions_output_text: str,
-    mock_suggestions_model: str,
-    mock_suggestions_engine: str,
-):
-    return CodeSuggestionsOutput(
-        text=mock_suggestions_output_text,
-        score=0,
-        model_metadata=LegacyModelMetadata(
-            name=mock_suggestions_model, engine=mock_suggestions_engine
-        ),
-        lang_id=LanguageId.PYTHON,
-        metadata=CodeSuggestionsOutput.Metadata(),  # type: ignore[attr-defined]
-    )
-
-
-@contextmanager
-def _mock_execute(klass: str, mock_suggestions_output: CodeSuggestionsOutput):
-    with patch(f"{klass}.execute", return_value=mock_suggestions_output) as mock:
-        yield mock
-
-
-@pytest.fixture(name="mock_generations")
-def mock_generations_fixture(mock_suggestions_output: CodeSuggestionsOutput):
-    with _mock_execute(
-        "ai_gateway.code_suggestions.CodeGenerations", mock_suggestions_output
-    ) as mock:
-        yield mock
-
-
-@pytest.fixture(name="mock_completions")
-def mock_completions_fixture(mock_suggestions_output: CodeSuggestionsOutput):
-    with _mock_execute(
-        "ai_gateway.code_suggestions.CodeCompletions", mock_suggestions_output
-    ) as mock:
-        yield mock
-
-
-@contextmanager
-def _mock_async_execute(klass: str, mock_suggestions_output: CodeSuggestionsOutput):
-    async def _stream(
-        *_args: Any, **_kwargs: Any
-    ) -> AsyncIterator[CodeSuggestionsChunk]:
-        for c in list(mock_suggestions_output.text):
-            yield CodeSuggestionsChunk(text=c)
-
-    with patch(f"{klass}.execute", side_effect=_stream) as mock:
-        yield mock
-
-
-@pytest.fixture(name="mock_generations_stream")
-def mock_generations_stream_fixture(mock_suggestions_output: CodeSuggestionsOutput):
-    with (  # pylint: disable=contextmanager-generator-missing-cleanup
-        _mock_async_execute(
-            "ai_gateway.code_suggestions.CodeGenerations", mock_suggestions_output
-        ) as mock
-    ):
-        yield mock
-
-
-@pytest.fixture(name="mock_completions_stream")
-def mock_completions_stream_fixture(mock_suggestions_output: CodeSuggestionsOutput):
-    with (  # pylint: disable=contextmanager-generator-missing-cleanup
-        _mock_async_execute(
-            "ai_gateway.code_suggestions.CodeCompletions", mock_suggestions_output
-        ) as mock
-    ):
-        yield mock
-
-
-@pytest.fixture(name="mock_with_prompt_prepared")
-def mock_with_prompt_prepared_fixture():
-    with patch(
-        "ai_gateway.code_suggestions.CodeGenerations.with_prompt_prepared"
-    ) as mock:
-        yield mock
-
-
 @pytest.fixture(name="mock_litellm_acompletion")
 def mock_litellm_acompletion_fixture():
     with patch("ai_gateway.models.litellm.acompletion") as mock_acompletion:
@@ -442,39 +190,6 @@ def mock_litellm_acompletion_fixture():
             ],
             usage=AsyncMock(completion_tokens=999),
         )
-
-        yield mock_acompletion
-
-
-@pytest.fixture(name="mock_litellm_atext_completion")
-def mock_litellm_atext_completion_fixture():
-    with patch("litellm.atext_completion") as mock_acompletion:
-        mock_acompletion.return_value = AsyncMock(
-            choices=[
-                AsyncMock(
-                    text="Test text completion response",
-                    logprobs=AsyncMock(token_logprobs=[999]),
-                ),
-            ],
-            usage={"prompt_tokens": 1, "completion_tokens": 999, "total_tokens": 1000},
-        )
-
-        yield mock_acompletion
-
-
-@pytest.fixture(name="mock_litellm_acompletion_streamed")
-def mock_litellm_acompletion_streamed_fixture():
-    with patch("ai_gateway.models.litellm.acompletion") as mock_acompletion:
-        streamed_response = AsyncMock()
-        streamed_response.__aiter__.return_value = iter(
-            [
-                AsyncMock(
-                    choices=[AsyncMock(delta=AsyncMock(content="Streamed content"))]
-                )
-            ]
-        )
-
-        mock_acompletion.return_value = streamed_response
 
         yield mock_acompletion
 
@@ -768,31 +483,9 @@ def user_fixture(auth_user: CloudConnectorUser) -> StarletteUser | None:
     return StarletteUser(auth_user)
 
 
-@pytest.fixture(name="ui_chat_log")
-def ui_chat_log_fixture() -> list[UiChatLog]:
-    return [
-        {
-            "message_type": MessageTypeEnum.AGENT,
-            "content": "This is a test message",
-            "timestamp": "2025-01-08T12:00:00Z",
-            "status": None,
-            "correlation_id": None,
-            "tool_info": None,
-            "message_sub_type": None,
-            "additional_context": None,
-            "message_id": None,
-        }
-    ]
-
-
 @pytest.fixture(name="goal")
 def goal_fixture() -> str:
     return "Make the world a better place"
-
-
-@pytest.fixture(name="last_human_input")
-def last_human_input_fixture() -> WorkflowEvent | None:
-    return None
 
 
 @pytest.fixture(name="project")
@@ -812,27 +505,6 @@ def project_fixture() -> Project:
 @pytest.fixture(name="additional_context")
 def additional_context_fixture() -> list[AdditionalContext] | None:
     return None
-
-
-@pytest.fixture(name="workflow_state", scope="function")
-def workflow_state_fixture(
-    project: Project,
-    goal: str | None,
-    last_human_input: WorkflowEvent | None,
-    ui_chat_log: list[UiChatLog],
-    additional_context: list[AdditionalContext] | None,
-):
-    return WorkflowState(
-        plan=Plan(steps=[]),
-        status=WorkflowStatusEnum.NOT_STARTED,
-        conversation_history={},
-        handover=[],
-        last_human_input=last_human_input,
-        ui_chat_log=ui_chat_log,
-        project=project,
-        goal=goal,
-        additional_context=additional_context,
-    )
 
 
 @pytest.fixture(autouse=True)
