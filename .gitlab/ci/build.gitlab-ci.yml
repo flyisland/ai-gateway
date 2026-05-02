@@ -4,54 +4,113 @@ install:
   script:
     - poetry install
 
+.docker-build-arch:
+  extends:
+    - .docker
+  parallel:
+    matrix:
+      - ARCH: amd64
+        RUNNER: saas-linux-medium-amd64
+      - ARCH: arm64
+        RUNNER: saas-linux-medium-arm64
+  tags:
+    - $RUNNER
+  script:
+    - docker buildx build
+        --file "${BUILD_FILE:-Dockerfile}"
+        --tag "${BUILD_TAG}-${ARCH}"
+        ${BUILD_EXTRA_ARGS}
+        --push
+        .
+
+.docker-manifest:
+  extends:
+    - .docker
+  script:
+    - docker manifest create ${MANIFEST_TAG}
+        ${MANIFEST_TAG}-amd64
+        ${MANIFEST_TAG}-arm64
+    - docker manifest push ${MANIFEST_TAG}
+
+build-docker-model-gateway-arch:
+  stage: build
+  extends:
+    - .docker-build-arch
+  variables:
+    BUILD_TAG: "${TARGET_IMAGE}"
+    BUILD_EXTRA_ARGS: "--build-arg GITLAB_API_TOKEN=$GITLAB_API_TOKEN"
+
 build-docker-model-gateway:
   stage: build
   extends:
-    - .kaniko_base
+    - .docker-manifest
   variables:
-    KANIKO_BUILD_FILE: Dockerfile
-    KANIKO_DESTINATION: "${TARGET_IMAGE}"
-    KANIKO_EXTRA_ARGS:
-      --build-arg GITLAB_API_TOKEN=$GITLAB_API_TOKEN
+    MANIFEST_TAG: "${TARGET_IMAGE}"
+  needs:
+    - build-docker-model-gateway-arch
 
 build:ingest-image:
   stage: build
   extends:
-    - .kaniko_base
+    - .docker
+  script:
+    - docker buildx build
+        --file scripts/ingest/Dockerfile
+        --tag "${INGEST_IMAGE}"
+        --push
+        .
+
+build:self-hosted-ai-gateway-image-arch:
+  stage: build
+  extends:
+    - .docker-build-arch
   variables:
-    KANIKO_BUILD_FILE: scripts/ingest/Dockerfile
-    KANIKO_DESTINATION: "${INGEST_IMAGE}"
+    BUILD_FILE: docker/self_hosted/Dockerfile
+    BUILD_TAG: "${TARGET_IMAGE}"
+    BUILD_EXTRA_ARGS: "--build-arg TAG=$CI_COMMIT_TAG --build-arg SRC_IMAGE=${TARGET_IMAGE}-${ARCH}"
+  rules:
+    - if: $CI_COMMIT_TAG =~ /^self-hosted-/
+  needs:
+    - build-docker-model-gateway
 
 build:self-hosted-ai-gateway-image:
   stage: build
   extends:
-    - .kaniko_base
+    - .docker-manifest
   variables:
-    KANIKO_BUILD_FILE: docker/self_hosted/Dockerfile
-    KANIKO_DESTINATION: "${TARGET_IMAGE}"
-    KANIKO_EXTRA_ARGS: |
-      --build-arg TAG=$CI_COMMIT_TAG
-      --build-arg SRC_IMAGE="${TARGET_IMAGE}"
+    MANIFEST_TAG: "${TARGET_IMAGE}"
   rules:
     - if: $CI_COMMIT_TAG =~ /^self-hosted-/
+  needs:
+    - build:self-hosted-ai-gateway-image-arch
+
+build:self-hosted-ai-gateway-latest-image-arch:
+  stage: build
+  extends:
+    - .docker-build-arch
+  variables:
+    BUILD_FILE: docker/self_hosted/Dockerfile
+    BUILD_TAG: "${SELF_HOSTED_TARGET_IMAGE}"
+    BUILD_EXTRA_ARGS: "--build-arg TAG=master --build-arg SRC_IMAGE=${TARGET_IMAGE}-${ARCH}"
+  rules:
+    - if: $CI_COMMIT_BRANCH && $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
   needs:
     - build-docker-model-gateway
 
 build:self-hosted-ai-gateway-latest-image:
   stage: build
   extends:
-    - .kaniko_base
+    - .docker-manifest
   variables:
-    KANIKO_BUILD_FILE: docker/self_hosted/Dockerfile
-    KANIKO_DESTINATION: "${SELF_HOSTED_TARGET_IMAGE}"
-    KANIKO_EXTRA_ARGS: |
-      --build-arg TAG=master
-      --build-arg SRC_IMAGE="${TARGET_IMAGE}"
+    MANIFEST_TAG: "${SELF_HOSTED_TARGET_IMAGE}"
   rules:
     - if: $CI_COMMIT_BRANCH && $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
   needs:
-    - build-docker-model-gateway
+    - build:self-hosted-ai-gateway-latest-image-arch
 
+# FIPS builds use buildx for --build-context support.
+# arm64 FIPS images are not yet supported due to UBI9 base image
+# and CNG hardening script compatibility concerns.
 .build-fips-base-image:
   stage: build
   extends:
@@ -64,8 +123,8 @@ build:self-hosted-ai-gateway-latest-image:
         --tag "$TARGET_IMAGE"
         --build-arg GITLAB_API_TOKEN=$GITLAB_API_TOKEN
         --build-context hardening=https://gitlab.com/gitlab-org/build/CNG.git#v18.3.5:hardening
+        --push
         .
-    - docker push "$TARGET_IMAGE"
   needs:
     - build-docker-model-gateway
 
@@ -91,8 +150,8 @@ build:ai-gateway-fips-base-image-nightly:
         --tag "$TARGET_IMAGE"
         --build-arg TAG=${FIPS_TAG}
         --build-arg SRC_IMAGE="${FIPS_TARGET_IMAGE}"
+        --push
         .
-    - docker push "$TARGET_IMAGE"
 
 build:self-hosted-ai-gateway-fips-image:
   extends: .build-self-hosted-fips-base-image
