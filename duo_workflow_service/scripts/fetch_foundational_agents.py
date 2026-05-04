@@ -115,12 +115,63 @@ def save_workflow_to_file(
 ) -> str:
     """Save a workflow definition to a versioned YAML file.
 
-    Configs are stored in a versioned subdirectory structure:
-    ``{DIRECTORY_PATH}/{agent_id}/{DEFAULT_FLOW_VERSION}.yml``
+    Configs are stored in a versioned subdirectory structure::
+
+        {DIRECTORY_PATH}/{agent_id}/{DEFAULT_FLOW_VERSION}.yml
 
     This matches the flow registry layout introduced by the semver restructuring,
     where each flow name gets its own directory and versions are separate files
     within that directory.
+
+    **Current limitation — always saves as version 1.0.0**
+
+    This function always writes the fetched flow config as ``1.0.0.yml``,
+    regardless of the version declared inside the YAML itself.  Bundling
+    multiple major versions side by side (e.g. ``1.0.0.yml`` and ``2.0.0.yml``)
+    for self-hosted instances is not yet supported.  If you need to update an
+    existing flow, delete the old file first and re-run the script, or edit the
+    file in place.
+
+    **Raises ``FileExistsError`` if the target file already exists**
+
+    The function does *not* overwrite an existing file.  If
+    ``{DIRECTORY_PATH}/{agent_id}/1.0.0.yml`` already exists the call raises
+    ``FileExistsError`` and no data is written.  This is intentional: it
+    prevents accidental overwrites of hand-edited or previously synced configs.
+    To update an existing flow, remove the old file manually before running the
+    script.
+
+    Args:
+        agent_id: The flow name used as the subdirectory name (e.g. ``"developer"``).
+            This is the ``file_name`` portion of the ``file_name:catalog_id`` pair
+            passed on the command line.
+        flow_def: Raw YAML string fetched from the AI Catalog.  It is validated
+            against ``flow_config_model`` before being written to disk.
+        flow_config_model: The Pydantic model class that corresponds to the
+            requested flow registry version (``V1FlowConfig`` or
+            ``ExperimentalFlowConfig``).  Its ``DIRECTORY_PATH`` attribute
+            determines the root directory where the file is written.
+
+    Returns:
+        The absolute path of the file that was written.
+
+    Raises:
+        FileExistsError: If the target file already exists (no overwrite).
+        yaml.YAMLError: If ``flow_def`` is not valid YAML.
+        pydantic.ValidationError: If the parsed YAML does not conform to
+            ``flow_config_model``.
+
+    Example::
+
+        # Fetch and save the "developer" flow from catalog item 348 using the
+        # v1 flow registry schema:
+        #
+        #   python fetch_foundational_agents.py \\
+        #       http://gdk.test:3000 $TOKEN developer:348 \\
+        #       --flow-registry-version v1
+        #
+        # This writes:
+        #   duo_workflow_service/agent_platform/v1/flows/configs/developer/1.0.0.yml
     """
     # This always saves as the default version (1.0.0). Bundling multiple
     # major versions side by side for self-hosted instances is not yet
