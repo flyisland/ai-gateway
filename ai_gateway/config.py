@@ -24,7 +24,6 @@ __all__ = [
     "ConfigAuditEvent",
     "ConfigCachingProxy",
     "ConfigDuoWorkflow",
-    "ConfigModelEndpoints",
 ]
 
 ENV_PREFIX = "AIGW"
@@ -138,17 +137,6 @@ class ConfigAgenticMock(BaseModel):
 class ConfigModelKeys(BaseModel):
     mistral_api_key: Optional[str] = None
     fireworks_provider_api_key: Optional[str] = None
-
-
-class ConfigModelEndpoints(BaseModel):
-    fireworks_regional_endpoints: dict[str, dict[str, dict[str, str]]] = Field(
-        default_factory=dict,
-        description=(
-            "Regional Fireworks endpoint configuration keyed by region, then model name. "
-            "Each entry may include 'endpoint' and 'identifier' keys. "
-            "Set via AIGW_MODEL_ENDPOINTS__FIREWORKS_REGIONAL_ENDPOINTS."
-        ),
-    )
 
 
 def _build_location(default: str = "us-central1") -> str:
@@ -336,9 +324,6 @@ class Config(BaseSettings):
     duo_workflow: Annotated[
         ConfigDuoWorkflow, Field(default_factory=ConfigDuoWorkflow)
     ] = ConfigDuoWorkflow()
-    model_endpoints: Annotated[
-        ConfigModelEndpoints, Field(default_factory=ConfigModelEndpoints)
-    ] = ConfigModelEndpoints()
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)

@@ -33,67 +33,24 @@ def test_mock_selector(mock_model_responses, use_agentic_mock, expected_selector
 
 
 @pytest.mark.parametrize(
-    ("fireworks_api_base_url", "fireworks_regional_endpoints", "expected"),
+    ("fireworks_api_base_url", "expected"),
     [
         (
             "https://api.fireworks.ai/inference/v1",
-            {},
             frozenset(["https://api.fireworks.ai/inference/v1"]),
         ),
-        (
-            "https://api.fireworks.ai/inference/v1",
-            {
-                "us-east-1": {
-                    "model-a": {"endpoint": "https://us-east.fireworks.ai/v1"},
-                    "model-b": {"endpoint": "https://us-east.fireworks.ai/v1"},
-                },
-                "eu-west-1": {
-                    "model-c": {"endpoint": "https://eu-west.fireworks.ai/v1"},
-                },
-            },
-            frozenset(
-                [
-                    "https://api.fireworks.ai/inference/v1",
-                    "https://us-east.fireworks.ai/v1",
-                    "https://eu-west.fireworks.ai/v1",
-                ]
-            ),
-        ),
-        (
-            "https://api.fireworks.ai/inference/v1",
-            {
-                "us-east-1": {
-                    "model-a": {"some_other_key": "value"},
-                },
-            },
-            frozenset(["https://api.fireworks.ai/inference/v1"]),
-        ),
-        # trailing slashes are stripped during normalization
+        # trailing slash is stripped during normalization
         (
             "https://api.fireworks.ai/inference/v1/",
-            {
-                "us-east-1": {
-                    "model-a": {"endpoint": "https://us-east.fireworks.ai/v1/"},
-                },
-            },
-            frozenset(
-                [
-                    "https://api.fireworks.ai/inference/v1",
-                    "https://us-east.fireworks.ai/v1",
-                ]
-            ),
+            frozenset(["https://api.fireworks.ai/inference/v1"]),
         ),
         # empty base URL is excluded
-        ("", {}, frozenset()),
-        ("   ", {}, frozenset()),
+        ("", frozenset()),
+        ("   ", frozenset()),
     ],
 )
-def test_compute_fireworks_allowed_api_bases(
-    fireworks_api_base_url, fireworks_regional_endpoints, expected
-):
-    result = _compute_fireworks_allowed_api_bases(
-        fireworks_api_base_url, fireworks_regional_endpoints
-    )
+def test_compute_fireworks_allowed_api_bases(fireworks_api_base_url, expected):
+    result = _compute_fireworks_allowed_api_bases(fireworks_api_base_url)
     assert result == expected
 
 

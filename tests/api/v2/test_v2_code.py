@@ -2447,23 +2447,13 @@ class TestAmazonQIntegration:
 
 class TestCustomModelsSSRF:
     @pytest.fixture(name="config_values")
-    def config_values_fixture(self, assets_dir, gcp_location):
+    def config_values_fixture(self, assets_dir):
         return {
             "custom_models": {
                 "enabled": False,
             },
             "self_signed_jwt": {
                 "signing_key": open(assets_dir / "keys" / "signing_key.pem").read(),
-            },
-            "model_endpoints": {
-                "fireworks_regional_endpoints": {
-                    gcp_location: {
-                        "qwen2p5-coder-7b": {
-                            "endpoint": "https://fireworks.endpoint",
-                            "identifier": "qwen2p5-coder-7b",
-                        },
-                    },
-                },
             },
         }
 
