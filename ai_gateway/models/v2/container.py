@@ -27,19 +27,17 @@ litellm.module_level_aclient = AsyncHTTPHandler(event_hooks={"request": [log_req
 
 def _compute_fireworks_allowed_api_bases(
     fireworks_api_base_url: str,
-    fireworks_regional_endpoints: dict[str, dict[str, dict[str, str]]],
 ) -> frozenset[str]:
-    """Compute the set of allowed Fireworks API base URLs from operator configuration."""
-    bases = (
-        {fireworks_api_base_url.rstrip("/")}
-        if fireworks_api_base_url.strip()
-        else set()
-    )
-    for region_models in fireworks_regional_endpoints.values():
-        for model_config in region_models.values():
-            if endpoint := model_config.get("endpoint"):
-                bases.add(endpoint.rstrip("/"))
-    return frozenset(bases)
+    """Compute the set of allowed Fireworks API base URLs from operator configuration.
+
+    Fireworks regional endpoints have been discontinued. The single ``fireworks_api_base_url``
+    (configured via ``AIGW_FIREWORKS_API_BASE_URL``) is the only endpoint that needs to be
+    allowlisted so that the SSRF protection in ``validate_custom_endpoint`` permits outgoing
+    requests to Fireworks without requiring custom models to be enabled.
+    """
+    if fireworks_api_base_url.strip():
+        return frozenset([fireworks_api_base_url.rstrip("/")])
+    return frozenset()
 
 
 def _init_google_chat_gen_vertex_ai_global_client(config: dict[str, Any]):
@@ -76,7 +74,6 @@ class ContainerModels(containers.DeclarativeContainer):
     _fireworks_allowed_api_bases = providers.Singleton(
         _compute_fireworks_allowed_api_bases,
         fireworks_api_base_url=config.fireworks_api_base_url,
-        fireworks_regional_endpoints=config.model_endpoints.fireworks_regional_endpoints,
     )
 
     _duo_workflow = providers.Callable(
