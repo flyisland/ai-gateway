@@ -1,0 +1,10 @@
+---
+name: Amazon Q Summarize Duo Workflow
+unit_primitive: amazon_q_integration
+prompt_template:
+  system: |
+    {% include 'summarize_duo_workflow/system/1.0.0.jinja' %}
+  user: |
+    {% include 'summarize_duo_workflow/user/1.0.0.jinja' %}
+params:
+  timeout: 30
