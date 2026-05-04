@@ -37,6 +37,50 @@ configs/
 
 The API version (v1, experimental) is already determined by the root path (`agent_platform/v1` vs `agent_platform/experimental`), so it's not included in the directory structure.
 
+### Syncing Flows from the AI Catalog
+
+The `fetch-foundational-agents` script (`duo_workflow_service/scripts/fetch_foundational_agents.py`) fetches a flow
+config from the GitLab AI Catalog and writes it to the correct versioned path in the flow registry.
+
+**Usage:**
+
+```shell
+poetry run fetch-foundational-agents \
+  <gitlab_url> \
+  <gitlab_token> \
+  <agent_ids> \
+  --flow-registry-version <v1|experimental>
+```
+
+Where `<agent_ids>` is a comma-separated list of `file_name:catalog_id` pairs, for example:
+
+```shell
+poetry run fetch-foundational-agents \
+  http://gdk.test:3000 \
+  $TOKEN \
+  developer:348,code_review:349 \
+  --flow-registry-version v1
+```
+
+This writes:
+
+```plaintext
+duo_workflow_service/agent_platform/v1/flows/configs/developer/1.0.0.yml
+duo_workflow_service/agent_platform/v1/flows/configs/code_review/1.0.0.yml
+```
+
+Use `--dry-run` to print the fetched YAML to stdout without writing any files.
+
+> **Current limitation — always saves as version `1.0.0`**
+>
+> The script always writes the fetched config as `1.0.0.yml`, regardless of the version declared inside the YAML
+> itself. Bundling multiple major versions side by side (e.g. `1.0.0.yml` and `2.0.0.yml`) for self-hosted instances
+> is not yet supported.
+>
+> If you need to update an existing flow, delete the old file first and re-run the script, or edit the file in place.
+> The script raises a `FileExistsError` and exits without writing anything if the target file already exists — it
+> never overwrites.
+
 ### Requesting a Flow
 
 There are two ways to request a flow from a client:
@@ -54,9 +98,32 @@ Use `flowConfigId`, `flowConfigSchemaVersion`, and `flowVersion` in `StartWorkfl
 All three fields must be provided together.
 `flowConfigId` and `flowConfig` are mutually exclusive — the server rejects requests that set both.
 
+**Example — requesting the `developer` flow at version `1.0.0` via `grpcurl`:**
+
+```shell
+grpcurl \
+  -plaintext \
+  -H "Authorization: Bearer $TOKEN" \
+  -d '{
+    "goal": "Fix the failing test in src/utils.py",
+    "flow_config_id": "developer",
+    "flow_config_schema_version": "v1",
+    "flow_version": "1.0.0"
+  }' \
+  localhost:50052 \
+  duo_workflow_service.DuoWorkflowService/StartWorkflow
+```
+
+> **Note:** `flowConfigSchemaVersion` (`"v1"` or `"experimental"`) maps to the root directory of the flow config
+> (`agent_platform/v1/flows/configs/` vs `agent_platform/experimental/flows/configs/`). It is **not** the same as
+> `flowVersion`, which selects the specific YAML file within the flow's subdirectory.
+
 #### Deprecated `workflowDefinition` string
 
 Set `workflowDefinition` to `"<flow_name>/<api_version>"` (e.g. `"developer/v1"`). This always resolves to the default version (`1.0.0`) and is kept for backward compatibility with older clients.
+
+> **Limitation:** The `workflowDefinition` path always loads `1.0.0.yml` — there is no way to pin a specific version
+> through this field. Use the structured proto fields if you need version control.
 
 #### Resolution priority
 
@@ -66,6 +133,16 @@ When a request arrives, the server resolves the flow in this order:
 1. If `flowConfig` + `flowConfigSchemaVersion` are set → uses the inline config struct directly
 1. If `workflowDefinition` matches a known legacy workflow name (`software_development`, `chat`, etc.) → uses that workflow class directly. Otherwise, parses it as `"flow_name/api_version"` and loads `configs/{flow_name}/1.0.0.yml`
 1. If no fields are set → defaults to the `software_development` workflow
+
+#### Common pitfalls
+
+| Pitfall | Symptom | Fix |
+|---------|---------|-----|
+| Providing only some of `flowConfigId`, `flowConfigSchemaVersion`, `flowVersion` | Server returns a validation error | All three fields are required together; omitting any one causes the request to fall through to the next resolution step, which is usually not what you want |
+| Setting both `flowConfigId` and `flowConfig` | Server rejects the request | These fields are mutually exclusive; use one or the other |
+| Requesting a `flowVersion` that does not exist on disk | `Unknown flow` error at runtime | Check that `configs/{flowConfigId}/{flowVersion}.yml` exists under the correct `agent_platform/{flowConfigSchemaVersion}/flows/` directory |
+| Using `workflowDefinition` and expecting a specific version | Always loads `1.0.0` | Switch to the structured proto fields (`flowConfigId` + `flowConfigSchemaVersion` + `flowVersion`) to pin a version |
+| Confusing `flowConfigSchemaVersion` with `flowVersion` | Wrong flow loaded or `Unknown flow` error | `flowConfigSchemaVersion` selects the registry root (`v1` / `experimental`); `flowVersion` selects the YAML file within the flow's subdirectory |
 
 ## Development Plan
 
