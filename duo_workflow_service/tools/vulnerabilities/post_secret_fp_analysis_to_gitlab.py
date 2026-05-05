@@ -3,9 +3,9 @@ from typing import Any, ClassVar, Type
 
 from pydantic import BaseModel, Field
 
-from duo_workflow_service.tools.duo_base_tool import (
+from duo_workflow_service.tools.duo_base_tool import DuoBaseTool
+from duo_workflow_service.tools.tier_access_checker import (
     LICENSED_FEATURE_SECURITY_DASHBOARD,
-    DuoBaseTool,
 )
 
 
