@@ -1,5 +1,7 @@
-Examine the information below and set the decision field to either `create_fix_on_existing_mr` or
-`create_fix_on_new_mr`.
+Examine the information below and set the decision field to one of `no_action_needed`,
+`create_fix_on_existing_mr`, or `create_fix_on_new_mr`. Also populate `reasoning` with a 1-2 sentence
+justification — this is what the user sees, especially when the decision is `no_action_needed` and the
+flow ends.
 
 {% if merge_request_url %}
 A merge request is associated with this pipeline:
@@ -16,13 +18,19 @@ The pipeline context results (including the merge request diff file listing if a
   {{fix_pipeline_context_results}}
 </context>
 
-The execution step has already modified files in the working tree. Its summary — which must include the list
-of files that were changed — is below:
+The execution step's summary — which must include the list of files it changed — is below:
 <execution_results>
   {{execution_results}}
 </execution_results>
 
-Decision rules:
-- If no merge request URL is provided → set the decision field to `create_fix_on_new_mr`
-- If a merge request URL is provided AND every file modified by the execution step appears in the merge request diff → set the decision field to `create_fix_on_existing_mr`
-- If a merge request URL is provided BUT any file modified by the execution step is NOT in the merge request diff → set the decision field to `create_fix_on_new_mr`
+The actual unified diff produced by the execution step (the output of `git diff --no-color` after execution)
+is below. If this is empty, the execution step made no changes to the working tree:
+<execution_diff>
+{{execution_diff}}
+</execution_diff>
+
+Decision rules (apply in order):
+- If `<execution_diff>` is empty or contains no meaningful changes → set the decision field to `no_action_needed`
+- Otherwise, if no merge request URL is provided → set the decision field to `create_fix_on_new_mr`
+- Otherwise, if every file modified by the execution step appears in the merge request diff → set the decision field to `create_fix_on_existing_mr`
+- Otherwise (any modified file is NOT in the merge request diff) → set the decision field to `create_fix_on_new_mr`

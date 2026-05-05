@@ -1,4 +1,5 @@
 import json
+import re
 from typing import Any, Optional, Type
 
 import structlog
@@ -627,6 +628,12 @@ class ListMergeRequest(DuoBaseTool):
         return f"List merge requests in project {args.project_id} {filter_text}"
 
 
+SUGGESTION_BLOCK_RE = re.compile(
+    r"```suggestion(?::-(\d+)\+(\d+))?[ \t]*\n(.*?)(?:\r?\n)?```", re.DOTALL
+)
+HUNK_HEADER_RE = re.compile(r"@@\s+-(\d+)(?:,\d+)?\s+\+(\d+)(?:,\d+)?\s+@@")
+
+
 class CreateMergeRequestDiffNoteInput(MergeRequestResourceInput):
     """Input schema for posting an inline diff note on a merge request."""
 
@@ -726,6 +733,24 @@ For example:
         except Exception as e:
             raise ToolException(str(e)) from e
 
+        blocks = self._extract_suggestion_blocks(body)
+        if blocks:
+            file_diff = await self._fetch_file_diff(
+                validation_result.project_id,
+                validation_result.merge_request_iid,
+                old_path=old_path,
+                new_path=new_path,
+            )
+            if file_diff is not None and self._all_blocks_are_no_ops(
+                blocks,
+                file_diff,
+                old_line=old_line,
+                new_line=new_line,
+            ):
+                raise ToolException(
+                    "every suggestion in this comment is identical to the targeted line(s); refusing to post no-op"
+                )
+
         position: dict[str, Any] = {
             "position_type": "text",
             "base_sha": diff_refs["base_sha"],
@@ -797,6 +822,104 @@ For example:
             "head_sha": diff_refs["head_sha"],
             "start_sha": diff_refs["start_sha"],
         }
+
+    @staticmethod
+    def _extract_suggestion_blocks(body: str) -> list[tuple[int, int, list[str]]]:
+        """Parse every ``suggestion:-X+Y`` block in the body.
+
+        Returns one ``(before, after, replacement_lines)`` tuple per block, or an
+        empty list if the body contains no suggestion blocks.
+        """
+        return [
+            (int(before or 0), int(after or 0), content.split("\n"))
+            for before, after, content in SUGGESTION_BLOCK_RE.findall(body)
+        ]
+
+    def _all_blocks_are_no_ops(
+        self,
+        blocks: list[tuple[int, int, list[str]]],
+        file_diff: str,
+        *,
+        old_line: Optional[int],
+        new_line: Optional[int],
+    ) -> bool:
+        """Return True only when every block matches its targeted range exactly."""
+        for before, after, suggestion_lines in blocks:
+            target_lines = self._lines_at_range(
+                file_diff,
+                target_old=old_line,
+                target_new=new_line,
+                before=before,
+                after=after,
+            )
+            if target_lines is None or suggestion_lines != target_lines:
+                return False
+        return True
+
+    async def _fetch_file_diff(
+        self,
+        project_id: str,
+        merge_request_iid: int,
+        *,
+        old_path: str,
+        new_path: str,
+    ) -> Optional[str]:
+        """Return the unified diff for ``old_path``/``new_path``, paginating through /diffs."""
+        path = (
+            f"{MERGE_REQUESTS_API_PATH.format(project_id=project_id)}/"
+            f"{merge_request_iid}/diffs"
+        )
+        try:
+            diffs = await self._paginate_get(path)
+        except Exception:  # pylint: disable=broad-except
+            return None
+        for entry in diffs:
+            if not isinstance(entry, dict):
+                continue
+            if entry.get("new_path") == new_path or entry.get("old_path") == old_path:
+                diff_text = entry.get("diff")
+                return diff_text if diff_text else None
+        return None
+
+    @staticmethod
+    def _lines_at_range(
+        diff: str,
+        *,
+        target_old: Optional[int],
+        target_new: Optional[int],
+        before: int,
+        after: int,
+    ) -> Optional[list[str]]:
+        """Extract ``before + 1 + after`` consecutive lines around the target from a unified diff.
+
+        ``target_new`` takes precedence when both are set. Returns None if the
+        target is undefined or any line in the range is outside the diff's
+        context window.
+        """
+        use_new = target_new is not None
+        target = target_new if use_new else target_old
+        if target is None or target - before < 1:
+            return None
+        line_map: dict[int, str] = {}
+        old_n = new_n = 0
+        for line in diff.splitlines():
+            header = HUNK_HEADER_RE.match(line)
+            if header:
+                old_n, new_n = int(header.group(1)), int(header.group(2))
+                continue
+            prefix, content = line[:1], line[1:]
+            if prefix in ("+", " ") and use_new:
+                line_map[new_n] = content
+            elif prefix in ("-", " ") and not use_new:
+                line_map[old_n] = content
+            if prefix in ("+", " "):
+                new_n += 1
+            if prefix in ("-", " "):
+                old_n += 1
+        wanted = range(target - before, target + after + 1)
+        if any(n not in line_map for n in wanted):
+            return None
+        return [line_map[n] for n in wanted]
 
     def format_display_message(
         self,
