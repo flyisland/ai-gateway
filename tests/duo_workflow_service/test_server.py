@@ -2005,6 +2005,85 @@ async def test_execute_workflow_with_flow_config_id_happy_path(
 
 @pytest.mark.asyncio
 @patch("duo_workflow_service.server.resolve_flow")
+async def test_execute_workflow_empty_workflow_id_aborts(
+    mock_resolve_flow,
+    mock_context,
+    servicer,
+):
+    """Server aborts with INVALID_ARGUMENT when workflowID is empty.
+
+    An empty workflowID produces an invalid GraphQL Global ID on the DWS side, causing a 'not a valid Global ID' error.
+    Rejecting it early at the gRPC boundary gives the client a clear, immediate error instead.
+    """
+
+    async def mock_request_iterator() -> AsyncIterable[contract_pb2.ClientEvent]:
+        yield contract_pb2.ClientEvent(
+            startRequest=contract_pb2.StartWorkflowRequest(
+                workflowID="",
+                workflowDefinition="software_development",
+                goal="test",
+            )
+        )
+
+    result = servicer.ExecuteWorkflow(
+        mock_request_iterator(),
+        mock_context,
+        internal_event_client=create_mock_internal_event_client(),
+    )
+
+    with pytest.raises((StopAsyncIteration, grpc.RpcError)):
+        await anext(result)
+
+    mock_resolve_flow.assert_not_called()
+    mock_context.abort.assert_called_once_with(
+        grpc.StatusCode.INVALID_ARGUMENT,
+        "workflowID must not be empty",
+    )
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    "workflow_id",
+    ["", None],
+    ids=["empty-string", "missing-field"],
+)
+@patch("duo_workflow_service.server.resolve_flow")
+async def test_execute_workflow_missing_or_empty_workflow_id_never_starts_workflow(
+    mock_resolve_flow,
+    workflow_id,
+    mock_context,
+    servicer,
+):
+    """resolve_flow is never called when workflowID is absent or empty."""
+
+    start_request_kwargs: dict = {
+        "workflowDefinition": "software_development",
+        "goal": "test",
+    }
+    if workflow_id is not None:
+        start_request_kwargs["workflowID"] = workflow_id
+
+    async def mock_request_iterator() -> AsyncIterable[contract_pb2.ClientEvent]:
+        yield contract_pb2.ClientEvent(
+            startRequest=contract_pb2.StartWorkflowRequest(**start_request_kwargs)
+        )
+
+    result = servicer.ExecuteWorkflow(
+        mock_request_iterator(),
+        mock_context,
+        internal_event_client=create_mock_internal_event_client(),
+    )
+
+    with pytest.raises((StopAsyncIteration, grpc.RpcError)):
+        await anext(result)
+
+    mock_resolve_flow.assert_not_called()
+    mock_context.abort.assert_called_once()
+    assert mock_context.abort.call_args[0][0] == grpc.StatusCode.INVALID_ARGUMENT
+
+
+@pytest.mark.asyncio
+@patch("duo_workflow_service.server.resolve_flow")
 async def test_execute_workflow_flow_config_id_and_flow_config_conflict(
     mock_resolve_flow,
     mock_context,
