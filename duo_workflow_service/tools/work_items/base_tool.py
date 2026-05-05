@@ -19,6 +19,7 @@ import structlog
 from langchain_core.tools import ToolException
 from pydantic import StringConstraints
 
+from duo_workflow_service.gitlab.resource_resolver import resolve_identifier_to_path
 from duo_workflow_service.gitlab.url_parser import GitLabUrlParseError, GitLabUrlParser
 from duo_workflow_service.tools.duo_base_tool import DuoBaseTool
 from duo_workflow_service.tools.work_items.queries.work_items import (
@@ -139,7 +140,9 @@ class WorkItemBaseTool(DuoBaseTool):
         parent_type: Literal["group", "project"],
         identifier: Union[int, str],
     ) -> ResolvedParent:
-        full_path = await self._resolve_identifier_to_path(str(identifier), parent_type)
+        full_path = await resolve_identifier_to_path(
+            self.gitlab_client, str(identifier), parent_type
+        )
         return ResolvedParent(type=parent_type, full_path=full_path)
 
     @staticmethod

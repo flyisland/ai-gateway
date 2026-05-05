@@ -5,9 +5,9 @@ from pydantic import BaseModel, Field
 from duo_workflow_service.tools.ascp.queries import LIST_ASCP_SCANS_QUERY
 from duo_workflow_service.tools.ascp.types import ScanTypeLiteral
 from duo_workflow_service.tools.ascp.utils import parse_graphql_errors
-from duo_workflow_service.tools.duo_base_tool import (
+from duo_workflow_service.tools.duo_base_tool import DuoBaseTool
+from duo_workflow_service.tools.tier_access_checker import (
     LICENSED_FEATURE_SECURITY_DASHBOARD,
-    DuoBaseTool,
 )
 
 DEFAULT_PAGE_SIZE = 50

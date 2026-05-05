@@ -4,12 +4,12 @@ from typing import Any, ClassVar, Type, Union
 from langchain_core.tools import ToolException
 from pydantic import BaseModel, Field
 
-from duo_workflow_service.tools.duo_base_tool import (
-    LICENSED_FEATURE_SECURITY_DASHBOARD,
-    DuoBaseTool,
-)
+from duo_workflow_service.tools.duo_base_tool import DuoBaseTool
 from duo_workflow_service.tools.findings.queries.security_findings import (
     GET_SECURITY_FINDING_DETAILS_QUERY,
+)
+from duo_workflow_service.tools.tier_access_checker import (
+    LICENSED_FEATURE_SECURITY_DASHBOARD,
 )
 
 

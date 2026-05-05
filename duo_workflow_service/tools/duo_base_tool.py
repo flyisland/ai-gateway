@@ -1,5 +1,4 @@
 import json
-import urllib.parse
 from abc import abstractmethod
 from typing import (
     Any,
@@ -17,38 +16,20 @@ from langchain_core.tools import BaseTool, ToolException
 from packaging.version import Version
 from pydantic import BaseModel, Field
 
-from duo_workflow_service.errors.typing import (
-    TierAccessDeniedException,
-)
 from duo_workflow_service.gitlab.gitlab_api import Project
 from duo_workflow_service.gitlab.http_client import GitlabHttpClient, GitLabHttpResponse
 from duo_workflow_service.gitlab.url_parser import GitLabUrlParseError, GitLabUrlParser
 from duo_workflow_service.security.secret_redaction import redact_secrets
 from duo_workflow_service.security.tool_output_security import ToolTrustLevel
+from duo_workflow_service.tools.tier_access_checker import TierAccessChecker
 from duo_workflow_service.tools.tool_output_manager import (
     TruncationConfig,
     truncate_tool_response,
 )
-from duo_workflow_service.tools.work_items.version_compatibility import (
-    supports_licensed_feature_availability,
-)
-from duo_workflow_service.tracking.errors import log_exception
 
 log = structlog.stdlib.get_logger("workflow")
 
 DESCRIPTION_CHARACTER_LIMIT = 1_048_576
-
-# Licensed feature constants for tier access checks.
-# Must match value in GitLab's GitlabSubscriptions::LicensedFeatureEnum GraphQL enum.
-LICENSED_FEATURE_SECURITY_DASHBOARD = "SECURITY_DASHBOARD"
-
-_TIER_CHECK_QUERY_TEMPLATE = """
-query($fullPath: ID!, $feature: LicensedFeature!) {
-    %s(fullPath: $fullPath) {
-        licensedFeatureAvailability(feature: $feature) { available requiredPlan }
-    }
-}
-"""
 
 # editorconfig-checker-disable
 QUICK_ACTIONS_WARNING = """
@@ -188,14 +169,13 @@ class DuoBaseTool(BaseTool):
 
         feature = self._get_required_feature_for_tier_check(saved_kwargs)
 
-        if feature and self._is_empty_or_error_response(tool_result):
-            if not supports_licensed_feature_availability():
-                log.debug(
-                    "Skipping tier access check: GitLab version too old",
-                    feature=feature,
-                )
-            else:
-                await self._check_tier_access(feature, saved_kwargs)
+        if feature:
+            checker = TierAccessChecker(
+                tool_name=self.name,
+                gitlab_client=self.gitlab_client,
+                project=self.project,
+            )
+            await checker.check_tier_access(feature, tool_result, saved_kwargs)
 
         # Apply truncation
         tool_response = truncate_tool_response(
@@ -220,134 +200,6 @@ class DuoBaseTool(BaseTool):
         self, _kwargs: dict[str, Any]
     ) -> Optional[str]:
         return self.tier_check_licensed_feature
-
-    async def _get_resource_path(
-        self, kwargs: dict[str, Any]
-    ) -> Optional[tuple[str, str]]:
-        """Return (full_path, scope) for the resource to tier-check."""
-        project_full_path = kwargs.get("project_full_path")
-        if project_full_path:
-            return str(project_full_path), "project"
-        for key, scope in (("group_id", "namespace"), ("project_id", "project")):
-            value = kwargs.get(key)
-            if value:
-                try:
-                    resolved = await self._resolve_identifier_to_path(str(value), scope)
-                except ToolException:
-                    return None
-                return resolved, scope
-        if self.project:
-            web_url = self.project.get("web_url", "")
-            if web_url:
-                path = urllib.parse.urlparse(web_url).path.lstrip("/")
-                if path:
-                    return path, "project"
-        return None
-
-    @staticmethod
-    def _is_empty_or_error_response(result: Any) -> bool:
-        if not isinstance(result, str):
-            return False
-        try:
-            parsed = json.loads(result)
-        except (json.JSONDecodeError, TypeError):
-            return False
-        if isinstance(parsed, dict):
-            if parsed.get("error"):
-                return True
-            return any(
-                isinstance(v, (list, dict)) and len(v) == 0 for v in parsed.values()
-            )
-        return isinstance(parsed, list) and not parsed
-
-    async def _check_tier_access(
-        self,
-        feature: str,
-        saved_kwargs: dict[str, Any],
-    ) -> None:
-        """Raise TierAccessDeniedException if the feature is unavailable."""
-        log.info(
-            "Running tier access check",
-            tool=self.name,
-            feature=feature,
-        )
-
-        result = await self._get_resource_path(saved_kwargs)
-        if not result:
-            return
-
-        resource_path, scope = result
-        root_key = "namespace" if scope != "project" else "project"
-        query = _TIER_CHECK_QUERY_TEMPLATE % root_key
-
-        try:
-            response = await self.gitlab_client.apost(
-                path="/api/graphql",
-                body=json.dumps(
-                    {
-                        "query": query,
-                        "variables": {"fullPath": resource_path, "feature": feature},
-                    }
-                ),
-            )
-            body = (
-                response.body if isinstance(response, GitLabHttpResponse) else response
-            )
-            if isinstance(body, str):
-                body = json.loads(body)
-
-            check = (body or {}).get("data", {}).get(root_key, {})
-            check = check.get("licensedFeatureAvailability", {}) if check else {}
-
-            if check and check.get("available") is False:
-                raise TierAccessDeniedException(
-                    required_plan=check.get("requiredPlan"),
-                    feature=feature,
-                )
-        except TierAccessDeniedException:
-            raise
-        except Exception as e:
-            log_exception(
-                e,
-                extra={
-                    "context": "Tier access check failed",
-                    "feature": feature,
-                },
-            )
-
-    async def _resolve_identifier_to_path(self, identifier: str, scope: str) -> str:
-        """Resolve a project/group identifier to its full path.
-
-        Raises:
-            ToolException: If the identifier cannot be resolved.
-        """
-        identifier_str = str(identifier)
-
-        if identifier_str.isdigit():
-            endpoint = "projects" if scope == "project" else "groups"
-            data = await self.gitlab_client.aget(f"/api/v4/{endpoint}/{identifier_str}")
-
-            if not data.is_success():
-                log.error(
-                    "Resolve parent path request failed with status %s: %s",
-                    data.status_code,
-                    data.body,
-                )
-                raise ToolException(
-                    f"Failed to resolve {scope} from ID '{identifier_str}': {data.body}"
-                )
-
-            full_path = data.body.get(
-                "path_with_namespace" if scope == "project" else "full_path"
-            )
-            if not full_path:
-                raise ToolException(
-                    f"Could not resolve {scope} full path from ID '{identifier_str}'"
-                )
-        else:
-            full_path = identifier_str
-
-        return urllib.parse.unquote(full_path)
 
     def _validate_project_url(
         self, url: Optional[str], project_id: Optional[int | str]

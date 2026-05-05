@@ -6,9 +6,9 @@ from pydantic.alias_generators import to_camel
 from duo_workflow_service.tools.ascp.queries import CREATE_ASCP_SCAN_MUTATION
 from duo_workflow_service.tools.ascp.types import ScanTypeLiteral
 from duo_workflow_service.tools.ascp.utils import parse_graphql_errors
-from duo_workflow_service.tools.duo_base_tool import (
+from duo_workflow_service.tools.duo_base_tool import DuoBaseTool
+from duo_workflow_service.tools.tier_access_checker import (
     LICENSED_FEATURE_SECURITY_DASHBOARD,
-    DuoBaseTool,
 )
 
 
