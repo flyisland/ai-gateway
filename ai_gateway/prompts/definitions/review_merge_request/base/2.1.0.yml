@@ -6,7 +6,7 @@ model:
 unit_primitive: duo_agent_platform
 prompt_template:
   system: |
-    {% include 'review_merge_request/system/2.0.0.jinja' %}
+    {% include 'review_merge_request/system/2.1.0.jinja' %}
   user: |
     {% include 'review_merge_request/user/2.0.0.jinja' %}
 params:
