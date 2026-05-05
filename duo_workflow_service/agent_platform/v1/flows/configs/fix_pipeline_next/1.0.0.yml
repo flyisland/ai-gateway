@@ -70,6 +70,8 @@ components:
         as: "fix_pipeline_context_results"
       - from: "context:fix_pipeline_next_execution.final_answer"
         as: "execution_results"
+      - from: "context:fix_pipeline_next_check_diff.tool_responses"
+        as: "execution_diff"
       - from: "context:inputs.merge_request.url"
         as: "merge_request_url"
         optional: True
@@ -150,6 +152,37 @@ components:
       - from: "context:inputs.workspace_agent_skills"
         as: "workspace_agent_skills"
         optional: True
+    ui_log_events:
+      - "on_tool_execution_success"
+      - "on_tool_execution_failed"
+
+  - name: "fix_pipeline_next_checkout_existing_branch"
+    type: AgentComponent
+    prompt_id: "fix_pipeline_next_checkout_existing_branch"
+    prompt_version: "^1.0.0"
+    inputs:
+      - from: "context:inputs.pipeline.source_branch"
+        as: "ref"
+      - from: "context:project_http_url_to_repo"
+        as: "repository_url"
+    toolset:
+      - "run_git_command"
+    ui_log_events:
+      - "on_tool_execution_success"
+      - "on_tool_execution_failed"
+
+  - name: "fix_pipeline_next_check_diff"
+    type: DeterministicStepComponent
+    tool_name: "run_git_command"
+    inputs:
+      - from: "context:project_http_url_to_repo"
+        as: "repository_url"
+      - from: "diff"
+        as: "command"
+        literal: True
+      - from: "--no-color"
+        as: "args"
+        literal: True
     ui_log_events:
       - "on_tool_execution_success"
       - "on_tool_execution_failed"
@@ -265,11 +298,15 @@ routers:
       input: "context:fix_pipeline_next_decide_approach.final_answer.decision"
       routes:
         "add_comment": "fix_pipeline_add_comment"
-        "create_plan": "fix_pipeline_next_execution"
+        "create_plan": "fix_pipeline_next_checkout_existing_branch"
         "default_route": "fix_pipeline_add_comment"
+  - from: "fix_pipeline_next_checkout_existing_branch"
+    to: "fix_pipeline_next_execution"
   - from: "fix_pipeline_add_comment"
     to: "end"
   - from: "fix_pipeline_next_execution"
+    to: "fix_pipeline_next_check_diff"
+  - from: "fix_pipeline_next_check_diff"
     to: "fix_pipeline_next_decide_fix"
   - from: "fix_pipeline_next_decide_fix"
     condition:
@@ -277,6 +314,7 @@ routers:
       routes:
         "create_fix_on_existing_mr": "fix_pipeline_next_code_suggestions"
         "create_fix_on_new_mr": "create_repository_branch"
+        "no_action_needed": "end"
         "default_route": "create_repository_branch"
   - from: "fix_pipeline_next_code_suggestions"
     to: "end"
