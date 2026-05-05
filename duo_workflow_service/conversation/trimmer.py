@@ -12,6 +12,7 @@ from langchain_core.messages import (
     trim_messages,
 )
 
+from duo_workflow_service.conversation.token_estimator import count_tokens
 from duo_workflow_service.token_counter.tiktoken_counter import TikTokenCounter
 from duo_workflow_service.tracking.errors import log_exception
 
@@ -37,79 +38,14 @@ class TrimResult:
     duration_ms: float = 0.0
 
 
-def _find_last_ai_with_usage(
-    messages: list[BaseMessage],
-) -> tuple[int, int] | None:
-    """Find the last AIMessage that has usage_metadata and returns its usage and index."""
-    for i, msg in reversed(list(enumerate(messages))):
-        if (
-            isinstance(msg, AIMessage)
-            and msg.usage_metadata
-            and msg.usage_metadata.get("total_tokens")
-        ):
-            return msg.usage_metadata["total_tokens"], i
-    return None
-
-
-def _estimate_tokens_from_history(
-    messages: list[BaseMessage], token_counter: TikTokenCounter
-) -> int:
-    """Estimate total tokens for a full conversation history.
-
-    Uses the cumulative token count from the last AIMessage's usage_metadata
-    as a baseline, then estimates only trailing messages (after that AIMessage)
-    using TikTokenCounter.
-
-    IMPORTANT: Requires the FULL conversation history. Passing a slice will
-    return incorrect results since total_tokens from usage_metadata is cumulative.
-
-    Args:
-        messages: Full conversation history as sent to the LLM.
-        token_counter: TikTokenCounter instance for counting trailing message tokens.
-
-    Known limitations:
-        - The system prompt will always be included in the usage_metadata even if the system message is not
-            part of the history.
-        - Up to the last AI message with usage metadata we will have accurate counts.
-            NOTE: This includes the final rendered prompt templates' content.
-            However, the trailing messages will only get a rough estimation based on their content.
-            This means, if prompt templates are used (e.g. to render additional_context in message.additional_kwargs)
-            based on the message.content, the token count will be underestimated.
-    """
-    if not messages:
-        return 0
-
-    result = _find_last_ai_with_usage(messages)
-    if result:
-        base_tokens, last_ai_idx = result
-        trailing_messages = messages[last_ai_idx + 1 :]
-    else:
-        base_tokens = 0
-        trailing_messages = messages
-
-    trailing_tokens = (
-        token_counter.count_tokens(
-            trailing_messages,
-            # We don't count agent tool tokens - they're included in the AI message's total_tokens already
-            include_tool_tokens=False,
-        )
-        if trailing_messages
-        else 0
-    )
-
-    return base_tokens + trailing_tokens
-
-
 def _pretrim_large_messages(
     messages: List[BaseMessage],
-    token_counter: TikTokenCounter,
     max_single_message_tokens: int,
 ) -> List[BaseMessage]:
     """Replace messages that exceed the single message token limit with a placeholder.
 
     Args:
         messages: List of messages to check
-        token_counter: Token counter for the component
         max_single_message_tokens: Maximum tokens allowed for a single message
 
     Returns:
@@ -117,7 +53,7 @@ def _pretrim_large_messages(
     """
     processed_messages = []
     for message in messages:
-        msg_token = token_counter.count_tokens([message], include_tool_tokens=False)
+        msg_token = count_tokens([message], is_complete_history=False)
         if msg_token > max_single_message_tokens:
             logger.info(
                 f"Message with role: {message.type} token size: {msg_token} "
@@ -303,10 +239,7 @@ def apply_token_based_trim(
     token_budget = int(TRIM_THRESHOLD * max_context_tokens)
     max_single_message_tokens = int(token_budget * MAX_SINGLE_MESSAGE_TOKEN_SHARE)
 
-    token_counter = TikTokenCounter(component_name)
-    initial_tokens = _estimate_tokens_from_history(
-        messages=messages, token_counter=token_counter
-    )
+    initial_tokens = count_tokens(messages=messages, is_complete_history=True)
     initial_roles = _get_message_roles(messages)
 
     if initial_tokens < token_budget:
@@ -341,16 +274,14 @@ def apply_token_based_trim(
         budget_utilization_pct=round(initial_tokens / token_budget * 100, 1),
     )
 
-    processed_messages = _pretrim_large_messages(
-        messages, token_counter, max_single_message_tokens
-    )
+    processed_messages = _pretrim_large_messages(messages, max_single_message_tokens)
 
     try:
         result = trim_messages(
             processed_messages,
             max_tokens=token_budget,
             strategy="last",
-            token_counter=token_counter.count_tokens,
+            token_counter=lambda x: count_tokens(x, is_complete_history=False),
             start_on="human",
             include_system=True,
             allow_partial=False,
@@ -379,7 +310,13 @@ def apply_token_based_trim(
 
     duration_ms = round((time.perf_counter() - t_start) * 1000, 2)
     final_roles = _get_message_roles(result)
-    final_tokens = token_counter.count_tokens(result, include_tool_tokens=True)
+
+    final_tokens = (
+        initial_tokens
+        if result == messages
+        else count_tokens(result, is_complete_history=False)
+        + TikTokenCounter(agent_name=component_name).tool_tokens
+    )
 
     logger.info(
         "Finished trimming",

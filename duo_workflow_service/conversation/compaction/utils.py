@@ -7,9 +7,7 @@ from duo_workflow_service.conversation.compaction.schema import (
     CompactionConfig,
     MessageSlices,
 )
-from duo_workflow_service.conversation.compaction.token_estimator import (
-    CompactionTokenEstimator,
-)
+from duo_workflow_service.conversation.token_estimator import count_tokens
 
 
 def is_turn_complete(messages: list[BaseMessage]) -> bool:
@@ -59,7 +57,6 @@ def is_turn_complete(messages: list[BaseMessage]) -> bool:
 def resolve_recent_messages_internal(
     messages: list[BaseMessage],
     config: CompactionConfig,
-    token_estimator: CompactionTokenEstimator,
 ) -> list[BaseMessage]:
     """Collect complete turns from the end, respecting token and message count limits.
 
@@ -69,7 +66,6 @@ def resolve_recent_messages_internal(
     Args:
         messages: List of messages to collect from
         config: Compaction configuration with limits
-        token_estimator: Token estimator for counting
 
     Returns:
         Recent messages in correct order
@@ -86,7 +82,7 @@ def resolve_recent_messages_internal(
         turn = current_turn[::-1]
 
         if is_turn_complete(turn):
-            turn_tokens = token_estimator.estimate_arbitrary_messages(turn)
+            turn_tokens = count_tokens(turn, is_complete_history=False)
             if (
                 total_tokens + turn_tokens > config.recent_messages_token_budget
                 or len(turn + recent_messages) > config.max_recent_messages
@@ -103,14 +99,12 @@ def resolve_recent_messages_internal(
 def slice_for_summarization(
     messages: list[BaseMessage],
     config: CompactionConfig,
-    token_estimator: CompactionTokenEstimator,
 ) -> MessageSlices:
     """Split messages into three parts for summarization.
 
     Args:
         messages: List of messages to slice
         config: Compaction configuration
-        token_estimator: Token estimator for counting
 
     Returns:
         MessageSlices with leading_context, to_summarize, and recent_to_keep
@@ -128,9 +122,7 @@ def slice_for_summarization(
     leading_context = messages[:leading_context_end]
     remaining = messages[leading_context_end:]
 
-    recent_to_keep = resolve_recent_messages_internal(
-        remaining, config, token_estimator
-    )
+    recent_to_keep = resolve_recent_messages_internal(remaining, config)
     to_summarize = remaining[: len(remaining) - len(recent_to_keep)]
 
     return MessageSlices(

@@ -1,5 +1,5 @@
 from typing import List, cast
-from unittest.mock import MagicMock, patch
+from unittest.mock import patch
 
 import pytest
 from langchain_core.messages import (
@@ -11,12 +11,10 @@ from langchain_core.messages import (
 )
 
 from duo_workflow_service.conversation.trimmer import (
-    _estimate_tokens_from_history,
     _pretrim_large_messages,
     apply_token_based_trim,
     restore_message_consistency,
 )
-from duo_workflow_service.token_counter.tiktoken_counter import TikTokenCounter
 
 # Error message for invalid tool call responses
 INVALID_TOOL_ERROR_MESSAGE = (
@@ -26,11 +24,11 @@ INVALID_TOOL_ERROR_MESSAGE = (
 )
 
 
-def test_pretrim_large_messages():
-    token_counter = MagicMock()
+@patch("duo_workflow_service.conversation.trimmer.count_tokens")
+def test_pretrim_large_messages(mock_count_tokens):
     max_single_messages_tokens = 100
     # Simulate token count
-    token_counter.count_tokens.side_effect = lambda msgs, include_tool_tokens=True: (
+    mock_count_tokens.side_effect = lambda msgs, is_complete_history: (
         50 if "small" in msgs[0].content else 150
     )
 
@@ -41,7 +39,7 @@ def test_pretrim_large_messages():
 
     # Cast the list to List[BaseMessage] to satisfy mypy
     result = _pretrim_large_messages(
-        cast(List[BaseMessage], messages), token_counter, max_single_messages_tokens
+        cast(List[BaseMessage], messages), max_single_messages_tokens
     )
 
     assert len(result) == 2
@@ -263,11 +261,9 @@ def test_restore_message_consistency_tool_message_before_tool_call():
 
 
 @patch("duo_workflow_service.conversation.trimmer.trim_messages")
-@patch("duo_workflow_service.conversation.trimmer.TikTokenCounter")
-@patch("duo_workflow_service.conversation.trimmer._estimate_tokens_from_history")
+@patch("duo_workflow_service.conversation.trimmer.count_tokens", return_value=999_999)
 def test_apply_token_based_trim_preserves_tool_messages(
-    mock_estimate_tokens,
-    mock_token_counter_cls,
+    mock_count_tokens,
     mock_trim_messages,
 ):
     """Test that apply_token_based_trim passes tool messages through unchanged.
@@ -280,10 +276,6 @@ def test_apply_token_based_trim_preserves_tool_messages(
     Consistency is repaired at read time in AgentPromptTemplate.invoke and ChatAgentPromptTemplate.invoke, just before
     the prompt is sent to the LLM.
     """
-    mock_estimate_tokens.return_value = 999_999
-    mock_counter = MagicMock()
-    mock_counter.count_tokens.return_value = 999_999
-    mock_token_counter_cls.return_value = mock_counter
 
     original_messages = [
         SystemMessage(content="system message"),
@@ -395,17 +387,9 @@ def test_apply_token_based_trim_single_message_too_large():
 
 
 @patch("duo_workflow_service.conversation.trimmer.trim_messages")
-@patch("duo_workflow_service.conversation.trimmer.TikTokenCounter")
-@patch("duo_workflow_service.conversation.trimmer._estimate_tokens_from_history")
-def test_apply_token_based_trim_error_handling(
-    mock_estimate_tokens, mock_token_counter_cls, mock_trim_messages
-):
+@patch("duo_workflow_service.conversation.trimmer.count_tokens", return_value=999_999)
+def test_apply_token_based_trim_error_handling(mock_count_tokens, mock_trim_messages):
     """Test fallback mechanism when trim_messages raises an exception."""
-    # Force the expensive path by reporting high token count
-    mock_estimate_tokens.return_value = 999_999
-    mock_counter = MagicMock()
-    mock_counter.count_tokens.return_value = 999_999
-    mock_token_counter_cls.return_value = mock_counter
 
     mock_trim_messages.side_effect = ValueError("Simulated error in trim_messages")
 
@@ -730,17 +714,11 @@ def test_restore_message_consistency_tool_message_not_immediately_after_ai():
 
 
 @patch("duo_workflow_service.conversation.trimmer.trim_messages")
-@patch("duo_workflow_service.conversation.trimmer.TikTokenCounter")
-@patch("duo_workflow_service.conversation.trimmer._estimate_tokens_from_history")
+@patch("duo_workflow_service.conversation.trimmer.count_tokens", return_value=999_999)
 def test_apply_token_based_trim_empty_result_handling(
-    mock_estimate_tokens, mock_token_counter_cls, mock_trim_messages
+    mock_count_tokens, mock_trim_messages
 ):
     """Test fallback when trim_messages returns empty list."""
-    # Force the expensive path by reporting high token count
-    mock_estimate_tokens.return_value = 999_999
-    mock_counter = MagicMock()
-    mock_counter.count_tokens.return_value = 999_999
-    mock_token_counter_cls.return_value = mock_counter
 
     mock_trim_messages.return_value = []
 
@@ -872,22 +850,13 @@ def test_apply_token_based_trim_skips_when_under_budget(mock_logger):
     assert len(start_calls) == 0
 
 
-@patch("duo_workflow_service.conversation.trimmer._estimate_tokens_from_history")
+@patch("duo_workflow_service.conversation.trimmer.count_tokens", return_value=999_999)
 @patch("duo_workflow_service.conversation.trimmer.trim_messages")
-@patch("duo_workflow_service.conversation.trimmer.TikTokenCounter")
 def test_apply_token_based_trim_trims_when_over_threshold(
-    mock_token_counter_cls,
     mock_trim_messages,
-    mock_estimate_tokens,
+    mock_count_tokens,
 ):
     """Verify full trimming kicks in when token utilization exceeds TRIM_THRESHOLD."""
-    # Make fast path estimation return over budget so we proceed to slow path
-    mock_estimate_tokens.return_value = 999_999
-
-    # Make the token counter report high utilization (over 80% of budget)
-    mock_counter = MagicMock()
-    mock_counter.count_tokens.return_value = 999_999
-    mock_token_counter_cls.return_value = mock_counter
 
     input_messages = cast(
         List[BaseMessage],
@@ -965,23 +934,16 @@ def test_apply_token_based_trim_under_budget_returns_messages_unchanged():
         (70_001, True),
     ],
 )
-@patch("duo_workflow_service.conversation.trimmer._estimate_tokens_from_history")
+@patch("duo_workflow_service.conversation.trimmer.count_tokens")
 @patch("duo_workflow_service.conversation.trimmer.trim_messages")
-@patch("duo_workflow_service.conversation.trimmer.TikTokenCounter")
 def test_apply_token_based_trim_threshold_boundary(
-    mock_token_counter_cls,
     mock_trim_messages,
-    mock_estimate_tokens,
+    mock_count_tokens,
     token_count,
     expect_trim_called,
 ):
     """Verify trimming triggers exactly at the TRIM_THRESHOLD boundary."""
-    # Fast path 2 uses _estimate_tokens_from_history - mock it to return the test token_count
-    mock_estimate_tokens.return_value = token_count
-
-    mock_counter = MagicMock()
-    mock_counter.count_tokens.return_value = token_count
-    mock_token_counter_cls.return_value = mock_counter
+    mock_count_tokens.return_value = token_count
 
     mock_trim_messages.return_value = [
         SystemMessage(content="system"),
@@ -1005,111 +967,6 @@ def test_apply_token_based_trim_threshold_boundary(
         mock_trim_messages.assert_called_once()
     else:
         mock_trim_messages.assert_not_called()
-
-
-class TestEstimateTokensFromHistory:
-    def test_empty_messages(self):
-        token_counter = TikTokenCounter("")
-        assert _estimate_tokens_from_history([], token_counter) == 0
-
-    def test_uses_total_tokens_from_ai_message(self):
-        """When there's an AIMessage with usage_metadata, use its total_tokens."""
-        human = HumanMessage(content="Hello")
-        ai = AIMessage(
-            content="Hi there!",
-            usage_metadata={"input_tokens": 10, "output_tokens": 5, "total_tokens": 15},
-        )
-        messages = [human, ai]
-        token_counter = TikTokenCounter("")
-
-        result = _estimate_tokens_from_history(messages, token_counter)
-
-        assert result == 15
-
-    def test_estimates_trailing_messages(self):
-        """Messages after the last AIMessage should be estimated with TikTokenCounter."""
-        human1 = HumanMessage(content="Hello")
-        ai = AIMessage(
-            content="Hi!",
-            usage_metadata={"input_tokens": 10, "output_tokens": 5, "total_tokens": 15},
-        )
-        human2 = HumanMessage(content="How are you?")
-        messages = [human1, ai, human2]
-        token_counter = TikTokenCounter("")
-
-        result = _estimate_tokens_from_history(messages, token_counter)
-
-        expected = 15 + token_counter.count_tokens([human2], include_tool_tokens=False)
-        assert result == expected
-
-    def test_no_ai_message_estimates_all(self):
-        """Without AIMessage, all messages should be estimated with TikTokenCounter."""
-        messages = [
-            HumanMessage(content="Hello"),
-            HumanMessage(content="How are you?"),
-        ]
-        token_counter = TikTokenCounter("")
-
-        result = _estimate_tokens_from_history(messages, token_counter)
-
-        expected = token_counter.count_tokens(messages, include_tool_tokens=False)
-        assert result == expected
-
-    def test_uses_latest_ai_message(self):
-        """Should use the last AIMessage's total_tokens as baseline."""
-        human1 = HumanMessage(content="First")
-        ai1 = AIMessage(
-            content="Response 1",
-            usage_metadata={"input_tokens": 10, "output_tokens": 5, "total_tokens": 15},
-        )
-        human2 = HumanMessage(content="Second")
-        ai2 = AIMessage(
-            content="Response 2",
-            usage_metadata={
-                "input_tokens": 25,
-                "output_tokens": 10,
-                "total_tokens": 35,
-            },
-        )
-        messages = [human1, ai1, human2, ai2]
-        token_counter = TikTokenCounter("")
-
-        result = _estimate_tokens_from_history(messages, token_counter)
-
-        assert result == 35
-
-    def test_multi_turn_with_trailing(self):
-        """Multi-turn conversation with a new user message at the end."""
-        human1 = HumanMessage(content="What is Python?")
-        ai1 = AIMessage(
-            content="Python is a programming language.",
-            usage_metadata={"input_tokens": 10, "output_tokens": 8, "total_tokens": 18},
-        )
-        human2 = HumanMessage(content="Who created it?")
-        ai2 = AIMessage(
-            content="Guido van Rossum created Python.",
-            usage_metadata={"input_tokens": 25, "output_tokens": 7, "total_tokens": 32},
-        )
-        human3 = HumanMessage(content="When was it released?")
-        messages = [human1, ai1, human2, ai2, human3]
-        token_counter = TikTokenCounter("")
-
-        result = _estimate_tokens_from_history(messages, token_counter)
-
-        expected = 32 + token_counter.count_tokens([human3], include_tool_tokens=False)
-        assert result == expected
-
-    def test_ai_message_without_usage_metadata_skipped(self):
-        """AIMessage without usage_metadata should be treated like other messages."""
-        human = HumanMessage(content="Hello")
-        ai_no_metadata = AIMessage(content="Hi there!")
-        messages = [human, ai_no_metadata]
-        token_counter = TikTokenCounter("")
-
-        result = _estimate_tokens_from_history(messages, token_counter)
-
-        expected = token_counter.count_tokens(messages, include_tool_tokens=False)
-        assert result == expected
 
 
 class TestTrimResultFields:
