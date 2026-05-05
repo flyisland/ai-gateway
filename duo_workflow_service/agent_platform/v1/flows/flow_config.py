@@ -32,17 +32,25 @@ DEFAULT_FLOW_VERSION = "1.0.0"
 
 
 def _safe_resolve(path: Path, base_path: Path) -> Path:
-    """Resolve *path*, rejecting symlinks and traversal outside *base_path*.
+    """Resolve *path*, allowing symlinks only when they stay within *base_path*.
 
     Symlink check must happen before .resolve() because resolve() follows
     symlinks, after which is_symlink() always returns False.
 
+    Symlinks that resolve to a path inside *base_path* are permitted so that
+    flow config files can reference other configs within the same directory
+    tree (e.g. ``developer_unstable/1.0.0.yml`` → ``../developer/2.0.0.yml``).
+    Symlinks that escape *base_path* are rejected to prevent path-traversal
+    attacks.
+
     Raises:
-        ValueError: If path is a symlink or resolves outside base_path.
+        ValueError: If path resolves outside base_path, or if symlink resolution
+            fails (e.g. circular symlinks raise OSError/RuntimeError).
     """
-    if path.is_symlink():
-        raise ValueError(f"Symlinks are not allowed for security reasons: {path.name}")
-    resolved = path.resolve()
+    try:
+        resolved = path.resolve()
+    except (OSError, RuntimeError) as e:
+        raise ValueError(f"Symlink resolution failed for '{path.name}': {e}") from e
     if not resolved.is_relative_to(base_path):
         raise ValueError(
             f"Path traversal detected: '{path.name}' resolves outside config directory"
@@ -116,7 +124,13 @@ class BaseFlowConfig(BaseModel):
         version_query = flow_version or DEFAULT_FLOW_VERSION
         base_path = cls.DIRECTORY_PATH.resolve()
         flow_dir = _safe_resolve(base_path / flow_id, base_path)
-        available = [f.stem for f in flow_dir.glob("*.yml") if not f.is_symlink()]
+        available = []
+        for f in flow_dir.glob("*.yml"):
+            try:
+                _safe_resolve(f, base_path)
+                available.append(f.stem)
+            except ValueError:
+                pass
         version = resolve_version(available, version_query)
         try:
             yaml_path = _safe_resolve(flow_dir / f"{version}.yml", base_path)

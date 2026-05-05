@@ -187,7 +187,7 @@ graph TD;
     classDef last fill:#bfb6fc
 ```
 
-## Graph: `developer/experimental` (Flow Registry)
+## Graph: `developer 1.0.0 (experimental)` (Flow Registry)
 
 ```mermaid
 ---
@@ -210,7 +210,7 @@ graph TD;
     classDef last fill:#bfb6fc;
 ```
 
-## Graph: `developer_unstable/experimental` (Flow Registry)
+## Graph: `developer 2.0.0 (experimental)` (Flow Registry)
 
 ```mermaid
 ---
@@ -231,7 +231,28 @@ graph TD;
     classDef last fill:#bfb6fc;
 ```
 
-## Graph: `analytics_agent/v1` (Flow Registry)
+## Graph: `developer_unstable 1.0.0 (experimental)` (Flow Registry)
+
+```mermaid
+---
+config:
+    flowchart:
+        curve: linear
+---
+graph TD;
+    __start__(__start__):::first;
+    __end__(__end__):::last;
+    __start__ --> git_unshallow;
+    git_unshallow(git_unshallow<br>#91;DeterministicStepComponent#93;);
+    developer_agent(developer_agent<br>#91;AgentComponent#93;);
+    git_unshallow --> developer_agent;
+    developer_agent --> __end__;
+    classDef default fill:#f2f0ff,line-height:1.2;
+    classDef first fill-opacity:0;
+    classDef last fill:#bfb6fc;
+```
+
+## Graph: `analytics_agent 1.0.0 (v1)` (Flow Registry)
 
 ```mermaid
 ---
@@ -249,7 +270,7 @@ graph TD;
     classDef last fill:#bfb6fc;
 ```
 
-## Graph: `code_review/v1` (Flow Registry)
+## Graph: `code_review 1.0.0 (v1)` (Flow Registry)
 
 ```mermaid
 ---
@@ -280,7 +301,7 @@ graph TD;
     classDef last fill:#bfb6fc;
 ```
 
-## Graph: `convert_to_gl_ci/v1` (Flow Registry)
+## Graph: `convert_to_gl_ci 1.0.0 (v1)` (Flow Registry)
 
 ```mermaid
 ---
@@ -307,7 +328,7 @@ graph TD;
     classDef last fill:#bfb6fc;
 ```
 
-## Graph: `developer/v1` (Flow Registry)
+## Graph: `developer 1.0.0 (v1)` (Flow Registry)
 
 ```mermaid
 ---
@@ -330,7 +351,7 @@ graph TD;
     classDef last fill:#bfb6fc;
 ```
 
-## Graph: `duo_permissions_assistant/v1` (Flow Registry)
+## Graph: `duo_permissions_assistant 1.0.0 (v1)` (Flow Registry)
 
 ```mermaid
 ---
@@ -348,7 +369,7 @@ graph TD;
     classDef last fill:#bfb6fc;
 ```
 
-## Graph: `fix_pipeline/v1` (Flow Registry)
+## Graph: `fix_pipeline 1.0.0 (v1)` (Flow Registry)
 
 ```mermaid
 ---
@@ -391,7 +412,7 @@ graph TD;
     classDef last fill:#bfb6fc;
 ```
 
-## Graph: `fix_pipeline_next/v1` (Flow Registry)
+## Graph: `fix_pipeline_next 1.0.0 (v1)` (Flow Registry)
 
 ```mermaid
 ---
@@ -432,7 +453,7 @@ graph TD;
     classDef last fill:#bfb6fc;
 ```
 
-## Graph: `orbit_agent/v1` (Flow Registry)
+## Graph: `orbit_agent 1.0.0 (v1)` (Flow Registry)
 
 ```mermaid
 ---
@@ -450,7 +471,7 @@ graph TD;
     classDef last fill:#bfb6fc;
 ```
 
-## Graph: `project_activity/v1` (Flow Registry)
+## Graph: `project_activity 1.0.0 (v1)` (Flow Registry)
 
 ```mermaid
 ---
@@ -483,7 +504,7 @@ graph TD;
     classDef last fill:#bfb6fc;
 ```
 
-## Graph: `resolve_sast_vulnerability/v1` (Flow Registry)
+## Graph: `resolve_sast_vulnerability 1.0.0 (v1)` (Flow Registry)
 
 ```mermaid
 ---
@@ -522,7 +543,7 @@ graph TD;
     classDef last fill:#bfb6fc;
 ```
 
-## Graph: `sast_fp_detection/v1` (Flow Registry)
+## Graph: `sast_fp_detection 1.0.0 (v1)` (Flow Registry)
 
 ```mermaid
 ---
@@ -554,7 +575,7 @@ graph TD;
     classDef last fill:#bfb6fc;
 ```
 
-## Graph: `secrets_fp_detection/v1` (Flow Registry)
+## Graph: `secrets_fp_detection 1.0.0 (v1)` (Flow Registry)
 
 ```mermaid
 ---
@@ -583,7 +604,7 @@ graph TD;
     classDef last fill:#bfb6fc;
 ```
 
-## Graph: `slack_assistant/v1` (Flow Registry)
+## Graph: `slack_assistant 1.0.0 (v1)` (Flow Registry)
 
 ```mermaid
 ---
