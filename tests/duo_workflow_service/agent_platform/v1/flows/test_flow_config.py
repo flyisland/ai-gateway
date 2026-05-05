@@ -14,6 +14,7 @@ from duo_workflow_service.agent_platform.v1.components import (
 )
 from duo_workflow_service.agent_platform.v1.flows.flow_config import (
     FlowConfig,
+    _safe_resolve,
     list_configs,
     load_component_class,
 )
@@ -332,18 +333,116 @@ class TestFlowConfig:
             with pytest.raises((ValueError, FileNotFoundError)):
                 FlowConfig.from_yaml_config(obfuscated_path)
 
-    def test_flowconfig_from_yaml_config_symlink_protection(self, tmp_path):
-        """Test that a symlinked yml file is rejected."""
-        config_dir = tmp_path / "my_flow"
+    def test_flowconfig_from_yaml_config_symlink_outside_base_rejected(self, tmp_path):
+        """Test that a symlink pointing outside the base directory is rejected."""
+        base_dir = tmp_path / "configs"
+        base_dir.mkdir()
+        config_dir = base_dir / "my_flow"
         config_dir.mkdir()
+        # real_file is outside base_dir — this must be rejected
         real_file = tmp_path / "secret.yml"
         real_file.write_text("secret: content")
         symlink_yml = config_dir / "1.0.0.yml"
         symlink_yml.symlink_to(real_file)
 
-        with patch.object(FlowConfig, "DIRECTORY_PATH", Path(tmp_path)):
+        with patch.object(FlowConfig, "DIRECTORY_PATH", base_dir):
             with pytest.raises(ValueError, match="No version matching"):
                 FlowConfig.from_yaml_config("my_flow")
+
+    def test_flowconfig_from_yaml_config_circular_symlink_raises_value_error(
+        self, tmp_path
+    ):
+        """Test that a circular symlink raises ValueError, not OSError.
+
+        Path.resolve() raises OSError (errno 40: Too many levels of symbolic links) for circular symlinks.
+        _safe_resolve() must convert this to ValueError so callers see a consistent exception type and the error does
+        not propagate as an unhandled 500 to the API layer.
+        """
+        base_dir = tmp_path / "configs"
+        base_dir.mkdir()
+        config_dir = base_dir / "my_flow"
+        config_dir.mkdir()
+        # Create a circular symlink: a.yml -> b.yml -> a.yml
+        symlink_a = config_dir / "a.yml"
+        symlink_b = config_dir / "b.yml"
+        symlink_a.symlink_to(symlink_b)
+        symlink_b.symlink_to(symlink_a)
+
+        with pytest.raises(ValueError, match="Symlink resolution failed"):
+            _safe_resolve(symlink_a, base_dir)
+
+    def test_flowconfig_from_yaml_config_circular_symlink_in_flow_dir_skipped(
+        self, tmp_path
+    ):
+        """Test that from_yaml_config skips circular symlinks when building available list.
+
+        A circular symlink within base_path must not cause an unhandled OSError; it should be silently excluded from the
+        available versions list.
+        """
+        config_data = {
+            "flow": {"entry_point": "test_agent"},
+            "components": [
+                {
+                    "name": "test_agent",
+                    "type": "AgentComponent",
+                    "inputs": ["context:goal"],
+                }
+            ],
+            "routers": [{"from": "test_agent", "to": "end"}],
+            "environment": "chat",
+            "version": "v1",
+        }
+        base_dir = tmp_path / "configs"
+        base_dir.mkdir()
+        config_dir = base_dir / "my_flow"
+        config_dir.mkdir()
+
+        # Create a valid config file
+        valid_file = config_dir / "1.0.0.yml"
+        valid_file.write_text(yaml.dump(config_data))
+
+        # Create a circular symlink alongside the valid file
+        symlink_a = config_dir / "circular_a.yml"
+        symlink_b = config_dir / "circular_b.yml"
+        symlink_a.symlink_to(symlink_b)
+        symlink_b.symlink_to(symlink_a)
+
+        with patch.object(FlowConfig, "DIRECTORY_PATH", base_dir):
+            # Should succeed, loading the valid 1.0.0.yml and ignoring the circular symlinks
+            config = FlowConfig.from_yaml_config("my_flow")
+            assert config.flow.entry_point == "test_agent"
+
+    def test_flowconfig_from_yaml_config_symlink_within_base_allowed(self, tmp_path):
+        """Test that a symlink pointing within the base directory is allowed."""
+        config_data = {
+            "flow": {"entry_point": "test_agent"},
+            "components": [
+                {
+                    "name": "test_agent",
+                    "type": "AgentComponent",
+                    "inputs": ["context:goal"],
+                }
+            ],
+            "routers": [{"from": "test_agent", "to": "end"}],
+            "environment": "chat-partial",
+            "version": "v1",
+        }
+        # Create the canonical config file
+        canonical_dir = tmp_path / "canonical_flow"
+        canonical_dir.mkdir()
+        canonical_file = canonical_dir / "2.0.0.yml"
+        with open(canonical_file, "w") as f:
+            yaml.dump(config_data, f)
+
+        # Create a symlink from another flow dir pointing to the canonical file
+        alias_dir = tmp_path / "alias_flow"
+        alias_dir.mkdir()
+        symlink_yml = alias_dir / "1.0.0.yml"
+        symlink_yml.symlink_to(canonical_file)
+
+        with patch.object(FlowConfig, "DIRECTORY_PATH", Path(tmp_path)):
+            config = FlowConfig.from_yaml_config("alias_flow")
+            assert config.flow.entry_point == "test_agent"
 
     @pytest.mark.parametrize(
         "safe_path",

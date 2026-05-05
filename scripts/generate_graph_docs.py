@@ -101,15 +101,15 @@ def main():
                 output_file.write("```mermaid\n" + diagram + "```\n")
 
         for flow_registry_dir in FLOW_REGISTRY_CONFIG_DIRS:
-            config_files = sorted(Path(flow_registry_dir).glob("*/1.0.0.yml"))
+            config_files = sorted(Path(flow_registry_dir).glob("*/*.yml"))
             for config_file in config_files:
-                if config_file.is_symlink():
-                    continue
                 with open(config_file) as yml_contents:
                     data = yaml.safe_load(yml_contents)
-                    version = data["version"]
-                    flow_name = config_file.parent.name + "/" + version
-                output_file.write(f"\n## Graph: `{flow_name}` (Flow Registry)\n\n")
+                    api_version = data["version"]  # e.g. "experimental" or "v1"
+                    flow_version = config_file.stem  # e.g. "1.0.0" or "2.0.0"
+                    flow_name = config_file.parent.name
+                    display_name = f"{flow_name} {flow_version} ({api_version})"
+                output_file.write(f"\n## Graph: `{display_name}` (Flow Registry)\n\n")
 
                 diagram = GRAPH_CONFIG
                 routers = data["routers"]

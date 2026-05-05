@@ -19,8 +19,8 @@ PROJECT_URL_NO_GIT = (
 )
 
 
-def _load_user_prompt_template(flow_name: str) -> str:
-    config = FlowConfig.from_yaml_config(flow_name)
+def _load_user_prompt_template(flow_name: str, flow_version: str | None = None) -> str:
+    config = FlowConfig.from_yaml_config(flow_name, flow_version)
     prompts = config.prompts
     assert prompts is not None
     raw = prompts[0]["prompt_template"]["user"]
@@ -34,9 +34,18 @@ def _load_user_prompt_template(flow_name: str) -> str:
     return "\n".join(lines)
 
 
-@pytest.fixture(scope="module", params=["developer", "developer_unstable"])
+@pytest.fixture(
+    scope="module",
+    params=[
+        ("developer", None),
+        ("developer", "2.0.0"),
+        ("developer_unstable", None),
+    ],
+    ids=["developer-1.0.0", "developer-2.0.0", "developer_unstable-1.0.0"],
+)
 def user_prompt_template(request):
-    return _load_user_prompt_template(request.param)
+    flow_name, flow_version = request.param
+    return _load_user_prompt_template(flow_name, flow_version)
 
 
 def render(template_str, **kwargs):
@@ -49,7 +58,15 @@ def render(template_str, **kwargs):
     return jinja_env.from_string(template_str).render(**defaults)
 
 
-@pytest.mark.parametrize("flow_name", ["developer", "developer_unstable"])
+@pytest.mark.parametrize(
+    "flow_name,flow_version",
+    [
+        ("developer", None),
+        ("developer", "2.0.0"),
+        ("developer_unstable", None),
+    ],
+    ids=["developer-1.0.0", "developer-2.0.0", "developer_unstable-1.0.0"],
+)
 class TestLangChainTemplateCompatibility:
     """Ensure the prompt template works end-to-end through LangChain's ChatPromptTemplate.
 
@@ -70,22 +87,26 @@ class TestLangChainTemplateCompatibility:
         "history": [],
     }
 
-    def _build_chat_prompt_template(self, flow_name: str) -> ChatPromptTemplate:
-        config = FlowConfig.from_yaml_config(flow_name)
+    def _build_chat_prompt_template(
+        self, flow_name: str, flow_version: str | None
+    ) -> ChatPromptTemplate:
+        config = FlowConfig.from_yaml_config(flow_name, flow_version)
         assert config.prompts is not None
         prompt_template = config.prompts[0]["prompt_template"]
         messages = prompt_template_to_messages(prompt_template)
         return ChatPromptTemplate.from_messages(messages, template_format="jinja2")
 
-    def test_langchain_prompt_invocation_does_not_raise(self, flow_name):
+    def test_langchain_prompt_invocation_does_not_raise(self, flow_name, flow_version):
         """Invoking the prompt with normal agent inputs must not raise a KeyError."""
-        chat_prompt = self._build_chat_prompt_template(flow_name)
+        chat_prompt = self._build_chat_prompt_template(flow_name, flow_version)
         # This should not raise KeyError about missing variables
         chat_prompt.invoke(self.AGENT_INPUTS)
 
-    def test_langchain_prompt_mention_goal_does_not_raise(self, flow_name):
+    def test_langchain_prompt_mention_goal_does_not_raise(
+        self, flow_name, flow_version
+    ):
         """Mention-trigger goal must also not raise a KeyError."""
-        chat_prompt = self._build_chat_prompt_template(flow_name)
+        chat_prompt = self._build_chat_prompt_template(flow_name, flow_version)
         inputs = {
             **self.AGENT_INPUTS,
             "goal": "Input: Fix this bug\nContext: {Issue IID: 42}",
