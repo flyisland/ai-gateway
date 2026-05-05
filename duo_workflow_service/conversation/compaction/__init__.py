@@ -10,9 +10,6 @@ from duo_workflow_service.conversation.compaction.schema import (
     CompactionResult,
     MessageSlices,
 )
-from duo_workflow_service.conversation.compaction.token_estimator import (
-    CompactionTokenEstimator,
-)
 from duo_workflow_service.conversation.compaction.utils import (
     is_turn_complete,
     resolve_recent_messages_internal,
@@ -24,7 +21,6 @@ __all__ = [
     "create_conversation_compactor",
     "CompactionConfig",
     "CompactionResult",
-    "CompactionTokenEstimator",
     "MessageSlices",
     "is_turn_complete",
     "resolve_recent_messages_internal",

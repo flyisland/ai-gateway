@@ -7,7 +7,6 @@ from langchain_core.messages import AIMessage, HumanMessage, ToolMessage
 
 from duo_workflow_service.conversation.compaction import (
     CompactionConfig,
-    CompactionTokenEstimator,
     create_conversation_compactor,
 )
 from duo_workflow_service.conversation.compaction.compactor import (
@@ -22,41 +21,41 @@ DEFAULT_MAX_RECENT_MESSAGES = 10
 @patch(
     "duo_workflow_service.conversation.compaction.compactor.get_model_max_context_token_limit"
 )
-@patch.object(CompactionTokenEstimator, "estimate_complete_history")
+@patch("duo_workflow_service.conversation.compaction.compactor.count_tokens")
 class TestConversationCompactorShouldCompact:
     """Test suite for ConversationCompactor.should_compact method."""
 
     def test_empty_messages_returns_false(
-        self, mock_estimate, mock_get_max_context, compactor
+        self, mock_count_tokens, mock_get_max_context, compactor
     ):
         """Empty message list should return False."""
         mock_get_max_context.return_value = 400_000
-        mock_estimate.return_value = 0
+        mock_count_tokens.return_value = 0
 
         assert compactor.should_compact([]) is False
-        mock_estimate.assert_not_called()
+        mock_count_tokens.assert_not_called()
         mock_get_max_context.assert_not_called()
 
     def test_below_max_n_recent_messages_returns_false(
-        self, mock_estimate, mock_get_max_context, compactor
+        self, mock_count_tokens, mock_get_max_context, compactor
     ):
         """Message count below max_recent_messages should return False."""
         mock_get_max_context.return_value = 400_000
-        mock_estimate.return_value = 300_000
+        mock_count_tokens.return_value = 300_000
 
         messages = [HumanMessage(content=f"Message {i}") for i in range(5)]
         assert len(messages) < DEFAULT_MAX_RECENT_MESSAGES
 
         assert compactor.should_compact(messages) is False
-        mock_estimate.assert_not_called()
+        mock_count_tokens.assert_not_called()
         mock_get_max_context.assert_not_called()
 
     def test_exactly_max_n_recent_messages_returns_false(
-        self, mock_estimate, mock_get_max_context, compactor
+        self, mock_count_tokens, mock_get_max_context, compactor
     ):
         """Message count exactly at max_recent_messages should return False."""
         mock_get_max_context.return_value = 400_000
-        mock_estimate.return_value = 300_000
+        mock_count_tokens.return_value = 300_000
 
         messages = [
             HumanMessage(content=f"Message {i}")
@@ -65,16 +64,16 @@ class TestConversationCompactorShouldCompact:
         assert len(messages) == DEFAULT_MAX_RECENT_MESSAGES
 
         assert compactor.should_compact(messages) is False
-        mock_estimate.assert_not_called()
+        mock_count_tokens.assert_not_called()
         mock_get_max_context.assert_not_called()
 
     def test_above_max_n_recent_messages_but_below_trim_threshold_returns_false(
-        self, mock_estimate, mock_get_max_context, compactor
+        self, mock_count_tokens, mock_get_max_context, compactor
     ):
         """Message count above max_recent_messages but tokens below threshold should return False."""
         max_context = 400_000
         mock_get_max_context.return_value = max_context
-        mock_estimate.return_value = int(0.6 * max_context)
+        mock_count_tokens.return_value = int(0.6 * max_context)
 
         messages = [
             HumanMessage(content=f"Message {i}")
@@ -83,16 +82,16 @@ class TestConversationCompactorShouldCompact:
         assert len(messages) > DEFAULT_MAX_RECENT_MESSAGES
 
         assert compactor.should_compact(messages) is False
-        mock_estimate.assert_called_once_with(messages)
+        mock_count_tokens.assert_called_once_with(messages, is_complete_history=True)
         mock_get_max_context.assert_called_once()
 
     def test_exactly_at_trim_threshold_returns_false(
-        self, mock_estimate, mock_get_max_context, compactor
+        self, mock_count_tokens, mock_get_max_context, compactor
     ):
         """Token count exactly at trim_threshold should return False (not greater than)."""
         max_context = 400_000
         mock_get_max_context.return_value = max_context
-        mock_estimate.return_value = int(0.7 * max_context)
+        mock_count_tokens.return_value = int(0.7 * max_context)
 
         messages = [
             HumanMessage(content=f"Message {i}")
@@ -100,16 +99,16 @@ class TestConversationCompactorShouldCompact:
         ]
 
         assert compactor.should_compact(messages) is False
-        mock_estimate.assert_called_once_with(messages)
+        mock_count_tokens.assert_called_once_with(messages, is_complete_history=True)
         mock_get_max_context.assert_called_once()
 
     def test_above_max_n_recent_messages_and_above_trim_threshold_returns_true(
-        self, mock_estimate, mock_get_max_context, compactor
+        self, mock_count_tokens, mock_get_max_context, compactor
     ):
         """Message count above max_recent_messages and tokens above threshold should return True."""
         max_context = 400_000
         mock_get_max_context.return_value = max_context
-        mock_estimate.return_value = int(0.75 * max_context)
+        mock_count_tokens.return_value = int(0.75 * max_context)
 
         messages = [
             HumanMessage(content=f"Message {i}")
@@ -118,11 +117,11 @@ class TestConversationCompactorShouldCompact:
         assert len(messages) > DEFAULT_MAX_RECENT_MESSAGES
 
         assert compactor.should_compact(messages) is True
-        mock_estimate.assert_called_once_with(messages)
+        mock_count_tokens.assert_called_once_with(messages, is_complete_history=True)
         mock_get_max_context.assert_called_once()
 
     def test_with_different_model_context_limits(
-        self, mock_estimate, mock_get_max_context, compactor
+        self, mock_count_tokens, mock_get_max_context, compactor
     ):
         """should_compact should work with different model context limits."""
         messages = [
@@ -132,39 +131,39 @@ class TestConversationCompactorShouldCompact:
 
         small_context = 100_000
         mock_get_max_context.return_value = small_context
-        mock_estimate.return_value = int(0.75 * small_context)
+        mock_count_tokens.return_value = int(0.75 * small_context)
         assert compactor.should_compact(messages) is True
 
         large_context = 1_000_000
         mock_get_max_context.return_value = large_context
-        mock_estimate.return_value = int(0.75 * large_context)
+        mock_count_tokens.return_value = int(0.75 * large_context)
         assert compactor.should_compact(messages) is True
 
-        assert mock_estimate.call_count == 2
+        assert mock_count_tokens.call_count == 2
         assert mock_get_max_context.call_count == 2
 
     def test_with_high_token_usage_and_few_messages_returns_false(
-        self, mock_estimate, mock_get_max_context, compactor
+        self, mock_count_tokens, mock_get_max_context, compactor
     ):
         """High token usage but few messages should return False."""
         max_context = 400_000
         mock_get_max_context.return_value = max_context
-        mock_estimate.return_value = int(0.9 * max_context)
+        mock_count_tokens.return_value = int(0.9 * max_context)
 
         messages = [HumanMessage(content=f"Message {i}") for i in range(5)]
         assert len(messages) < DEFAULT_MAX_RECENT_MESSAGES
 
         assert compactor.should_compact(messages) is False
-        mock_estimate.assert_not_called()
+        mock_count_tokens.assert_not_called()
         mock_get_max_context.assert_not_called()
 
     def test_with_many_messages_and_low_token_usage_returns_false(
-        self, mock_estimate, mock_get_max_context, compactor
+        self, mock_count_tokens, mock_get_max_context, compactor
     ):
         """Many messages but low token usage should return False."""
         max_context = 400_000
         mock_get_max_context.return_value = max_context
-        mock_estimate.return_value = int(0.5 * max_context)
+        mock_count_tokens.return_value = int(0.5 * max_context)
 
         messages = [
             HumanMessage(content="Short")
@@ -173,16 +172,16 @@ class TestConversationCompactorShouldCompact:
         assert len(messages) > DEFAULT_MAX_RECENT_MESSAGES
 
         assert compactor.should_compact(messages) is False
-        mock_estimate.assert_called_once_with(messages)
+        mock_count_tokens.assert_called_once_with(messages, is_complete_history=True)
         mock_get_max_context.assert_called_once()
 
     def test_with_realistic_conversation_pattern(
-        self, mock_estimate, mock_get_max_context, compactor
+        self, mock_count_tokens, mock_get_max_context, compactor
     ):
         """Test with realistic conversation pattern (alternating human/AI messages)."""
         max_context = 400_000
         mock_get_max_context.return_value = max_context
-        mock_estimate.return_value = int(0.8 * max_context)
+        mock_count_tokens.return_value = int(0.8 * max_context)
 
         messages = []
         for i in range(DEFAULT_MAX_RECENT_MESSAGES + 5):
@@ -194,16 +193,16 @@ class TestConversationCompactorShouldCompact:
         assert len(messages) > DEFAULT_MAX_RECENT_MESSAGES
 
         assert compactor.should_compact(messages) is True
-        mock_estimate.assert_called_once_with(messages)
+        mock_count_tokens.assert_called_once_with(messages, is_complete_history=True)
         mock_get_max_context.assert_called_once()
 
     def test_with_tool_messages_in_conversation(
-        self, mock_estimate, mock_get_max_context, compactor
+        self, mock_count_tokens, mock_get_max_context, compactor
     ):
         """Test with tool messages in conversation."""
         max_context = 400_000
         mock_get_max_context.return_value = max_context
-        mock_estimate.return_value = int(0.75 * max_context)
+        mock_count_tokens.return_value = int(0.75 * max_context)
 
         messages = [
             HumanMessage(content="Help me"),
@@ -220,16 +219,16 @@ class TestConversationCompactorShouldCompact:
         assert len(messages) > DEFAULT_MAX_RECENT_MESSAGES
 
         assert compactor.should_compact(messages) is True
-        mock_estimate.assert_called_once_with(messages)
+        mock_count_tokens.assert_called_once_with(messages, is_complete_history=True)
         mock_get_max_context.assert_called_once()
 
     def test_boundary_condition_one_message_above_threshold(
-        self, mock_estimate, mock_get_max_context, compactor
+        self, mock_count_tokens, mock_get_max_context, compactor
     ):
         """Test boundary: one message above max_recent_messages with tokens just above threshold."""
         max_context = 400_000
         mock_get_max_context.return_value = max_context
-        mock_estimate.return_value = int(0.7 * max_context) + 1
+        mock_count_tokens.return_value = int(0.7 * max_context) + 1
 
         messages = [
             HumanMessage(content=f"Message {i}")
@@ -237,15 +236,15 @@ class TestConversationCompactorShouldCompact:
         ]
 
         assert compactor.should_compact(messages) is True
-        mock_estimate.assert_called_once_with(messages)
+        mock_count_tokens.assert_called_once_with(messages, is_complete_history=True)
         mock_get_max_context.assert_called_once()
 
     def test_with_zero_context_limit(
-        self, mock_estimate, mock_get_max_context, compactor
+        self, mock_count_tokens, mock_get_max_context, compactor
     ):
         """Test with zero context limit (edge case)."""
         mock_get_max_context.return_value = 0
-        mock_estimate.return_value = 100
+        mock_count_tokens.return_value = 100
 
         messages = [
             HumanMessage(content=f"Message {i}")
@@ -253,7 +252,7 @@ class TestConversationCompactorShouldCompact:
         ]
 
         assert compactor.should_compact(messages) is True
-        mock_estimate.assert_called_once_with(messages)
+        mock_count_tokens.assert_called_once_with(messages, is_complete_history=True)
         mock_get_max_context.assert_called_once()
 
     @patch(
@@ -263,7 +262,7 @@ class TestConversationCompactorShouldCompact:
     def test_with_custom_config_max_recent_messages(
         self,
         _mock_get_model_metadata,
-        mock_estimate,
+        mock_count_tokens,
         mock_get_max_context,
         mock_prompt_registry,
         user,
@@ -271,7 +270,7 @@ class TestConversationCompactorShouldCompact:
         """Test with custom max_recent_messages in config."""
         max_context = 400_000
         mock_get_max_context.return_value = max_context
-        mock_estimate.return_value = int(0.75 * max_context)
+        mock_count_tokens.return_value = int(0.75 * max_context)
 
         messages = [HumanMessage(content=f"Message {i}") for i in range(8)]
 
@@ -292,7 +291,7 @@ class TestConversationCompactorShouldCompact:
     def test_with_custom_config_trim_threshold(
         self,
         _mock_get_model_metadata,
-        mock_estimate,
+        mock_count_tokens,
         mock_get_max_context,
         mock_prompt_registry,
         user,
@@ -300,7 +299,7 @@ class TestConversationCompactorShouldCompact:
         """Test with custom trim_threshold in config."""
         max_context = 400_000
         mock_get_max_context.return_value = max_context
-        mock_estimate.return_value = int(0.55 * max_context)
+        mock_count_tokens.return_value = int(0.55 * max_context)
 
         messages = [
             HumanMessage(content=f"Message {i}")
@@ -350,13 +349,13 @@ class TestConversationCompactorCompact:
         mock_prompt.ainvoke.assert_not_called()
 
     @pytest.mark.asyncio
-    @patch.object(CompactionTokenEstimator, "estimate_complete_history")
+    @patch("duo_workflow_service.conversation.compaction.compactor.count_tokens")
     async def test_compact_success(
-        self, mock_estimate, mock_get_max_context, compactor, mock_prompt
+        self, mock_count_tokens, mock_get_max_context, compactor, mock_prompt
     ):
         """Should return compacted messages when summarization succeeds."""
         mock_get_max_context.return_value = 400_000
-        mock_estimate.return_value = int(0.8 * 400_000)
+        mock_count_tokens.return_value = int(0.8 * 400_000)
 
         summary_message = AIMessage(
             content="Summary of conversation",
@@ -395,13 +394,13 @@ class TestConversationCompactorCompact:
         assert result.messages[-1].content == COMPACTION_CONTINUE_MESSAGE
 
     @pytest.mark.asyncio
-    @patch.object(CompactionTokenEstimator, "estimate_complete_history")
+    @patch("duo_workflow_service.conversation.compaction.compactor.count_tokens")
     async def test_compact_llm_failure(
-        self, mock_estimate, mock_get_max_context, compactor, mock_prompt
+        self, mock_count_tokens, mock_get_max_context, compactor, mock_prompt
     ):
         """Should return original messages and error when LLM fails."""
         mock_get_max_context.return_value = 400_000
-        mock_estimate.return_value = int(0.8 * 400_000)
+        mock_count_tokens.return_value = int(0.8 * 400_000)
 
         mock_prompt.ainvoke.side_effect = Exception("LLM error")
 
@@ -420,10 +419,11 @@ class TestConversationCompactorCompact:
         assert result.error is not None
 
     @pytest.mark.asyncio
-    @patch.object(CompactionTokenEstimator, "estimate_complete_history")
-    @patch.object(
-        CompactionTokenEstimator, "estimate_arbitrary_messages", return_value=50000
+    @patch(
+        "duo_workflow_service.conversation.compaction.utils.count_tokens",
+        return_value=50000,
     )
+    @patch("duo_workflow_service.conversation.compaction.compactor.count_tokens")
     @patch(
         "duo_workflow_service.conversation.compaction.compactor.get_model_metadata",
         return_value=None,
@@ -431,8 +431,8 @@ class TestConversationCompactorCompact:
     async def test_compact_no_messages_to_summarize(
         self,
         _mock_get_model_metadata,
-        _mock_estimate_arbitrary,
-        mock_estimate_complete,
+        mock_count_tokens_compactor,
+        _mock_count_tokens_utils,
         mock_get_max_context,
         mock_prompt_registry,
         mock_prompt,
@@ -440,7 +440,7 @@ class TestConversationCompactorCompact:
     ):
         """Should return unchanged when slicing leaves nothing to summarize."""
         mock_get_max_context.return_value = 400_000
-        mock_estimate_complete.return_value = int(0.8 * 400_000)
+        mock_count_tokens_compactor.return_value = int(0.8 * 400_000)
 
         compactor = create_conversation_compactor(
             config=CompactionConfig(
@@ -467,13 +467,13 @@ class TestConversationCompactorCompact:
         mock_prompt.ainvoke.assert_not_called()
 
     @pytest.mark.asyncio
-    @patch.object(CompactionTokenEstimator, "estimate_complete_history")
+    @patch("duo_workflow_service.conversation.compaction.compactor.count_tokens")
     async def test_compact_result_has_correct_metadata(
-        self, mock_estimate, mock_get_max_context, compactor, mock_prompt
+        self, mock_count_tokens, mock_get_max_context, compactor, mock_prompt
     ):
         """CompactionResult should have correct token counts and message counts."""
         mock_get_max_context.return_value = 400_000
-        mock_estimate.return_value = int(0.8 * 400_000)
+        mock_count_tokens.return_value = int(0.8 * 400_000)
 
         summary_message = AIMessage(
             content="Summary",
@@ -500,13 +500,13 @@ class TestConversationCompactorCompact:
         assert result.messages_summarized > 0
 
     @pytest.mark.asyncio
-    @patch.object(CompactionTokenEstimator, "estimate_complete_history")
+    @patch("duo_workflow_service.conversation.compaction.compactor.count_tokens")
     async def test_compact_does_not_append_human_message_when_last_is_human(
-        self, mock_estimate, mock_get_max_context, compactor, mock_prompt
+        self, mock_count_tokens, mock_get_max_context, compactor, mock_prompt
     ):
         """Should not append extra HumanMessage when compacted messages already end with one."""
         mock_get_max_context.return_value = 400_000
-        mock_estimate.return_value = int(0.8 * 400_000)
+        mock_count_tokens.return_value = int(0.8 * 400_000)
 
         summary_message = AIMessage(
             content="Summary",
@@ -616,10 +616,10 @@ class TestCompactorPrometheusMetrics:
     """Test Prometheus metric recording during compaction."""
 
     @pytest.mark.asyncio
-    @patch.object(CompactionTokenEstimator, "estimate_complete_history")
+    @patch("duo_workflow_service.conversation.compaction.compactor.count_tokens")
     async def test_success_increments_counter_and_records_duration(
         self,
-        mock_estimate,
+        mock_count_tokens,
         mock_metrics,
         mock_get_max_context,
         compactor,
@@ -627,7 +627,7 @@ class TestCompactorPrometheusMetrics:
     ):
         """Successful compaction should increment counter and observe duration."""
         mock_get_max_context.return_value = 400_000
-        mock_estimate.return_value = int(0.8 * 400_000)
+        mock_count_tokens.return_value = int(0.8 * 400_000)
 
         summary_message = AIMessage(
             content="Summary",
@@ -657,10 +657,10 @@ class TestCompactorPrometheusMetrics:
         )
 
     @pytest.mark.asyncio
-    @patch.object(CompactionTokenEstimator, "estimate_complete_history")
+    @patch("duo_workflow_service.conversation.compaction.compactor.count_tokens")
     async def test_error_increments_counter(
         self,
-        mock_estimate,
+        mock_count_tokens,
         mock_metrics,
         mock_get_max_context,
         compactor,
@@ -668,7 +668,7 @@ class TestCompactorPrometheusMetrics:
     ):
         """Failed compaction should increment counter with error status."""
         mock_get_max_context.return_value = 400_000
-        mock_estimate.return_value = int(0.8 * 400_000)
+        mock_count_tokens.return_value = int(0.8 * 400_000)
 
         mock_prompt.ainvoke.side_effect = Exception("LLM error")
 
@@ -693,14 +693,14 @@ class TestCompactorSnowplowEvents:
     """Test Snowplow event firing during compaction."""
 
     @pytest.mark.asyncio
-    @patch.object(CompactionTokenEstimator, "estimate_complete_history")
+    @patch("duo_workflow_service.conversation.compaction.compactor.count_tokens")
     @patch(
         "duo_workflow_service.conversation.compaction.compactor.duo_workflow_metrics"
     )
     async def test_fires_compaction_event_on_success(
         self,
         _mock_metrics,
-        mock_estimate,
+        mock_count_tokens,
         mock_get_max_context,
         compactor_with_events,
         mock_prompt,
@@ -708,7 +708,7 @@ class TestCompactorSnowplowEvents:
     ):
         """Should fire compaction_executed event with correct fields on success."""
         mock_get_max_context.return_value = 400_000
-        mock_estimate.return_value = int(0.8 * 400_000)
+        mock_count_tokens.return_value = int(0.8 * 400_000)
 
         summary_message = AIMessage(
             content="Summary",
@@ -746,14 +746,14 @@ class TestCompactorSnowplowEvents:
         assert "duration_seconds" in additional_props.extra
 
     @pytest.mark.asyncio
-    @patch.object(CompactionTokenEstimator, "estimate_complete_history")
+    @patch("duo_workflow_service.conversation.compaction.compactor.count_tokens")
     @patch(
         "duo_workflow_service.conversation.compaction.compactor.duo_workflow_metrics"
     )
     async def test_fires_compaction_event_on_error(
         self,
         _mock_metrics,
-        mock_estimate,
+        mock_count_tokens,
         mock_get_max_context,
         compactor_with_events,
         mock_prompt,
@@ -761,7 +761,7 @@ class TestCompactorSnowplowEvents:
     ):
         """Should fire compaction_executed event with error_type on failure."""
         mock_get_max_context.return_value = 400_000
-        mock_estimate.return_value = int(0.8 * 400_000)
+        mock_count_tokens.return_value = int(0.8 * 400_000)
 
         mock_prompt.ainvoke.side_effect = RuntimeError("LLM error")
 
@@ -783,21 +783,21 @@ class TestCompactorSnowplowEvents:
         assert "duration_seconds" in additional_props.extra
 
     @pytest.mark.asyncio
-    @patch.object(CompactionTokenEstimator, "estimate_complete_history")
+    @patch("duo_workflow_service.conversation.compaction.compactor.count_tokens")
     @patch(
         "duo_workflow_service.conversation.compaction.compactor.duo_workflow_metrics"
     )
     async def test_fire_compaction_event_noop_without_client(
         self,
         _mock_metrics,
-        mock_estimate,
+        mock_count_tokens,
         mock_get_max_context,
         compactor,
         mock_prompt,
     ):
         """_fire_compaction_event should be a no-op when internal_events_client is None."""
         mock_get_max_context.return_value = 400_000
-        mock_estimate.return_value = int(0.8 * 400_000)
+        mock_count_tokens.return_value = int(0.8 * 400_000)
 
         summary_message = AIMessage(
             content="Summary",
