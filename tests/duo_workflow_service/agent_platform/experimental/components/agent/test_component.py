@@ -6,7 +6,7 @@ from typing import ClassVar, Literal
 from unittest.mock import Mock, patch
 
 import pytest
-from langchain_core.messages import AIMessage
+from langchain_core.messages import AIMessage, HumanMessage, ToolMessage
 from pydantic import BaseModel, ConfigDict, Field
 
 from ai_gateway.response_schemas import BaseResponseSchemaRegistry
@@ -1090,3 +1090,197 @@ class TestAgentComponentBindToSupervisor:
 
         # After binding, outputs should be empty
         assert component.outputs == ()
+
+
+class TestAgentComponentToolApprovalRouter:
+    """Test suite for tool approval fetch router."""
+
+    @pytest.fixture(name="agent_component_with_tool_approval")
+    def agent_component_with_tool_approval_fixture(
+        self,
+        component_name,
+        flow_id,
+        flow_type,
+        user,
+        prompt_id,
+        prompt_version,
+        mock_toolset,
+        mock_prompt_registry,
+        mock_internal_event_client,
+    ):
+        """Fixture for AgentComponent with tool approval enabled."""
+        return AgentComponent(
+            name=component_name,
+            flow_id=flow_id,
+            flow_type=flow_type,
+            user=user,
+            inputs=["context:user_input"],
+            prompt_id=prompt_id,
+            prompt_version=prompt_version,
+            toolset=mock_toolset,
+            prompt_registry=mock_prompt_registry,
+            internal_event_client=mock_internal_event_client,
+            require_tool_approval=True,
+            pre_approved_tools=[],
+        )
+
+    # pylint: disable=unused-argument
+    def test_tool_approval_fetch_router_with_tool_message_routes_to_agent(
+        self,
+        agent_component_with_tool_approval,
+        mock_state_graph,
+        mock_router,
+        base_flow_state,
+        component_name,
+        mock_agent_node_cls,
+        mock_tool_node_cls,
+        mock_final_response_node_cls,
+    ):
+        """Test that ToolMessage after approval fetch routes to agent (REJECT case)."""
+        # Create state with ToolMessage (rejection)
+        mock_tool_message = Mock(spec=ToolMessage)
+        mock_tool_message.tool_call_id = "test_call_123"
+        mock_tool_message.content = "Tool execution was rejected by user."
+
+        state_with_tool_message = base_flow_state.copy()
+        state_with_tool_message[FlowStateKeys.CONVERSATION_HISTORY] = {
+            component_name: [mock_tool_message]
+        }
+        # Add approval decision to context
+        state_with_tool_message[FlowStateKeys.CONTEXT][
+            f"{component_name}__tool_approval_decision"
+        ] = "reject"
+
+        agent_component_with_tool_approval.attach(mock_state_graph, mock_router)
+
+        # Get the tool approval fetch router function
+        router_calls = mock_state_graph.add_conditional_edges.call_args_list
+        approval_fetch_router_call = next(
+            call
+            for call in router_calls
+            if call[0][0] == f"{component_name}#tool_approval_fetch"
+        )
+        router_function = approval_fetch_router_call[0][1]
+
+        # Test the routing behavior - should route to agent
+        result = router_function(state_with_tool_message)
+        assert result == f"{component_name}#agent"
+
+    # pylint: disable=unused-argument
+    def test_tool_approval_fetch_router_with_human_message_routes_to_agent(
+        self,
+        agent_component_with_tool_approval,
+        mock_state_graph,
+        mock_router,
+        base_flow_state,
+        component_name,
+        mock_agent_node_cls,
+        mock_tool_node_cls,
+        mock_final_response_node_cls,
+    ):
+        """Test that HumanMessage after approval fetch routes to agent (MODIFY case)."""
+        # Create state with HumanMessage (rejection with feedback)
+        mock_human_message = Mock(spec=HumanMessage)
+        mock_human_message.content = "Please use a different approach"
+
+        state_with_human_message = base_flow_state.copy()
+        state_with_human_message[FlowStateKeys.CONVERSATION_HISTORY] = {
+            component_name: [mock_human_message]
+        }
+        # Add approval decision to context (MODIFY case)
+        state_with_human_message[FlowStateKeys.CONTEXT][
+            f"{component_name}__tool_approval_decision"
+        ] = "modify"
+
+        agent_component_with_tool_approval.attach(mock_state_graph, mock_router)
+
+        # Get the tool approval fetch router function
+        router_calls = mock_state_graph.add_conditional_edges.call_args_list
+        approval_fetch_router_call = next(
+            call
+            for call in router_calls
+            if call[0][0] == f"{component_name}#tool_approval_fetch"
+        )
+        router_function = approval_fetch_router_call[0][1]
+
+        # Test the routing behavior - should route to agent
+        result = router_function(state_with_human_message)
+        assert result == f"{component_name}#agent"
+
+    # pylint: disable=unused-argument
+    def test_tool_approval_fetch_router_with_ai_message_routes_to_tools(
+        self,
+        agent_component_with_tool_approval,
+        mock_state_graph,
+        mock_router,
+        base_flow_state,
+        component_name,
+        mock_agent_node_cls,
+        mock_tool_node_cls,
+        mock_final_response_node_cls,
+        mock_other_tool_call,
+    ):
+        """Test that AIMessage with tool_calls after approval routes to tools (APPROVE case)."""
+        # Create state with AIMessage with tool calls (approval)
+        mock_ai_message = Mock(spec=AIMessage)
+        mock_ai_message.tool_calls = [mock_other_tool_call]
+
+        state_with_ai_message = base_flow_state.copy()
+        state_with_ai_message[FlowStateKeys.CONVERSATION_HISTORY] = {
+            component_name: [mock_ai_message]
+        }
+        # Add approval decision to context (APPROVE case)
+        state_with_ai_message[FlowStateKeys.CONTEXT][
+            f"{component_name}__tool_approval_decision"
+        ] = "approve"
+
+        agent_component_with_tool_approval.attach(mock_state_graph, mock_router)
+
+        # Get the tool approval fetch router function
+        router_calls = mock_state_graph.add_conditional_edges.call_args_list
+        approval_fetch_router_call = next(
+            call
+            for call in router_calls
+            if call[0][0] == f"{component_name}#tool_approval_fetch"
+        )
+        router_function = approval_fetch_router_call[0][1]
+
+        # Test the routing behavior - should route to tools
+        result = router_function(state_with_ai_message)
+        assert result == f"{component_name}#tools"
+
+    # pylint: disable=unused-argument
+    def test_tool_approval_fetch_router_with_empty_history_raises_error(
+        self,
+        agent_component_with_tool_approval,
+        mock_state_graph,
+        mock_router,
+        base_flow_state,
+        component_name,
+        mock_agent_node_cls,
+        mock_tool_node_cls,
+        mock_final_response_node_cls,
+    ):
+        """Test that empty conversation history raises RoutingError."""
+        state_with_empty_history = base_flow_state.copy()
+        state_with_empty_history[FlowStateKeys.CONVERSATION_HISTORY] = {
+            component_name: []
+        }
+
+        agent_component_with_tool_approval.attach(mock_state_graph, mock_router)
+
+        # Get the tool approval fetch router function
+        router_calls = mock_state_graph.add_conditional_edges.call_args_list
+        approval_fetch_router_call = next(
+            call
+            for call in router_calls
+            if call[0][0] == f"{component_name}#tool_approval_fetch"
+        )
+        router_function = approval_fetch_router_call[0][1]
+
+        # Test the routing behavior - should raise RoutingError for missing approval decision
+        with pytest.raises(
+            RoutingError,
+            match="No approval decision found in state",
+        ):
+            router_function(state_with_empty_history)

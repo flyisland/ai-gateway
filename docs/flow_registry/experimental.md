@@ -48,11 +48,11 @@ The experimental version of Flow Registry extends the IOKey hierarchy with a thi
 For the foundational `IOKey` and `IOKeyTemplate` abstractions, see the
 [Contribution Guidelines](contribution_guidelines.md#iokey-and-iokeytemplate-abstraction).
 
-| Abstraction | Resolved at | How |
-|---|---|---|
-| `IOKey` | Graph-build time (static) | Direct field values |
+| Abstraction     | Resolved at                      | How                            |
+|-----------------|----------------------------------|--------------------------------|
+| `IOKey`         | Graph-build time (static)        | Direct field values            |
 | `IOKeyTemplate` | Graph-build time (parameterised) | `to_iokey(replacements: dict)` |
-| `RuntimeIOKey` | Graph-execution time (runtime) | `to_iokey(state: FlowState)` |
+| `RuntimeIOKey`  | Graph-execution time (runtime)   | `to_iokey(state: FlowState)`   |
 
 ### RuntimeIOKey
 
@@ -138,6 +138,64 @@ async def run(self, state: FlowState) -> dict:
 
 The `AgentComponent` (including supervisor mode) has been promoted to the stable v1 version.
 See the [AgentComponent documentation in v1.md](v1.md#agentcomponent) for full details.
+
+#### AgentComponent Experimental Features: Tool Approval
+
+`AgentComponent` in the `experimental` version of the flow registry supports human-in-the-loop tool approval. This
+mimics the approval mechanism present in the chat workflow, where a user is asked whether they would like to approve,
+deny, or deny with comment the Agent's current tool execution.
+
+When tool approval is enabled, the workflow pauses execution after the agent generates tool calls, presents them to the
+user for review, and waits for the user's decision before proceeding.
+
+##### Optional Parameters
+
+- `require_tool_approval: bool`: enable tool approval for `AgentComponent` (optional). Defaults to `false`.
+- `pre_approved_tools: list[str]`: a list of pre-approved tools (optional). Defaults to empty list.
+
+##### Supported Event Types
+
+The tool approval flow processes different types of user responses:
+
+- **APPROVE**: User approves the tool execution. Workflow proceeds to execute the tools normally.
+- **REJECT**: User rejects the tool execution. Rejection messages are added to the conversation history and the workflow
+  returns to the agent to try alternative approaches.
+- **MODIFY**: User rejects with feedback. Rejection messages plus the user's feedback are added to the conversation
+  history, allowing the agent to understand why the approach was rejected and adjust accordingly.
+
+##### UI Log Events
+
+- `on_tool_approval_request`: Logged when tool calls require approval. Displays the tool name and arguments to the user
+  for review.
+
+##### Pre-Approval Behavior
+
+Tools can be pre-approved in two ways, which are combined at runtime:
+
+1. **Component-level**: Listed in the `pre_approved_tools` parameter
+1. **Workflow-level**: Specified via `pre_approved_agent_privileges` in the workflow startRequest
+
+A tool is pre-approved if it appears in either list. If all tool calls are pre-approved (from either source), the
+approval flow is skipped entirely and tools execute immediately.
+
+**Example:**
+
+```yaml
+components:
+    - name: "code_editor"
+      type: AgentComponent
+      prompt_id: "code_assistant"
+      prompt_version: "^1.0.0"
+      require_tool_approval: true
+      pre_approved_tools: [ "read_file", "list_dir", "find_files" ]  # Read-only tools skip approval
+      toolset: [ "read_file", "list_dir", "find_files", "edit_file", "run_command" ]
+      ui_log_events:
+          - "on_agent_final_answer"
+          - "on_tool_execution_success"
+          - "on_tool_execution_failed"
+          - "on_tool_approval_request"  # Required to show approval requests in UI
+      inputs: [ "context:goal" ]
+```
 
 ### HumanInputComponent
 
@@ -263,7 +321,9 @@ routers:
 
 ### DeterministicStepComponent
 
-The DeterministicStepComponent executes a **single tool** deterministically with predetermined arguments extracted from the flow state. This component provides a way to run one specific tool without AI involvement, using inputs to extract the necessary parameters and producing predictable outputs following fixed conventions.
+The DeterministicStepComponent executes a **single tool** deterministically with predetermined arguments extracted from
+the flow state. This component provides a way to run one specific tool without AI involvement, using inputs to extract
+the necessary parameters and producing predictable outputs following fixed conventions.
 
 The component provides these capabilities:
 
@@ -273,7 +333,9 @@ The component provides these capabilities:
 - **Integration with existing toolsets**: Compatible with any registered tool in the toolset
 - **Chainable design**: Multiple DeterministicStepComponents can be chained to execute sequential tool operations
 
-Unlike AgentComponent or OneOffComponent which use AI to determine tool usage, DeterministicStepComponent executes exactly one pre-specified tool with arguments extracted directly from the flow state, making it ideal for predictable, repeatable operations. **To execute multiple tools, chain multiple DeterministicStepComponents together in your flow.**
+Unlike AgentComponent or OneOffComponent which use AI to determine tool usage, DeterministicStepComponent executes
+exactly one pre-specified tool with arguments extracted directly from the flow state, making it ideal for predictable,
+repeatable operations. **To execute multiple tools, chain multiple DeterministicStepComponents together in your flow.**
 
 #### Required Parameters
 
@@ -283,7 +345,8 @@ Unlike AgentComponent or OneOffComponent which use AI to determine tool usage, D
 
 #### Optional Parameters
 
-- **toolset**: Toolset containing the tool to be executed. (If no toolset is specified, a new one is created with only the `tool_name`)
+- **toolset**: Toolset containing the tool to be executed. (If no toolset is specified, a new one is created with only
+  the `tool_name`)
 - **inputs**: List of input data sources to extract tool parameters (default: empty list)
 - **ui_log_events**: UI logging configuration for displaying tool execution
 - **ui_role_as**: Display role in UI (default: `"tool"`)
@@ -303,15 +366,15 @@ Each DeterministicStepComponent automatically produces:
 
 ```yaml
 components:
-   - name: "read"
-     type: DeterministicStepComponent
-     inputs:
-       - from: "context:goal"
-         as: "file_path"
-     tool_name: "read_file"
-     ui_log_events:
-       - "on_tool_execution_success"
-       - "on_tool_execution_failed"
+    - name: "read"
+      type: DeterministicStepComponent
+      inputs:
+          - from: "context:goal"
+            as: "file_path"
+      tool_name: "read_file"
+      ui_log_events:
+          - "on_tool_execution_success"
+          - "on_tool_execution_failed"
 ```
 
 ##### Chain multiple tools

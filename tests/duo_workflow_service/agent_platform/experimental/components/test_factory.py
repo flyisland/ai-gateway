@@ -1,7 +1,6 @@
 """Test suite for AgentComponent factory (experimental registry).
 
-The factory implementation has been migrated to v1; this module verifies that the factory is correctly re-registered in
-the experimental ComponentRegistry and that it delegates to the v1 implementation.
+The factory uses experimental components for features like tool approval.
 """
 
 from unittest.mock import Mock
@@ -9,6 +8,9 @@ from unittest.mock import Mock
 import pytest
 
 from ai_gateway.response_schemas import BaseResponseSchemaRegistry
+from duo_workflow_service.agent_platform.experimental.components.agent.component import (
+    AgentComponent,
+)
 from duo_workflow_service.agent_platform.experimental.components.base import (
     BaseComponent,
 )
@@ -20,9 +22,6 @@ from duo_workflow_service.agent_platform.experimental.components.registry import
 )
 from duo_workflow_service.agent_platform.experimental.components.supervisor.component import (
     SupervisorAgentComponent,
-)
-from duo_workflow_service.agent_platform.v1.components.agent.component import (
-    AgentComponent,
 )
 
 # The @inject decorator wraps the class into a function when the class has
