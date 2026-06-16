@@ -148,3 +148,7 @@ See [release doc](docs/release.md).
 ## Rate limiting
 
 Access to AI Gateway is subjected to rate limiting defined as part of <https://gitlab.com/gitlab-com/runbooks/-/blob/master/docs/cloud_connector/README.md#rate-limiting>.
+
+Synced from https://gitlab.com/gitlab-org/modelops/applied-ml/code-suggestions/ai-assist.git
+
+[![Ask DeepWiki](https://deepwiki.com/badge.svg)](https://deepwiki.com/flyisland/ai-gateway)
